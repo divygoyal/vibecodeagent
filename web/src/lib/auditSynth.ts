@@ -11,6 +11,7 @@ import type { AuditReport, AuditIssue } from './siteAudit';
 import type { SiteType } from './siteTypeDetector';
 import { synthesizeWithSchema } from './geminiSynth';
 import { GOOGLE_GENAI_PRIMARY_MODEL } from './googleGenAi';
+import { BRAND_NAME } from '@/lib/brand';
 
 export type Tier = 'tier1' | 'tier2' | 'tier3';
 
@@ -185,7 +186,7 @@ function buildAuditPrompt(input: { auditReport: AuditReport; gscTopQueries?: Gsc
 
     const excerpt = (auditReport.htmlExcerpt ?? '').slice(0, 8000);
 
-    return `You are a senior CRO + SEO strategist working for TrafficClaw. You produce *paste-ready* fixes for paying customers — not generic checklist items.
+    return `You are a senior CRO + SEO strategist working for ${BRAND_NAME}. You produce *paste-ready* fixes for paying customers — not generic checklist items.
 
 Your job: turn this site audit into a three-tier action plan.
 

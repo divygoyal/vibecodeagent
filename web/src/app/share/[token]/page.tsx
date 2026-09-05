@@ -8,6 +8,7 @@ import SharedDashboardClient from './SharedDashboardClient';
 import SharePromoPopup from '@/components/share/SharePromoPopup';
 import ShareConversionBar from '@/components/share/ShareConversionBar';
 import { verifyShareWatermarkSignature } from '@/lib/shareWatermark';
+import { BRAND_NAME } from '@/lib/brand';
 
 // Promo popup auto-opens 20s after a viewer lands on the public share view,
 // OR sooner on exit-intent (mouse leaving the top of the viewport). The
@@ -20,8 +21,8 @@ const PROMO_POPUP_DELAY_MS = 20000;
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-    title: 'Shared Dashboard — TrafficClaw',
-    description: 'View shared analytics dashboard powered by TrafficClaw',
+    title: `Shared Dashboard — ${BRAND_NAME}`,
+    description: `View shared analytics dashboard powered by ${BRAND_NAME}`,
 };
 
 /* ─── Page Component ─── */
@@ -64,7 +65,7 @@ export default async function SharedDashboardPage({
                             href="https://trafficclaw.com"
                             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-all"
                         >
-                            Visit TrafficClaw
+                            Visit {BRAND_NAME}
                         </Link>
                     ) : null}
                 </div>
@@ -146,7 +147,7 @@ export default async function SharedDashboardPage({
                         </div>
                         <div>
                             <h1 className="text-sm font-semibold text-zinc-100">Shared Dashboard</h1>
-                            <p className="text-[10px] text-zinc-600">TrafficClaw Analytics</p>
+                            <p className="text-[10px] text-zinc-600">{BRAND_NAME} Analytics</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 text-[10px] text-zinc-600">
@@ -179,10 +180,10 @@ export default async function SharedDashboardPage({
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
                             </svg>
                         </div>
-                        <span className="text-sm font-semibold text-zinc-300">TrafficClaw</span>
+                        <span className="text-sm font-semibold text-zinc-300">{BRAND_NAME}</span>
                     </div>
                     <p className="text-xs text-zinc-600 text-center">
-                        Powered by TrafficClaw — Free AI-Powered Analytics
+                        Powered by {BRAND_NAME} — Free AI-Powered Analytics
                     </p>
                     <Link
                         href="https://trafficclaw.com"

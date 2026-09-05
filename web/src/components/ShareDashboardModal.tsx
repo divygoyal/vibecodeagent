@@ -6,6 +6,7 @@ import {
     X, Link, Copy, Check, Share2, Eye, Trash2, Shield, Code2
 } from 'lucide-react';
 import { OVERVIEW_SHARE_CONFIG } from '@/lib/shareTypes';
+import { BRAND_NAME } from '@/lib/brand';
 
 /* ─── Types ─── */
 interface ShareConfig {
@@ -378,7 +379,7 @@ export default function ShareDashboardModal({ open, onClose, propertyId, siteUrl
                                 <p className="mt-2 text-sm text-zinc-300">
                                     New links open the interaction-first shared overview. The page keeps the
                                     OpenPanel-style connected dashboard behavior while staying wired to your real
-                                    TrafficClaw analytics data.
+                                    {BRAND_NAME} analytics data.
                                 </p>
                             </div>
 

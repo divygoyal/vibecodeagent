@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
+import { BRAND_NAME } from '@/lib/brand';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
@@ -18,7 +19,7 @@ function getMockContainerStatus() {
     memory_usage_mb: 128,
     plan: 'free',
     telegramStatus: 'connected',
-    botUsername: 'TrafficClawDevBot',
+    botUsername: `${BRAND_NAME}DevBot`,
     telegramBotToken: '',
     connectedProviders: [
       { provider: 'google', connected: true },

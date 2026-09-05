@@ -1,3 +1,4 @@
+import { BRAND_NAME } from '@/lib/brand';
 const ANALYTICS_EMBED_URL =
     'https://trafficclaw.com/share/aaa1e9e2505785a849dcc68eeea06aa3?embed=true';
 
@@ -17,10 +18,10 @@ export const HOMEPAGE_CONTENT = {
     analyticsEmbedUrl: ANALYTICS_EMBED_URL,
     reasonsIntro: {
         eyebrow: '5+1 reasons',
-        title: 'Why TrafficClaw is the best Google Analytics alternative?',
+        title: `Why ${BRAND_NAME} is the best Google Analytics alternative?`,
         description: 'Here are 5+1 simple reasons that sum it up.',
         supportingCopy:
-            'TrafficClaw turns analytics into something you can talk to, share, embed, and actually enjoy showing people.',
+            `${BRAND_NAME} turns analytics into something you can talk to, share, embed, and actually enjoy showing people.`,
         checkpoints: [
             '01 AI traffic chat',
             '02 Realtime globe',
@@ -199,7 +200,7 @@ export const HOMEPAGE_CONTENT = {
             metric: '+110.8% sessions',
             imageSrc: '/home/proof-antigravity.png',
             caption:
-                'Sessions climbed to 54k while active users crossed 39k. TrafficClaw makes those growth moves legible the moment they happen.',
+                `Sessions climbed to 54k while active users crossed 39k. ${BRAND_NAME} makes those growth moves legible the moment they happen.`,
         },
         {
             site: 'nailart.app',

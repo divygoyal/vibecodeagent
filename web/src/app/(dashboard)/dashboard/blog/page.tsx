@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Calendar, Clock, ArrowUpRight, TrendingUp, Search, Bot, BarChart3, Lightbulb, Shield, Zap, Brain } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 
 interface BlogPost {
     slug: string;
@@ -17,8 +18,8 @@ interface BlogPost {
 const POSTS: BlogPost[] = [
     {
         slug: 'ai-analyst-verdicts-not-advice',
-        title: 'Why TrafficClaw Gives Verdicts, Not Advice',
-        excerpt: 'Most SEO tools give you generic advice. TrafficClaw\'s AI Analyst analyzes your actual data — GA4 traffic, Search Console rankings, CTR benchmarks — and delivers specific, actionable verdicts with evidence.',
+        title: `Why ${BRAND_NAME} Gives Verdicts, Not Advice`,
+        excerpt: `Most SEO tools give you generic advice. ${BRAND_NAME}'s AI Analyst analyzes your actual data — GA4 traffic, Search Console rankings, CTR benchmarks — and delivers specific, actionable verdicts with evidence.`,
         date: 'Mar 5, 2026',
         readTime: '5 min read',
         category: 'Product',
@@ -48,7 +49,7 @@ const POSTS: BlogPost[] = [
     {
         slug: 'striking-distance-keywords',
         title: 'Striking Distance Keywords: The Fastest Way to Page 1',
-        excerpt: 'Keywords ranking on positions 4-20 with high impressions are your biggest opportunity. Learn how TrafficClaw\'s AI identifies these "striking distance" keywords and tells you exactly how to push them up.',
+        excerpt: `Keywords ranking on positions 4-20 with high impressions are your biggest opportunity. Learn how ${BRAND_NAME}'s AI identifies these "striking distance" keywords and tells you exactly how to push them up.`,
         date: 'Feb 25, 2026',
         readTime: '8 min read',
         category: 'SEO Strategy',
@@ -58,7 +59,7 @@ const POSTS: BlogPost[] = [
     {
         slug: 'daily-briefing-feature',
         title: 'Start Your Day with an AI Briefing',
-        excerpt: 'TrafficClaw now auto-generates a daily briefing when you open AI Chat — overnight traffic changes, ranking shifts, anomaly alerts, and the #1 action you should take today. All powered by your live data.',
+        excerpt: `${BRAND_NAME} now auto-generates a daily briefing when you open AI Chat — overnight traffic changes, ranking shifts, anomaly alerts, and the #1 action you should take today. All powered by your live data.`,
         date: 'Feb 22, 2026',
         readTime: '4 min read',
         category: 'Product',
@@ -68,7 +69,7 @@ const POSTS: BlogPost[] = [
     {
         slug: 'site-audit-security',
         title: 'Site Audits: Catch Broken Links, Missing Meta, and Security Issues',
-        excerpt: 'TrafficClaw\'s site audit crawls your pages for broken links, missing meta tags, schema errors, SSL issues, and Core Web Vitals problems. Get a prioritized list of fixes with estimated impact.',
+        excerpt: `${BRAND_NAME}'s site audit crawls your pages for broken links, missing meta tags, schema errors, SSL issues, and Core Web Vitals problems. Get a prioritized list of fixes with estimated impact.`,
         date: 'Feb 18, 2026',
         readTime: '6 min read',
         category: 'Technical SEO',
@@ -78,7 +79,7 @@ const POSTS: BlogPost[] = [
     {
         slug: 'growth-hacking-with-ai',
         title: '5 Growth Hacks Using AI-Powered SEO Analysis',
-        excerpt: 'From automated content decay detection to CTR optimization for high-impression pages — five data-driven strategies to accelerate your organic growth using TrafficClaw\'s AI analyst.',
+        excerpt: `From automated content decay detection to CTR optimization for high-impression pages — five data-driven strategies to accelerate your organic growth using ${BRAND_NAME}'s AI analyst.`,
         date: 'Feb 14, 2026',
         readTime: '7 min read',
         category: 'Growth',

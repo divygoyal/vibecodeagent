@@ -8,6 +8,7 @@
 
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
+import { BRAND_NAME } from '@/lib/brand';
 
 // ── Types ──
 
@@ -193,7 +194,7 @@ export async function exportDashboardToPDF(
       const pageText = `Page ${page} of ${totalPages}`;
       pdf.text(pageText, PDF_MARGIN, pageH - 3);
 
-      const stamp = `Generated ${getTimestamp()} \u2014 TrafficClaw`;
+      const stamp = `Generated ${getTimestamp()} \u2014 ${BRAND_NAME}`;
       const stampW = pdf.getTextWidth(stamp);
       pdf.text(stamp, pageW - PDF_MARGIN - stampW, pageH - 3);
     };

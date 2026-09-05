@@ -7,6 +7,7 @@ import {
 } from '@/lib/shareOverviewData';
 import type { ShareOverviewFilter } from '@/lib/shareOverviewFilters';
 import type { NormalizedShareConfig } from '@/lib/shareTypes';
+import { BRAND_NAME } from '@/lib/brand';
 import {
     fetchUmamiActiveVisitors,
     fetchUmamiMetrics,
@@ -680,18 +681,18 @@ export async function fetchShareUmamiDashboard(input: {
     );
 
     const sourceLabel = currentParts.mode === 'hybrid'
-        ? 'TrafficClaw + Umami'
+        ? `${BRAND_NAME} + Umami`
         : currentParts.mode === 'umami'
             ? 'Umami'
-            : 'TrafficClaw';
+            : `${BRAND_NAME}`;
 
     const sourceMessage = currentParts.mode === 'hybrid'
-        ? 'Historical data is served from TrafficClaw before cutover and Umami after cutover.'
+        ? `Historical data is served from ${BRAND_NAME} before cutover and Umami after cutover.`
         : currentParts.mode === 'umami'
             ? 'This range is fully served from the Umami share bridge.'
             : input.config.umamiWebsiteId
-                ? 'This range is entirely before the Umami cutover, so it is served from TrafficClaw history.'
-                : 'Umami has not been configured for this share yet, so TrafficClaw history is serving the full range.';
+                ? `This range is entirely before the Umami cutover, so it is served from ${BRAND_NAME} history.`
+                : `Umami has not been configured for this share yet, so ${BRAND_NAME} history is serving the full range.`;
 
     return {
         source: {

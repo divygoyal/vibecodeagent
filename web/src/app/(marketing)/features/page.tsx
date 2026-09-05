@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
 import FeaturesClient from './FeaturesClient';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
     title: 'Features — Analytics, SEO Intelligence & AI Tools',
     description:
-        'Explore TrafficClaw features: real-time analytics dashboard, SEO keyword tracking, AI chat assistant, site audit, Telegram bot, smart alerts, and AI-powered SEO tools.',
+        `Explore ${BRAND_NAME} features: real-time analytics dashboard, SEO keyword tracking, AI chat assistant, site audit, Telegram bot, smart alerts, and AI-powered SEO tools.`,
     alternates: { canonical: '/features' },
     openGraph: {
-        title: 'Features — Analytics, SEO Intelligence & AI Tools | TrafficClaw',
+        title: `Features — Analytics, SEO Intelligence & AI Tools | ${BRAND_NAME}`,
         description:
             'Real-time analytics, SEO tracking, AI chat, site audit, Telegram bot, smart alerts, and AI SEO tools — all in one dashboard.',
         url: '/features',
@@ -20,10 +21,10 @@ const featuresFaqSchema = {
     mainEntity: [
         {
             '@type': 'Question',
-            name: 'What data sources does TrafficClaw support?',
+            name: `What data sources does ${BRAND_NAME} support?`,
             acceptedAnswer: {
                 '@type': 'Answer',
-                text: 'TrafficClaw connects to Google Analytics 4 and Google Search Console. We also integrate with GitHub for code-level SEO fixes and Telegram for mobile notifications and queries.',
+                text: `${BRAND_NAME} connects to Google Analytics 4 and Google Search Console. We also integrate with GitHub for code-level SEO fixes and Telegram for mobile notifications and queries.`,
             },
         },
         {
@@ -44,7 +45,7 @@ const featuresFaqSchema = {
         },
         {
             '@type': 'Question',
-            name: 'Can I use TrafficClaw for multiple websites?',
+            name: `Can I use ${BRAND_NAME} for multiple websites?`,
             acceptedAnswer: {
                 '@type': 'Answer',
                 text: 'Yes. Growth and Pro plans support multiple Google Analytics properties and Search Console sites. Switch between sites instantly from the dashboard.',

@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 
 import RedditWebsiteEmbed from '@/components/social/RedditWebsiteEmbed';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-    title: 'TrafficClaw Reddit Embed',
-    description: 'Reddit mentions embed powered by TrafficClaw',
+    title: `${BRAND_NAME} Reddit Embed`,
+    description: `Reddit mentions embed powered by ${BRAND_NAME}`,
     robots: {
         index: false,
         follow: false,

@@ -10,6 +10,7 @@ import {
 import {
     XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, CartesianGrid,
 } from 'recharts';
+import { BRAND_NAME } from '@/lib/brand';
 
 export interface StartupProfileData {
     id: number;
@@ -329,9 +330,9 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
     const baseOrigin = profileUrl.replace(/\/leaderboard\/\d+$/, '');
     const minimalBadgeUrl = `${baseOrigin}/api/badges/${entry.id}`;
     const rankBadgeUrl = `${minimalBadgeUrl}?variant=rank`;
-    const htmlEmbed = `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">\n  <img src="${minimalBadgeUrl}" alt="Verified on TrafficClaw" height="54" />\n</a>`;
-    const rankHtmlEmbed = `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">\n  <img src="${rankBadgeUrl}" alt="${entry.startup_name} — TrafficClaw rank" height="54" />\n</a>`;
-    const markdownEmbed = `[![Verified on TrafficClaw](${minimalBadgeUrl})](${profileUrl})`;
+    const htmlEmbed = `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">\n  <img src="${minimalBadgeUrl}" alt="Verified on ${BRAND_NAME}" height="54" />\n</a>`;
+    const rankHtmlEmbed = `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">\n  <img src="${rankBadgeUrl}" alt="${entry.startup_name} — ${BRAND_NAME} rank" height="54" />\n</a>`;
+    const markdownEmbed = `[![Verified on ${BRAND_NAME}](${minimalBadgeUrl})](${profileUrl})`;
 
     return (
         <div className="relative min-h-screen overflow-x-clip bg-[#010101] text-white">
@@ -411,7 +412,7 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                             </a>
                         )}
                         <a
-                            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just got verified on TrafficClaw! Check out ${entry.startup_name}'s real traffic stats ${profileUrl}`)}`}
+                            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just got verified on ${BRAND_NAME}! Check out ${entry.startup_name}'s real traffic stats ${profileUrl}`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-2 text-xs font-medium text-zinc-300 transition hover:border-white/[0.15] hover:text-white"
@@ -502,7 +503,7 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                         <div className="mt-5 space-y-2 border-t border-white/[0.04] pt-4 text-[12px] text-zinc-400">
                             {entry.created_at && (
                                 <p>
-                                    First joined TrafficClaw on{' '}
+                                    First joined {BRAND_NAME} on{' '}
                                     <span className="font-semibold text-zinc-200">
                                         {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                     </span>
@@ -537,13 +538,13 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                         <h2 className="text-lg font-semibold tracking-[-0.02em] text-white">Embed badge</h2>
                     </div>
                     <p className="text-sm leading-6 text-zinc-400">
-                        Add this badge to your site to show you&apos;re verified on TrafficClaw — every click is a free backlink to your listing.
+                        Add this badge to your site to show you&apos;re verified on {BRAND_NAME} — every click is a free backlink to your listing.
                     </p>
 
                     {/* Live preview tile */}
                     <div className="mt-5 flex flex-col items-center gap-3 rounded-2xl border border-white/[0.06] bg-[#04070d]/60 px-6 py-8">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={minimalBadgeUrl} alt="Verified on TrafficClaw" height={54} />
+                        <img src={minimalBadgeUrl} alt={`Verified on ${BRAND_NAME}`} height={54} />
                         <p className="text-[11px] text-zinc-500">Default height is 54px. Change the height attribute to resize.</p>
                     </div>
 
@@ -555,7 +556,7 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                     </div>
 
                     <p className="mt-5 text-center text-[11px] text-zinc-500">
-                        When someone clicks this badge, it links back to your TrafficClaw listing.
+                        When someone clicks this badge, it links back to your {BRAND_NAME} listing.
                     </p>
                 </div>
             </div>

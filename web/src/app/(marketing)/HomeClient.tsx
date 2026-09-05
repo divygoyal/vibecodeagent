@@ -16,6 +16,7 @@ import {
     ScanSearch, Clock,
     Code2, Eye, Gauge, Users
 } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 const DemoCharts = dynamic(() => import('@/components/landing/DemoCharts'), {
     ssr: false,
     loading: () => <div className="h-[400px] animate-pulse bg-white/[0.02] rounded-xl m-4" />,
@@ -362,7 +363,7 @@ function Features() {
                     </h2>
                     <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
                         Stop switching between Google Analytics, Search Console, and your IDE.
-                        TrafficClaw brings everything into one intelligent interface.
+                        {BRAND_NAME} brings everything into one intelligent interface.
                     </p>
                 </div>
 
@@ -979,7 +980,7 @@ function AIChatDemo() {
                 {/* Bottom tagline + CTA */}
                 <div className="text-center mt-8 space-y-4">
                     <p className="text-sm text-zinc-500">
-                        Real response from TrafficClaw AI · Powered by your live Google Search Console data
+                        Real response from {BRAND_NAME} AI · Powered by your live Google Search Console data
                     </p>
                     <button
                         onClick={() => signIn('google', { callbackUrl: '/dashboard/analytics' })}
@@ -1010,7 +1011,7 @@ function Testimonials() {
         {
             name: 'Marcus R.',
             role: 'Solo founder',
-            text: 'Paying $9/mo instead of $200+ for Semrush. I don\'t need 25 billion keywords — I need to know what\'s happening with MY site. TrafficClaw does exactly that.',
+            text: `Paying $9/mo instead of $200+ for Semrush. I don't need 25 billion keywords — I need to know what's happening with MY site. ${BRAND_NAME} does exactly that.`,
             avatar: 'MR',
             stars: 5,
         },
@@ -1526,7 +1527,7 @@ function WhoItsFor() {
                         <span className="gradient-text">care about growth</span>
                     </h2>
                     <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-                        Whether you&apos;re a solo founder or a marketing team, TrafficClaw gives you the tools to grow smarter.
+                        Whether you&apos;re a solo founder or a marketing team, {BRAND_NAME} gives you the tools to grow smarter.
                     </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -1579,7 +1580,7 @@ function ComparisonTable() {
                         How we stack up
                     </h2>
                     <p className="text-zinc-400 max-w-xl mx-auto">
-                        TrafficClaw combines analytics + SEO + AI in one tool — at a fraction of the cost.
+                        {BRAND_NAME} combines analytics + SEO + AI in one tool — at a fraction of the cost.
                     </p>
                 </div>
                 <div className="overflow-x-auto">
@@ -1632,7 +1633,7 @@ function FAQ() {
 
     const faqs = [
         {
-            q: 'How does TrafficClaw access my analytics data?',
+            q: `How does ${BRAND_NAME} access my analytics data?`,
             a: 'We use read-only Google OAuth to connect to your GA4 and Search Console. We never modify your data or settings. You can revoke access at any time from your Google account.',
         },
         {
@@ -1649,7 +1650,7 @@ function FAQ() {
         },
         {
             q: 'Can I connect multiple websites?',
-            a: 'Yes! TrafficClaw automatically detects all GA4 properties and Search Console sites linked to your Google account. Switch between them from the dashboard.',
+            a: `Yes! ${BRAND_NAME} automatically detects all GA4 properties and Search Console sites linked to your Google account. Switch between them from the dashboard.`,
         },
         {
             q: 'How accurate is the AI analysis?',
@@ -1660,8 +1661,8 @@ function FAQ() {
             a: 'Absolutely. No contracts, no commitments. Cancel your subscription anytime and you\'ll keep access until the end of your billing period.',
         },
         {
-            q: 'What makes TrafficClaw different from GA4 or Ahrefs?',
-            a: 'TrafficClaw combines analytics and SEO into one AI-powered interface. Instead of clicking through dashboards, just ask "which keywords are dropping?" and get instant answers. Plus, get proactive alerts via Telegram without checking any dashboard.',
+            q: `What makes ${BRAND_NAME} different from GA4 or Ahrefs?`,
+            a: `${BRAND_NAME} combines analytics and SEO into one AI-powered interface. Instead of clicking through dashboards, just ask "which keywords are dropping?" and get instant answers. Plus, get proactive alerts via Telegram without checking any dashboard.`,
         },
     ];
 
@@ -2228,7 +2229,7 @@ function Footer() {
                     </div>
 
                     <div className="text-xs text-zinc-500">
-                        © 2026 TrafficClaw. All rights reserved.
+                        © 2026 {BRAND_NAME}. All rights reserved.
                     </div>
                 </div>
             </div>

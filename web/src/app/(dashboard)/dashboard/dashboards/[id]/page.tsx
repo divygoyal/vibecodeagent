@@ -14,6 +14,7 @@ import WidgetPalette from '@/components/dashboard-builder/WidgetPalette';
 import WidgetConfigPanel from '@/components/dashboard-builder/WidgetConfigPanel';
 import ThemeCustomizer from '@/components/dashboard-builder/ThemeCustomizer';
 import ActiveFiltersBar from '@/components/dashboard-builder/ActiveFiltersBar';
+import { BRAND_NAME } from '@/lib/brand';
 
 // ── Types ──
 
@@ -314,7 +315,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
           {theme.showTrafficClawBranding && (
             <div className="mt-8 text-center">
               <p className="text-[10px] text-[var(--db-text)]/20">
-                Built with TrafficClaw
+                Built with {BRAND_NAME}
               </p>
             </div>
           )}

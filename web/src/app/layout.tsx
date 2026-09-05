@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
+import { BRAND_NAME, SITE_URL } from '@/lib/brand';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,8 +17,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'TrafficClaw — AI-Powered SEO & Analytics Platform',
-    template: '%s | TrafficClaw',
+    default: `${BRAND_NAME} — AI-Powered SEO & Analytics Platform`,
+    template: `%s | ${BRAND_NAME}`,
   },
   description: "AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated fixes. Start free.",
   icons: {
@@ -26,11 +27,11 @@ export const metadata: Metadata = {
     ],
     apple: '/apple-icon.svg',
   },
-  metadataBase: new URL('https://trafficclaw.com'),
+  metadataBase: new URL(SITE_URL),
   openGraph: {
-    title: 'TrafficClaw — AI-Powered SEO & Analytics Platform',
+    title: `${BRAND_NAME} — AI-Powered SEO & Analytics Platform`,
     description: 'Monitor Google Analytics & Search Console, get AI-powered insights, traffic drop alerts, and automated SEO fixes.',
-    siteName: 'TrafficClaw',
+    siteName: `${BRAND_NAME}`,
     type: 'website',
     locale: 'en_US',
     images: [
@@ -38,13 +39,13 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'TrafficClaw — AI-Powered SEO & Analytics Dashboard',
+        alt: `${BRAND_NAME} — AI-Powered SEO & Analytics Dashboard`,
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'TrafficClaw — AI-Powered SEO & Analytics Platform',
+    title: `${BRAND_NAME} — AI-Powered SEO & Analytics Platform`,
     description: 'Monitor Google Analytics & Search Console, get AI-powered insights, traffic drop alerts, and automated SEO fixes.',
     images: ['/og-image.png'],
   },
@@ -105,15 +106,15 @@ export default function RootLayout({
             __html: JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'SoftwareApplication',
-              name: 'TrafficClaw',
+              name: `${BRAND_NAME}`,
               applicationCategory: 'BusinessApplication',
               operatingSystem: 'Web',
-              url: 'https://trafficclaw.com',
+              url: `${SITE_URL}`,
               description: 'AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated fixes.',
               featureList: 'Real-time Analytics Dashboard, SEO Intelligence, AI Chat Assistant, Site Audit, Telegram Bot, Smart Alerts, AI SEO Tools',
               offers: [
-                { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '50 AI credits/month', url: 'https://trafficclaw.com/pricing' },
-                { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '100 AI credits/month + Telegram bot', url: 'https://trafficclaw.com/pricing' },
+                { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '50 AI credits/month', url: `${SITE_URL}/pricing` },,
+                { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '100 AI credits/month + Telegram bot', url: `${SITE_URL}/pricing` },,
               ],
             }),
           }}
@@ -124,9 +125,9 @@ export default function RootLayout({
             __html: JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'Organization',
-              name: 'TrafficClaw',
-              url: 'https://trafficclaw.com',
-              logo: 'https://trafficclaw.com/icon.svg',
+              name: `${BRAND_NAME}`,
+              url: `${SITE_URL}`,
+              logo: `${SITE_URL}/icon.svg`,
               description: 'AI-powered SEO & analytics platform for growth teams.',
               contactPoint: {
                 '@type': 'ContactPoint',
@@ -143,14 +144,14 @@ export default function RootLayout({
             __html: JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'WebSite',
-              name: 'TrafficClaw',
-              alternateName: 'TrafficClaw — AI-Powered SEO & Analytics Platform',
-              url: 'https://trafficclaw.com',
+              name: `${BRAND_NAME}`,
+              alternateName: `${BRAND_NAME} — AI-Powered SEO & Analytics Platform`,
+              url: `${SITE_URL}`,
               description:
                 'AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated SEO fixes.',
               inLanguage: 'en-US',
               publisher: {
-                '@id': 'https://trafficclaw.com/#organization',
+                '@id': `${SITE_URL}/#organization`,
               },
             }),
           }}

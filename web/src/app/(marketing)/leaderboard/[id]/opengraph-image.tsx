@@ -1,7 +1,8 @@
 import { ImageResponse } from 'next/og';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const runtime = 'edge';
-export const alt = 'TrafficClaw verified leaderboard entry';
+export const alt = `${BRAND_NAME} verified leaderboard entry`;
 export const contentType = 'image/png';
 export const size = { width: 1200, height: 630 };
 
@@ -72,7 +73,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                             T
                         </div>
                         <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em' }}>
-                            TrafficClaw
+                            {BRAND_NAME}
                         </span>
                     </div>
                     <span

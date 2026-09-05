@@ -13,6 +13,7 @@
  */
 import { buildEnrichedSnapshot, type IsoWeekRange, getCompletedIsoWeekRange } from '@/lib/chatSnapshot';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
+import { BRAND_NAME } from '@/lib/brand';
 import {
     getGoogleGenAIClient,
     getGoogleGenAIText,
@@ -122,7 +123,7 @@ function buildHeadlinePrompt(snapshot: unknown, range: IsoWeekRange, siteUrl: st
     if (snapshotJson.length > 18000) snapshotJson = snapshotJson.slice(0, 18000) + '...';
 
     const siteLabel = siteUrl || '(no site connected)';
-    return `You are TrafficClaw's weekly analyst. Given the user's enriched snapshot for the week of Mon ${fmt(range.startDate)} to Sun ${fmt(range.endDate)} (their site: ${siteLabel}), produce:
+    return `You are ${BRAND_NAME}'s weekly analyst. Given the user's enriched snapshot for the week of Mon ${fmt(range.startDate)} to Sun ${fmt(range.endDate)} (their site: ${siteLabel}), produce:
 
 1. A one-sentence headline (max 90 chars, prose, NO emoji at the start). Examples:
    - "Week 19 — /pricing lost 1,240 sessions after the May 8 redeploy."

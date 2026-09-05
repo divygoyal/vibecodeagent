@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 
 import LandingHomepage from '@/components/marketing/home/LandingHomepage';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-    title: 'Talk to your Google Analytics — AI for GA4 + Search Console | TrafficClaw',
+    title: `Talk to your Google Analytics — AI for GA4 + Search Console | ${BRAND_NAME}`,
     description:
-        'TrafficClaw is your AI co-pilot for Google Analytics and Search Console. Ask in plain English, get answers, daily insights, and SEO wins — plus a realtime globe and embeddable mentions.',
+        `${BRAND_NAME} is your AI co-pilot for Google Analytics and Search Console. Ask in plain English, get answers, daily insights, and SEO wins — plus a realtime globe and embeddable mentions.`,
     alternates: { canonical: '/' },
     openGraph: {
-        title: 'Talk to your Google Analytics — AI for GA4 + Search Console | TrafficClaw',
+        title: `Talk to your Google Analytics — AI for GA4 + Search Console | ${BRAND_NAME}`,
         description:
             'Your AI co-pilot for Google Analytics and Search Console. Ask anything in plain English. Get answers, daily insights, and SEO wins in seconds.',
         url: '/',
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
 const reviewSchema = {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',
-    name: 'TrafficClaw',
+    name: `${BRAND_NAME}`,
     url: 'https://trafficclaw.com',
     applicationCategory: 'BusinessApplication',
     review: [
@@ -32,7 +33,7 @@ const reviewSchema = {
             '@type': 'Review',
             author: { '@type': 'Person', name: 'Marcus Rodriguez' },
             reviewRating: { '@type': 'Rating', ratingValue: '5', bestRating: '5' },
-            reviewBody: 'We replaced three SEO tools with TrafficClaw. The striking distance finder alone paid for our subscription in the first week.',
+            reviewBody: `We replaced three SEO tools with ${BRAND_NAME}. The striking distance finder alone paid for our subscription in the first week.`,
         },
         {
             '@type': 'Review',

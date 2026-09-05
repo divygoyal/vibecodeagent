@@ -1,3 +1,4 @@
+import { BRAND_NAME } from '@/lib/brand';
 export type XWidgetVisibleCards = 1 | 2 | 3 | 4;
 
 export interface XWidgetConfig {
@@ -58,7 +59,7 @@ export function buildXEmbedCode({
     const embedUrl = `${origin}/embed/x/${token}`;
     const frameId = `trafficclaw-x-${token.slice(0, 12)}`;
 
-    return `<!-- TrafficClaw X mentions widget -->
+    return `<!-- ${BRAND_NAME} X mentions widget -->
 <iframe
   id="${frameId}"
   src="${embedUrl}"
@@ -94,7 +95,7 @@ export function buildRedditEmbedCode({
     const embedUrl = `${origin}/embed/reddit/${token}`;
     const frameId = `trafficclaw-reddit-${token.slice(0, 12)}`;
 
-    return `<!-- TrafficClaw Reddit mentions widget -->
+    return `<!-- ${BRAND_NAME} Reddit mentions widget -->
 <iframe
   id="${frameId}"
   src="${embedUrl}"

@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 import type { ThemePreset, BorderRadius, DashboardTheme } from '@/types/dashboard';
 import { THEME_PRESETS } from '@/lib/dashboardBuilder';
 import { useDashboardBuilderStore } from '@/stores/dashboardBuilderStore';
+import { BRAND_NAME } from '@/lib/brand';
 
 // ── Preset swatch ──
 
@@ -184,7 +185,7 @@ export default function ThemeCustomizer() {
           </div>
           <div className="flex items-center justify-between">
             <label className="text-[10px] font-medium text-white/40 uppercase tracking-wider">
-              Show TrafficClaw Badge
+              Show {BRAND_NAME} Badge
             </label>
             <button
               onClick={() => updateTheme({ showTrafficClawBranding: !theme.showTrafficClawBranding })}

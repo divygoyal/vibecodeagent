@@ -16,6 +16,7 @@
 import * as cheerio from 'cheerio';
 import { runGSCQuery } from './googleApi';
 import { isBlockedUrl } from './urlValidation';
+import { BRAND_NAME } from '@/lib/brand';
 
 export interface IntentMismatchQuery {
     query: string;
@@ -226,7 +227,7 @@ async function fetchPageContent(pageUrl: string, signal?: AbortSignal): Promise<
         const composedSignal = signal ?? controller.signal;
         const res = await fetch(pageUrl, {
             headers: {
-                'User-Agent': 'TrafficClaw-IntentMismatchBot/1.0',
+                'User-Agent': `${BRAND_NAME}-IntentMismatchBot/1.0`,
                 'Accept': 'text/html,application/xhtml+xml',
             },
             redirect: 'follow',

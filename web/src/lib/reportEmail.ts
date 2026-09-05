@@ -20,6 +20,7 @@ import { computePeriod, fetchReportData, type ReportPeriod, type ReportRawData }
 import { analyzeReportData, type ReportAnalysis } from './reportAnalysis';
 import { synthesizeWithGemini } from './reportGeminiSynth';
 import { generateReportPdf } from './reportPdfGenerate';
+import { BRAND_NAME, SITE_URL, LOGO_LIGHT_SRC } from '@/lib/brand';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -265,7 +266,7 @@ export function buildSubjectLine(
     dateRange: string,
 ): string {
     const periodCap = period === 'weekly' ? 'Weekly' : 'Monthly';
-    return `Your ${periodCap} TrafficClaw report — ${dateRange}`;
+    return `Your ${periodCap} ${BRAND_NAME} report — ${dateRange}`;
 }
 
 interface FindingCard {
@@ -602,7 +603,7 @@ export function renderReportEmailHtml(input: RenderInput): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="x-ua-compatible" content="IE=edge">
-<title>Your ${esc(input.periodLabel)} TrafficClaw report</title>
+<title>Your ${esc(input.periodLabel)} ${BRAND_NAME} report</title>
 <style>
   @media only screen and (max-width: 600px) {
     .container { width: 100% !important; max-width: 100% !important; }
@@ -644,8 +645,8 @@ export function renderReportEmailHtml(input: RenderInput): string {
     <table role="presentation" class="container" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
 
       <tr><td class="logo-wrap" align="left" style="padding:0 0 22px;">
-        <a href="https://trafficclaw.com" style="text-decoration:none;display:inline-block;" target="_blank">
-          <img src="https://trafficclaw.com/logo-light.svg" alt="TrafficClaw" width="150" height="30" style="display:inline-block;width:150px;height:30px;max-width:150px;border:0;outline:none;">
+        <a href="${SITE_URL}" style="text-decoration:none;display:inline-block;" target="_blank">
+          <img src="${SITE_URL}${LOGO_LIGHT_SRC}" alt="${BRAND_NAME}" width="150" height="30" style="display:inline-block;width:150px;height:30px;max-width:150px;border:0;outline:none;">
         </a>
       </td></tr>
 
@@ -763,7 +764,7 @@ export function renderReportEmailHtml(input: RenderInput): string {
         <p class="footer-copy" style="margin:0 0 10px;font-size:13px;line-height:1.6;color:#52525b;">
           Want to chat about the numbers? Reply to this email or hit <a href="https://trafficclaw.com/dashboard/support" style="color:#0891B2;text-decoration:none;font-weight:500;">Help &amp; Support</a> in the dashboard.
         </p>
-        <p style="margin:0 0 4px;font-size:12px;color:#71717a;">&mdash; The TrafficClaw team</p>
+        <p style="margin:0 0 4px;font-size:12px;color:#71717a;">&mdash; The ${BRAND_NAME} team</p>
         <p style="margin:14px 0 0;font-size:11px;color:#a1a1aa;">
           <a href="https://trafficclaw.com" style="color:#a1a1aa;text-decoration:none;">trafficclaw.com</a>
           &nbsp;&middot;&nbsp;

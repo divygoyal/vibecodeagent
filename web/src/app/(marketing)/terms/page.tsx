@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-    title: 'Terms of Service | TrafficClaw',
+    title: `Terms of Service | ${BRAND_NAME}`,
     description:
-        'Terms of Service for TrafficClaw — AI-powered analytics and SEO platform. Read about acceptable use, user accounts, and service terms.',
+        `Terms of Service for ${BRAND_NAME} — AI-powered analytics and SEO platform. Read about acceptable use, user accounts, and service terms.`,
     alternates: { canonical: '/terms' },
     openGraph: {
-        title: 'Terms of Service | TrafficClaw',
-        description: 'Terms governing use of the TrafficClaw platform and services.',
+        title: `Terms of Service | ${BRAND_NAME}`,
+        description: `Terms governing use of the ${BRAND_NAME} platform and services.`,
         url: '/terms',
     },
 };
@@ -35,14 +36,14 @@ export default function TermsPage() {
                     <section>
                         <h2 className="text-2xl font-semibold text-white mb-4">1. Acceptance of Terms</h2>
                         <p>
-                            By accessing or using TrafficClaw, you agree to be bound by these Terms of Service. If you disagree with any part of the terms, you may not access the service.
+                            By accessing or using {BRAND_NAME}, you agree to be bound by these Terms of Service. If you disagree with any part of the terms, you may not access the service.
                         </p>
                     </section>
 
                     <section>
                         <h2 className="text-2xl font-semibold text-white mb-4">2. Description of Service</h2>
                         <p>
-                            TrafficClaw provides AI-powered analytics and SEO insights via a web dashboard and Telegram bot interface. We reserve the right to modify or discontinue the service at any time.
+                            {BRAND_NAME} provides AI-powered analytics and SEO insights via a web dashboard and Telegram bot interface. We reserve the right to modify or discontinue the service at any time.
                         </p>
                     </section>
 

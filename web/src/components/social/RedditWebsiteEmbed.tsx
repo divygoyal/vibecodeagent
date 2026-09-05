@@ -8,6 +8,7 @@ import OfficialRedditPostEmbed from '@/components/social/OfficialRedditPostEmbed
 import RedditMentionsLockup from '@/components/social/RedditMentionsMark';
 import { DEFAULT_X_WIDGET_CONFIG, type XWidgetConfig } from '@/lib/socialEmbeds';
 import type { RedditMentionPayload } from '@/lib/redditMentionsShared';
+import { BRAND_NAME } from '@/lib/brand';
 
 type RedditEmbedResponse = {
     token: string;
@@ -87,7 +88,7 @@ function WidgetShell({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2.5 rounded-[10px] border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-zinc-300 transition hover:border-cyan-400/20 hover:bg-white/[0.06] hover:text-white"
-                            aria-label="Powered by TrafficClaw"
+                            aria-label={`Powered by ${BRAND_NAME}`}
                         >
                             <span className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">
                                 Powered by

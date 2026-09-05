@@ -17,6 +17,7 @@ import { fetchReportData, computePeriod } from '@/lib/reportDataFetcher';
 import { analyzeReportData } from '@/lib/reportAnalysis';
 import { synthesizeWithGemini } from '@/lib/reportGeminiSynth';
 import { generateReportPdf } from '@/lib/reportPdfGenerate';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const maxDuration = 180;
 export const dynamic = 'force-dynamic';
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
     console.log(`[UserReport] PDF generation: ${Date.now() - t4}ms`);
     console.log(`[UserReport] Total: ${Date.now() - t0}ms | PDF: ${pdfBuffer.length} bytes`);
 
-    const filename = `TrafficClaw_${periodType}_${period.startDate}_${period.endDate}.pdf`;
+    const filename = `${BRAND_NAME}_${periodType}_${period.startDate}_${period.endDate}.pdf`;
 
     const safeBuffer = pdfBuffer.buffer.slice(
       pdfBuffer.byteOffset,

@@ -5,6 +5,7 @@ import {
     Bot, BarChart3, Search, Plug, Zap, Crown,
     Copy, CheckCircle2, Code2, MessageSquare, Coins
 } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 
 const SECTIONS = [
     { id: 'getting-started', label: 'Getting Started', icon: Zap },
@@ -70,7 +71,7 @@ export default function DocsPage() {
                         <div>
                             <h1 className="text-2xl font-bold text-white mb-2">Getting Started</h1>
                             <p className="text-zinc-400 text-sm leading-relaxed">
-                                TrafficClaw is your AI-powered SEO & analytics platform. Connect Google Analytics and Search Console,
+                                {BRAND_NAME} is your AI-powered SEO & analytics platform. Connect Google Analytics and Search Console,
                                 get AI-driven verdicts on your data, and optionally connect a Telegram bot for on-the-go insights.
                             </p>
                         </div>
@@ -185,7 +186,7 @@ export default function DocsPage() {
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-4">
                             <h2 className="text-lg font-semibold text-white">Connecting GA4</h2>
                             <p className="text-sm text-zinc-400">
-                                Sign in with Google on the Settings page. TrafficClaw will automatically detect
+                                Sign in with Google on the Settings page. {BRAND_NAME} will automatically detect
                                 your GA4 properties and start pulling data. You can switch between properties using the dropdown.
                             </p>
                             <h3 className="text-sm font-semibold text-white mt-4">Metrics Tracked</h3>

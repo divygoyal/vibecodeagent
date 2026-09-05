@@ -12,6 +12,7 @@ import { isPushSupported, isPushEnabled, requestPushPermission, disablePush } fr
 import { useContainerStatus } from '@/lib/useDashboardData';
 import { toast } from 'sonner';
 import LeaderboardOptIn from './LeaderboardOptIn';
+import { BRAND_NAME } from '@/lib/brand';
 
 /* ───────────────────────────────────────────────────────────────────
  * Settings
@@ -197,7 +198,7 @@ function AccountTab({ session }: { session: ReturnType<typeof useSession>['data'
                     )}
                     <div className="min-w-0 flex-1">
                         <div className="text-[15px] font-semibold text-white truncate">
-                            {session?.user?.name || 'TrafficClaw user'}
+                            {session?.user?.name || `${BRAND_NAME} user`}
                         </div>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-zinc-500">
                             <Mail className="h-3 w-3" />
@@ -278,12 +279,13 @@ function ConnectionsTab({
                 />
                 <ServiceRow
                     name="GitHub"
-                    description="Selective per-repo access via the TrafficClaw GitHub App — pick exactly which repos the AI can read."
+                    description={`Selective per-repo access via the ${BRAND_NAME} GitHub App — pick exactly which repos the AI can read.`}
+
                     icon={<Github className="h-4 w-4 text-white" />}
                     connected={hasGithubConnection}
                     onConnect={() => { window.location.href = '/api/auth/github-app/install'; }}
                     onDisconnect={async () => {
-                        if (!confirm('Disconnect GitHub from TrafficClaw? You can also fully revoke access by uninstalling on github.com/settings/installations.')) return;
+                        if (!confirm(`Disconnect GitHub from ${BRAND_NAME}? You can also fully revoke access by uninstalling on github.com/settings/installations.`)) return;
                         try {
                             const res = await fetch('/api/github-app/disconnect', { method: 'POST' });
                             if (res.ok) {

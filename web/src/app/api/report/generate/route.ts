@@ -18,6 +18,7 @@ import { synthesizeWithGemini } from '@/lib/reportGeminiSynth';
 import { generateReportPdf } from '@/lib/reportPdfGenerate';
 import { getValidAccessToken } from '@/lib/googleApi';
 import { verifySuperadminToken } from '@/lib/superadminToken';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const maxDuration = 180;
 export const dynamic = 'force-dynamic';
@@ -140,7 +141,7 @@ export async function POST(req: Request) {
         console.log(`[Report] PDF generation: ${Date.now() - t4}ms`);
         console.log(`[Report] Total: ${Date.now() - t0}ms | PDF: ${pdfBuffer.length} bytes`);
 
-        const filename = `TrafficClaw_${periodType}_${period.startDate}_${period.endDate}.pdf`;
+        const filename = `${BRAND_NAME}_${periodType}_${period.startDate}_${period.endDate}.pdf`;
 
         const safeBuffer = pdfBuffer.buffer.slice(
             pdfBuffer.byteOffset,

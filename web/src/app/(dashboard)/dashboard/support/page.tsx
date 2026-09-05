@@ -12,6 +12,7 @@ import {
     Clock, ChevronRight, Lock,
 } from 'lucide-react';
 import { MAX_INPUT_CHARS, WARN_INPUT_CHARS, ERR_MESSAGE_TOO_LONG } from '@/lib/chatLimits';
+import { BRAND_NAME } from '@/lib/brand';
 
 type SupportMessage = {
     id: number;
@@ -193,7 +194,7 @@ export default function SupportPage() {
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(20,196,225,0.18),rgba(122,217,218,0.10))] ring-1 ring-cyan-400/20 flex-shrink-0">
                             <Image
                                 src="/icon.svg"
-                                alt="TrafficClaw"
+                                alt={`${BRAND_NAME}`}
                                 width={22}
                                 height={22}
                                 className="rounded-md"
@@ -485,7 +486,7 @@ function Bubble({
             <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[78%] sm:max-w-[68%]`}>
                 {!grouped && !isUser && (
                     <div className="text-[11px] text-zinc-500 mb-1 px-1">
-                        TrafficClaw Support
+                        {BRAND_NAME} Support
                     </div>
                 )}
                 <div

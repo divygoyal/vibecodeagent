@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { FileDown, Loader2, Calendar, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { BRAND_NAME } from '@/lib/brand';
 
 interface MobileExportModalProps {
     isOpen: boolean;
@@ -55,7 +56,7 @@ export default function MobileExportModal({
             const blob = await res.blob();
             const filenameHeader = res.headers.get('Content-Disposition') || '';
             const match = filenameHeader.match(/filename="?([^"]+)"?/);
-            const filename = match?.[1] || `TrafficClaw_${period}_report.pdf`;
+            const filename = match?.[1] || `${BRAND_NAME}_${period}_report.pdf`;
 
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');

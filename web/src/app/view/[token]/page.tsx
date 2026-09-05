@@ -13,6 +13,7 @@ import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
 import { createFilterId, isFilterableDimension } from '@/lib/dashboardFilterEngine';
 import DashboardGrid from '@/components/dashboard-builder/DashboardGrid';
 import ActiveFiltersBar from '@/components/dashboard-builder/ActiveFiltersBar';
+import { BRAND_NAME } from '@/lib/brand';
 
 // ── Constants ──
 
@@ -148,9 +149,9 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
   // SEO meta tags via document.title
   useEffect(() => {
     if (dashboard) {
-      document.title = `${dashboard.name} | TrafficClaw Dashboard`;
+      document.title = `${dashboard.name} | ${BRAND_NAME} Dashboard`;
     }
-    return () => { document.title = 'TrafficClaw'; };
+    return () => { document.title = `${BRAND_NAME}`; };
   }, [dashboard]);
 
   // ── Loading state ──
@@ -173,7 +174,7 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
             href="/"
             className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
           >
-            Go to TrafficClaw
+            Go to {BRAND_NAME}
           </a>
         )}
       </div>
@@ -219,7 +220,7 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
               rel="noopener noreferrer"
               className="text-[9px] text-[var(--db-text)]/15 hover:text-[var(--db-text)]/30 transition-colors"
             >
-              TrafficClaw
+              {BRAND_NAME}
             </a>
           </div>
         )}
@@ -365,7 +366,7 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
             rel="noopener noreferrer"
             className="text-[10px] text-[var(--db-text)]/20 hover:text-[var(--db-text)]/40 transition-colors"
           >
-            Built with TrafficClaw
+            Built with {BRAND_NAME}
           </a>
         </div>
       )}

@@ -26,6 +26,7 @@ import { XMark } from '@/components/social/XMentionsMark';
 import { PUBLIC_MENTIONS_DEMO_DOMAIN } from '@/lib/publicMentionsRateLimit';
 import { type RedditMentionPayload } from '@/lib/redditMentionsShared';
 import { canonicalizeDomainInput, type XMentionPayload } from '@/lib/xMentionsShared';
+import { BRAND_NAME } from '@/lib/brand';
 
 const marketingHeading = Space_Grotesk({
     subsets: ['latin'],
@@ -83,7 +84,7 @@ const DEFAULT_TRAFFICCLAW_REDDIT_MENTION: RedditMentionPayload = {
     id: 'trafficclaw-reddit-demo',
     postId: '1s3po44',
     title: '20 websites are already using my globe — and I didn’t expect this so soon 😅',
-    text: 'Live visitors on a real-time globe view on TrafficClaw.',
+    text: `Live visitors on a real-time globe view on ${BRAND_NAME}.`,
     author: 'Zealousideal_Gur9406',
     subreddit: 'microsaas',
     score: 0,
@@ -163,7 +164,7 @@ function XPreviewCard({
                 <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">
                         <span className="h-1.5 w-1.5 rounded-full bg-cyan-300/80" />
-                        TrafficClaw sample post
+                        {BRAND_NAME} sample post
                     </div>
                     <XMark className="h-3.5 w-3.5 text-zinc-500" />
                 </div>
@@ -297,7 +298,7 @@ function RedditPreviewCard({
                 <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">
                         <span className="h-1.5 w-1.5 rounded-full bg-[#FF4500]/80" />
-                        TrafficClaw sample thread
+                        {BRAND_NAME} sample thread
                     </div>
                     <RedditMark className="h-3.5 w-3.5 text-zinc-500" />
                 </div>

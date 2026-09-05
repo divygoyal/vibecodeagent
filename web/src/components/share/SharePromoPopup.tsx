@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Sparkles, X } from 'lucide-react';
 import { LogoIcon } from '@/components/Logo';
+import { BRAND_NAME } from '@/lib/brand';
 
 interface SharePromoPopupProps {
     /** Force open immediately on mount (preview / debug). */
@@ -163,7 +164,7 @@ export default function SharePromoPopup({
                     onClick={handleBackdrop}
                     role="dialog"
                     aria-modal="true"
-                    aria-label="Try TrafficClaw"
+                    aria-label={`Try ${BRAND_NAME}`}
                 >
                     <motion.div
                         key="modal"

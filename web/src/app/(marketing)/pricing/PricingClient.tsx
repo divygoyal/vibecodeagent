@@ -5,6 +5,7 @@ import { motion, useInView } from 'framer-motion';
 import { signIn } from 'next-auth/react';
 import { CheckCircle2, ArrowRight, Tag, Copy, Check } from 'lucide-react';
 import PricingTierCards from '@/components/marketing/pricing/PricingTierCards';
+import { BRAND_NAME } from '@/lib/brand';
 
 const fadeUp = {
     hidden: { opacity: 0, y: 30 },
@@ -196,7 +197,7 @@ export default function PricingClient() {
                     </motion.div>
                     <motion.div variants={fadeUp} className="space-y-4">
                         {[
-                            { q: 'Is there a free plan?', a: 'Every new account gets 5 free AI messages to try TrafficClaw. No credit card required. The full analytics dashboard, SEO tools, and site audit are available on all plans.' },
+                            { q: 'Is there a free plan?', a: `Every new account gets 5 free AI messages to try ${BRAND_NAME}. No credit card required. The full analytics dashboard, SEO tools, and site audit are available on all plans.` },
                             { q: 'What happens when I run out of credits?', a: 'You can still access your analytics dashboard, SEO data, and audit tools. AI chat responses require credits. Credits reset at the start of each billing cycle — no rollover.' },
                             { q: 'Can I upgrade or downgrade anytime?', a: 'Yes. You can switch plans at any time. When you upgrade, you get immediate access to the new credit amount. Downgrades take effect at the next billing cycle.' },
                             { q: 'What payment methods do you accept?', a: 'We accept all major credit cards, debit cards, and select digital wallets through our payment provider Dodo Payments. All transactions are encrypted and secure.' },

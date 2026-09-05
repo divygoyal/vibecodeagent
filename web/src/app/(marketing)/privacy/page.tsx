@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-    title: 'Privacy Policy | TrafficClaw',
+    title: `Privacy Policy | ${BRAND_NAME}`,
     description:
-        'Learn how TrafficClaw collects, uses, and protects your data. We adhere to Google API Services User Data Policy including Limited Use requirements.',
+        `Learn how ${BRAND_NAME} collects, uses, and protects your data. We adhere to Google API Services User Data Policy including Limited Use requirements.`,
     alternates: { canonical: '/privacy' },
     openGraph: {
-        title: 'Privacy Policy | TrafficClaw',
-        description: 'How TrafficClaw handles your data — Google API compliance, data retention, and security practices.',
+        title: `Privacy Policy | ${BRAND_NAME}`,
+        description: `How ${BRAND_NAME} handles your data — Google API compliance, data retention, and security practices.`,
         url: '/privacy',
     },
 };
@@ -35,7 +36,7 @@ export default function PrivacyPage() {
                     <section>
                         <h2 className="text-2xl font-semibold text-white mb-4">1. Introduction</h2>
                         <p>
-                            TrafficClaw (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our website and services.
+                            {BRAND_NAME} (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our website and services.
                         </p>
                     </section>
 
@@ -51,7 +52,7 @@ export default function PrivacyPage() {
                     <section>
                         <h2 className="text-2xl font-semibold text-white mb-4">3. Google User Data</h2>
                         <p className="mb-4">
-                            TrafficClaw accesses your Google Analytics and Search Console data solely to provide you with insights and analysis.
+                            {BRAND_NAME} accesses your Google Analytics and Search Console data solely to provide you with insights and analysis.
                         </p>
                         <ul className="list-disc pl-6 space-y-2">
                             <li><strong>Access:</strong> We only access data you explicitly grant permissions for.</li>

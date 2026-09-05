@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getValidAccessToken, fetchRealtimeForEmbed, fetchEmbedTokenCredentials } from '@/lib/googleApi';
 import { cachedFetch } from '@/lib/apiCache';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,7 +86,7 @@ export async function GET(req: Request) {
             () => fetchRealtimeForEmbed(accessToken, tokenData.propertyId)
         );
 
-        // Free users see "Powered by TrafficClaw" watermark; paid users can remove it
+        // Free users see `Powered by ${BRAND_NAME}` watermark; paid users can remove it
         const showBranding = tokenData.plan === 'free';
 
         return NextResponse.json({ ...data, showBranding }, {

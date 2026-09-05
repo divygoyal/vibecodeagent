@@ -9,6 +9,7 @@ import {
     Globe, LayoutDashboard, Link2, BarChart3, Activity, FileText, Loader2,
     Trophy, ShieldCheck, ShieldOff, LifeBuoy, Send
 } from 'lucide-react'
+import { BRAND_NAME } from '@/lib/brand';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -519,7 +520,7 @@ export default function SuperAdminPage() {
                         <div className="flex items-center justify-center gap-3 mb-8">
                             <Shield className="w-8 h-8 text-emerald-400" />
                             <div>
-                                <h1 className="text-xl font-bold text-white">TrafficClaw</h1>
+                                <h1 className="text-xl font-bold text-white">{BRAND_NAME}</h1>
                                 <p className="text-xs text-zinc-500">Super Admin Access</p>
                             </div>
                         </div>
@@ -1812,7 +1813,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
             const a = document.createElement('a')
             a.href = url
             const safeName = (options?.label || propertyId || siteUrl).replace(/[^a-zA-Z0-9_-]/g, '_')
-            a.download = `TrafficClaw_${period}_${safeName}.pdf`
+            a.download = `${BRAND_NAME}_${period}_${safeName}.pdf`
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
@@ -2360,7 +2361,7 @@ function QueriesTab({ queries, onRefresh }: { queries: QueryData[]; onRefresh: (
                                 {/* Actions */}
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <a
-                                        href={`mailto:${query.email}?subject=${encodeURIComponent(`Re: Your TrafficClaw query`)}&body=${encodeURIComponent(`Hi ${query.name},\n\nThank you for reaching out to TrafficClaw.\n\n---\nYour original message:\n${query.message}\n`)}`}
+                                        href={`mailto:${query.email}?subject=${encodeURIComponent(`Re: Your ${BRAND_NAME} query`)}&body=${encodeURIComponent(`Hi ${query.name},\n\nThank you for reaching out to ${BRAND_NAME}.\n\n---\nYour original message:\n${query.message}\n`)}`}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 text-xs font-medium hover:bg-emerald-600/30 transition-colors"
                                     >
                                         <Mail className="w-3.5 h-3.5" />

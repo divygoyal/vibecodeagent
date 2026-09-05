@@ -5,6 +5,7 @@
 import * as cheerio from 'cheerio';
 import { isBlockedUrl } from './urlValidation';
 import { detectSiteType, type SiteTypeResult } from './siteTypeDetector';
+import { BRAND_NAME } from '@/lib/brand';
 
 // ─── Types ───
 
@@ -100,7 +101,7 @@ export async function runSiteAudit(rawUrl: string): Promise<AuditReport> {
 
         const res = await fetch(url, {
             headers: {
-                'User-Agent': 'TrafficClaw-AuditBot/1.0 (SEO Audit Tool)',
+                'User-Agent': `${BRAND_NAME}-AuditBot/1.0 (SEO Audit Tool)`,
                 'Accept': 'text/html,application/xhtml+xml',
             },
             redirect: 'follow',
