@@ -227,6 +227,11 @@ export function useSiteList(enabled = true) {
 
     return {
         sites: Array.isArray(data) ? data : [],
+        // True once a fetch has resolved at least once. Distinct from
+        // !isLoading: with a null SWR key (registration still pending)
+        // isLoading is false while nothing has ever loaded — and the
+        // stale-workspace guard must not treat that as "loaded but missing".
+        hasLoaded: data !== undefined,
         isLoading,
         isError: Boolean(error),
         error,
@@ -260,6 +265,8 @@ export function usePropertyList(enabled = true) {
 
     return {
         properties: Array.isArray(data) ? data : [],
+        // See useSiteList: distinguishes "fetched" from "never requested".
+        hasLoaded: data !== undefined,
         isLoading,
         isError: Boolean(error),
         error,

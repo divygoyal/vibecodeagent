@@ -466,11 +466,13 @@ export default function DashboardLayout({
     const {
         sites: gscSites,
         isLoading: siteInventoryLoading,
+        hasLoaded: siteInventoryLoaded,
         error: siteInventoryRequestError,
     } = useSiteList(hasGoogleConnection);
     const {
         properties,
         isLoading: propertyInventoryLoading,
+        hasLoaded: propertyInventoryLoaded,
         error: propertyInventoryRequestError,
     } = usePropertyList(hasGoogleConnection);
 
@@ -521,7 +523,9 @@ export default function DashboardLayout({
         propertyInventoryError,
         siteInventoryLoading,
         propertyInventoryLoading,
-    }), [propertyInventoryError, propertyInventoryLoading, selectedProperty, selectedSite, siteInventoryError, siteInventoryLoading, typedProperties, typedSites]);
+        siteInventoryReady: siteInventoryLoaded,
+        propertyInventoryReady: propertyInventoryLoaded,
+    }), [propertyInventoryError, propertyInventoryLoading, propertyInventoryLoaded, selectedProperty, selectedSite, siteInventoryError, siteInventoryLoading, siteInventoryLoaded, typedProperties, typedSites]);
     const {
         resolvedSiteUrl,
         resolvedPropertyId,
