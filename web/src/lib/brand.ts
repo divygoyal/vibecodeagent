@@ -9,7 +9,6 @@
  *     NEXT_PUBLIC_LOGO_SRC=/logo-aitraffic.svg
  *     NEXT_PUBLIC_LOGO_LIGHT_SRC=/logo-light-aitraffic.svg
 
-import { BRAND_NAME } from '@/lib/brand';
  *
  * Rule: user-visible copy uses BRAND_NAME / SITE_URL. Functional
  * identifiers (API paths, env names, container names, OAuth, DB values,

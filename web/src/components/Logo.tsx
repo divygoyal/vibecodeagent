@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_NAME } from '@/lib/brand';
+
 /**
  * TrafficClaw Logo Component
  * Usage: <Logo /> or <Logo size="sm" /> or <Logo iconOnly />
@@ -61,8 +63,8 @@ export function Logo({
             <LogoIcon size={s.icon} />
             {!iconOnly && (
                 <span className={`${s.text} font-extrabold tracking-tight`}>
-                    <span className="text-white">Traffic</span>
-                    <span style={{ color: CLAW_BRAND_ACCENT }}>Claw</span>
+                    <span className="text-white">{BRAND_NAME === 'TrafficClaw' ? 'Traffic' : 'AI'}</span>
+                    <span style={{ color: CLAW_BRAND_ACCENT }}>{BRAND_NAME === 'TrafficClaw' ? 'Claw' : 'traffic'}</span>
                 </span>
             )}
         </div>
