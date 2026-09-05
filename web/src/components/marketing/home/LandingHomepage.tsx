@@ -34,7 +34,7 @@ import { signShareEmbedUrl } from '@/lib/shareWatermark';
 import { JourneyLine, JourneyNode } from './JourneyTimeline';
 import BadgeMarquee from './BadgeMarquee';
 import PricingTierCards from '@/components/marketing/pricing/PricingTierCards';
-import { BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME, isDefaultBrand } from '@/lib/brand';
 
 type FeaturedReason = {
     number: string;
@@ -629,6 +629,7 @@ export default function LandingHomepage() {
                             so we render the rank ourselves. Revert to the eyebrow
                             pill (HOMEPAGE_CONTENT.hero.eyebrow) once the launch
                             cools. */}
+                        {isDefaultBrand() && (
                         <div className="mb-6 flex flex-wrap items-center justify-center gap-3">
                             <a
                                 href="https://www.producthunt.com/products/trafficclaw/launches/trafficclaw?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-trafficclaw"
@@ -650,6 +651,7 @@ export default function LandingHomepage() {
                                 #8 Product of the Day
                             </div>
                         </div>
+                        )}
                         <h1 className="text-[2.25rem] font-semibold tracking-[-0.07em] text-white sm:text-6xl lg:text-[5.9rem] lg:leading-[0.94]">
                             <span className="block text-white">
                                 {HOMEPAGE_CONTENT.hero.titleLead}

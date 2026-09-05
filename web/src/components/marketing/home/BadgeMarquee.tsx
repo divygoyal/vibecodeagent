@@ -1,4 +1,4 @@
-import { BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME, isDefaultBrand } from '@/lib/brand';
 /* Badge marquee — CSS-only, pauses on hover via .marquee-track:hover in globals.css */
 
 const B = 'block hover:opacity-75 transition-opacity shrink-0';
@@ -9,9 +9,11 @@ const TXT =
 function Badges() {
     return (
         <>
+            {isDefaultBrand() && (
             <a href="https://www.producthunt.com/products/trafficclaw?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-trafficclaw" target="_blank" rel="noopener noreferrer" className={B}>
                 <img alt={`${BRAND_NAME} | Product Hunt`} className={IMG} src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1103214&theme=dark&t=1774016804657" />
             </a>
+            )}
             <a href="https://toolsaiapp.com/" target="_blank" rel="noopener noreferrer" className={B}>
                 <img src="https://toolsaiapp.com/wp-content/uploads/2025/12/badge.png" alt="Featured on Tools AI App" className={IMG} />
             </a>
