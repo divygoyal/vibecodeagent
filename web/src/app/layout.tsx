@@ -82,6 +82,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
+        <meta name="ory-verify" content="orynth-754970ea155245b89f4e47db77c81f43" />
         {/*
           Chrome / Edge / Safari auto-translate wrap text nodes in a <font> tag,
           which steals them from React's expected parent. When React then runs
