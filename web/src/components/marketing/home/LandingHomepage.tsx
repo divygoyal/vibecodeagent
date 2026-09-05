@@ -596,6 +596,7 @@ export default function LandingHomepage() {
     // signature, so their watermark always renders. See
     // `lib/shareWatermark.ts` for the threat model.
     const watermarkedEmbedUrl = signShareEmbedUrl(HOMEPAGE_CONTENT.analyticsEmbedUrl);
+    const liveDashboardUrl = isDefaultBrand() ? HOMEPAGE_CONTENT.analyticsEmbedUrl : '/dashboard';
     return (
         <div className="relative overflow-x-clip bg-[#010101] text-white">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_18%),linear-gradient(180deg,#030303_0%,#010101_24%,#000000_100%)]" />
@@ -720,7 +721,7 @@ export default function LandingHomepage() {
                                 label={HOMEPAGE_CONTENT.hero.primaryCta}
                             />
                         </div>
-                        <GradientButton href={HOMEPAGE_CONTENT.analyticsEmbedUrl} secondary newTab>
+                        <GradientButton href={liveDashboardUrl} secondary newTab>
                             {HOMEPAGE_CONTENT.hero.secondaryCta}
                             <ArrowUpRight className="h-4 w-4 text-[#7AD9DA]" />
                         </GradientButton>
@@ -825,7 +826,7 @@ export default function LandingHomepage() {
                                         <GoogleStartButton
                                             className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full border border-[#14C4E1]/28 bg-[linear-gradient(135deg,#14C4E1_0%,#7AD9DA_100%)] px-5 text-center text-sm font-semibold text-[#031017] transition-all duration-200 hover:brightness-105 sm:w-auto"
                                         />
-                                        <GradientButton href={HOMEPAGE_CONTENT.analyticsEmbedUrl} secondary newTab>
+                                        <GradientButton href={liveDashboardUrl} secondary newTab>
                                             Open live dashboard
                                             <ArrowUpRight className="h-4 w-4 text-[#7AD9DA]" />
                                         </GradientButton>
