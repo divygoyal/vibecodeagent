@@ -8,7 +8,7 @@ import SharedDashboardClient from './SharedDashboardClient';
 import SharePromoPopup from '@/components/share/SharePromoPopup';
 import ShareConversionBar from '@/components/share/ShareConversionBar';
 import { verifyShareWatermarkSignature } from '@/lib/shareWatermark';
-import { BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME, SITE_URL, SITE_HOST } from '@/lib/brand';
 
 // Promo popup auto-opens 20s after a viewer lands on the public share view,
 // OR sooner on exit-intent (mouse leaving the top of the viewport). The
@@ -21,7 +21,7 @@ const PROMO_POPUP_DELAY_MS = 20000;
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-    title: `Shared Dashboard — ${BRAND_NAME}`,
+    title: 'Shared Dashboard',
     description: `View shared analytics dashboard powered by ${BRAND_NAME}`,
 };
 
@@ -62,7 +62,7 @@ export default async function SharedDashboardPage({
                     </p>
                     {!isEmbed ? (
                         <Link
-                            href="https://trafficclaw.com"
+                            href={SITE_URL}
                             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-all"
                         >
                             Visit {BRAND_NAME}
@@ -186,10 +186,10 @@ export default async function SharedDashboardPage({
                         Powered by {BRAND_NAME} — Free AI-Powered Analytics
                     </p>
                     <Link
-                        href="https://trafficclaw.com"
+                        href={SITE_URL}
                         className="text-xs text-emerald-500/70 hover:text-emerald-400 transition-colors"
                     >
-                        trafficclaw.com
+                        {SITE_HOST}
                     </Link>
                 </div>
             </footer>

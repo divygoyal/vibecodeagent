@@ -13,7 +13,7 @@ import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
 import { createFilterId, isFilterableDimension } from '@/lib/dashboardFilterEngine';
 import DashboardGrid from '@/components/dashboard-builder/DashboardGrid';
 import ActiveFiltersBar from '@/components/dashboard-builder/ActiveFiltersBar';
-import { BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME, SITE_URL } from '@/lib/brand';
 
 // ── Constants ──
 
@@ -215,7 +215,7 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
         {dashboard.theme.showTrafficClawBranding && (
           <div className="text-center pb-4">
             <a
-              href="https://trafficclaw.com"
+              href={SITE_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[9px] text-[var(--db-text)]/15 hover:text-[var(--db-text)]/30 transition-colors"
@@ -361,7 +361,7 @@ export default function PublicDashboardView({ params }: { params: Promise<{ toke
       {dashboard.theme.showTrafficClawBranding && (
         <div className="text-center pb-8">
           <a
-            href="https://trafficclaw.com"
+            href={SITE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[10px] text-[var(--db-text)]/20 hover:text-[var(--db-text)]/40 transition-colors"
