@@ -234,7 +234,7 @@ function AccountTab({ session }: { session: ReturnType<typeof useSession>['data'
                 <div className="mt-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                         <div className="text-[13px] font-medium text-white">Sign out</div>
-                        <div className="mt-0.5 text-[11.5px] text-zinc-500">Sign out of your TrafficClaw account.</div>
+                        <div className="mt-0.5 text-[11.5px] text-zinc-500">Sign out of your {BRAND_NAME} account.</div>
                     </div>
                     <button
                         onClick={() => signOut({ callbackUrl: '/' })}

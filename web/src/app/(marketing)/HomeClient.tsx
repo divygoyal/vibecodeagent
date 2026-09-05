@@ -1588,7 +1588,7 @@ function ComparisonTable() {
                         <thead>
                             <tr className="border-b border-white/[0.06]">
                                 <th className="text-left py-4 pr-4 text-zinc-500 font-medium">Feature</th>
-                                <th className="text-center py-4 px-3 text-emerald-400 font-semibold">TrafficClaw</th>
+                                <th className="text-center py-4 px-3 text-emerald-400 font-semibold">{BRAND_NAME}</th>
                                 <th className="text-center py-4 px-3 text-zinc-500 font-medium">GA4</th>
                                 <th className="text-center py-4 px-3 text-zinc-500 font-medium">SEMrush</th>
                                 <th className="text-center py-4 px-3 text-zinc-500 font-medium">Ahrefs</th>
@@ -1679,7 +1679,7 @@ function FAQ() {
                             questions
                         </span>
                     </h2>
-                    <p className="text-zinc-400 text-lg">Everything you need to know about TrafficClaw.</p>
+                    <p className="text-zinc-400 text-lg">Everything you need to know about {BRAND_NAME}.</p>
                 </div>
 
                 <div className="space-y-3">
@@ -2215,7 +2215,7 @@ function Footer() {
                 {/* Footer links */}
                 <div className="flex flex-col items-center gap-4 md:flex-row md:justify-between md:gap-6">
                     <div className="flex items-center gap-2">
-                        <img src="/icon.svg" alt="TrafficClaw" className="w-6 h-6 rounded-md" />
+                        <img src="/icon.svg" alt={BRAND_NAME} className="w-6 h-6 rounded-md" />
                         <span className="text-sm font-bold text-white">
                             Traffic<span className="text-emerald-400">Claw</span>
                         </span>

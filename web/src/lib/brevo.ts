@@ -47,7 +47,7 @@ export interface BrevoSendResult {
 export async function sendTransactional(input: BrevoSendInput): Promise<BrevoSendResult> {
     const apiKey = process.env.BREVO_API_KEY;
     const senderEmail = process.env.BREVO_SENDER_EMAIL;
-    const senderName = process.env.BREVO_SENDER_NAME || 'TrafficClaw';
+    const senderName = process.env.BREVO_SENDER_NAME || BRAND_NAME;
 
     if (!apiKey || !senderEmail) {
         const missing = [

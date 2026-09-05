@@ -1,5 +1,5 @@
 'use client';
-
+import { BRAND_NAME } from '@/lib/brand';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -144,7 +144,7 @@ function SharedEventsReportPage({
             <div className="border-b border-white/[0.06] bg-[#07090c]">
                 <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
                     <div className="min-w-0">
-                        <div className="text-sm font-semibold text-zinc-100">TrafficClaw Shared Events</div>
+                        <div className="text-sm font-semibold text-zinc-100">{BRAND_NAME} Shared Events</div>
                         <div className="text-xs text-zinc-500">
                             {siteUrl ? `Analytics for ${siteUrl}` : 'Share-safe event report'}
                         </div>

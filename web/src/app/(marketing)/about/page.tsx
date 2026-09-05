@@ -29,7 +29,7 @@ export default function AboutPage() {
                     </ol>
                 </nav>
 
-                <h1 className="text-4xl font-bold mb-4">About TrafficClaw</h1>
+                <h1 className="text-4xl font-bold mb-4">About {BRAND_NAME}</h1>
                 <p className="text-zinc-500 mb-8">The AI-powered growth intelligence platform for modern teams.</p>
 
                 <div className="space-y-8 text-zinc-300 leading-relaxed">
@@ -97,7 +97,7 @@ export default function AboutPage() {
                         >
                             <div>
                                 <div className="text-sm font-semibold text-white">Explore Features</div>
-                                <div className="text-xs text-zinc-500">See everything TrafficClaw offers</div>
+                                <div className="text-xs text-zinc-500">See everything {BRAND_NAME} offers</div>
                             </div>
                             <ArrowRight className="w-4 h-4 text-zinc-500 group-hover:text-white transition-colors" />
                         </Link>

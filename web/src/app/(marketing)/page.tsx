@@ -4,7 +4,7 @@ import LandingHomepage from '@/components/marketing/home/LandingHomepage';
 import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-    title: `Talk to your Google Analytics — AI for GA4 + Search Console | ${BRAND_NAME}`,
+    title: `Talk to your Google Analytics — AI for GA4 + Search Console`,
     description:
         `${BRAND_NAME} is your AI co-pilot for Google Analytics and Search Console. Ask in plain English, get answers, daily insights, and SEO wins — plus a realtime globe and embeddable mentions.`,
     alternates: { canonical: '/' },

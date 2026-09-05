@@ -1,5 +1,5 @@
 'use client';
-
+import { BRAND_NAME } from '@/lib/brand';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -62,7 +62,7 @@ function Navbar() {
         >
             <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:px-8">
                 <Link href="/" className="flex items-center gap-2.5">
-                    <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className="rounded-lg" />
+                    <Image src="/icon.svg" alt={BRAND_NAME} width={32} height={32} className="rounded-lg" />
                     <span className="text-lg font-bold tracking-tight text-white">
                         Traffic<span className="text-[#7AD9DA]">Claw</span>
                     </span>

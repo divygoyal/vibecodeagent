@@ -814,7 +814,7 @@ export default function DashboardLayout({
                 {/* Logo */}
                 <div className="relative z-10 h-16 flex items-center px-4 border-b border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent)]">
                     <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
-                        <Image src="/icon.svg" alt="TrafficClaw" width={32} height={32} className={`${shellCompactRadiusClass} flex-shrink-0`} />
+                        <Image src="/icon.svg" alt={BRAND_NAME} width={32} height={32} className={`${shellCompactRadiusClass} flex-shrink-0`} />
                         {!collapsed && (
                             <span className="text-base font-bold text-[var(--text-primary)] whitespace-nowrap">
                                 Traffic<span style={{ color: brandAccentColor }}>Claw</span>
@@ -1241,7 +1241,7 @@ export default function DashboardLayout({
                         {/* Header with logo and close */}
                         <div className="relative z-10 flex h-16 items-center justify-between border-b border-white/[0.06] px-4 pt-[env(safe-area-inset-top,0px)]">
                             <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5">
-                                <Image src="/icon.svg" alt="TrafficClaw" width={28} height={28} className="rounded-lg" />
+                                <Image src="/icon.svg" alt={BRAND_NAME} width={28} height={28} className="rounded-lg" />
                                 <span className="text-sm font-bold text-[var(--text-primary)]">
                                     Traffic<span style={{ color: brandAccentColor }}>Claw</span>
                                 </span>

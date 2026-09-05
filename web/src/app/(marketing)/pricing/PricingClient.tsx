@@ -193,7 +193,7 @@ export default function PricingClient() {
                 <div className="max-w-3xl mx-auto">
                     <motion.div variants={fadeUp} className="text-center mb-12">
                         <h2 className="text-3xl font-bold text-white mb-3">Frequently Asked Questions</h2>
-                        <p className="text-sm text-zinc-400">Everything you need to know about TrafficClaw pricing.</p>
+                        <p className="text-sm text-zinc-400">Everything you need to know about {BRAND_NAME} pricing.</p>
                     </motion.div>
                     <motion.div variants={fadeUp} className="space-y-4">
                         {[

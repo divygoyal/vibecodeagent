@@ -251,7 +251,7 @@ export default function DocsPage() {
                             <p className="text-sm text-zinc-400">The Telegram bot is available on the <span className="text-violet-400 font-semibold">Pro plan ($29/mo)</span>.</p>
                             <CodeBlock code={`# 1. Open Telegram and message @BotFather\n/newbot\n# 2. Follow the prompts to name your bot\n# 3. Copy the API token\n# 4. Paste it in Dashboard → Bot page`} />
                             <p className="text-sm text-zinc-400">
-                                TrafficClaw provisions a container for your bot and connects it automatically.
+                                {BRAND_NAME} provisions a container for your bot and connects it automatically.
                                 Your bot will have access to all your connected Google data.
                             </p>
                         </div>
@@ -272,7 +272,7 @@ export default function DocsPage() {
                     <>
                         <div>
                             <h1 className="text-2xl font-bold text-white mb-2">Integrations</h1>
-                            <p className="text-zinc-400 text-sm">Connect TrafficClaw with your tools.</p>
+                            <p className="text-zinc-400 text-sm">Connect {BRAND_NAME} with your tools.</p>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <IntegrationItem emoji="🐙" name="GitHub" desc="Sign in and sync repositories" status="Available" />

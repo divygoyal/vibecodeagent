@@ -1,5 +1,5 @@
 'use client';
-
+import { BRAND_NAME } from '@/lib/brand';
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import {
@@ -39,7 +39,7 @@ export default function GlobePublicPage() {
                         </div>
                         <div className="text-left">
                             <p className="text-emerald-400 font-bold text-sm">Free forever. No limits. No credit card.</p>
-                            <p className="text-zinc-500 text-xs">Upgrade to any paid plan to remove the &quot;Powered by TrafficClaw&quot; watermark.</p>
+                            <p className="text-zinc-500 text-xs">Upgrade to any paid plan to remove the &quot;Powered by {BRAND_NAME}&quot; watermark.</p>
                         </div>
                     </div>
                     <div className="flex flex-wrap justify-center gap-3">

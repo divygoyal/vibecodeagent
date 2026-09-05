@@ -201,7 +201,7 @@ export default function SupportPage() {
                             />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="text-[14px] font-semibold text-white">TrafficClaw Support</div>
+                            <div className="text-[14px] font-semibold text-white">{BRAND_NAME} Support</div>
                             <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
                                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400" />
                                 Online
@@ -413,7 +413,7 @@ function EmptyState({ userName }: { userName: string }) {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center px-6">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-cyan-500/10 border border-cyan-500/20 mb-4">
-                <Image src="/icon.svg" alt="TrafficClaw" width={26} height={26} />
+                <Image src="/icon.svg" alt={BRAND_NAME} width={26} height={26} />
             </div>
             <h3 className="text-[15px] font-semibold text-white">Hi {userName}, how can we help?</h3>
             <p className="mt-1.5 text-[13px] text-zinc-500 max-w-sm leading-relaxed">

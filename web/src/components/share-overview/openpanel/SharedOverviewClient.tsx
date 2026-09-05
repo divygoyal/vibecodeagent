@@ -1019,7 +1019,7 @@ function ShareGeoStatsCard({
         <div className="flex h-full flex-col gap-3 px-4 py-3.5">
             <div className="flex items-center gap-2">
                 <LogoIcon size={18} />
-                <span className="text-[13px] font-bold tracking-tight text-white">TrafficClaw</span>
+                <span className="text-[13px] font-bold tracking-tight text-white">{BRAND_NAME}</span>
                 <span className="rounded-md border border-cyan-400/10 bg-cyan-400/[0.08] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-cyan-100/85">Real-time</span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 text-[13px] text-zinc-300">

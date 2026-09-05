@@ -1,5 +1,5 @@
 'use client';
-
+import { BRAND_NAME } from '@/lib/brand';
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -329,7 +329,7 @@ export default function EmbedGlobePage() {
                             <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
                         </svg>
                         <a href="https://trafficclaw.com" target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-400 font-medium hover:text-zinc-300 transition">
-                            Powered by <span className="text-emerald-400 font-semibold">TrafficClaw</span>
+                            Powered by <span className="text-emerald-400 font-semibold">{BRAND_NAME}</span>
                         </a>
                     </div>
                 </div>

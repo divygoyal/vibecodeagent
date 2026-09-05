@@ -274,7 +274,7 @@ export default function FeaturesClient() {
                 <div className="max-w-3xl mx-auto">
                     <motion.div variants={fadeUp} className="text-center mb-12">
                         <h2 className="text-3xl font-bold text-white mb-3">Feature FAQ</h2>
-                        <p className="text-sm text-zinc-400">Common questions about TrafficClaw capabilities.</p>
+                        <p className="text-sm text-zinc-400">Common questions about {BRAND_NAME} capabilities.</p>
                     </motion.div>
                     <motion.div variants={fadeUp} className="space-y-4">
                         {[

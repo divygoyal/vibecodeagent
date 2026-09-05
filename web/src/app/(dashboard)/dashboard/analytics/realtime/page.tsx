@@ -1,5 +1,5 @@
 'use client';
-
+import { BRAND_NAME } from '@/lib/brand';
 import { useState, useMemo, useEffect, useCallback, useRef, Component, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
@@ -381,7 +381,7 @@ export default function RealtimePage() {
                                 <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
                                 <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
                             </svg>
-                            <span className="text-[14px] font-bold text-white tracking-tight">TrafficClaw</span>
+                            <span className="text-[14px] font-bold text-white tracking-tight">{BRAND_NAME}</span>
                         </div>
                         <div className="w-px h-4 bg-zinc-600/50 mx-0.5" />
                         <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.15em]">Real-Time</span>
@@ -566,7 +566,7 @@ export default function RealtimePage() {
                         <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
                         <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
                     </svg>
-                    <span className="text-[11px] text-zinc-400 font-medium">Powered by TrafficClaw</span>
+                    <span className="text-[11px] text-zinc-400 font-medium">Powered by {BRAND_NAME}</span>
                 </div>
             </motion.div>
         </div>

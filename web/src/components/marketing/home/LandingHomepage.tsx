@@ -867,7 +867,7 @@ export default function LandingHomepage() {
                 <BadgeMarquee />
                 <div className="mx-auto flex max-w-[1380px] flex-col items-start justify-between gap-4 px-4 py-8 text-sm text-zinc-500 sm:px-6 md:flex-row md:items-center lg:px-8">
                     <div className="flex items-center gap-3">
-                        <Image src="/icon.svg" alt="TrafficClaw" width={28} height={28} className="rounded-lg" />
+                        <Image src="/icon.svg" alt={BRAND_NAME} width={28} height={28} className="rounded-lg" />
                         <span>
                             Traffic<span className="text-[#7AD9DA]">Claw</span>
                         </span>
