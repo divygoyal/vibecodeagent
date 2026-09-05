@@ -871,7 +871,11 @@ export default function LandingHomepage() {
                     <div className="flex items-center gap-3">
                         <Image src="/icon.svg" alt={BRAND_NAME} width={28} height={28} className="rounded-lg" />
                         <span>
-                            Traffic<span className="text-[#7AD9DA]">Claw</span>
+                            {BRAND_NAME === 'TrafficClaw' ? (
+                                <>Traffic<span className="text-[#7AD9DA]">Claw</span></>
+                            ) : (
+                                <>AI<span className="text-[#7AD9DA]">traffic</span></>
+                            )}
                         </span>
                     </div>
                     <div className="flex flex-wrap gap-5">

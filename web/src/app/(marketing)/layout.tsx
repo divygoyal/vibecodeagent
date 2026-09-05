@@ -64,7 +64,11 @@ function Navbar() {
                 <Link href="/" className="flex items-center gap-2.5">
                     <Image src="/icon.svg" alt={BRAND_NAME} width={32} height={32} className="rounded-lg" />
                     <span className="text-lg font-bold tracking-tight text-white">
-                        Traffic<span className="text-[#7AD9DA]">Claw</span>
+                        {BRAND_NAME === 'TrafficClaw' ? (
+                            <>Traffic<span className="text-[#7AD9DA]">Claw</span></>
+                        ) : (
+                            <>AI<span className="text-[#7AD9DA]">traffic</span></>
+                        )}
                     </span>
                 </Link>
 
