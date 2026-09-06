@@ -596,6 +596,12 @@ export default function LandingHomepage() {
     // signature, so their watermark always renders. See
     // `lib/shareWatermark.ts` for the threat model.
     const watermarkedEmbedUrl = signShareEmbedUrl(HOMEPAGE_CONTENT.analyticsEmbedUrl);
+    // Clone hero embeds the clone's own live share through the same
+    // DeferredEmbed code path prod uses (signed with the local secret,
+    // verified by the same deployment).
+    const CLONE_HERO_EMBED_URL =
+        'https://cloud.aitraffic.dev/share/d98e7afc391d5335d52f18a0dcf7e335?embed=true';
+    const heroEmbedSrc = isDefaultBrand() ? watermarkedEmbedUrl : signShareEmbedUrl(CLONE_HERO_EMBED_URL);
     const liveDashboardUrl = isDefaultBrand() ? HOMEPAGE_CONTENT.analyticsEmbedUrl : '/dashboard';
     return (
         <div className="relative overflow-x-clip bg-[#010101] text-white">
@@ -686,20 +692,14 @@ export default function LandingHomepage() {
                                 </div>
                             </div>
 
-                            {isDefaultBrand() ? (
                             <DeferredEmbed
-                                src={watermarkedEmbedUrl}
+                                src={heroEmbedSrc}
                                 title={`${BRAND_NAME} shared analytics dashboard`}
                                 mountStrategy="idle"
                                 className="h-[300px] min-[420px]:h-[360px] sm:h-[520px] lg:h-[760px]"
                             >
                                 <HeroFrameFallback />
                             </DeferredEmbed>
-                            ) : (
-                            <div className="relative h-[300px] overflow-hidden min-[420px]:h-[360px] sm:h-[520px] lg:h-[760px]">
-                                <HeroFrameFallback />
-                            </div>
-                            )}
                         </div>
                     </div>
 
