@@ -12,6 +12,7 @@ import { isPushSupported, isPushEnabled, requestPushPermission, disablePush } fr
 import { useContainerStatus } from '@/lib/useDashboardData';
 import { toast } from 'sonner';
 import LeaderboardOptIn from './LeaderboardOptIn';
+import SponsorshipPricing from './SponsorshipPricing';
 
 /* ───────────────────────────────────────────────────────────────────
  * Settings
@@ -164,7 +165,13 @@ export default function SettingsPage() {
                         />
                     )}
                     {activeTab === 'leaderboard' && (
-                        <LeaderboardOptIn />
+                        <div className="space-y-6">
+                            <LeaderboardOptIn />
+                            {/* Renders nothing unless the user has a verified,
+                                sellable entry, so the tab is unchanged for
+                                everyone else. */}
+                            <SponsorshipPricing />
+                        </div>
                     )}
                 </main>
             </div>

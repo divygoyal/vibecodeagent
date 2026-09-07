@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "eval:chat": "npx -y tsx src/services/chat/__eval__/run.ts"
+    "eval:chat": "npx -y tsx src/services/chat/__eval__/run.ts",
+    "check:pricing": "npx -y tsx src/lib/__checks__/sponsorshipMarketplace.check.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -10,6 +10,8 @@ import {
 import {
     XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, CartesianGrid,
 } from 'recharts';
+import SponsorshipPanel from './SponsorshipPanel';
+import type { PublisherListingOverride } from '@/lib/sponsorshipPricing';
 
 export interface StartupProfileData {
     id: number;
@@ -42,6 +44,9 @@ export interface StartupProfileData {
         rank_overall: number | null;
         rank_in_category: number | null;
     }>;
+    /** Publisher's own sponsorship pricing. Absent/null means "use the price
+     *  computed from the GA4 metrics above" — see `sponsorshipPricing.ts`. */
+    sponsorship_listing?: PublisherListingOverride | null;
 }
 
 function formatNumber(n: number): string {
@@ -529,6 +534,26 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                         </div>
                     </div>
                 </div>
+
+                {/* Sponsorship — renders nothing unless the entry is verified and
+                    has enough traffic to price, so unverified profiles are
+                    byte-for-byte what they were before. */}
+                <SponsorshipPanel
+                    entryId={entry.id}
+                    entryName={entry.startup_name}
+                    pricingInput={{
+                        monthly_pageviews: entry.monthly_pageviews,
+                        engagement_rate: entry.engagement_rate,
+                        bounce_rate: entry.bounce_rate,
+                        avg_session_duration: entry.avg_session_duration,
+                        primary_country: entry.primary_country,
+                        category: entry.category,
+                        verification_status: entry.verification_status,
+                        is_verified: entry.is_verified,
+                    }}
+                    listing={entry.sponsorship_listing ?? null}
+                    sourcePath={`/leaderboard/${entry.slug || entry.id}`}
+                />
 
                 {/* Embed badge — always visible, matches Trust Traffic pattern */}
                 <div className="mt-6 overflow-hidden rounded-[26px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.06),transparent_38%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-8">

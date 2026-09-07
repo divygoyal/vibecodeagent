@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text, func, or_, case
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, SupportMessage, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent, WeeklyDigest
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, SupportMessage, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent, WeeklyDigest, SponsorshipListing, SponsorshipRequest, SponsorshipRequestItem
 from plugin_security import (
     GOOGLE_PLUGINS,
     build_google_credentials_stdin,
@@ -232,6 +232,76 @@ async def init_db():
             print(f"[startup] leaderboard multi-site migration: {result}")
         except Exception as exc:
             print(f"[startup] multi-site leaderboard migration FAILED: {type(exc).__name__}: {exc}")
+
+        # Sponsorship booking marketplace (017_add_sponsorship_marketplace.sql).
+        # Base.metadata.create_all above already creates these from the models,
+        # but the explicit idempotent DDL is kept here so a database that was
+        # created before the models existed converges without a manual step —
+        # same belt-and-braces pattern as migrations 010-016.
+        for ddl in [
+            """CREATE TABLE IF NOT EXISTS sponsorship_listings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entry_id INTEGER NOT NULL,
+                price_cents INTEGER,
+                floor_cents INTEGER,
+                accepting_requests BOOLEAN NOT NULL DEFAULT 1,
+                placement_note TEXT,
+                auto_price_cents_at_save INTEGER,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_sponsorship_listing_entry UNIQUE (entry_id),
+                FOREIGN KEY (entry_id) REFERENCES leaderboard_entries(id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_sponsorship_listings_entry_id ON sponsorship_listings(entry_id)",
+            """CREATE TABLE IF NOT EXISTS sponsorship_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                advertiser_email VARCHAR(255) NOT NULL,
+                advertiser_name VARCHAR(120),
+                advertiser_site VARCHAR(500),
+                source VARCHAR(20) NOT NULL DEFAULT 'profile',
+                source_path VARCHAR(255),
+                budget_cents INTEGER,
+                quoted_total_cents INTEGER NOT NULL DEFAULT 0,
+                site_count INTEGER NOT NULL DEFAULT 0,
+                message TEXT,
+                status VARCHAR(20) NOT NULL DEFAULT 'new',
+                ip_address VARCHAR(64),
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_sponsorship_requests_created_at ON sponsorship_requests(created_at)",
+            "CREATE INDEX IF NOT EXISTS ix_sponsorship_requests_status ON sponsorship_requests(status)",
+            "CREATE INDEX IF NOT EXISTS ix_sponsorship_requests_email ON sponsorship_requests(advertiser_email)",
+            """CREATE TABLE IF NOT EXISTS sponsorship_request_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER NOT NULL,
+                entry_id INTEGER NOT NULL,
+                entry_name VARCHAR(150),
+                entry_domain VARCHAR(255),
+                price_cents_at_request INTEGER NOT NULL,
+                price_source VARCHAR(20) NOT NULL DEFAULT 'computed',
+                estimated_impressions INTEGER,
+                status VARCHAR(20) NOT NULL DEFAULT 'new',
+                notified_at DATETIME,
+                responded_at DATETIME,
+                paid_at DATETIME,
+                paid_amount_cents INTEGER,
+                live_at DATETIME,
+                operator_note TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (request_id) REFERENCES sponsorship_requests(id) ON DELETE CASCADE,
+                FOREIGN KEY (entry_id) REFERENCES leaderboard_entries(id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_sponsorship_request_items_request_id ON sponsorship_request_items(request_id)",
+            "CREATE INDEX IF NOT EXISTS ix_sponsorship_request_items_entry_id ON sponsorship_request_items(entry_id)",
+            "CREATE INDEX IF NOT EXISTS ix_sponsorship_request_items_status ON sponsorship_request_items(status)",
+            "CREATE INDEX IF NOT EXISTS ix_sponsorship_request_items_paid_at ON sponsorship_request_items(paid_at)",
+        ]:
+            try:
+                await conn.execute(text(ddl))
+            except Exception as exc:
+                print(f"[startup] sponsorship marketplace DDL skipped: {type(exc).__name__}: {exc}")
 
 
 async def get_db():
@@ -3468,9 +3538,18 @@ async def get_leaderboard_entry_detail(
     )
     history_rows = list(reversed(history_result.scalars().all()))
 
+    # Additive: the publisher's sponsorship override, if they set one. `None`
+    # means "no row", which the web layer reads as "use the computed price".
+    # Inlined here so the profile page needs no second round trip.
+    listing_result = await db.execute(
+        select(SponsorshipListing).where(SponsorshipListing.entry_id == entry.id)
+    )
+    sponsorship_listing = listing_result.scalar_one_or_none()
+
     return {
         "id": entry.id,
         "slug": entry.slug,
+        "sponsorship_listing": _serialize_sponsorship_listing(sponsorship_listing),
         "startup_name": entry.startup_name,
         "description": entry.description,
         "website_url": entry.website_url,
@@ -3574,11 +3653,30 @@ async def list_leaderboard(
     result = await db.execute(paginated)
     entries = result.scalars().all()
 
+    # Additive: publisher sponsorship overrides for this page of entries, in one
+    # query rather than N. Absent from the map means "no row", which the web
+    # layer reads as "use the computed price".
+    listings_by_entry: Dict[int, dict] = {}
+    if entries:
+        listings_result = await db.execute(
+            select(SponsorshipListing).where(
+                SponsorshipListing.entry_id.in_([e.id for e in entries])
+            )
+        )
+        for listing in listings_result.scalars().all():
+            serialized = _serialize_sponsorship_listing(listing)
+            if serialized:
+                listings_by_entry[listing.entry_id] = serialized
+
     return {
         "entries": [
             {
                 "id": e.id,
                 "slug": e.slug,
+                # Additive fields for sponsorship pricing. `avg_session_duration`
+                # was already on the model but not exposed on the list shape.
+                "avg_session_duration": e.avg_session_duration or 0,
+                "sponsorship_listing": listings_by_entry.get(e.id),
                 "startup_name": e.startup_name,
                 "description": e.description,
                 "website_url": e.website_url,
@@ -3627,6 +3725,9 @@ def _serialize_entry(entry: LeaderboardEntry) -> dict:
         "monthly_pageviews": entry.monthly_pageviews or 0,
         "engagement_rate": entry.engagement_rate or 0,
         "bounce_rate": entry.bounce_rate or 0,
+        # Additive: needed so the publisher's own pricing screen computes the
+        # same suggestion the public profile shows.
+        "avg_session_duration": entry.avg_session_duration or 0,
         "visitor_trend": entry.visitor_trend or 0,
         "is_verified": bool(entry.is_verified),
         "verification_status": entry.verification_status or ("verified" if entry.is_verified else "pending"),
@@ -6465,6 +6566,508 @@ async def get_weekly_digests(
     return {
         "digests": [_serialize_weekly_digest_summary(d) for d in digests],
         "exists": True,
+    }
+
+
+# ============= Sponsorship Marketplace =============
+#
+# The 30-day demand test: publishers list a priced sponsor slot, advertisers
+# request it, and the first ten deals are fulfilled by hand. No payments, no
+# escrow, no ad server, no tag, no credits. See migration
+# 017_add_sponsorship_marketplace.sql for the reasoning behind the schema.
+#
+# All prices are computed in the web layer by `web/src/lib/sponsorshipPricing.ts`
+# so the formula lives in exactly one place. These endpoints only store the
+# publisher's override and the request records — they never price anything.
+
+SPONSORSHIP_ITEM_STATUSES = {
+    "new", "contacted", "accepted", "declined", "paid", "live", "completed", "lost",
+}
+
+
+def _sponsorship_host(website_url: Optional[str]) -> Optional[str]:
+    """Bare lowercase host, `www.` stripped. Mirrors `normalizeHost` in
+    `web/src/app/api/leaderboard/join/route.ts` so the domain stored on a
+    request item matches what the site shows publicly."""
+    if not website_url:
+        return None
+    raw = website_url.strip().lower()
+    if not raw:
+        return None
+    with_scheme = raw if raw.startswith(("http://", "https://")) else f"https://{raw}"
+    try:
+        host = urlparse(with_scheme).hostname or ""
+    except Exception:
+        return None
+    host = host[4:] if host.startswith("www.") else host
+    return host or None
+
+# Statuses that mean money actually arrived. This set defines the gate for the
+# whole experiment: 3 paid sponsorships inside 30 days.
+SPONSORSHIP_PAID_STATUSES = {"paid", "live", "completed"}
+SPONSORSHIP_DEAD_STATUSES = {"declined", "lost"}
+
+
+class SponsorshipListingUpsert(BaseModel):
+    """Publisher's own pricing. `price_cents = None` means inherit the computed
+    suggestion, so clearing the field is a first-class action, not a delete."""
+    price_cents: Optional[int] = None
+    floor_cents: Optional[int] = None
+    accepting_requests: Optional[bool] = None
+    placement_note: Optional[str] = None
+    # What the pricing model suggested when the publisher hit save. Stored so we
+    # can later measure whether the formula is any good.
+    auto_price_cents_at_save: Optional[int] = None
+
+
+class SponsorshipRequestItemCreate(BaseModel):
+    entry_id: int
+    price_cents_at_request: int
+    price_source: Optional[str] = "computed"
+    estimated_impressions: Optional[int] = None
+
+
+class SponsorshipRequestCreate(BaseModel):
+    advertiser_email: str
+    advertiser_name: Optional[str] = None
+    advertiser_site: Optional[str] = None
+    source: Optional[str] = "profile"   # profile | budget
+    source_path: Optional[str] = None
+    budget_cents: Optional[int] = None
+    message: Optional[str] = None
+    ip_address: Optional[str] = None
+    items: List[SponsorshipRequestItemCreate]
+
+
+class SponsorshipItemUpdate(BaseModel):
+    """Operator-driven status transition. Timestamps are stamped server-side
+    from the status so the funnel can never disagree with the status column."""
+    status: Optional[str] = None
+    paid_amount_cents: Optional[int] = None
+    operator_note: Optional[str] = None
+
+
+def _serialize_sponsorship_listing(listing: Optional[SponsorshipListing]) -> Optional[dict]:
+    """Shape consumed by `resolveSponsorshipPrice()` in the web layer.
+
+    Returns None when there is no row, and None is meaningful: it is the signal
+    to use the computed price. Do not substitute an empty object.
+    """
+    if not listing:
+        return None
+    return {
+        "entry_id": listing.entry_id,
+        "price_cents": listing.price_cents,
+        "floor_cents": listing.floor_cents,
+        "accepting_requests": bool(listing.accepting_requests),
+        "placement_note": listing.placement_note,
+        "auto_price_cents_at_save": listing.auto_price_cents_at_save,
+        "updated_at": listing.updated_at.isoformat() if listing.updated_at else None,
+    }
+
+
+async def _fetch_sponsorship_listing(db: AsyncSession, entry_id: int) -> Optional[SponsorshipListing]:
+    result = await db.execute(
+        select(SponsorshipListing).where(SponsorshipListing.entry_id == entry_id)
+    )
+    return result.scalar_one_or_none()
+
+
+def _serialize_sponsorship_item(item: SponsorshipRequestItem) -> dict:
+    return {
+        "id": item.id,
+        "request_id": item.request_id,
+        "entry_id": item.entry_id,
+        "entry_name": item.entry_name,
+        "entry_domain": item.entry_domain,
+        "price_cents_at_request": item.price_cents_at_request,
+        "price_source": item.price_source,
+        "estimated_impressions": item.estimated_impressions,
+        "status": item.status,
+        "notified_at": isoformat_or_none(item.notified_at),
+        "responded_at": isoformat_or_none(item.responded_at),
+        "paid_at": isoformat_or_none(item.paid_at),
+        "paid_amount_cents": item.paid_amount_cents,
+        "live_at": isoformat_or_none(item.live_at),
+        "operator_note": item.operator_note,
+        "created_at": isoformat_or_none(item.created_at),
+    }
+
+
+def _rollup_request_status(items: List[SponsorshipRequestItem]) -> str:
+    """Derive the parent status from its items.
+
+    Stored rather than computed on read so the funnel query stays a single
+    cheap aggregate, but always recomputed from the items on every write so the
+    two can never drift.
+    """
+    if not items:
+        return "new"
+    statuses = [i.status for i in items]
+    paid = [s for s in statuses if s in SPONSORSHIP_PAID_STATUSES]
+    dead = [s for s in statuses if s in SPONSORSHIP_DEAD_STATUSES]
+    if paid and len(paid) == len(statuses):
+        return "won"
+    if paid:
+        return "partially_won"
+    if dead and len(dead) == len(statuses):
+        return "lost"
+    if any(s != "new" for s in statuses):
+        return "contacted"
+    return "new"
+
+
+@app.get("/api/sponsorship/listing/{entry_id}")
+async def get_sponsorship_listing(
+    entry_id: int,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Publisher reads their own override. 404s if they don't own the entry."""
+    await _resolve_user_entry(db, user_identifier, entry_id)
+    listing = await _fetch_sponsorship_listing(db, entry_id)
+    return {"listing": _serialize_sponsorship_listing(listing)}
+
+
+@app.put("/api/sponsorship/listing/{entry_id}")
+async def upsert_sponsorship_listing(
+    entry_id: int,
+    data: SponsorshipListingUpsert,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Publisher sets their own price / floor / availability.
+
+    Upsert rather than insert-or-fail: the settings UI is a single form the
+    publisher can save repeatedly. Ownership is proved by `_resolve_user_entry`
+    before anything is written.
+    """
+    await _resolve_user_entry(db, user_identifier, entry_id)
+
+    payload = data.model_dump(exclude_unset=True)
+    for money_field in ("price_cents", "floor_cents", "auto_price_cents_at_save"):
+        value = payload.get(money_field)
+        if value is not None:
+            if not isinstance(value, int) or value < 0 or value > 100_000_000:
+                raise HTTPException(status_code=400, detail=f"{money_field} out of range")
+    note = payload.get("placement_note")
+    if isinstance(note, str):
+        payload["placement_note"] = note.strip()[:500] or None
+
+    listing = await _fetch_sponsorship_listing(db, entry_id)
+    if not listing:
+        listing = SponsorshipListing(entry_id=entry_id)
+        db.add(listing)
+    for key, value in payload.items():
+        setattr(listing, key, value)
+    listing.updated_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(listing)
+    return {"success": True, "listing": _serialize_sponsorship_listing(listing)}
+
+
+@app.post("/api/sponsorship/requests")
+async def create_sponsorship_request(
+    data: SponsorshipRequestCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Record one advertiser submission covering one or more sites.
+
+    Returns each created item enriched with the publisher's contact address so
+    the web layer can email both parties in the same request. Those addresses
+    are server-to-server only and must never reach the browser.
+
+    Entries that are not verified, not active or unknown are dropped from the
+    request rather than failing the whole submission — a stale tab should not
+    lose a lead. The response reports what was dropped.
+    """
+    email = (data.advertiser_email or "").strip().lower()
+    if "@" not in email or len(email) > 254:
+        raise HTTPException(status_code=400, detail="Valid advertiser_email is required")
+    if not data.items:
+        raise HTTPException(status_code=400, detail="At least one site is required")
+    if len(data.items) > 50:
+        raise HTTPException(status_code=400, detail="Too many sites in one request")
+
+    entry_ids = list({int(i.entry_id) for i in data.items})
+    entries_result = await db.execute(
+        select(LeaderboardEntry).where(
+            LeaderboardEntry.id.in_(entry_ids),
+            LeaderboardEntry.is_active == True,
+            or_(
+                LeaderboardEntry.verification_status == "verified",
+                LeaderboardEntry.is_verified == True,
+            ),
+        )
+    )
+    entries = {e.id: e for e in entries_result.scalars().all()}
+    dropped = [eid for eid in entry_ids if eid not in entries]
+    if not entries:
+        raise HTTPException(status_code=400, detail="No verified, active sites in this request")
+
+    owner_ids = {e.user_id for e in entries.values()}
+    owners_result = await db.execute(select(User).where(User.id.in_(owner_ids)))
+    owners = {u.id: u for u in owners_result.scalars().all()}
+
+    source = data.source if data.source in ("profile", "budget") else "profile"
+    request_row = SponsorshipRequest(
+        advertiser_email=email,
+        advertiser_name=(data.advertiser_name or "").strip()[:120] or None,
+        advertiser_site=(data.advertiser_site or "").strip()[:500] or None,
+        source=source,
+        source_path=(data.source_path or "").strip()[:255] or None,
+        budget_cents=data.budget_cents,
+        message=(data.message or "").strip()[:2000] or None,
+        ip_address=(data.ip_address or "").strip()[:64] or None,
+        quoted_total_cents=0,
+        site_count=0,
+        status="new",
+    )
+    db.add(request_row)
+    await db.flush()  # need request_row.id for the items
+
+    created: List[SponsorshipRequestItem] = []
+    total = 0
+    for spec in data.items:
+        entry = entries.get(int(spec.entry_id))
+        if not entry:
+            continue
+        price = max(0, int(spec.price_cents_at_request or 0))
+        total += price
+        item = SponsorshipRequestItem(
+            request_id=request_row.id,
+            entry_id=entry.id,
+            entry_name=(entry.startup_name or "")[:150] or None,
+            entry_domain=(_sponsorship_host(entry.website_url) or entry.website_url or "")[:255] or None,
+            price_cents_at_request=price,
+            price_source=spec.price_source if spec.price_source in ("publisher", "computed") else "computed",
+            estimated_impressions=spec.estimated_impressions,
+            status="new",
+            notified_at=datetime.utcnow(),
+        )
+        db.add(item)
+        created.append(item)
+
+    request_row.quoted_total_cents = total
+    request_row.site_count = len(created)
+    await db.commit()
+    await db.refresh(request_row)
+    for item in created:
+        await db.refresh(item)
+
+    items_payload = []
+    for item in created:
+        entry = entries[item.entry_id]
+        owner = owners.get(entry.user_id)
+        items_payload.append({
+            **_serialize_sponsorship_item(item),
+            "entry_slug": entry.slug,
+            # Publisher notification target: the address they chose to publish,
+            # falling back to their account email.
+            "publisher_email": entry.contact_email or (owner.email if owner else None),
+            "publisher_name": entry.founder_name or (owner.github_username if owner else None),
+        })
+
+    return {
+        "success": True,
+        "request": {
+            "id": request_row.id,
+            "advertiser_email": request_row.advertiser_email,
+            "advertiser_name": request_row.advertiser_name,
+            "source": request_row.source,
+            "budget_cents": request_row.budget_cents,
+            "quoted_total_cents": request_row.quoted_total_cents,
+            "site_count": request_row.site_count,
+            "status": request_row.status,
+            "created_at": isoformat_or_none(request_row.created_at),
+        },
+        "items": items_payload,
+        "dropped_entry_ids": dropped,
+    }
+
+
+@app.get("/api/sponsorship/requests")
+async def list_sponsorship_requests(
+    status: Optional[str] = None,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Operator view: every request with its per-site items, newest first."""
+    capped = max(1, min(limit, 500))
+    query = select(SponsorshipRequest).order_by(SponsorshipRequest.created_at.desc()).limit(capped)
+    if status:
+        query = query.where(SponsorshipRequest.status == status)
+    result = await db.execute(query)
+    requests = list(result.scalars().all())
+
+    items_by_request: Dict[int, List[SponsorshipRequestItem]] = {}
+    if requests:
+        items_result = await db.execute(
+            select(SponsorshipRequestItem)
+            .where(SponsorshipRequestItem.request_id.in_([r.id for r in requests]))
+            .order_by(SponsorshipRequestItem.id.asc())
+        )
+        for item in items_result.scalars().all():
+            items_by_request.setdefault(item.request_id, []).append(item)
+
+    return {
+        "requests": [
+            {
+                "id": r.id,
+                "advertiser_email": r.advertiser_email,
+                "advertiser_name": r.advertiser_name,
+                "advertiser_site": r.advertiser_site,
+                "source": r.source,
+                "source_path": r.source_path,
+                "budget_cents": r.budget_cents,
+                "quoted_total_cents": r.quoted_total_cents,
+                "site_count": r.site_count,
+                "message": r.message,
+                "status": r.status,
+                "created_at": isoformat_or_none(r.created_at),
+                "items": [_serialize_sponsorship_item(i) for i in items_by_request.get(r.id, [])],
+            }
+            for r in requests
+        ],
+        "total": len(requests),
+    }
+
+
+@app.patch("/api/sponsorship/request-items/{item_id}")
+async def update_sponsorship_request_item(
+    item_id: int,
+    data: SponsorshipItemUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Advance one site's status through the funnel.
+
+    Timestamps are derived from the status transition instead of being passed
+    in, so `paid_at` can only ever be set by moving to a paid status. That keeps
+    the "3 paid sponsorships in 30 days" gate honest — it cannot be nudged by a
+    stray API call that sets a date without a status.
+    """
+    result = await db.execute(
+        select(SponsorshipRequestItem).where(SponsorshipRequestItem.id == item_id)
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Request item not found")
+
+    now = datetime.utcnow()
+    if data.status is not None:
+        if data.status not in SPONSORSHIP_ITEM_STATUSES:
+            raise HTTPException(status_code=400, detail=f"Unknown status: {data.status}")
+        item.status = data.status
+        if data.status in ("accepted", "declined") and not item.responded_at:
+            item.responded_at = now
+        if data.status in SPONSORSHIP_PAID_STATUSES and not item.paid_at:
+            item.paid_at = now
+            if not item.responded_at:
+                item.responded_at = now
+        if data.status == "live" and not item.live_at:
+            item.live_at = now
+        if data.status == "contacted" and not item.notified_at:
+            item.notified_at = now
+
+    if data.paid_amount_cents is not None:
+        if data.paid_amount_cents < 0 or data.paid_amount_cents > 100_000_000:
+            raise HTTPException(status_code=400, detail="paid_amount_cents out of range")
+        item.paid_amount_cents = data.paid_amount_cents
+    if data.operator_note is not None:
+        item.operator_note = data.operator_note.strip()[:2000] or None
+    item.updated_at = now
+
+    # Re-roll the parent so the stored status never drifts from its children.
+    siblings_result = await db.execute(
+        select(SponsorshipRequestItem).where(SponsorshipRequestItem.request_id == item.request_id)
+    )
+    siblings = list(siblings_result.scalars().all())
+    parent_result = await db.execute(
+        select(SponsorshipRequest).where(SponsorshipRequest.id == item.request_id)
+    )
+    parent = parent_result.scalar_one_or_none()
+    if parent:
+        parent.status = _rollup_request_status(siblings)
+        parent.updated_at = now
+
+    await db.commit()
+    await db.refresh(item)
+    return {"success": True, "item": _serialize_sponsorship_item(item), "request_status": parent.status if parent else None}
+
+
+@app.get("/api/sponsorship/funnel")
+async def sponsorship_funnel(
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """The one number that decides whether any of this gets built further.
+
+    Gate: 3 paid sponsorships within 30 days, at any price. Everything else in
+    this response is context for that single figure.
+    """
+    window_days = max(1, min(days, 365))
+    since = datetime.utcnow() - timedelta(days=window_days)
+
+    items_result = await db.execute(
+        select(SponsorshipRequestItem).where(SponsorshipRequestItem.created_at >= since)
+    )
+    items = list(items_result.scalars().all())
+
+    requests_result = await db.execute(
+        select(SponsorshipRequest).where(SponsorshipRequest.created_at >= since)
+    )
+    requests = list(requests_result.scalars().all())
+
+    by_status: Dict[str, int] = {}
+    for item in items:
+        by_status[item.status] = by_status.get(item.status, 0) + 1
+
+    paid_items = [i for i in items if i.status in SPONSORSHIP_PAID_STATUSES]
+    revenue_cents = sum(i.paid_amount_cents or i.price_cents_at_request or 0 for i in paid_items)
+    requested_cents = sum(i.price_cents_at_request or 0 for i in items)
+
+    response_latencies = [
+        (i.responded_at - i.created_at).total_seconds() / 3600
+        for i in items
+        if i.responded_at and i.created_at
+    ]
+
+    by_source: Dict[str, Dict[str, int]] = {}
+    request_by_id = {r.id: r for r in requests}
+    for item in items:
+        parent = request_by_id.get(item.request_id)
+        source = parent.source if parent else "unknown"
+        bucket = by_source.setdefault(source, {"requested": 0, "paid": 0})
+        bucket["requested"] += 1
+        if item.status in SPONSORSHIP_PAID_STATUSES:
+            bucket["paid"] += 1
+
+    return {
+        "window_days": window_days,
+        "since": since.isoformat(),
+        # The gate.
+        "paid_sponsorships": len(paid_items),
+        "gate_target": 3,
+        "gate_met": len(paid_items) >= 3,
+        "requests": len(requests),
+        "site_requests": len(items),
+        "unique_advertisers": len({r.advertiser_email for r in requests}),
+        "items_by_status": by_status,
+        "requested_value_cents": requested_cents,
+        "paid_value_cents": revenue_cents,
+        "request_to_paid_pct": round(len(paid_items) / len(items) * 100, 1) if items else 0.0,
+        "median_response_hours": (
+            round(sorted(response_latencies)[len(response_latencies) // 2], 1)
+            if response_latencies else None
+        ),
+        "by_source": by_source,
     }
 
 
