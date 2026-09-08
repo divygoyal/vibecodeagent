@@ -4,8 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import {
     Trophy, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, Loader2,
     CheckCircle2, Globe, Twitter, Copy, Check, Code2, Plus, Pencil,
-    Trash2, ArrowLeft,
+    Trash2, ArrowLeft, Megaphone,
 } from 'lucide-react';
+import AdSlotsEditor from './AdSlotsEditor';
+import {
+    draftsToPayload,
+    slotToDraft,
+    type AdSlot,
+    type AdSlotDraft,
+} from '@/lib/adSlots';
 
 const CATEGORIES = [
     { value: 'SaaS', label: 'SaaS' },
@@ -58,7 +65,13 @@ interface LeaderboardEntry {
     last_refreshed: string | null;
 }
 
-type Mode = { kind: 'list' } | { kind: 'create' } | { kind: 'edit'; entry: LeaderboardEntry };
+type Mode =
+    | { kind: 'list' }
+    | { kind: 'create' }
+    | { kind: 'edit'; entry: LeaderboardEntry }
+    // Managing the ad slots of an already-listed site. Separate from 'edit' so
+    // saving a price never re-runs GA4 domain verification.
+    | { kind: 'slots'; entry: LeaderboardEntry };
 
 const EMPTY_FORM = {
     startup_name: '',
@@ -155,6 +168,15 @@ export default function LeaderboardOptIn() {
     const [form, setForm] = useState(EMPTY_FORM);
     const [showBadgeEmbed, setShowBadgeEmbed] = useState<number | null>(null);
     const [copiedField, setCopiedField] = useState<string | null>(null);
+    // Ad slots being edited. Empty array = this site sells nothing, which is
+    // the default and stays a no-op through the whole save path.
+    const [slotDrafts, setSlotDrafts] = useState<AdSlotDraft[]>([]);
+    const [slotsLoading, setSlotsLoading] = useState(false);
+    const [savingSlots, setSavingSlots] = useState(false);
+    // Did the entry already have saved slots when we opened it? Needed so that
+    // deleting every row actually clears them server-side, while an entry that
+    // never had slots never triggers a slot request at all.
+    const [hadSavedSlots, setHadSavedSlots] = useState(false);
 
     useEffect(() => {
         void refreshEntries();
@@ -184,16 +206,101 @@ export default function LeaderboardOptIn() {
         }
     }
 
+    /**
+     * Load an entry's saved slots (including paused) into editable rows.
+     */
+    async function loadSlots(entryId: number) {
+        setSlotsLoading(true);
+        try {
+            const res = await fetch(`/api/ad-slots?entry_id=${entryId}`, { cache: 'no-store' });
+            const data = await res.json();
+            const slots: AdSlot[] = Array.isArray(data.slots) ? data.slots : [];
+            setSlotDrafts(slots.map(slotToDraft));
+            setHadSavedSlots(slots.length > 0);
+        } catch {
+            setSlotDrafts([]);
+            setHadSavedSlots(false);
+        } finally {
+            setSlotsLoading(false);
+        }
+    }
+
+    /**
+     * Persist the current rows for one entry. Returns an error string on
+     * failure so callers can decide how loudly to complain.
+     *
+     * The price travels as the integer cents of whatever the publisher typed —
+     * `draftsToPayload` does the dollars-to-cents unit conversion and nothing
+     * else.
+     */
+    async function saveSlots(entryId: number): Promise<string | null> {
+        const converted = draftsToPayload(slotDrafts);
+        if (!converted.ok) return converted.error;
+        // Nothing to send and nothing to clear — leave the API alone entirely.
+        if (converted.slots.length === 0 && !hadSavedSlots) return null;
+
+        try {
+            const res = await fetch('/api/ad-slots', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ entry_id: entryId, slots: converted.slots }),
+            });
+            const raw = await res.text();
+            let data: { success?: boolean; error?: string; detail?: string; slots?: AdSlot[] } = {};
+            try {
+                data = raw ? JSON.parse(raw) : {};
+            } catch {
+                return `Server returned ${res.status} while saving ad slots.`;
+            }
+            if (!res.ok || !data.success) {
+                return data.error || data.detail || `Could not save ad slots (status ${res.status}).`;
+            }
+            const saved = Array.isArray(data.slots) ? data.slots : [];
+            setSlotDrafts(saved.map(slotToDraft));
+            setHadSavedSlots(saved.length > 0);
+            return null;
+        } catch {
+            return 'Network error while saving ad slots.';
+        }
+    }
+
     function startCreate() {
         // Pre-select the first GA property the user has access to so the form
         // is one-click submittable for the common case.
         const firstProperty = properties[0]?.property || '';
         setForm({ ...EMPTY_FORM, ga_property_id: firstProperty });
+        setSlotDrafts([]);
+        setHadSavedSlots(false);
         setMessage(null);
         setMode({ kind: 'create' });
     }
 
+    function startSlots(entry: LeaderboardEntry) {
+        setSlotDrafts([]);
+        setHadSavedSlots(false);
+        setMessage(null);
+        setMode({ kind: 'slots', entry });
+        void loadSlots(entry.id);
+    }
+
+    async function handleSaveSlots(entry: LeaderboardEntry) {
+        setSavingSlots(true);
+        setMessage(null);
+        const error = await saveSlots(entry.id);
+        setSavingSlots(false);
+        if (error) {
+            setMessage({ tone: 'err', text: error });
+            return;
+        }
+        setMessage({ tone: 'ok', text: `Ad slots saved for ${entry.startup_name}.` });
+        setMode({ kind: 'list' });
+    }
+
     function startEdit(entry: LeaderboardEntry) {
+        // Editing a listing doesn't touch slots — drop any rows left over from
+        // another site's slot screen so they can never follow us here.
+        setSlotDrafts([]);
+        setHadSavedSlots(false);
         setForm({
             startup_name: entry.startup_name || '',
             description: entry.description || '',
@@ -214,6 +321,8 @@ export default function LeaderboardOptIn() {
     function backToList() {
         setMode({ kind: 'list' });
         setMessage(null);
+        setSlotDrafts([]);
+        setHadSavedSlots(false);
     }
 
     function toggleLookingFor(value: string) {
@@ -239,6 +348,14 @@ export default function LeaderboardOptIn() {
             setMessage({ tone: 'err', text: 'Add the website URL we should match against the GA4 property.' });
             return;
         }
+        // Catch a half-filled slot row before creating the listing, so the
+        // publisher never ends up with a live site and a lost slot. With no
+        // rows this always passes and changes nothing.
+        const slotCheck = draftsToPayload(slotDrafts);
+        if (!slotCheck.ok) {
+            setMessage({ tone: 'err', text: slotCheck.error });
+            return;
+        }
 
         setSaving(true);
         setMessage(null);
@@ -254,7 +371,7 @@ export default function LeaderboardOptIn() {
             // route would have returned JSON, which used to throw and surface as
             // an uninformative "Network error" toast.
             const raw = await res.text();
-            let data: { success?: boolean; error?: string; detail?: string; verification?: { status?: string } } = {};
+            let data: { success?: boolean; id?: number; error?: string; detail?: string; verification?: { status?: string } } = {};
             try {
                 data = raw ? JSON.parse(raw) : {};
             } catch {
@@ -267,14 +384,29 @@ export default function LeaderboardOptIn() {
                     : `Could not save (status ${res.status}).`;
                 setMessage({ tone: 'err', text: data.error || data.detail || fallback });
             } else {
-                setMessage({
-                    tone: 'ok',
-                    text: isEdit
-                        ? 'Listing updated.'
-                        : data.verification?.status === 'verified'
-                            ? '🎉 You\'re live on the leaderboard!'
-                            : 'Listing saved — verification will retry on the daily refresh.',
-                });
+                const baseText = isEdit
+                    ? 'Listing updated.'
+                    : data.verification?.status === 'verified'
+                        ? '🎉 You\'re live on the leaderboard!'
+                        : 'Listing saved — verification will retry on the daily refresh.';
+
+                // Slots need an entry id, so they can only be written once the
+                // entry exists — on create, the id comes back on this response.
+                // Editing a listing never touches slots (they have their own
+                // screen), so this whole block is skipped there.
+                let slotError: string | null = null;
+                if (!isEdit && slotCheck.slots.length > 0) {
+                    const newEntryId = Number(data.id);
+                    slotError = Number.isFinite(newEntryId) && newEntryId > 0
+                        ? await saveSlots(newEntryId)
+                        : 'the listing saved but we did not get its id back.';
+                }
+
+                setMessage(
+                    slotError
+                        ? { tone: 'err', text: `${baseText} Ad slots were not saved — ${slotError} Use “Ad slots” on the listing to try again.` }
+                        : { tone: 'ok', text: baseText },
+                );
                 await refreshEntries();
                 setMode({ kind: 'list' });
             }
@@ -309,6 +441,7 @@ export default function LeaderboardOptIn() {
     const headerCopy = useMemo(() => {
         if (mode.kind === 'create') return { title: 'Add a verified site', subtitle: 'Each site needs its own GA4 property — we match the property\'s web stream against the host.' };
         if (mode.kind === 'edit') return { title: 'Edit listing', subtitle: 'Update the public profile or swap the connected GA4 property.' };
+        if (mode.kind === 'slots') return { title: 'Ad slots', subtitle: 'Add, price, pause or remove what you sell on this site. Your price, your words.' };
         return { title: 'Traffic Leaderboard', subtitle: 'Share verified GA4 traffic publicly. List as many of your sites as you like — each needs its own GA4 property.' };
     }, [mode.kind]);
 
@@ -428,7 +561,7 @@ export default function LeaderboardOptIn() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex flex-wrap items-center gap-1.5">
                                         {entry.is_verified && (
                                             <a
                                                 href={`/leaderboard/${entry.slug || entry.id}`}
@@ -440,6 +573,14 @@ export default function LeaderboardOptIn() {
                                                 View
                                             </a>
                                         )}
+                                        <button
+                                            type="button"
+                                            onClick={() => startSlots(entry)}
+                                            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:border-white/[0.12] hover:text-white"
+                                        >
+                                            <Megaphone className="h-3 w-3" />
+                                            Ad slots
+                                        </button>
                                         <button
                                             type="button"
                                             onClick={() => setShowBadgeEmbed(showBadgeEmbed === entry.id ? null : entry.id)}
@@ -668,6 +809,11 @@ export default function LeaderboardOptIn() {
                         </div>
                     </div>
 
+                    {/* Optional. A listing with no slots saves exactly as it always has. */}
+                    {mode.kind === 'create' && (
+                        <AdSlotsEditor drafts={slotDrafts} onChange={setSlotDrafts} disabled={saving} />
+                    )}
+
                     <div className="flex items-center gap-3 pt-1">
                         <button
                             type="submit"
@@ -686,6 +832,46 @@ export default function LeaderboardOptIn() {
                         </button>
                     </div>
                 </form>
+            )}
+
+            {/* Manage the slots of a site that's already listed */}
+            {mode.kind === 'slots' && (
+                <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+                        <span className="text-sm font-semibold text-white">{mode.entry.startup_name}</span>
+                        <span className="text-zinc-400">
+                            {formatNumber(mode.entry.monthly_visitors)} verified visitors / 28d
+                        </span>
+                    </div>
+
+                    {slotsLoading ? (
+                        <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-black/20 p-6 text-sm text-zinc-500">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading your ad slots…
+                        </div>
+                    ) : (
+                        <AdSlotsEditor drafts={slotDrafts} onChange={setSlotDrafts} disabled={savingSlots} />
+                    )}
+
+                    <div className="flex items-center gap-3 pt-1">
+                        <button
+                            type="button"
+                            onClick={() => handleSaveSlots(mode.entry)}
+                            disabled={savingSlots || slotsLoading}
+                            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 px-5 py-2.5 text-sm font-semibold text-black transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {savingSlots ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />}
+                            Save ad slots
+                        </button>
+                        <button
+                            type="button"
+                            onClick={backToList}
+                            className="inline-flex min-h-[44px] items-center rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-2 text-xs font-medium text-zinc-400 transition hover:text-white"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );

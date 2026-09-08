@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text, func, or_, case
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, SupportMessage, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent, WeeklyDigest
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, SupportMessage, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent, WeeklyDigest, AdSlot, AdSlotRequest
 from plugin_security import (
     GOOGLE_PLUGINS,
     build_google_credentials_stdin,
@@ -232,6 +232,64 @@ async def init_db():
             print(f"[startup] leaderboard multi-site migration: {result}")
         except Exception as exc:
             print(f"[startup] multi-site leaderboard migration FAILED: {type(exc).__name__}: {exc}")
+
+        # Publisher-defined ad slots + buyer requests (017_add_ad_slots.sql).
+        # Base.metadata.create_all above already creates these from the AdSlot /
+        # AdSlotRequest models; these idempotent statements mirror the migration
+        # file exactly so a database that predates the models still converges.
+        #
+        # Note there is no price-suggestion column of any kind here by design —
+        # price_cents is only ever what the publisher typed.
+        for ddl in [
+            """
+            CREATE TABLE IF NOT EXISTS ad_slots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entry_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                name VARCHAR(120) NOT NULL,
+                price_cents INTEGER NOT NULL DEFAULT 0,
+                billing_period VARCHAR(20) NOT NULL DEFAULT 'month',
+                quantity_total INTEGER NOT NULL DEFAULT 1,
+                quantity_taken INTEGER NOT NULL DEFAULT 0,
+                preview_image_url VARCHAR(500),
+                preview_note TEXT,
+                is_active BOOLEAN NOT NULL DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (entry_id) REFERENCES leaderboard_entries(id) ON DELETE CASCADE
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS ix_ad_slots_entry_id ON ad_slots(entry_id)",
+            "CREATE INDEX IF NOT EXISTS ix_ad_slots_user_id ON ad_slots(user_id)",
+            """
+            CREATE TABLE IF NOT EXISTS ad_slot_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                slot_id INTEGER NOT NULL,
+                entry_id INTEGER NOT NULL,
+                publisher_user_id INTEGER NOT NULL,
+                buyer_name VARCHAR(120),
+                buyer_email VARCHAR(255) NOT NULL,
+                message TEXT,
+                slot_name_at_request VARCHAR(120),
+                price_cents_at_request INTEGER NOT NULL DEFAULT 0,
+                billing_period_at_request VARCHAR(20),
+                status VARCHAR(20) NOT NULL DEFAULT 'new',
+                publisher_note TEXT,
+                paid_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (slot_id) REFERENCES ad_slots(id) ON DELETE CASCADE,
+                FOREIGN KEY (entry_id) REFERENCES leaderboard_entries(id) ON DELETE CASCADE
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS ix_ad_slot_requests_slot_id ON ad_slot_requests(slot_id)",
+            "CREATE INDEX IF NOT EXISTS ix_ad_slot_requests_entry_id ON ad_slot_requests(entry_id)",
+            "CREATE INDEX IF NOT EXISTS ix_ad_slot_requests_publisher ON ad_slot_requests(publisher_user_id, created_at)",
+        ]:
+            try:
+                await conn.execute(text(ddl))
+            except Exception as exc:
+                print(f"[startup] ad slot DDL skipped: {type(exc).__name__}: {exc}")
 
 
 async def get_db():
@@ -3468,9 +3526,21 @@ async def get_leaderboard_entry_detail(
     )
     history_rows = list(reversed(history_result.scalars().all()))
 
+    # Ad slots the publisher is currently selling. Paused slots are withheld so
+    # a buyer never sees something that isn't actually on the market. Prices are
+    # verbatim publisher input — nothing here is derived from the traffic
+    # figures alongside them.
+    slots_result = await db.execute(
+        select(AdSlot)
+        .where(AdSlot.entry_id == entry.id, AdSlot.is_active == True)
+        .order_by(AdSlot.id.asc())
+    )
+    ad_slots = [_serialize_ad_slot(s) for s in slots_result.scalars().all()]
+
     return {
         "id": entry.id,
         "slug": entry.slug,
+        "ad_slots": ad_slots,
         "startup_name": entry.startup_name,
         "description": entry.description,
         "website_url": entry.website_url,
@@ -4040,9 +4110,26 @@ async def get_leaderboard_status(
     entries = list(result.scalars().all())
     if not entries:
         return {"joined": False, "entries": []}
+
+    # Attach each entry's ad slots (including paused ones — this is the owner's
+    # own view) so the settings editor can prefill without an extra round trip
+    # per site. Entries with no slots simply get an empty list, which is exactly
+    # what every pre-existing listing looks like.
+    slots_result = await db.execute(
+        select(AdSlot)
+        .where(AdSlot.entry_id.in_([e.id for e in entries]))
+        .order_by(AdSlot.id.asc())
+    )
+    slots_by_entry: dict = {}
+    for slot in slots_result.scalars().all():
+        slots_by_entry.setdefault(slot.entry_id, []).append(_serialize_ad_slot(slot))
+
     return {
         "joined": True,
-        "entries": [_serialize_entry(e) for e in entries],
+        "entries": [
+            {**_serialize_entry(e), "ad_slots": slots_by_entry.get(e.id, [])}
+            for e in entries
+        ],
     }
 
 
@@ -4210,6 +4297,336 @@ async def backfill_leaderboard_history(
 
     await db.commit()
     return {"success": True, "upserted": upserted}
+
+
+# ============= Ad Slots (publisher-defined, publisher-priced) =============
+#
+# A publisher lists whatever they are actually selling, in their own words, at
+# their own price: "Header banner" $50/month, "Newsletter mention" $100 per
+# send, "Footer logo" $20/month. A site can have as many slots as it likes.
+#
+# There is NO price suggestion, estimate, CPM calculation or "recommended"
+# figure anywhere in this section, and none must ever be added. price_cents is
+# the number the publisher typed. The GA4 traffic figures already on the entry
+# are context shown next to a slot, never an input to it.
+
+VALID_BILLING_PERIODS = {"month", "week", "newsletter_send", "one_off"}
+# new -> accepted -> paid is the happy path; declined / cancelled are terminal.
+VALID_REQUEST_STATUSES = {"new", "accepted", "declined", "paid", "cancelled"}
+MAX_SLOTS_PER_ENTRY = 20
+
+
+class AdSlotInput(BaseModel):
+    """One slot as submitted by the publisher.
+
+    `price_cents` arrives already converted from whatever the publisher typed.
+    The server clamps it to a sane non-negative integer and stores it verbatim.
+    """
+    id: Optional[int] = None          # present when editing an existing slot
+    name: str
+    price_cents: int = 0
+    billing_period: str = "month"
+    quantity_total: int = 1
+    quantity_taken: int = 0
+    preview_image_url: Optional[str] = None
+    preview_note: Optional[str] = None
+    is_active: bool = True
+
+
+class AdSlotSyncRequest(BaseModel):
+    """Full desired set of slots for one entry (add / edit / remove in one go)."""
+    slots: List[AdSlotInput] = []
+
+
+class AdSlotRequestCreate(BaseModel):
+    slot_id: int
+    buyer_email: str
+    buyer_name: Optional[str] = None
+    message: Optional[str] = None
+
+
+class AdSlotRequestStatusUpdate(BaseModel):
+    status: Optional[str] = None
+    publisher_note: Optional[str] = None
+
+
+def _serialize_ad_slot(slot: AdSlot) -> dict:
+    total = max(int(slot.quantity_total or 0), 0)
+    taken = min(max(int(slot.quantity_taken or 0), 0), total)
+    return {
+        "id": slot.id,
+        "entry_id": slot.entry_id,
+        "name": slot.name,
+        # Exactly what the publisher entered. Formatting happens in the UI.
+        "price_cents": int(slot.price_cents or 0),
+        "billing_period": slot.billing_period or "month",
+        "quantity_total": total,
+        "quantity_taken": taken,
+        "quantity_open": max(total - taken, 0),
+        "preview_image_url": slot.preview_image_url,
+        "preview_note": slot.preview_note,
+        "is_active": bool(slot.is_active),
+        "created_at": slot.created_at.isoformat() if slot.created_at else None,
+        "updated_at": slot.updated_at.isoformat() if slot.updated_at else None,
+    }
+
+
+def _serialize_ad_slot_request(req: AdSlotRequest) -> dict:
+    return {
+        "id": req.id,
+        "slot_id": req.slot_id,
+        "entry_id": req.entry_id,
+        "buyer_name": req.buyer_name,
+        "buyer_email": req.buyer_email,
+        "message": req.message,
+        "slot_name_at_request": req.slot_name_at_request,
+        "price_cents_at_request": int(req.price_cents_at_request or 0),
+        "billing_period_at_request": req.billing_period_at_request,
+        "status": req.status or "new",
+        "publisher_note": req.publisher_note,
+        "paid_at": req.paid_at.isoformat() if req.paid_at else None,
+        "created_at": req.created_at.isoformat() if req.created_at else None,
+        "updated_at": req.updated_at.isoformat() if req.updated_at else None,
+    }
+
+
+async def _load_owned_entry(db: AsyncSession, entry_id: int, user_identifier: str) -> LeaderboardEntry:
+    """Resolve an entry, 403ing unless it belongs to the given user."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    result = await db.execute(
+        select(LeaderboardEntry).where(LeaderboardEntry.id == entry_id)
+    )
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    if int(entry.user_id) != int(user.id):
+        raise HTTPException(status_code=403, detail="Entry does not belong to this user")
+    return entry
+
+
+@app.get("/api/ad-slots/entry/{entry_id}")
+async def list_ad_slots_for_entry(
+    entry_id: int,
+    include_paused: bool = False,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """List an entry's slots. `include_paused=true` for the owner's editor."""
+    stmt = select(AdSlot).where(AdSlot.entry_id == entry_id)
+    if not include_paused:
+        stmt = stmt.where(AdSlot.is_active == True)
+    result = await db.execute(stmt.order_by(AdSlot.id.asc()))
+    return {"slots": [_serialize_ad_slot(s) for s in result.scalars().all()]}
+
+
+@app.put("/api/ad-slots/entry/{entry_id}")
+async def sync_ad_slots_for_entry(
+    entry_id: int,
+    body: AdSlotSyncRequest,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Replace the entry's slot set with exactly what the publisher submitted.
+
+    Rows carrying an `id` are updated in place (so their request history keeps
+    pointing at a live slot); rows without one are inserted; anything the
+    publisher removed from the list is deleted. An empty list clears them all,
+    which is also what an existing listing that never used slots looks like.
+    """
+    entry = await _load_owned_entry(db, entry_id, user_identifier)
+
+    if len(body.slots) > MAX_SLOTS_PER_ENTRY:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A site can list at most {MAX_SLOTS_PER_ENTRY} ad slots.",
+        )
+
+    existing_result = await db.execute(select(AdSlot).where(AdSlot.entry_id == entry_id))
+    existing = {s.id: s for s in existing_result.scalars().all()}
+    kept_ids: set = set()
+
+    for incoming in body.slots:
+        name = (incoming.name or "").strip()[:120]
+        if not name:
+            # A nameless row is an empty form line, not a slot. Skip silently so
+            # a stray blank row never blocks saving the listing.
+            continue
+
+        period = incoming.billing_period if incoming.billing_period in VALID_BILLING_PERIODS else "month"
+        # Store the publisher's number as-is, only guarded against negatives and
+        # absurd values. No derivation, no rounding to a "suggested" band.
+        price_cents = min(max(int(incoming.price_cents or 0), 0), 100_000_000)
+        total = min(max(int(incoming.quantity_total or 1), 1), 999)
+        taken = min(max(int(incoming.quantity_taken or 0), 0), total)
+
+        target = existing.get(incoming.id) if incoming.id else None
+        if target is None:
+            target = AdSlot(entry_id=entry_id, user_id=entry.user_id)
+            db.add(target)
+        else:
+            kept_ids.add(target.id)
+
+        target.name = name
+        target.price_cents = price_cents
+        target.billing_period = period
+        target.quantity_total = total
+        target.quantity_taken = taken
+        target.preview_image_url = (incoming.preview_image_url or None)
+        target.preview_note = (incoming.preview_note or None)
+        target.is_active = bool(incoming.is_active)
+        target.updated_at = datetime.utcnow()
+
+    for slot_id, slot in existing.items():
+        if slot_id not in kept_ids:
+            await db.delete(slot)
+
+    await db.commit()
+
+    refreshed = await db.execute(
+        select(AdSlot).where(AdSlot.entry_id == entry_id).order_by(AdSlot.id.asc())
+    )
+    return {
+        "success": True,
+        "slots": [_serialize_ad_slot(s) for s in refreshed.scalars().all()],
+    }
+
+
+@app.post("/api/ad-slot-requests")
+async def create_ad_slot_request(
+    data: AdSlotRequestCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Record a buyer's request for one specific slot.
+
+    Snapshots the slot's name, price and period as listed at this moment so a
+    later publisher edit can't change the agreed terms retroactively. Returns
+    the publisher's contact details so the web layer can email both parties.
+    """
+    slot_result = await db.execute(select(AdSlot).where(AdSlot.id == data.slot_id))
+    slot = slot_result.scalar_one_or_none()
+    if not slot:
+        raise HTTPException(status_code=404, detail="Ad slot not found")
+    if not slot.is_active:
+        raise HTTPException(status_code=400, detail="This slot is not currently being sold.")
+
+    entry_result = await db.execute(
+        select(LeaderboardEntry).where(LeaderboardEntry.id == slot.entry_id)
+    )
+    entry = entry_result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    req = AdSlotRequest(
+        slot_id=slot.id,
+        entry_id=slot.entry_id,
+        publisher_user_id=slot.user_id,
+        buyer_name=(data.buyer_name or "").strip()[:120] or None,
+        buyer_email=(data.buyer_email or "").strip()[:255],
+        message=(data.message or "").strip()[:2000] or None,
+        slot_name_at_request=slot.name,
+        price_cents_at_request=int(slot.price_cents or 0),
+        billing_period_at_request=slot.billing_period,
+        status="new",
+    )
+    db.add(req)
+    await db.commit()
+    await db.refresh(req)
+
+    return {
+        "success": True,
+        "request": _serialize_ad_slot_request(req),
+        "publisher": {
+            "startup_name": entry.startup_name,
+            "contact_email": entry.contact_email,
+            "founder_name": entry.founder_name,
+            "slug": entry.slug,
+        },
+    }
+
+
+@app.get("/api/ad-slot-requests/{identifier}")
+async def list_ad_slot_requests_for_publisher(
+    identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """The publisher's inbox: every request across all of their sites.
+
+    `paid_count` / `paid_cents` are plain sums of deals the publisher marked
+    paid — a tally of what actually happened, not a projection.
+    """
+    user = await get_user_by_identifier(db, identifier)
+    if not user:
+        return {"requests": [], "paid_count": 0, "paid_cents": 0}
+
+    result = await db.execute(
+        select(AdSlotRequest)
+        .where(AdSlotRequest.publisher_user_id == user.id)
+        .order_by(AdSlotRequest.created_at.desc())
+    )
+    requests = list(result.scalars().all())
+
+    entry_names: dict = {}
+    if requests:
+        entry_ids = {r.entry_id for r in requests}
+        entries_result = await db.execute(
+            select(LeaderboardEntry).where(LeaderboardEntry.id.in_(entry_ids))
+        )
+        entry_names = {e.id: e.startup_name for e in entries_result.scalars().all()}
+
+    paid = [r for r in requests if (r.status or "") == "paid"]
+    return {
+        "requests": [
+            {**_serialize_ad_slot_request(r), "site_name": entry_names.get(r.entry_id)}
+            for r in requests
+        ],
+        "paid_count": len(paid),
+        "paid_cents": sum(int(r.price_cents_at_request or 0) for r in paid),
+    }
+
+
+@app.patch("/api/ad-slot-requests/{request_id}")
+async def update_ad_slot_request(
+    request_id: int,
+    body: AdSlotRequestStatusUpdate,
+    user_identifier: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Move a request along the pipeline (publisher only). Stamps paid_at."""
+    user = await get_user_by_identifier(db, user_identifier)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(select(AdSlotRequest).where(AdSlotRequest.id == request_id))
+    req = result.scalar_one_or_none()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    if int(req.publisher_user_id) != int(user.id):
+        raise HTTPException(status_code=403, detail="Request does not belong to this user")
+
+    if body.status is not None:
+        if body.status not in VALID_REQUEST_STATUSES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status. Options: {sorted(VALID_REQUEST_STATUSES)}",
+            )
+        req.status = body.status
+        # paid_at is the "this was a real deal" marker. Set on entry to paid,
+        # cleared if the publisher walks it back so counts stay honest.
+        req.paid_at = datetime.utcnow() if body.status == "paid" else None
+
+    if body.publisher_note is not None:
+        req.publisher_note = body.publisher_note.strip()[:2000] or None
+
+    req.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(req)
+    return {"success": True, "request": _serialize_ad_slot_request(req)}
 
 
 # ============= Annotations =============

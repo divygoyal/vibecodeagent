@@ -391,6 +391,79 @@ class LeaderboardEntry(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class AdSlot(Base):
+    """One thing a publisher is selling on one of their verified sites.
+
+    A site has MANY slots, each named in the publisher's own words at its own
+    price — "Header banner" $50/month, "Newsletter mention" $100 per send,
+    "Footer logo" $20/month.
+
+    PRICING RULE: price_cents is exactly what the publisher typed (x100).
+    Nothing computes, suggests, estimates or recommends a price. There is no
+    CPM maths anywhere in this codebase. The GA4 traffic figures on the parent
+    LeaderboardEntry are context displayed beside a slot, never an input to it.
+    """
+    __tablename__ = "ad_slots"
+
+    id = Column(Integer, primary_key=True)
+    entry_id = Column(Integer, nullable=False, index=True)  # leaderboard_entries.id
+    # Denormalized owner so ownership checks don't need a join on every write.
+    user_id = Column(Integer, nullable=False, index=True)
+
+    # 1. Name / type — free text, no enum of ad types.
+    name = Column(String(120), nullable=False)
+    # 2. Price — publisher-entered amount in integer cents.
+    price_cents = Column(Integer, nullable=False, default=0)
+    # 3. Billing period — month | week | newsletter_send | one_off
+    billing_period = Column(String(20), nullable=False, default="month")
+    # 4. Availability — how many exist vs how many are currently taken.
+    quantity_total = Column(Integer, nullable=False, default=1)
+    quantity_taken = Column(Integer, nullable=False, default=0)
+    # 5. Preview — screenshot and/or where on the page the slot appears.
+    preview_image_url = Column(String(500))
+    preview_note = Column(Text)
+
+    # Pause selling without deleting the slot (keeps its request history).
+    is_active = Column(Boolean, nullable=False, default=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AdSlotRequest(Base):
+    """A buyer asking for ONE specific AdSlot.
+
+    The *_at_request columns snapshot how the slot was advertised when the buyer
+    hit send, so a later edit by the publisher can't retroactively change the
+    agreed terms.
+
+    Fulfilment is manual — no ad server, no tag, no payments, no escrow. `status`
+    is a hand-moved pipeline (new -> accepted -> paid, or declined / cancelled)
+    so the publisher can count real closed deals; paid_at stamps the close.
+    """
+    __tablename__ = "ad_slot_requests"
+
+    id = Column(Integer, primary_key=True)
+    slot_id = Column(Integer, nullable=False, index=True)
+    entry_id = Column(Integer, nullable=False, index=True)
+    publisher_user_id = Column(Integer, nullable=False, index=True)
+
+    buyer_name = Column(String(120))
+    buyer_email = Column(String(255), nullable=False)
+    message = Column(Text)
+
+    slot_name_at_request = Column(String(120))
+    price_cents_at_request = Column(Integer, nullable=False, default=0)
+    billing_period_at_request = Column(String(20))
+
+    status = Column(String(20), nullable=False, default="new")
+    publisher_note = Column(Text)
+    paid_at = Column(DateTime)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ChatThread(Base):
     """A persisted AI-chat conversation thread.
 
