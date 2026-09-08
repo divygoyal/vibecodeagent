@@ -464,6 +464,36 @@ class AdSlotRequest(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class LeaderboardAudience(Base):
+    """Audience intelligence for one leaderboard entry (1:1, upserted by the cron).
+
+    Each *_json column holds a JSON array/object in the shape documented in
+    web/src/lib/audienceTypes.ts — shares are percentages 0–100 over the 28-day
+    window. A NULL column means the source couldn't provide it (GSC property not
+    matched, demographics thresholded, Gemini not configured) and readers render
+    nothing for that section.
+
+    This table is context shown beside a publisher's ad slots. It is never an
+    input to slot pricing.
+    """
+    __tablename__ = "leaderboard_audience"
+
+    entry_id = Column(Integer, primary_key=True)  # leaderboard_entries.id
+
+    countries_json = Column(Text)      # [{name, iso2?, share}]
+    channels_json = Column(Text)       # [{name, share}]
+    devices_json = Column(Text)        # [{name, share}]
+    top_pages_json = Column(Text)      # [{path, views, share}]
+    cities_json = Column(Text)         # [{name, share}]
+    top_queries_json = Column(Text)    # [{query, clicks, impressions}]
+    topics_json = Column(Text)         # [{label, share, evidence[]}]
+    demographics_json = Column(Text)   # {age: [{name, share}] | null, gender: [...] | null}
+    gsc_site_url = Column(String(255))
+
+    data_window = Column(String(20), nullable=False, default="28d")
+    refreshed_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ChatThread(Base):
     """A persisted AI-chat conversation thread.
 

@@ -16,6 +16,8 @@ import {
     type AdSlot,
 } from '@/lib/adSlots';
 import { BRAND_NAME } from '@/lib/brand';
+import type { AudienceIntelligence } from '@/lib/audienceTypes';
+import AudiencePanel from './AudiencePanel';
 
 export interface StartupProfileData {
     id: number;
@@ -48,6 +50,12 @@ export interface StartupProfileData {
      * many sites that sell nothing — the profile then renders as it always has.
      */
     ad_slots?: AdSlot[];
+    /**
+     * Who visits, from verified GA4 (+ GSC). Context for a buyer reading the
+     * slots below it — never an input to their prices. Null when the refresh
+     * cron has not written a row yet; any section inside may also be null.
+     */
+    audience?: AudienceIntelligence | null;
     history?: Array<{
         recorded_on: string | null;
         monthly_visitors: number;
@@ -56,7 +64,7 @@ export interface StartupProfileData {
     }>;
 }
 
-function formatNumber(n: number): string {
+export function formatNumber(n: number): string {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
     if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
     return n.toLocaleString();
@@ -86,7 +94,7 @@ function PremiumBackdrop() {
     );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+export function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
         <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.1] bg-white/[0.03] px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.2em] text-[#7AD9DA]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#14C4E1]" />
@@ -472,6 +480,9 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                         value={formatDuration(entry.avg_session_duration)}
                     />
                 </div>
+
+                {/* Audience — who visits, so a buyer can judge fit before reading the slots */}
+                <AudiencePanel entry={entry} />
 
                 {/* Ad slots — only when the publisher is actually selling something */}
                 <AdSlotsPanel entry={entry} />

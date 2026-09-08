@@ -23,7 +23,7 @@ from sqlalchemy import select, update, delete, text, func, or_, case
 from contextlib import asynccontextmanager
 
 from config import settings, PLANS
-from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, SupportMessage, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent, WeeklyDigest, AdSlot, AdSlotRequest
+from models import Base, User, OAuthConnection, UsageLog, ContainerEvent, Alert, ContactQuery, SupportMessage, EmbedToken, SocialEmbedToken, SharedDashboard, LeaderboardEntry, LeaderboardStatsHistory, Annotation, CustomDashboard, AnalyticsGoalDefinition, AnalyticsFunnelDefinition, SiteRepoLink, GitHubAppInstallation, ChatThread, ChatMessage, ChatFact, ChatFeedback, ChatEmbedding, ChatThreadState, ChatTelemetryEvent, WeeklyDigest, AdSlot, AdSlotRequest, LeaderboardAudience
 from plugin_security import (
     GOOGLE_PLUGINS,
     build_google_credentials_stdin,
@@ -285,6 +285,24 @@ async def init_db():
             "CREATE INDEX IF NOT EXISTS ix_ad_slot_requests_slot_id ON ad_slot_requests(slot_id)",
             "CREATE INDEX IF NOT EXISTS ix_ad_slot_requests_entry_id ON ad_slot_requests(entry_id)",
             "CREATE INDEX IF NOT EXISTS ix_ad_slot_requests_publisher ON ad_slot_requests(publisher_user_id, created_at)",
+            # 018_add_leaderboard_audience.sql — audience intelligence, 1:1 with entries.
+            """
+            CREATE TABLE IF NOT EXISTS leaderboard_audience (
+                entry_id INTEGER PRIMARY KEY,
+                countries_json TEXT,
+                channels_json TEXT,
+                devices_json TEXT,
+                top_pages_json TEXT,
+                cities_json TEXT,
+                top_queries_json TEXT,
+                topics_json TEXT,
+                demographics_json TEXT,
+                gsc_site_url VARCHAR(255),
+                data_window VARCHAR(20) NOT NULL DEFAULT '28d',
+                refreshed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (entry_id) REFERENCES leaderboard_entries(id) ON DELETE CASCADE
+            )
+            """,
         ]:
             try:
                 await conn.execute(text(ddl))
@@ -3537,10 +3555,15 @@ async def get_leaderboard_entry_detail(
     )
     ad_slots = [_serialize_ad_slot(s) for s in slots_result.scalars().all()]
 
+    audience_row = (
+        await db.execute(select(LeaderboardAudience).where(LeaderboardAudience.entry_id == entry.id))
+    ).scalar_one_or_none()
+
     return {
         "id": entry.id,
         "slug": entry.slug,
         "ad_slots": ad_slots,
+        "audience": _serialize_audience(audience_row),
         "startup_name": entry.startup_name,
         "description": entry.description,
         "website_url": entry.website_url,
@@ -3576,6 +3599,224 @@ async def get_leaderboard_entry_detail(
     }
 
 
+_AUDIENCE_JSON_FIELDS = (
+    ("countries", "countries_json"),
+    ("channels", "channels_json"),
+    ("devices", "devices_json"),
+    ("top_pages", "top_pages_json"),
+    ("cities", "cities_json"),
+    ("top_queries", "top_queries_json"),
+    ("topics", "topics_json"),
+    ("demographics", "demographics_json"),
+)
+
+
+def _load_json_or_none(raw: Optional[str]):
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _serialize_audience(row: Optional[LeaderboardAudience]) -> Optional[dict]:
+    """Shape documented in web/src/lib/audienceTypes.ts (AudienceIntelligence)."""
+    if row is None:
+        return None
+    out = {key: _load_json_or_none(getattr(row, col)) for key, col in _AUDIENCE_JSON_FIELDS}
+    out["gsc_site_url"] = row.gsc_site_url
+    out["data_window"] = row.data_window or "28d"
+    # Stored as naive UTC; emit an explicit Z so browsers don't parse it as local time.
+    refreshed = row.refreshed_at
+    if refreshed is None:
+        out["refreshed_at"] = None
+    elif refreshed.tzinfo is None:
+        out["refreshed_at"] = refreshed.isoformat() + "Z"
+    else:
+        out["refreshed_at"] = refreshed.isoformat()
+    return out
+
+
+def _topic_labels(row: Optional[LeaderboardAudience], limit: int = 4) -> List[str]:
+    topics = _load_json_or_none(row.topics_json) if row else None
+    if not isinstance(topics, list):
+        return []
+    ranked = sorted(
+        (t for t in topics if isinstance(t, dict) and t.get("label")),
+        key=lambda t: -(t.get("share") or 0),
+    )
+    return [str(t["label"]) for t in ranked[:limit]]
+
+
+@app.get("/api/leaderboard/publishers")
+async def list_leaderboard_publishers(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Admin-only — one row per verified publisher, for the one-time
+    "you can now list ad slots" announcement. Email resolves to the entry's
+    contact_email, else the account email. Users with several verified sites
+    get ONE row listing all of them so they receive one email, not N.
+    """
+    entries = (
+        await db.execute(
+            select(LeaderboardEntry)
+            .where(LeaderboardEntry.is_active == True)
+            .where(or_(LeaderboardEntry.verification_status == "verified", LeaderboardEntry.is_verified == True))
+            .order_by(LeaderboardEntry.user_id, LeaderboardEntry.id)
+        )
+    ).scalars().all()
+    if not entries:
+        return {"publishers": [], "total": 0}
+
+    user_ids = sorted({e.user_id for e in entries})
+    users = {u.id: u for u in (await db.execute(select(User).where(User.id.in_(user_ids)))).scalars().all()}
+    slot_counts = {
+        entry_id: int(count or 0)
+        for entry_id, count in (
+            await db.execute(
+                select(AdSlot.entry_id, func.count(AdSlot.id))
+                .where(AdSlot.entry_id.in_([e.id for e in entries]), AdSlot.is_active == True)
+                .group_by(AdSlot.entry_id)
+            )
+        ).all()
+    }
+
+    by_user: Dict[int, dict] = {}
+    for e in entries:
+        user = users.get(e.user_id)
+        email = (e.contact_email or (user.email if user else None) or "").strip().lower()
+        row = by_user.setdefault(e.user_id, {
+            "user_id": e.user_id,
+            "email": email,
+            "name": e.founder_name or (user.github_username if user else None),
+            "sites": [],
+        })
+        if not row["email"] and email:
+            row["email"] = email
+        row["sites"].append({
+            "entry_id": e.id,
+            "slug": e.slug,
+            "startup_name": e.startup_name,
+            "website_url": e.website_url,
+            "monthly_visitors": e.monthly_visitors or 0,
+            "ad_slot_count": slot_counts.get(e.id, 0),
+        })
+
+    publishers = [p for p in by_user.values() if p["email"]]
+    return {"publishers": publishers, "total": len(publishers)}
+
+
+@app.put("/api/leaderboard/{entry_id}/audience")
+async def upsert_leaderboard_audience(
+    entry_id: int,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key),
+):
+    """Cron-only upsert of audience intelligence for one entry.
+
+    Body is AudienceUpsertBody from web/src/lib/audienceTypes.ts. Only keys
+    present in the body are written, so a run that couldn't reach GSC leaves
+    the previous queries/topics in place instead of blanking them.
+    """
+    entry = (await db.execute(select(LeaderboardEntry).where(LeaderboardEntry.id == entry_id))).scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    row = (await db.execute(select(LeaderboardAudience).where(LeaderboardAudience.entry_id == entry_id))).scalar_one_or_none()
+    if row is None:
+        row = LeaderboardAudience(entry_id=entry_id)
+        db.add(row)
+
+    for key, col in _AUDIENCE_JSON_FIELDS:
+        if key in body:
+            setattr(row, col, json.dumps(body[key]) if body[key] is not None else None)
+    if "gsc_site_url" in body:
+        row.gsc_site_url = body["gsc_site_url"]
+    if body.get("data_window"):
+        row.data_window = str(body["data_window"])[:20]
+    row.refreshed_at = datetime.utcnow()
+
+    await db.commit()
+    return {"success": True, "audience": _serialize_audience(row)}
+
+
+@app.get("/api/sponsor-inventory")
+async def list_sponsor_inventory(
+    category: Optional[str] = None,
+    period: Optional[str] = None,
+    max_price_cents: Optional[int] = None,
+    sort: str = "traffic",
+    db: AsyncSession = Depends(get_db),
+):
+    """Public endpoint — every active ad slot on every verified, active entry.
+
+    Powers the /sponsor index. Prices are exactly what publishers typed; this
+    endpoint only filters and sorts, it never computes or suggests a price.
+    Sort modes: traffic (entry visitors desc, default) | price_asc | price_desc | newest.
+    """
+    entry_q = (
+        select(LeaderboardEntry)
+        .where(LeaderboardEntry.is_active == True)
+        .where(or_(LeaderboardEntry.verification_status == "verified", LeaderboardEntry.is_verified == True))
+        .where(LeaderboardEntry.monthly_visitors > 0)
+    )
+    if category and category != "all":
+        entry_q = entry_q.where(LeaderboardEntry.category == category)
+    entries = {e.id: e for e in (await db.execute(entry_q)).scalars().all()}
+    if not entries:
+        return {"slots": [], "total": 0, "sites": 0}
+
+    slot_q = select(AdSlot).where(AdSlot.entry_id.in_(list(entries.keys())), AdSlot.is_active == True)
+    if period and period != "all":
+        slot_q = slot_q.where(AdSlot.billing_period == period)
+    if max_price_cents is not None:
+        slot_q = slot_q.where(AdSlot.price_cents <= max(int(max_price_cents), 0))
+    slots = (await db.execute(slot_q)).scalars().all()
+    if not slots:
+        return {"slots": [], "total": 0, "sites": 0}
+
+    used_entry_ids = {s.entry_id for s in slots}
+    audience_rows = (
+        await db.execute(select(LeaderboardAudience).where(LeaderboardAudience.entry_id.in_(list(used_entry_ids))))
+    ).scalars().all()
+    audience_by_entry = {a.entry_id: a for a in audience_rows}
+
+    def entry_summary(e: LeaderboardEntry) -> dict:
+        return {
+            "id": e.id,
+            "slug": e.slug,
+            "startup_name": e.startup_name,
+            "description": e.description,
+            "website_url": e.website_url,
+            "logo_url": e.logo_url,
+            "category": e.category,
+            "monthly_visitors": e.monthly_visitors or 0,
+            "monthly_pageviews": e.monthly_pageviews or 0,
+            "engagement_rate": e.engagement_rate or 0,
+            "visitor_trend": e.visitor_trend or 0,
+            "primary_country": e.primary_country,
+            "verification_status": e.verification_status or ("verified" if e.is_verified else "pending"),
+            "last_refreshed": e.last_refreshed.isoformat() if e.last_refreshed else None,
+            "topic_labels": _topic_labels(audience_by_entry.get(e.id)),
+        }
+
+    items = [{**_serialize_ad_slot(s), "entry": entry_summary(entries[s.entry_id])} for s in slots]
+
+    if sort == "price_asc":
+        items.sort(key=lambda i: (i["price_cents"], -i["entry"]["monthly_visitors"]))
+    elif sort == "price_desc":
+        items.sort(key=lambda i: (-i["price_cents"], -i["entry"]["monthly_visitors"]))
+    elif sort == "newest":
+        items.sort(key=lambda i: i["created_at"] or "", reverse=True)
+    else:
+        items.sort(key=lambda i: (-i["entry"]["monthly_visitors"], i["price_cents"]))
+
+    return {"slots": items, "total": len(items), "sites": len(used_entry_ids)}
+
+
 @app.get("/api/leaderboard")
 async def list_leaderboard(
     sort: str = "traffic",
@@ -3583,6 +3824,7 @@ async def list_leaderboard(
     mrr: Optional[str] = None,
     country: Optional[str] = None,
     q: Optional[str] = None,
+    sponsorable: Optional[str] = None,
     page: int = 1,
     page_size: int = 25,
     db: AsyncSession = Depends(get_db),
@@ -3594,6 +3836,10 @@ async def list_leaderboard(
         engagement  — by engagement_rate desc
         movers      — by visitor_trend desc (positive growth first)
         newest      — by created_at desc
+
+    `sponsorable=true` restricts to entries with at least one active ad slot.
+    Each entry carries `ad_slot_count`, `min_slot_price_cents` (lowest
+    publisher-set price, or null) and `topic_labels` for the card badge.
     """
     page = max(page, 1)
     page_size = max(min(page_size, 100), 1)
@@ -3627,6 +3873,10 @@ async def list_leaderboard(
             (func.lower(LeaderboardEntry.startup_name).like(like))
             | (func.lower(LeaderboardEntry.description).like(like))
         )
+    if sponsorable and sponsorable.lower() in ("1", "true", "yes"):
+        base = base.where(
+            LeaderboardEntry.id.in_(select(AdSlot.entry_id).where(AdSlot.is_active == True))
+        )
 
     if sort == "engagement":
         ordered = base.order_by(LeaderboardEntry.engagement_rate.desc())
@@ -3643,6 +3893,27 @@ async def list_leaderboard(
     paginated = ordered.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(paginated)
     entries = result.scalars().all()
+
+    # Per-card sponsorship badge + topic labels, batched for the page.
+    slot_count_by_entry: Dict[int, int] = {}
+    min_price_by_entry: Dict[int, int] = {}
+    audience_by_entry: Dict[int, LeaderboardAudience] = {}
+    if entries:
+        ids = [e.id for e in entries]
+        slot_rows = (
+            await db.execute(
+                select(AdSlot.entry_id, func.count(AdSlot.id), func.min(AdSlot.price_cents))
+                .where(AdSlot.entry_id.in_(ids), AdSlot.is_active == True)
+                .group_by(AdSlot.entry_id)
+            )
+        ).all()
+        for entry_id, count, min_price in slot_rows:
+            slot_count_by_entry[entry_id] = int(count or 0)
+            min_price_by_entry[entry_id] = int(min_price) if min_price is not None else None
+        audience_by_entry = {
+            a.entry_id: a
+            for a in (await db.execute(select(LeaderboardAudience).where(LeaderboardAudience.entry_id.in_(ids)))).scalars().all()
+        }
 
     return {
         "entries": [
@@ -3667,6 +3938,9 @@ async def list_leaderboard(
                 "primary_country": e.primary_country,
                 "last_refreshed": e.last_refreshed.isoformat() if e.last_refreshed else None,
                 "created_at": e.created_at.isoformat() if e.created_at else None,
+                "ad_slot_count": slot_count_by_entry.get(e.id, 0),
+                "min_slot_price_cents": min_price_by_entry.get(e.id),
+                "topic_labels": _topic_labels(audience_by_entry.get(e.id)),
             }
             for e in entries
         ],
