@@ -2,12 +2,13 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { getShareData } from '@/app/api/share/route';
 import SharedEventsReportClient from '@/components/share-overview/openpanel/SharedEventsReportClient';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-    title: 'Shared Events Report — TrafficClaw',
-    description: 'View a shared events report powered by TrafficClaw',
+    title: `Shared Events Report — ${BRAND_NAME}`,
+    description: `View a shared events report powered by ${BRAND_NAME}`,
 };
 
 export default async function SharedEventsReportPage({
@@ -35,7 +36,7 @@ export default async function SharedEventsReportPage({
                         href="https://trafficclaw.com"
                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-all"
                     >
-                        Visit TrafficClaw
+                        Visit {BRAND_NAME}
                     </Link>
                 </div>
             </div>

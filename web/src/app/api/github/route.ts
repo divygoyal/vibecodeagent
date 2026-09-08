@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
+import { BRAND_NAME } from '@/lib/brand';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
@@ -36,7 +37,7 @@ function generateMockCommits() {
 
 function generateMockRepos() {
   return [
-    { name: 'trafficclaw-web', description: 'TrafficClaw SaaS frontend — Next.js', language: 'TypeScript', stars: 42, updated: new Date().toISOString(), url: '#' },
+    { name: 'trafficclaw-web', description: `${BRAND_NAME} SaaS frontend — Next.js`, language: 'TypeScript', stars: 42, updated: new Date().toISOString(), url: '#' },
     { name: 'trafficclaw-bot', description: 'Telegram bot engine with AI integrations', language: 'Python', stars: 28, updated: new Date().toISOString(), url: '#' },
     { name: 'seo-engine', description: 'Content decay detection & keyword gap analysis', language: 'Python', stars: 15, updated: new Date().toISOString(), url: '#' },
     { name: 'analytics-core', description: 'GA4 + GSC data pipeline', language: 'TypeScript', stars: 9, updated: new Date().toISOString(), url: '#' },

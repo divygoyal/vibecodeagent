@@ -29,6 +29,7 @@ import SeoPageOpportunitiesPanel from '@/components/seo/SeoPageOpportunitiesPane
 import SeoPageHealthPanel from '@/components/seo/SeoPageHealthPanel';
 import SeoAskAiChip from '@/components/seo/SeoAskAiChip';
 import { type SeoRecommendation } from '@/components/seo/SeoInsightsList';
+import { BRAND_NAME } from '@/lib/brand';
 
 interface Site {
     siteUrl: string;
@@ -149,7 +150,7 @@ export default function SEOPage() {
             {isDemoWorkspace ? (
                 <DemoModeBanner
                     description="You're viewing demo data because this account does not have any Google Analytics or Search Console properties yet."
-                    secondaryDescription={`TrafficClaw is using ${demoDomainLabel} as a safe demo workspace until you connect your own Google data.`}
+                    secondaryDescription={`${BRAND_NAME} is using ${demoDomainLabel} as a safe demo workspace until you connect your own Google data.`}
                 />
             ) : null}
 

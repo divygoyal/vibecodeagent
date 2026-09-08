@@ -26,6 +26,7 @@
  */
 import * as cheerio from 'cheerio';
 import { isBlockedUrl } from './urlValidation';
+import { BRAND_NAME } from '@/lib/brand';
 
 export interface PageStructure {
     url: string;
@@ -159,7 +160,7 @@ export async function inspectPageHtml(url: string): Promise<PageStructure> {
     try {
         res = await fetch(url, {
             headers: {
-                'User-Agent': 'TrafficClaw-Inspector/1.0',
+                'User-Agent': `${BRAND_NAME}-Inspector/1.0`,
                 'Accept': 'text/html,application/xhtml+xml',
             },
             redirect: 'follow',

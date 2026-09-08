@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { getCompletedIsoWeekRange } from '@/lib/chatSnapshot';
 import { runWeeklyDigestForUser } from '@/lib/weeklyDigestRunner';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const dynamic = 'force-dynamic';
 // The snapshot pipeline does a lot of upstream calls (GSC + GA4 + schema + PSI).
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
             const digest = {
                 userId: user.id,
                 email: user.email,
-                name: user.name || 'TrafficClaw User',
+                name: user.name || `${BRAND_NAME} User`,
                 timestamp,
                 // The actual email sending would be handled by an email service
                 // (e.g., Resend, SendGrid, Postmark) integrated in the admin API

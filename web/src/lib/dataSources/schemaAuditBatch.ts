@@ -12,6 +12,7 @@
  */
 import * as cheerio from 'cheerio';
 import { isBlockedUrl } from '../urlValidation';
+import { BRAND_NAME } from '@/lib/brand';
 
 export interface SchemaCoverage {
     hasOrganization: boolean;
@@ -58,7 +59,7 @@ export async function auditPageSchema(url: string): Promise<SchemaAuditResult> {
     let res: Response;
     try {
         res = await fetch(url, {
-            headers: { 'User-Agent': 'TrafficClaw-SchemaBot/1.0', Accept: 'text/html,application/xhtml+xml' },
+            headers: { 'User-Agent': `${BRAND_NAME}-SchemaBot/1.0`, Accept: 'text/html,application/xhtml+xml' },
             redirect: 'follow',
             signal: controller.signal,
         });

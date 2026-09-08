@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { BRAND_NAME } from '@/lib/brand';
 
 /**
  * Root-level error boundary. Next.js renders this when an error escapes every
@@ -64,7 +65,7 @@ export default function GlobalError({
                         Something went wrong
                     </h1>
                     <p style={{ fontSize: '14px', lineHeight: 1.6, color: '#a1a1aa', margin: '0 0 24px' }}>
-                        TrafficClaw hit an unexpected error. Reload the page to continue.
+                        {BRAND_NAME} hit an unexpected error. Reload the page to continue.
                     </p>
                     <button
                         type="button"

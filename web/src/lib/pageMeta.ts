@@ -11,6 +11,7 @@
  */
 import * as cheerio from 'cheerio';
 import { isBlockedUrl } from './urlValidation';
+import { BRAND_NAME } from '@/lib/brand';
 
 export interface PageMeta {
     url: string;
@@ -74,7 +75,7 @@ export async function fetchPageMeta(url: string): Promise<PageMeta> {
     try {
         res = await fetch(url, {
             headers: {
-                'User-Agent': 'TrafficClaw-MetaBot/1.0',
+                'User-Agent': `${BRAND_NAME}-MetaBot/1.0`,
                 'Accept': 'text/html,application/xhtml+xml',
             },
             redirect: 'follow',

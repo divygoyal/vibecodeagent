@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import StartupProfileClient, { type StartupProfileData } from './StartupProfileClient';
+import { BRAND_NAME } from '@/lib/brand';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -30,13 +31,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     const { id } = await params;
     const entry = await fetchEntry(id);
     if (!entry) {
-        return { title: 'Startup not found · TrafficClaw Leaderboard' };
+        return { title: `Startup not found · ${BRAND_NAME} Leaderboard` };
     }
     const visitors = entry.monthly_visitors.toLocaleString();
-    const title = `${entry.startup_name} — ${visitors} verified monthly visitors · TrafficClaw`;
+    const title = `${entry.startup_name} — ${visitors} verified monthly visitors · ${BRAND_NAME}`;
     const description = entry.description
         ? entry.description
-        : `${entry.startup_name} on the TrafficClaw verified traffic leaderboard. ${visitors} monthly visitors confirmed via Google Analytics.`;
+        : `${entry.startup_name} on the ${BRAND_NAME} verified traffic leaderboard. ${visitors} monthly visitors confirmed via Google Analytics.`;
     // Canonical always uses the slug when present so legacy `/leaderboard/4`
     // hits don't compete with the slug URL in Google's index.
     const canonical = `${SITE_URL}/leaderboard/${entry.slug || entry.id}`;
@@ -48,7 +49,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
             title,
             description,
             url: canonical,
-            siteName: 'TrafficClaw',
+            siteName: `${BRAND_NAME}`,
             type: 'profile',
         },
         twitter: {
@@ -70,7 +71,7 @@ export default async function StartupProfilePage({ params }: { params: Promise<{
     const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'WebPage',
-        name: `${entry.startup_name} on TrafficClaw`,
+        name: `${entry.startup_name} on ${BRAND_NAME}`,
         url: profileUrl,
         breadcrumb: {
             '@type': 'BreadcrumbList',

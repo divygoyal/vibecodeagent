@@ -3,6 +3,7 @@
  */
 
 import JSZip from 'jszip';
+import { BRAND_NAME } from '@/lib/brand';
 
 type Row = Record<string, string | number | boolean | null | undefined>;
 
@@ -166,7 +167,7 @@ export async function exportAnalyticsZip(data: any) {
     }
 
     // README
-    zip.file('README.txt', `TrafficClaw Analytics Export\nGenerated: ${new Date().toISOString()}\n\nFiles:\n- overview.csv: KPI summary\n- traffic.csv: Daily traffic data\n- pages.csv: Top pages\n- referrers.csv: Traffic sources\n- countries.csv: Geographic breakdown\n- devices.csv: Device breakdown\n- browsers.csv: Browser breakdown\n- channels.csv: Channel breakdown\n`);
+    zip.file('README.txt', `${BRAND_NAME} Analytics Export\nGenerated: ${new Date().toISOString()}\n\nFiles:\n- overview.csv: KPI summary\n- traffic.csv: Daily traffic data\n- pages.csv: Top pages\n- referrers.csv: Traffic sources\n- countries.csv: Geographic breakdown\n- devices.csv: Device breakdown\n- browsers.csv: Browser breakdown\n- channels.csv: Channel breakdown\n`);
 
     // Generate and download
     const blob = await zip.generateAsync({ type: 'blob' });

@@ -28,6 +28,7 @@ import {
 } from '@/lib/socialEmbeds';
 import { type RedditMentionPayload } from '@/lib/redditMentionsShared';
 import { canonicalizeDomainInput } from '@/lib/xMentionsShared';
+import { BRAND_NAME } from '@/lib/brand';
 
 type MentionFetchResult = {
     canonicalDomain: string;
@@ -599,7 +600,7 @@ export default function RedditApiPage() {
                             <div className="dashboard-hover-item border border-orange-400/15 bg-[linear-gradient(180deg,rgba(249,115,22,0.12),rgba(9,16,24,0.96))] p-4 sm:p-5">
                                 <div className="text-sm font-medium text-white">Done</div>
                                 <p className="mt-2 text-sm leading-6 text-zinc-200">
-                                    TrafficClaw keeps the same hosted widget URL active and refreshes the Reddit mentions daily behind the scenes.
+                                    {BRAND_NAME} keeps the same hosted widget URL active and refreshes the Reddit mentions daily behind the scenes.
                                 </p>
                             </div>
                         </div>

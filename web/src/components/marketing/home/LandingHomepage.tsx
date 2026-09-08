@@ -34,6 +34,7 @@ import { signShareEmbedUrl } from '@/lib/shareWatermark';
 import { JourneyLine, JourneyNode } from './JourneyTimeline';
 import BadgeMarquee from './BadgeMarquee';
 import PricingTierCards from '@/components/marketing/pricing/PricingTierCards';
+import { BRAND_NAME } from '@/lib/brand';
 
 type FeaturedReason = {
     number: string;
@@ -633,13 +634,13 @@ export default function LandingHomepage() {
                                 href="https://www.producthunt.com/products/trafficclaw/launches/trafficclaw?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-trafficclaw"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                aria-label="TrafficClaw on Product Hunt — view our launch"
+                                aria-label={`${BRAND_NAME} on Product Hunt — view our launch`}
                                 className="inline-block rounded-md transition-opacity duration-200 hover:opacity-90 focus-visible:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14C4E1]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                             >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                     src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1103214&theme=dark"
-                                    alt="TrafficClaw — Featured on Product Hunt"
+                                    alt={`${BRAND_NAME} — Featured on Product Hunt`}
                                     width={250}
                                     height={54}
                                     style={{ width: 250, height: 54 }}
@@ -684,7 +685,7 @@ export default function LandingHomepage() {
 
                             <DeferredEmbed
                                 src={watermarkedEmbedUrl}
-                                title="TrafficClaw shared analytics dashboard"
+                                title={`${BRAND_NAME} shared analytics dashboard`}
                                 mountStrategy="idle"
                                 className="h-[300px] min-[420px]:h-[360px] sm:h-[520px] lg:h-[760px]"
                             >
@@ -750,7 +751,7 @@ export default function LandingHomepage() {
                             <FeaturedReasonCard
                                 reason={HOMEPAGE_CONTENT.aiChat}
                                 icon={<Bot className="h-4 w-4" />}
-                                videoTitle="TrafficClaw AI chat demo"
+                                videoTitle={`${BRAND_NAME} AI chat demo`}
                                 fallbackEyebrow="AI chat"
                                 id="ai-chat"
                             />
@@ -760,7 +761,7 @@ export default function LandingHomepage() {
                             <FeaturedReasonCard
                                 reason={HOMEPAGE_CONTENT.globe}
                                 icon={<Globe className="h-4 w-4" />}
-                                videoTitle="TrafficClaw realtime globe demo"
+                                videoTitle={`${BRAND_NAME} realtime globe demo`}
                                 fallbackEyebrow="Live globe"
                                 id="globe"
                                 reverse

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { BRAND_NAME } from '@/lib/brand';
 
 // ── Rate Limiting ──────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ async function fetchWithTimeout(url: string, timeout = 10000): Promise<Response>
         const res = await fetch(url, {
             signal: controller.signal,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; TrafficClawBot/1.0)',
+                'User-Agent': `Mozilla/5.0 (compatible; ${BRAND_NAME}Bot/1.0)`,
                 'Accept': 'text/html,application/xhtml+xml,*/*',
             },
         });

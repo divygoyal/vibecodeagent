@@ -6,9 +6,25 @@ export default function robots(): MetadataRoute.Robots {
             {
                 userAgent: '*',
                 allow: '/',
-                disallow: ['/dashboard/', '/api/', '/admin/', '/superadmin/', '/auth/'],
+                disallow: [
+                    '/dashboard',
+                    '/dashboard/',
+                    '/admin',
+                    '/admin/',
+                    '/superadmin',
+                    '/api',
+                    '/api/',
+                    '/auth',
+                    '/auth/',
+                    '/share',
+                    '/view',
+                    '/embed',
+                    '/demo',
+                    '/share-popup-preview',
+                ],
             },
         ],
         sitemap: 'https://trafficclaw.com/sitemap.xml',
+        host: 'https://trafficclaw.com',
     };
 }

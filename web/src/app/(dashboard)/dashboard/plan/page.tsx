@@ -10,6 +10,7 @@ import {
     Sparkles, Lightbulb, GitBranch, Users, Globe, Layers,
 } from 'lucide-react';
 import { useCredits } from '@/lib/useDashboardData';
+import { BRAND_NAME } from '@/lib/brand';
 
 /* ───────────────────────────────────────────────────────────────────
  * Plan & Billing
@@ -40,7 +41,7 @@ const PLAN_CONFIG: Record<string, PlanInfo> = {
     free: {
         label: 'Free', icon: Zap, credits: 0, price: '$0',
         blurb: 'Browse the dashboard — no AI',
-        bestFor: 'Trying TrafficClaw',
+        bestFor: `Trying ${BRAND_NAME}`,
         costPerMsg: '—',
         valueLine: 'See your data; AI is locked',
     },

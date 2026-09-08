@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { BRAND_NAME } from '@/lib/brand';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -39,7 +40,7 @@ function escapeXml(s: string): string {
 
 function buildSvg({ rank, category, name }: { rank: number | null; category: string | null; name: string }): string {
     const safeName = escapeXml(name).slice(0, 40);
-    const rankLine = rank ? `#${rank} on TrafficClaw` : 'Verified on TrafficClaw';
+    const rankLine = rank ? `#${rank} on ${BRAND_NAME}` : `Verified on ${BRAND_NAME}`;
     const subline = rank && category ? `in ${escapeXml(category)}` : 'Real GA4 traffic';
 
     return `<?xml version="1.0" encoding="UTF-8"?>

@@ -1,3 +1,4 @@
+import { BRAND_NAME } from '@/lib/brand';
 /**
  * Thin Brevo (transactional email) client for the web layer.
  *
@@ -12,7 +13,7 @@
  * Env vars (set in web/.env.local for dev, .env / Coolify for prod):
  *   BREVO_API_KEY           — xkeysib-... transactional API key
  *   BREVO_SENDER_EMAIL      — verified sender (e.g. hello@trafficclaw.com)
- *   BREVO_SENDER_NAME       — display name (default "TrafficClaw")
+ *   BREVO_SENDER_NAME       — display name (default `${BRAND_NAME}`)
  *
  * Reference: https://developers.brevo.com/reference/sendtransacemail
  */

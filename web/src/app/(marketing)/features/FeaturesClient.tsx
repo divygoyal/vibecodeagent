@@ -9,6 +9,7 @@ import {
     TrendingUp, Zap, Shield, ArrowRight, CheckCircle2,
     Bell, Download, Brain, Eye, Target, Sparkles, Code2, Users
 } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 
 const fadeUp = {
     hidden: { opacity: 0, y: 30 },
@@ -277,11 +278,11 @@ export default function FeaturesClient() {
                     </motion.div>
                     <motion.div variants={fadeUp} className="space-y-4">
                         {[
-                            { q: 'What data sources does TrafficClaw support?', a: 'TrafficClaw connects to Google Analytics 4 and Google Search Console. We also integrate with GitHub for code-level SEO fixes and Telegram for mobile notifications and queries.' },
+                            { q: `What data sources does ${BRAND_NAME} support?`, a: `${BRAND_NAME} connects to Google Analytics 4 and Google Search Console. We also integrate with GitHub for code-level SEO fixes and Telegram for mobile notifications and queries.` },
                             { q: 'How does the AI Chat work?', a: 'The AI Chat uses Google Gemini with function calling to analyze your real analytics and SEO data. It can run page audits, calculate revenue impact, and generate content strategies — all based on your actual data, not generic advice.' },
-                            { q: 'Is the Globe Embed really free?', a: 'Yes. The embeddable real-time visitor globe is completely free for all users. The only paid perk is removing the small "Powered by TrafficClaw" watermark — available on any paid plan.' },
+                            { q: 'Is the Globe Embed really free?', a: `Yes. The embeddable real-time visitor globe is completely free for all users. The only paid perk is removing the small "Powered by ${BRAND_NAME}" watermark — available on any paid plan.` },
                             { q: 'What is the Telegram Bot powered by?', a: 'The Telegram bot is your own OpenClaw agent with Google Analytics and Search Console pre-connected. Each Pro user gets an isolated container that runs 24/7. Ask questions, get alerts, and run audits — all from Telegram.' },
-                            { q: 'Can I use TrafficClaw for multiple websites?', a: 'Yes. Growth and Pro plans support multiple Google Analytics properties and Search Console sites. Switch between sites instantly from the dashboard.' },
+                            { q: `Can I use ${BRAND_NAME} for multiple websites?`, a: 'Yes. Growth and Pro plans support multiple Google Analytics properties and Search Console sites. Switch between sites instantly from the dashboard.' },
                         ].map((faq, i) => (
                             <details key={i} className="group p-4 rounded-xl border border-white/[0.06] bg-white/[0.02]">
                                 <summary className="flex items-center justify-between cursor-pointer text-sm font-semibold text-white list-none">

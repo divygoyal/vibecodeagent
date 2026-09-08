@@ -27,6 +27,7 @@ import {
     YAxis,
 } from 'recharts';
 import type { ShareUmamiDashboardData, ShareUmamiRealtimeData } from '@/lib/shareUmamiData';
+import { BRAND_NAME } from '@/lib/brand';
 
 const RANGE_OPTIONS = ['7d', '30d', '90d'] as const;
 
@@ -160,7 +161,7 @@ function SharedUmamiPage({
                         <div className="space-y-4">
                             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
                                 <ShieldCheck className="h-3.5 w-3.5" />
-                                {embedMode ? 'TrafficClaw Embedded Analytics' : 'TrafficClaw Shared Analytics'}
+                                {embedMode ? `${BRAND_NAME} Embedded Analytics` : `${BRAND_NAME} Shared Analytics`}
                             </div>
                             <div>
                                 <h1 className={`${embedMode ? 'text-2xl sm:text-[28px]' : 'text-3xl'} font-semibold tracking-tight text-slate-950`}>
@@ -169,7 +170,7 @@ function SharedUmamiPage({
                                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
                                     {embedMode
                                         ? 'Responsive shared analytics optimized for iframe embeds and narrow mobile widths.'
-                                        : 'The public URL stays on TrafficClaw while this page blends TrafficClaw history with Umami-style reporting for the post-cutover window.'}
+                                        : `The public URL stays on ${BRAND_NAME} while this page blends ${BRAND_NAME} history with Umami-style reporting for the post-cutover window.`}
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
@@ -390,7 +391,7 @@ function SharedUmamiPage({
                         {!embedMode ? (
                             <footer className="mt-10 flex flex-col gap-3 border-t border-slate-200 px-1 py-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    Shared via TrafficClaw using a TrafficClaw-branded Umami bridge.
+                                    Shared via {BRAND_NAME} using a {BRAND_NAME}-branded Umami bridge.
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <span>Token: {token.slice(0, 12)}...</span>

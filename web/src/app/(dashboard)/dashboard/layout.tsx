@@ -36,6 +36,7 @@ import { useCredits, useAlerts, useContainerStatus, useSiteList, usePropertyList
 import { isPushEnabled, sendBrowserNotification } from '@/lib/pushNotifications';
 import { useChatStore } from '@/stores/chatStore';
 import { CreditsCard } from '@/components/sidebar/CreditsCard';
+import { BRAND_NAME } from '@/lib/brand';
 
 // Extended user type — id is added via JWT callback in auth.ts
 type SessionUser = { id?: string; name?: string | null; email?: string | null; image?: string | null };
@@ -615,7 +616,7 @@ export default function DashboardLayout({
             const newAlerts = typedAlerts.filter((alert) => alert.severity === 'critical');
             if (newAlerts.length > 0) {
                 sendBrowserNotification(
-                    'TrafficClaw Alert',
+                    `${BRAND_NAME} Alert`,
                     newAlerts[0].title || 'New critical alert detected',
                     { tag: 'critical-alert', onClick: () => setBellOpen(true) }
                 );

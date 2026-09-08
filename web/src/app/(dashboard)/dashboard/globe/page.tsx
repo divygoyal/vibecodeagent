@@ -18,6 +18,7 @@ import {
     convertCitiesToGlobeVisitors, convertToActivityFeed,
     type GlobeVisitor, type ActivityFeedItem,
 } from '@/lib/globeUtils';
+import { BRAND_NAME, SITE_URL } from '@/lib/brand';
 
 const RealtimeGlobeMaplibre = dynamic(() => import('@/components/globe/RealtimeGlobeMaplibre'), { ssr: false });
 
@@ -204,7 +205,7 @@ function EmbedTokenManager({ propertyId }: { propertyId: string }) {
         : null;
 
     const embedCode = embedUrl
-        ? `<!-- TrafficClaw Realtime Globe -->\n<iframe\n  src="${embedUrl}"\n  width="100%"\n  height="600"\n  frameborder="0"\n  style="border-radius: 16px; border: 1px solid rgba(255,255,255,0.06);"\n  allow="fullscreen"\n></iframe>`
+        ? `<!-- ${BRAND_NAME} Realtime Globe -->\n<iframe\n  src="${embedUrl}"\n  width="100%"\n  height="600"\n  frameborder="0"\n  style="border-radius: 16px; border: 1px solid rgba(255,255,255,0.06);"\n  allow="fullscreen"\n></iframe>`
         : null;
 
     return (
@@ -322,7 +323,7 @@ function EmbedTokenManager({ propertyId }: { propertyId: string }) {
             <div className="flex items-start gap-2.5 p-3 rounded-lg bg-emerald-500/[0.04] border border-emerald-500/10">
                 <DollarSign className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
                 <div className="text-xs text-zinc-500">
-                    <p><span className="text-emerald-400 font-medium">100% free to use.</span> The Globe API and embed are completely free for all users. Upgrade to any paid plan to remove the &quot;Powered by TrafficClaw&quot; watermark from your embedded globe.</p>
+                    <p><span className="text-emerald-400 font-medium">100% free to use.</span> The Globe API and embed are completely free for all users. Upgrade to any paid plan to remove the &quot;Powered by ${BRAND_NAME}&quot; watermark from your embedded globe.</p>
                 </div>
             </div>
         </div>
@@ -446,14 +447,14 @@ export default function GlobeApiPage() {
                     <span className="text-zinc-300">Live Demo</span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-white">Globe API</h1>
-                <p className="text-zinc-400 mt-1 text-sm sm:text-base">Embed a live visitor globe on your website. Real-time analytics visualization powered by TrafficClaw.</p>
+                <p className="text-zinc-400 mt-1 text-sm sm:text-base">Embed a live visitor globe on your website. Real-time analytics visualization powered by {BRAND_NAME}.</p>
             </div>
 
             {/* ─── No-Properties Banner ─── */}
             {isDemoWorkspace ? (
                 <DemoModeBanner
                     description="You’re viewing demo data because this account does not have any Google Analytics or Search Console properties yet."
-                    secondaryDescription={`TrafficClaw is using ${demoDomainLabel} as a safe demo workspace until you connect your own Google data.`}
+                    secondaryDescription={`${BRAND_NAME} is using ${demoDomainLabel} as a safe demo workspace until you connect your own Google data.`}
                 />
             ) : null}
 
@@ -497,7 +498,7 @@ export default function GlobeApiPage() {
                                     <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
                                     <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
                                 </svg>
-                                <span className="text-[14px] font-bold text-white tracking-tight">TrafficClaw</span>
+                                <span className="text-[14px] font-bold text-white tracking-tight">{BRAND_NAME}</span>
                             </div>
                             <div className="w-px h-4 bg-zinc-600/50 mx-0.5" />
                             <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.15em]">Real-Time</span>
@@ -682,7 +683,7 @@ export default function GlobeApiPage() {
                             <rect x="8" y="6" width="4" height="12" rx="1" fill="#10b981" />
                             <rect x="14" y="2" width="4" height="16" rx="1" fill="#10b981" />
                         </svg>
-                        <a href="https://trafficclaw.com" target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-400 font-medium hover:text-zinc-300 transition">Powered by TrafficClaw</a>
+                        <a href={SITE_URL} target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-400 font-medium hover:text-zinc-300 transition">Powered by {BRAND_NAME}</a>
                     </div>
                 </motion.div>
             </div>
@@ -835,7 +836,7 @@ export default function GlobeApiPage() {
                                 </li>
                                 <li className="flex items-center gap-2 text-zinc-400">
                                     <Shield className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
-                                    <span>&quot;Powered by TrafficClaw&quot; branding required</span>
+                                    <span>{`&quot;Powered by ${BRAND_NAME}&quot; branding required`}</span>
                                 </li>
                             </ul>
                         </div>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { BRAND_NAME } from '@/lib/brand';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -44,7 +45,7 @@ function generateMockLeaderboard() {
             is_verified: true, last_refreshed: new Date().toISOString(), created_at: '2026-03-01T10:00:00Z',
         },
         {
-            id: 6, startup_name: 'TrafficClaw', description: 'AI-powered SEO analytics with real-time traffic monitoring, GSC intelligence, and automated insights.',
+            id: 6, startup_name: `${BRAND_NAME}`, description: 'AI-powered SEO analytics with real-time traffic monitoring, GSC intelligence, and automated insights.',
             website_url: 'https://trafficclaw.com', logo_url: null, category: 'SaaS', mrr_range: '$500-1K',
             looking_for: ['visibility', 'partner'], twitter_handle: 'trafficclaw',
             monthly_visitors: 11204, monthly_pageviews: 28450, engagement_rate: 67, bounce_rate: 33, visitor_trend: 45.2,

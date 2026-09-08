@@ -35,6 +35,7 @@ import { DEMO_PROPERTY_ID, DEMO_SITE_URL } from '@/lib/demoWorkspace';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { BRAND_NAME } from '@/lib/brand';
 
 function siteHostTokens(siteUrl: string): { host: string; tokens: Set<string> } {
     const cleaned = siteUrl.replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -435,7 +436,7 @@ export default function SetupPage() {
                     Let&apos;s set up your workspace
                 </h1>
                 <p className="text-sm sm:text-base text-zinc-400 mb-10 max-w-md mx-auto leading-relaxed">
-                    TrafficClaw needs your Google Analytics and Search Console data to surface
+                    {BRAND_NAME} needs your Google Analytics and Search Console data to surface
                     insights, anomalies, and growth opportunities. Connect once and we&apos;ll
                     bring everything in.
                 </p>
@@ -580,7 +581,7 @@ export default function SetupPage() {
                 )}
                 <div className="text-center mb-8">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-zinc-500 mb-2">
-                        TrafficClaw
+                        {BRAND_NAME}
                     </p>
                     <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3">
                         Set up your workspace
@@ -716,7 +717,7 @@ export default function SetupPage() {
             <div className="max-w-3xl mx-auto py-10 sm:py-14 px-4 pb-24 sm:pb-14 fade-in">
                 <div className="text-center mb-8">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-zinc-500 mb-2">
-                        TrafficClaw
+                        {BRAND_NAME}
                     </p>
                     <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3">
                         Your SEO workspace is ready
@@ -792,7 +793,7 @@ export default function SetupPage() {
         <div className="max-w-2xl mx-auto py-10 sm:py-14 px-4 pb-32 sm:pb-14 fade-in">
             <div className="text-center mb-8">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-zinc-500 mb-2">
-                    TrafficClaw
+                    {BRAND_NAME}
                 </p>
                 <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3">
                     Connect {askingAboutGsc ? 'Search Console' : 'Google Analytics'}

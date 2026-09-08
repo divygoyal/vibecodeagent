@@ -33,6 +33,7 @@ import { ChatInput } from './chat/ChatInput';
 import { MessageBubble } from './chat/MessageBubble';
 import { ReasoningTrace, narrateToolStart, narrateToolResult, type TraceLine } from './chat/ReasoningTrace';
 import { MAX_INPUT_CHARS, ERR_MESSAGE_TOO_LONG } from '@/lib/chatLimits';
+import { BRAND_NAME } from '@/lib/brand';
 
 type Message = ChatMessage;
 
@@ -339,7 +340,7 @@ export default function AIChatbot() {
                     try {
                         const errorData = await res.json();
                         const creditMsg = errorData.response || (res.status === 402
-                            ? `⚡ You've run out of messages! **1 credit = 1 message.**\n\nGet more to continue using TrafficClaw AI.`
+                            ? `⚡ You've run out of messages! **1 credit = 1 message.**\n\nGet more to continue using ${BRAND_NAME} AI.`
                             : 'AI Chat is unavailable because this account does not have any Google Analytics property connected yet.');
                         setMessages(prev => {
                             const updated = [...prev];

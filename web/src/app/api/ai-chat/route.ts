@@ -25,6 +25,7 @@ import { logChatTelemetry } from '@/lib/chatTelemetry';
 import { makeFingerprint, findRepetitionMatch, formatRepetitionTag } from '@/lib/questionFingerprint';
 import { correlateDeploysWithLosers, shouldRunDeployCorrelation } from '@/lib/dataSources/deployCorrelation';
 import { MAX_INPUT_CHARS, ERR_MESSAGE_TOO_LONG } from '@/lib/chatLimits';
+import { BRAND_NAME } from '@/lib/brand';
 import {
     getGoogleGenAIClient,
     getGoogleGenAIText,
@@ -147,7 +148,7 @@ function getCachedOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T>
 // B3-full: persona-specific blocks live in services/chat/personas/*.ts
 // and are composed in via composePromptForPersona() per turn.
 // ═══════════════════════════════════════════════════════════════
-const SHARED_PREAMBLE = `You are TrafficClaw Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Answer general questions from your knowledge.
+const SHARED_PREAMBLE = `You are ${BRAND_NAME} Universal Analyst — an elite SEO & Analytics AI. Give VERDICTS, not advice. Be direct, bold, data-driven. DECLARE and PRESCRIBE. Never hedge. Answer general questions from your knowledge.
 
 READ THE SITE PROFILE FIRST. The snapshot starts with a SITE PROFILE block declaring whether this is a COMMERCIAL site (sells/captures), a CONTENT site (blog/portfolio/docs/magazine), a MIXED site, or UNKNOWN. The profile dictates which diagnoses make sense:
 - COMMERCIAL site → buyer-intent gap, funnel disconnect, missing /pricing/vs/alternative pages, conversion opacity ARE the right diagnoses.

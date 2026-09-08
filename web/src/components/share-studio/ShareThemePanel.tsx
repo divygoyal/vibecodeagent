@@ -8,8 +8,9 @@ import {
   type ShareThemePreset,
 } from '@/lib/shareTypes';
 import { useCredits } from '@/lib/useDashboardData';
+import { BRAND_NAME } from '@/lib/brand';
 
-// Plans allowed to hide the "Built with TrafficClaw" footer on a shared
+// Plans allowed to hide the `Built with ${BRAND_NAME}` footer on a shared
 // dashboard. Free and grandfathered Starter tiers always show it; this is
 // part of the Growth/Pro value prop and a soft growth lever.
 const WATERMARK_REMOVAL_PLANS = new Set(['growth', 'pro']);
@@ -34,7 +35,7 @@ export default function ShareThemePanel({ draft, onChange }: Props) {
   const canRemoveWatermark = WATERMARK_REMOVAL_PLANS.has((plan || '').toLowerCase());
   // Default is true (footer visible). When the user is on Growth/Pro and
   // flips the toggle off, save persists `showWatermark: false` and the
-  // public view drops the "Built with TrafficClaw" link.
+  // public view drops the `Built with ${BRAND_NAME}` link.
   const watermarkEnabled = draft.branding?.showWatermark ?? true;
 
   function applyPreset(p: typeof PRESETS[number]) {
@@ -118,7 +119,7 @@ export default function ShareThemePanel({ draft, onChange }: Props) {
       </div>
 
       {/* ── Branding / Watermark ──
-         Removing the "Built with TrafficClaw" footer is gated to paid plans.
+         Removing the `Built with ${BRAND_NAME}` footer is gated to paid plans.
          Free + Starter see the toggle in locked/highlighted form with an
          inline upgrade CTA — this surface is one of the highest-converting
          spots in the app because the desire is concrete and immediate. */}
@@ -137,7 +138,7 @@ export default function ShareThemePanel({ draft, onChange }: Props) {
                 )}
               </div>
               <p className="mt-1 text-[10.5px] leading-relaxed text-white/40">
-                Hide the &quot;Built with TrafficClaw&quot; link in the footer of your public share view. Your dashboard, your brand.
+                Hide the &quot;Built with {BRAND_NAME}&quot; link in the footer of your public share view. Your dashboard, your brand.
               </p>
               {!canRemoveWatermark && (
                 <Link
@@ -153,7 +154,7 @@ export default function ShareThemePanel({ draft, onChange }: Props) {
               onClick={toggleWatermark}
               disabled={!canRemoveWatermark}
               aria-pressed={!watermarkEnabled}
-              aria-label={canRemoveWatermark ? 'Toggle TrafficClaw watermark' : 'Watermark removal requires Growth or Pro plan'}
+              aria-label={canRemoveWatermark ? `Toggle ${BRAND_NAME} watermark` : 'Watermark removal requires Growth or Pro plan'}
               title={canRemoveWatermark ? '' : 'Available on Growth and Pro plans'}
               className={`relative mt-0.5 inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition ${
                 !canRemoveWatermark

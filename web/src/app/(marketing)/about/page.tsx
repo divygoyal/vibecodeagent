@@ -1,16 +1,17 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-    title: 'About TrafficClaw — AI-Powered Growth Intelligence Platform',
+    title: `About ${BRAND_NAME} — AI-Powered Growth Intelligence Platform`,
     description:
-        'TrafficClaw is an AI-powered growth intelligence platform that connects to Google Analytics & Search Console to deliver real-time insights, SEO recommendations, and automated fixes.',
+        `${BRAND_NAME} is an AI-powered growth intelligence platform that connects to Google Analytics & Search Console to deliver real-time insights, SEO recommendations, and automated fixes.`,
     alternates: { canonical: '/about' },
     openGraph: {
-        title: 'About TrafficClaw — AI-Powered Growth Intelligence Platform',
+        title: `About ${BRAND_NAME} — AI-Powered Growth Intelligence Platform`,
         description:
-            'Learn how TrafficClaw uses AI to democratize access to advanced analytics and SEO tools through a simple, conversational interface.',
+            `Learn how ${BRAND_NAME} uses AI to democratize access to advanced analytics and SEO tools through a simple, conversational interface.`,
         url: '/about',
     },
 };
@@ -35,7 +36,7 @@ export default function AboutPage() {
                     <section>
                         <h2 className="text-2xl font-semibold text-white mt-2 mb-4">Our Mission</h2>
                         <p>
-                            TrafficClaw is an AI-powered growth intelligence platform designed to help website owners
+                            {BRAND_NAME} is an AI-powered growth intelligence platform designed to help website owners
                             monitor, analyze, and improve their online presence. We believe that advanced analytics and
                             SEO tools shouldn&apos;t be reserved for enterprises with dedicated data teams.
                         </p>
@@ -66,7 +67,7 @@ export default function AboutPage() {
                     <section>
                         <h2 className="text-2xl font-semibold text-white mt-12 mb-4">Our Technology</h2>
                         <p>
-                            Built on top of advanced large language models (including Google&apos;s Gemini), TrafficClaw
+                            Built on top of advanced large language models (including Google&apos;s Gemini), {BRAND_NAME}
                             understands natural language queries about your data and can execute complex analysis tasks
                             that would normally require a data scientist. Our platform is built with:
                         </p>
@@ -83,7 +84,7 @@ export default function AboutPage() {
                         <p>
                             Whether you&apos;re a solo founder tracking your side project, a content creator optimizing
                             for discoverability, a marketing team scaling paid and organic channels, or an e-commerce
-                            brand monitoring revenue attribution — TrafficClaw adapts to your workflow and delivers
+                            brand monitoring revenue attribution — {BRAND_NAME} adapts to your workflow and delivers
                             insights that matter.
                         </p>
                     </section>

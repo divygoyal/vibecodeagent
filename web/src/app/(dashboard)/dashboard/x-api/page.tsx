@@ -26,6 +26,7 @@ import {
     type SocialEmbedTokenRecord,
 } from '@/lib/socialEmbeds';
 import { canonicalizeDomainInput, type XMentionPayload } from '@/lib/xMentionsShared';
+import { BRAND_NAME } from '@/lib/brand';
 
 type MentionFetchResult = {
     canonicalDomain: string;
@@ -594,7 +595,7 @@ export default function XApiPage() {
                             <div className="dashboard-hover-item border border-emerald-400/15 bg-[linear-gradient(180deg,rgba(16,185,129,0.12),rgba(9,16,24,0.96))] p-4 sm:p-5">
                                 <div className="text-sm font-medium text-white">Done</div>
                                 <p className="mt-2 text-sm leading-6 text-zinc-200">
-                                    TrafficClaw keeps the same hosted widget URL active and refreshes the mentions daily behind the scenes.
+                                    {BRAND_NAME} keeps the same hosted widget URL active and refreshes the mentions daily behind the scenes.
                                 </p>
                             </div>
                         </div>

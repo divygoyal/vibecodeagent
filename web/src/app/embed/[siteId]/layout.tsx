@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-  title: 'TrafficClaw Globe — Real-Time Visitors',
-  description: 'Real-time visitor globe powered by TrafficClaw',
+  title: `${BRAND_NAME} Globe — Real-Time Visitors`,
+  description: `Real-time visitor globe powered by ${BRAND_NAME}`,
 };
 
 export default function EmbedLayout({ children }: { children: React.ReactNode }) {

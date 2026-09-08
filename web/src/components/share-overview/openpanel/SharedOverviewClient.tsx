@@ -73,6 +73,7 @@ import {
     type ShareSectionId,
     type ShareBranding,
 } from '@/lib/shareTypes';
+import { BRAND_NAME } from '@/lib/brand';
 
 /* Live-preview overrides posted from the Share Studio (same-origin postMessage).
  * Any subset of these fields shadows the persisted config without touching the DB. */
@@ -236,7 +237,7 @@ type OverviewRuntime = {
     onRangeChange?: (value: string) => void;
     onShareDashboard?: () => void;
     config?: NormalizedShareConfig | null;
-    /** When true, the iframe-only "[Logo] TrafficClaw" strip is suppressed.
+    /** When true, the iframe-only `[Logo] ${BRAND_NAME}` strip is suppressed.
      *  Server-side gated by an HMAC signature on the `_b` URL param so
      *  only the marketing site can flip it. Customer embeds never carry
      *  the signature → they always see the watermark. */
@@ -3277,7 +3278,7 @@ function ShareOverviewPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center rounded-md transition hover:opacity-90"
-                            aria-label="TrafficClaw home"
+                            aria-label={`${BRAND_NAME} home`}
                         >
                             <Logo size="sm" />
                         </a>
@@ -3357,7 +3358,7 @@ function ShareOverviewPage() {
                 rel="noopener noreferrer"
                 className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
             >
-                Built with TrafficClaw
+                Built with {BRAND_NAME}
             </a>
         </div>
     ) : null;

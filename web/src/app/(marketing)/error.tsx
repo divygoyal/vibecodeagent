@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { BRAND_NAME } from '@/lib/brand';
 
 /**
  * Marketing-segment error boundary. Catches client-render crashes (most often:
@@ -35,7 +36,7 @@ export default function MarketingError({
                 </div>
                 <h1 className="mb-2 text-xl font-semibold tracking-[-0.01em]">Something went wrong</h1>
                 <p className="mb-6 text-sm leading-relaxed text-zinc-400">
-                    TrafficClaw hit an unexpected error loading this page. Reload to try again.
+                    {BRAND_NAME} hit an unexpected error loading this page. Reload to try again.
                 </p>
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
                     <button
