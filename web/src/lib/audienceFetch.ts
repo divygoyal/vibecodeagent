@@ -404,7 +404,8 @@ async function fetchDevices(token: string, pid: string): Promise<AudienceShare[]
         metric: 'activeUsers',
         limit: 10,
     });
-    return shapeShares(toShareRows(report), { total: reportTotal(report) });
+    // GA4 reports "smart tv" etc. at 0.0% for most sites; a row that rounds to zero is noise.
+    return shapeShares(toShareRows(report), { total: reportTotal(report), minShare: 0.1 });
 }
 
 async function fetchTopPages(token: string, pid: string): Promise<AudiencePage[]> {
