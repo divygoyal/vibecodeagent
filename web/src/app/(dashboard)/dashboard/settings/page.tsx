@@ -12,6 +12,7 @@ import { isPushSupported, isPushEnabled, requestPushPermission, disablePush } fr
 import { useContainerStatus } from '@/lib/useDashboardData';
 import { toast } from 'sonner';
 import LeaderboardOptIn from './LeaderboardOptIn';
+import AdSlotRequestsInbox from './AdSlotRequestsInbox';
 import { BRAND_NAME } from '@/lib/brand';
 
 /* ───────────────────────────────────────────────────────────────────
@@ -165,7 +166,11 @@ export default function SettingsPage() {
                         />
                     )}
                     {activeTab === 'leaderboard' && (
-                        <LeaderboardOptIn />
+                        <>
+                            <LeaderboardOptIn />
+                            {/* Renders nothing until a buyer has actually asked for a slot. */}
+                            <AdSlotRequestsInbox />
+                        </>
                     )}
                 </main>
             </div>

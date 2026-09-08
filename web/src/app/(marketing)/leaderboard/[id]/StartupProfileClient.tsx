@@ -5,11 +5,16 @@ import Link from 'next/link';
 import {
     ShieldCheck, ShieldAlert, ExternalLink, ArrowUpRight, ArrowDownRight,
     Users, Eye, Zap, Timer, ArrowLeft, Copy, Check,
-    Twitter, Mail, BarChart3, Code2,
+    Twitter, Mail, BarChart3, Code2, Megaphone, Loader2, Send,
 } from 'lucide-react';
 import {
     XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, CartesianGrid,
 } from 'recharts';
+import {
+    formatSlotPrice,
+    formatAvailability,
+    type AdSlot,
+} from '@/lib/adSlots';
 import { BRAND_NAME } from '@/lib/brand';
 
 export interface StartupProfileData {
@@ -37,6 +42,12 @@ export interface StartupProfileData {
     primary_country?: string | null;
     last_refreshed: string | null;
     created_at: string | null;
+    /**
+     * What the publisher is selling, in their own words at their own price.
+     * The detail endpoint returns active slots only. Absent or empty for the
+     * many sites that sell nothing — the profile then renders as it always has.
+     */
+    ad_slots?: AdSlot[];
     history?: Array<{
         recorded_on: string | null;
         monthly_visitors: number;
@@ -462,6 +473,9 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                     />
                 </div>
 
+                {/* Ad slots — only when the publisher is actually selling something */}
+                <AdSlotsPanel entry={entry} />
+
                 {/* Visitor history */}
                 <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                     <div className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.06),transparent_36%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-8">
@@ -561,6 +575,278 @@ export default function StartupProfileClient({ entry, profileUrl }: { entry: Sta
                 </div>
             </div>
         </div>
+    );
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Ad slots
+ *
+ * What the publisher sells, in their words at their price. The verified GA4
+ * figures are repeated at the top of this panel as context for a buyer; no
+ * value rendered here is derived from them. `formatSlotPrice` only formats the
+ * stored cents, so the number on screen is the number the publisher typed.
+ *
+ * Renders nothing at all when the site has no active slots.
+ * ──────────────────────────────────────────────────────────────────── */
+
+const SLOT_INPUT_CLASS =
+    'w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:border-[#14C4E1]/40 focus:outline-none';
+
+function AdSlotsPanel({ entry }: { entry: StartupProfileData }) {
+    const [openSlotId, setOpenSlotId] = useState<number | null>(null);
+    const slots = entry.ad_slots || [];
+    if (slots.length === 0) return null;
+
+    return (
+        <section className="mt-6 overflow-hidden rounded-[26px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(122,217,218,0.06),transparent_38%),linear-gradient(180deg,rgba(8,9,12,0.98),rgba(2,3,4,1))] p-6 shadow-[0_40px_120px_rgba(0,0,0,0.48)] sm:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-2">
+                    <SectionLabel>Ad slots</SectionLabel>
+                    <h2 className="flex items-center gap-2 text-xl font-semibold tracking-[-0.03em] text-white">
+                        <Megaphone className="h-4 w-4 text-[#7AD9DA]" />
+                        Sponsor {entry.startup_name}
+                    </h2>
+                </div>
+                {/* The verified traffic, sitting beside the slots as context */}
+                <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#14C4E1]/22 bg-[#14C4E1]/10 px-3 py-1.5 font-medium text-[#dff9ff]">
+                        <Users className="h-3 w-3" />
+                        {formatNumber(entry.monthly_visitors)} verified visitors / 28d
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-zinc-400">
+                        <Eye className="h-3 w-3" />
+                        {formatNumber(entry.monthly_pageviews)} pageviews
+                    </span>
+                </div>
+            </div>
+
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-zinc-400">
+                Every price below is set by {entry.founder_name || entry.startup_name} — the GA4 numbers
+                are context, not a formula. Your request goes straight to the publisher; the arrangement
+                and payment happen between the two of you.
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {slots.map((slot) => (
+                    <SlotCard
+                        key={slot.id}
+                        slot={slot}
+                        open={openSlotId === slot.id}
+                        onOpen={() => setOpenSlotId(slot.id)}
+                        onClose={() => setOpenSlotId((current) => (current === slot.id ? null : current))}
+                    />
+                ))}
+            </div>
+        </section>
+    );
+}
+
+function SlotCard({
+    slot,
+    open,
+    onOpen,
+    onClose,
+}: {
+    slot: AdSlot;
+    open: boolean;
+    onOpen: () => void;
+    onClose: () => void;
+}) {
+    const [sent, setSent] = useState(false);
+    const [previewFailed, setPreviewFailed] = useState(false);
+    const soldOut = Number(slot.quantity_open || 0) <= 0;
+    const availability = formatAvailability(slot);
+
+    return (
+        <div
+            className={`flex flex-col rounded-2xl border border-white/[0.07] bg-[linear-gradient(180deg,rgba(10,14,20,0.96),rgba(4,7,11,0.98))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_24px_50px_rgba(0,0,0,0.42)] ${
+                soldOut ? 'opacity-75' : ''
+            }`}
+        >
+            <div className="flex items-start justify-between gap-3">
+                <h3 className="min-w-0 text-sm font-semibold leading-snug text-white">{slot.name}</h3>
+                <span
+                    className={`flex-shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${
+                        soldOut
+                            ? 'border-white/[0.1] bg-white/[0.03] text-zinc-400'
+                            : 'border-emerald-400/22 bg-emerald-500/10 text-emerald-300'
+                    }`}
+                >
+                    {availability}
+                </span>
+            </div>
+
+            <div className="mt-2 text-[1.45rem] font-semibold tracking-[-0.04em] text-white">
+                {formatSlotPrice(slot)}
+            </div>
+
+            {slot.preview_image_url && !previewFailed && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={slot.preview_image_url}
+                    alt={`${slot.name} placement preview`}
+                    onError={() => setPreviewFailed(true)}
+                    className="mt-3 w-full rounded-xl border border-white/[0.06] object-cover"
+                />
+            )}
+
+            {slot.preview_note && (
+                <p className="mt-3 text-[12px] leading-6 text-zinc-400">{slot.preview_note}</p>
+            )}
+
+            <div className="mt-4 pt-1">
+                {sent ? (
+                    <div className="flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-2.5 text-[11.5px] leading-5 text-emerald-300">
+                        <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                        <span>Request sent. The publisher will reply to you directly by email.</span>
+                    </div>
+                ) : soldOut ? (
+                    <button
+                        type="button"
+                        disabled
+                        className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-2 text-xs font-medium text-zinc-500"
+                    >
+                        Sold out
+                    </button>
+                ) : open ? (
+                    <SlotRequestForm slot={slot} onSent={() => { setSent(true); onClose(); }} onCancel={onClose} />
+                ) : (
+                    <button
+                        type="button"
+                        onClick={onOpen}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-[#14C4E1]/30 bg-[linear-gradient(135deg,rgba(20,196,225,0.18),rgba(122,217,218,0.06))] px-3.5 py-2 text-xs font-semibold text-[#dff9ff] transition hover:brightness-110"
+                    >
+                        <Send className="h-3.5 w-3.5" />
+                        Request this slot
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Buyer's ask for ONE specific slot — `slot.id` is what gets posted, so a site
+ * with four slots produces four distinguishable requests. The price is never
+ * sent from here: the server snapshots it from the stored slot.
+ */
+function SlotRequestForm({
+    slot,
+    onSent,
+    onCancel,
+}: {
+    slot: AdSlot;
+    onSent: () => void;
+    onCancel: () => void;
+}) {
+    const [buyerName, setBuyerName] = useState('');
+    const [buyerEmail, setBuyerEmail] = useState('');
+    const [message, setMessage] = useState('');
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!buyerEmail.trim()) {
+            setError('Add your email so the publisher can reply.');
+            return;
+        }
+        setSending(true);
+        setError(null);
+        try {
+            const res = await fetch('/api/ad-slots/requests', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    slot_id: slot.id,
+                    buyer_name: buyerName.trim(),
+                    buyer_email: buyerEmail.trim(),
+                    message: message.trim(),
+                }),
+            });
+            const raw = await res.text();
+            let data: { success?: boolean; error?: string } = {};
+            try {
+                data = raw ? JSON.parse(raw) : {};
+            } catch {
+                setError(`Could not send your request (status ${res.status}).`);
+                return;
+            }
+            if (!res.ok || !data.success) {
+                setError(data.error || `Could not send your request (status ${res.status}).`);
+                return;
+            }
+            onSent();
+        } catch {
+            setError('Network error — please try again.');
+        } finally {
+            setSending(false);
+        }
+    }
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-2 rounded-xl border border-white/[0.06] bg-black/30 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                Request “{slot.name}”
+            </p>
+            <input
+                type="text"
+                value={buyerName}
+                onChange={(e) => setBuyerName(e.target.value)}
+                placeholder="Your name"
+                maxLength={120}
+                disabled={sending}
+                aria-label="Your name"
+                className={SLOT_INPUT_CLASS}
+            />
+            <input
+                type="email"
+                inputMode="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={buyerEmail}
+                onChange={(e) => setBuyerEmail(e.target.value)}
+                placeholder="you@company.com"
+                required
+                disabled={sending}
+                aria-label="Your email"
+                className={SLOT_INPUT_CLASS}
+            />
+            <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="What are you promoting, and when?"
+                rows={3}
+                maxLength={2000}
+                disabled={sending}
+                aria-label="Message to the publisher"
+                className={`${SLOT_INPUT_CLASS} resize-none leading-5`}
+            />
+            {error && (
+                <p className="rounded-lg border border-red-500/15 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300">
+                    {error}
+                </p>
+            )}
+            <div className="flex items-center gap-2 pt-0.5">
+                <button
+                    type="submit"
+                    disabled={sending || !buyerEmail.trim()}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-[#14C4E1]/30 bg-[linear-gradient(135deg,rgba(20,196,225,0.18),rgba(122,217,218,0.06))] px-3.5 py-2 text-xs font-semibold text-[#dff9ff] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                    Send request
+                </button>
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    disabled={sending}
+                    className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[11px] font-medium text-zinc-400 transition hover:text-white disabled:opacity-50"
+                >
+                    Cancel
+                </button>
+            </div>
+        </form>
     );
 }
 
