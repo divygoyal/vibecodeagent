@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { getValidAccessToken } from '@/lib/googleApi';
 import { verifyPropertyDomain } from '@/lib/leaderboardVerify';
+import { collectAudience, summarizeAudienceForLog } from '@/lib/audienceFetch';
 
 export const dynamic = 'force-dynamic';
 
@@ -224,6 +225,7 @@ export async function GET(req: NextRequest) {
         let failCount = 0;
         let verifiedCount = 0;
         let mismatchCount = 0;
+        let audienceCount = 0;
 
         for (const entry of entries) {
             try {
@@ -282,6 +284,33 @@ export async function GET(req: NextRequest) {
                     backfillHistory(entry.entry_id, entry.ga_property_id, token).catch((err) =>
                         console.warn(`[CRON] History backfill failed for entry ${entry.entry_id}:`, err),
                     );
+
+                    // Audience intelligence (countries, channels, pages, GSC
+                    // queries, topics). Awaited so the per-entry jitter below
+                    // still paces GA4/GSC quota, but never affects successCount.
+                    try {
+                        const audience = await collectAudience({
+                            token,
+                            gaPropertyId: entry.ga_property_id,
+                            websiteUrl: entry.website_url ?? null,
+                        });
+                        const audienceRes = await fetchWithRetry(
+                            `${ADMIN_API_URL}/api/leaderboard/${entry.entry_id}/audience`,
+                            {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
+                                body: JSON.stringify(audience),
+                            },
+                        );
+                        if (audienceRes.ok) {
+                            audienceCount++;
+                            console.log(`[CRON] ✓ Audience for entry ${entry.entry_id}: ${summarizeAudienceForLog(audience)}`);
+                        } else {
+                            console.warn(`[CRON] Audience upsert failed for entry ${entry.entry_id}: ${audienceRes.status}`);
+                        }
+                    } catch (audienceErr) {
+                        console.warn(`[CRON] Audience collection failed for entry ${entry.entry_id}:`, audienceErr);
+                    }
                 } else {
                     failCount++;
                     console.error(`[CRON] ✗ Failed to update entry ${entry.entry_id}: ${updateRes.status}`);
@@ -303,6 +332,7 @@ export async function GET(req: NextRequest) {
             failCount,
             verifiedCount,
             mismatchCount,
+            audienceCount,
         };
         console.log(`[CRON] Leaderboard refresh complete:`, summary);
         return NextResponse.json(summary);

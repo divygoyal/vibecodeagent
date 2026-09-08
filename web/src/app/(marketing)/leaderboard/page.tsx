@@ -9,8 +9,9 @@ import {
     Trophy, Sparkles, Clock, ShieldCheck,
     ArrowUpRight, ArrowDownRight, Search as SearchIcon,
     ChevronDown, ChevronLeft, ChevronRight, Users, Zap,
-    AlertTriangle, Flame, ArrowRight,
+    AlertTriangle, Flame, ArrowRight, Megaphone,
 } from 'lucide-react';
+import { formatCents } from '@/lib/adSlots';
 
 interface LeaderboardEntry {
     id: number;
@@ -33,6 +34,12 @@ interface LeaderboardEntry {
     primary_country?: string | null;
     last_refreshed: string | null;
     created_at: string | null;
+    /** Number of active publisher-defined ad slots. Absent on older API responses. */
+    ad_slot_count?: number;
+    /** Lowest price the publisher typed across their active slots, in cents. Never computed. */
+    min_slot_price_cents?: number | null;
+    /** Audience topic labels (see lib/audienceTypes). */
+    topic_labels?: string[];
 }
 
 interface LeaderboardListResponse {
@@ -241,6 +248,47 @@ function VerifiedPill({ status }: { status: string | undefined }) {
     return null;
 }
 
+/**
+ * "Sponsorships · from $20" pill. Rendered inside the row <button>, so this is
+ * a span (an <a> can't nest inside a button) that navigates itself and stops
+ * the click from also firing the row's own navigation.
+ */
+function SponsorshipPill({ entry, onNavigate }: { entry: LeaderboardEntry; onNavigate: (href: string) => void }) {
+    const count = entry.ad_slot_count ?? 0;
+    if (count <= 0) return null;
+    const minPrice = entry.min_slot_price_cents ?? 0;
+    const href = `/leaderboard/${entry.slug || entry.id}#sponsor`;
+    return (
+        <span
+            title={`${count} ad slot${count === 1 ? '' : 's'} — prices set by the publisher`}
+            onClick={(e) => {
+                e.stopPropagation();
+                onNavigate(href);
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300 transition hover:border-emerald-400/45 hover:bg-emerald-500/[0.16]"
+        >
+            <Megaphone className="h-3 w-3" />
+            Sponsorships{minPrice > 0 ? ` · from ${formatCents(minPrice)}` : ''}
+        </span>
+    );
+}
+
+function TopicChips({ labels }: { labels: string[] | undefined }) {
+    if (!labels || labels.length === 0) return null;
+    return (
+        <>
+            {labels.slice(0, 3).map((label) => (
+                <span
+                    key={label}
+                    className="rounded-md bg-white/[0.03] px-1.5 py-0.5 text-[10px] text-zinc-500"
+                >
+                    {label}
+                </span>
+            ))}
+        </>
+    );
+}
+
 export default function LeaderboardPage() {
     return (
         <Suspense fallback={<LeaderboardLoadingFallback />}>
@@ -289,6 +337,7 @@ function LeaderboardPageInner() {
     const country = searchParams.get('country') || 'all';
     const page = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1);
     const q = searchParams.get('q') || '';
+    const sponsorable = searchParams.get('sponsorable') === 'true';
 
     const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
     const [total, setTotal] = useState(0);
@@ -335,6 +384,7 @@ function LeaderboardPageInner() {
                 if (mrr !== 'all') params.set('mrr', mrr);
                 if (country !== 'all') params.set('country', country);
                 if (q) params.set('q', q);
+                if (sponsorable) params.set('sponsorable', 'true');
                 const res = await fetch(`/api/leaderboard?${params}`);
                 if (!res.ok) throw new Error(String(res.status));
                 const data = (await res.json()) as LeaderboardListResponse;
@@ -353,7 +403,7 @@ function LeaderboardPageInner() {
         return () => {
             cancelled = true;
         };
-    }, [sort, category, mrr, country, q, page]);
+    }, [sort, category, mrr, country, q, page, sponsorable]);
 
     const moversFetchedFor = useRef<string>('');
     useEffect(() => {
@@ -489,6 +539,26 @@ function LeaderboardPageInner() {
                                     <FilterSelect value={category} onChange={(v) => updateParams({ category: v, page: '1' })} options={CATEGORIES} />
                                     <FilterSelect value={mrr} onChange={(v) => updateParams({ mrr: v, page: '1' })} options={MRR_RANGES} />
                                     <FilterSelect value={country} onChange={(v) => updateParams({ country: v, page: '1' })} options={COUNTRIES} />
+                                    <button
+                                        type="button"
+                                        aria-pressed={sponsorable}
+                                        onClick={() => updateParams({ sponsorable: sponsorable ? undefined : 'true', page: '1' })}
+                                        className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium transition focus:outline-none ${
+                                            sponsorable
+                                                ? 'border-emerald-400/40 bg-emerald-500/[0.12] text-emerald-200'
+                                                : 'border-white/[0.1] bg-white/[0.03] text-zinc-300 hover:bg-white/[0.06]'
+                                        }`}
+                                    >
+                                        <Megaphone className={`h-3.5 w-3.5 ${sponsorable ? 'text-emerald-300' : 'text-zinc-500'}`} />
+                                        Sponsorships available
+                                    </button>
+                                    <Link
+                                        href="/sponsor"
+                                        className="inline-flex items-center gap-1 px-1.5 py-2 text-xs font-medium text-emerald-300/90 transition hover:text-emerald-200"
+                                    >
+                                        Browse all ad slots
+                                        <ArrowRight className="h-3 w-3" />
+                                    </Link>
                                 </div>
 
                                 <div className="flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -508,6 +578,14 @@ function LeaderboardPageInner() {
                                     ))}
                                 </div>
                             </div>
+
+                            {sponsorable && !loading && (
+                                <p className="flex items-center gap-1.5 text-xs text-zinc-400">
+                                    <Megaphone className="h-3.5 w-3.5 text-emerald-300" />
+                                    <span className="font-semibold text-emerald-200">{total}</span>
+                                    {total === 1 ? ' site' : ' sites'} with sponsorships available · prices set by each publisher
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -554,11 +632,13 @@ function LeaderboardPageInner() {
                                             <Trophy className="h-6 w-6 text-[#7AD9DA]" />
                                         </div>
                                         <h3 className="text-lg font-semibold tracking-[-0.03em] text-white">
-                                            {q ? `No startups match "${q}"` : 'Be the first on the leaderboard'}
+                                            {q ? `No startups match "${q}"` : sponsorable ? 'No sponsorships listed yet' : 'Be the first on the leaderboard'}
                                         </h3>
                                         <p className="mx-auto mt-2 max-w-md text-sm text-zinc-400">
                                             {q
                                                 ? 'Try a different search or clear filters.'
+                                                : sponsorable
+                                                ? 'Verified sites can list ad slots at their own price from Settings → Leaderboard.'
                                                 : 'Connect your Google Analytics property and we&apos;ll verify it against your domain — listed instantly.'}
                                         </p>
                                         <button
@@ -619,6 +699,7 @@ function LeaderboardPageInner() {
                                                                     {entry.primary_country}
                                                                 </span>
                                                             )}
+                                                            <SponsorshipPill entry={entry} onNavigate={(href) => router.push(href)} />
                                                             {entry.looking_for?.map((tag) => (
                                                                 <span
                                                                     key={tag}
@@ -629,6 +710,7 @@ function LeaderboardPageInner() {
                                                                     🎯 {tag}
                                                                 </span>
                                                             ))}
+                                                            <TopicChips labels={entry.topic_labels} />
                                                         </div>
                                                     </div>
                                                 </div>

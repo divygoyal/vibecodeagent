@@ -7,6 +7,10 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 export const dynamic = 'force-dynamic';
 
 // ============= Mock data for local development =============
+// Sponsorship fields mirror the admin API shape. Mock entries list no slots
+// (count 0, no price) — prices only ever come from what a publisher typed.
+const NO_SPONSORSHIP = { ad_slot_count: 0, min_slot_price_cents: null as number | null, topic_labels: [] as string[] };
+
 function generateMockLeaderboard() {
     return [
         {
@@ -15,6 +19,7 @@ function generateMockLeaderboard() {
             looking_for: ['partner', 'visibility'], twitter_handle: 'SkiniveApp',
             monthly_visitors: 125727, monthly_pageviews: 342891, engagement_rate: 86, bounce_rate: 14, visitor_trend: 23.4,
             is_verified: true, last_refreshed: new Date().toISOString(), created_at: '2026-01-15T10:00:00Z',
+            ...NO_SPONSORSHIP,
         },
         {
             id: 2, startup_name: 'Expert Listing', description: 'Expert Listing gives you direct access to property owners, developers, and principals.',
@@ -22,6 +27,7 @@ function generateMockLeaderboard() {
             looking_for: ['visibility'], twitter_handle: null,
             monthly_visitors: 30387, monthly_pageviews: 85210, engagement_rate: 38, bounce_rate: 62, visitor_trend: 8.1,
             is_verified: true, last_refreshed: new Date().toISOString(), created_at: '2026-02-20T10:00:00Z',
+            ...NO_SPONSORSHIP,
         },
         {
             id: 3, startup_name: 'AntiGravity Codes', description: 'The ultimate resource hub for developers using Google Antigravity. Features 500+ AI-powered tools.',
@@ -29,6 +35,7 @@ function generateMockLeaderboard() {
             looking_for: ['visibility', 'buyer', 'partner'], twitter_handle: 'devanshuai',
             monthly_visitors: 15977, monthly_pageviews: 43221, engagement_rate: 42, bounce_rate: 58, visitor_trend: 15.2,
             is_verified: true, last_refreshed: new Date().toISOString(), created_at: '2026-02-01T10:00:00Z',
+            ...NO_SPONSORSHIP,
         },
         {
             id: 4, startup_name: 'Diskusi Pajak', description: 'DiskusiPajak.com simplifies tax management for freelancers and digital businesses.',
@@ -36,6 +43,7 @@ function generateMockLeaderboard() {
             looking_for: ['partner'], twitter_handle: 'lesssummerize',
             monthly_visitors: 14955, monthly_pageviews: 39102, engagement_rate: 58, bounce_rate: 42, visitor_trend: -2.3,
             is_verified: true, last_refreshed: new Date().toISOString(), created_at: '2026-01-28T10:00:00Z',
+            ...NO_SPONSORSHIP,
         },
         {
             id: 5, startup_name: 'Shadcn Space', description: 'A collection of beautifully designed Shadcn UI blocks, components, templates, and more.',
@@ -43,6 +51,7 @@ function generateMockLeaderboard() {
             looking_for: ['visibility'], twitter_handle: 'ShadcnSpace',
             monthly_visitors: 13721, monthly_pageviews: 35443, engagement_rate: 56, bounce_rate: 44, visitor_trend: 31.7,
             is_verified: true, last_refreshed: new Date().toISOString(), created_at: '2026-03-01T10:00:00Z',
+            ...NO_SPONSORSHIP,
         },
         {
             id: 6, startup_name: `${BRAND_NAME}`, description: 'AI-powered SEO analytics with real-time traffic monitoring, GSC intelligence, and automated insights.',
@@ -50,6 +59,7 @@ function generateMockLeaderboard() {
             looking_for: ['visibility', 'partner'], twitter_handle: 'trafficclaw',
             monthly_visitors: 11204, monthly_pageviews: 28450, engagement_rate: 67, bounce_rate: 33, visitor_trend: 45.2,
             is_verified: true, last_refreshed: new Date().toISOString(), created_at: '2026-02-10T10:00:00Z',
+            ...NO_SPONSORSHIP,
         },
         {
             id: 7, startup_name: 'DevCanvas', description: 'Open-source design tool for developers. Create beautiful marketing pages without Figma.',
@@ -57,6 +67,7 @@ function generateMockLeaderboard() {
             looking_for: ['buyer'], twitter_handle: 'devcanvas_io',
             monthly_visitors: 8934, monthly_pageviews: 21567, engagement_rate: 72, bounce_rate: 28, visitor_trend: 12.8,
             is_verified: true, last_refreshed: new Date().toISOString(), created_at: '2026-03-10T10:00:00Z',
+            ...NO_SPONSORSHIP,
         },
         {
             id: 8, startup_name: 'BlogRocket', description: 'AI autopilot for your blog. Generates, optimizes, and publishes SEO content on schedule.',
@@ -64,6 +75,7 @@ function generateMockLeaderboard() {
             looking_for: ['partner', 'visibility'], twitter_handle: 'blogrocket',
             monthly_visitors: 6543, monthly_pageviews: 18976, engagement_rate: 61, bounce_rate: 39, visitor_trend: -5.1,
             is_verified: true, last_refreshed: new Date().toISOString(), created_at: '2026-03-15T10:00:00Z',
+            ...NO_SPONSORSHIP,
         },
     ];
 }
@@ -87,6 +99,7 @@ export async function GET(req: Request) {
     const mrr = searchParams.get('mrr') || '';
     const country = searchParams.get('country') || '';
     const q = searchParams.get('q') || '';
+    const sponsorable = ['true', '1'].includes((searchParams.get('sponsorable') || '').toLowerCase());
     const page = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1);
     const pageSize = Math.min(Math.max(parseInt(searchParams.get('page_size') || '25', 10) || 25, 1), 100);
 
@@ -96,6 +109,7 @@ export async function GET(req: Request) {
         if (mrr) params.set('mrr', mrr);
         if (country) params.set('country', country);
         if (q) params.set('q', q);
+        if (sponsorable) params.set('sponsorable', 'true');
 
         const res = await fetch(`${ADMIN_API_URL}/api/leaderboard?${params}`, {
             headers: { 'X-API-Key': ADMIN_API_KEY },
@@ -123,6 +137,7 @@ export async function GET(req: Request) {
 
         if (category && category !== 'all') mockData = mockData.filter((e) => e.category === category);
         if (mrr && mrr !== 'all') mockData = mockData.filter((e) => e.mrr_range === mrr);
+        if (sponsorable) mockData = mockData.filter((e) => e.ad_slot_count > 0);
         if (q) {
             const needle = q.toLowerCase();
             mockData = mockData.filter(
