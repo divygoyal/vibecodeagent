@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ArrowRight, Eye, ListChecks, Lock, Plug, ShieldCheck, Undo2 } from 'lucide-react';
 import { SetupTabs } from '@/components/connect-ai/SetupTabs';
 import { TOOL_SUMMARIES } from '@/components/connect-ai/toolSummaries';
-import { Badge, Card, buttonClasses } from '@/components/ui';
+import { Badge, Button, Card } from '@/components/ui';
 import { resourceUrl } from '@/lib/mcp/config';
 
 export const metadata: Metadata = {
@@ -77,8 +77,8 @@ export default function AiConnectorPage() {
                     <h1 className="mt-4 text-display-sm text-fg md:text-display">Use your Google Analytics and Search Console in ChatGPT and Claude</h1>
                     <p className="mt-4 max-w-[600px] text-lead text-fg-secondary">Connect Google once, then ask the AI you already use about every site you own. Read-only, you pick the sites, and it&apos;s free.</p>
                     <div className="mt-7 flex flex-wrap gap-3">
-                        <Link href="/dashboard/connect-ai" className={buttonClasses({ variant: 'primary', size: 'xl' })}>Connect your sites<ArrowRight aria-hidden size={18} strokeWidth={1.75} /></Link>
-                        <a href="#tools" className={buttonClasses({ variant: 'secondary', size: 'xl' })}>See the tools</a>
+                        <Button asChild variant="primary" size="xl"><Link href="/dashboard/connect-ai">Connect your sites<ArrowRight aria-hidden size={18} strokeWidth={1.75} /></Link></Button>
+                        <Button asChild variant="secondary" size="xl"><a href="#tools">See the tools</a></Button>
                     </div>
                     <p className="mt-5 text-body text-fg-muted">Works with ChatGPT, Claude, Claude Code, Cursor, VS Code and other MCP apps.</p>
                 </div>
@@ -182,7 +182,7 @@ export default function AiConnectorPage() {
                         <h2 className="flex items-center gap-2 text-title text-fg"><ShieldCheck aria-hidden size={20} strokeWidth={1.75} className="text-brand-text" />Ask your AI about your traffic today</h2>
                         <p className="mt-1 text-body-lg text-fg-secondary">Connect Google, copy the URL, approve. About two minutes.</p>
                     </div>
-                    <Link href="/dashboard/connect-ai" className={buttonClasses({ variant: 'primary', size: 'xl' })}>Connect your sites<ArrowRight aria-hidden size={18} strokeWidth={1.75} /></Link>
+                    <Button asChild variant="primary" size="xl"><Link href="/dashboard/connect-ai">Connect your sites<ArrowRight aria-hidden size={18} strokeWidth={1.75} /></Link></Button>
                 </Card>
             </section>
         </div>

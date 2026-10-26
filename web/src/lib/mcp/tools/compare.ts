@@ -317,7 +317,8 @@ export const pageDetail = defineTool({
         if (!site.ga4 && !site.gsc) throw new ToolError('invalid_argument', 'This site has neither GA4 nor Search Console connected');
         const path = normalizePath(args.page, site);
         const g = await ctx.google();
-        const sections: Section[] = [];
+        const gaSections: Section[] = [];
+        const gscSections: Section[] = [];
         const header = [...ctx.banner()];
         const desc: string[] = [];
         const noQueries = ctx.principal.excludeQueries;
@@ -337,7 +338,7 @@ export const pageDetail = defineTool({
             ]);
             const avgEng = (m: number[]) => (m[1] ? m[3] / m[1] : 0);
             const p = t.prev ?? metrics.map(() => 0);
-            sections.push({
+            gaSections.push({
                 title: 'ga4', columns: ['metric', 'current', 'previous', 'delta_pct'], rows: [
                     ['sessions', fmtInt(t.cur[0]), fmtInt(p[0]), fmtDelta(t.cur[0], p[0])],
                     ['users', fmtInt(t.cur[1]), fmtInt(p[1]), fmtDelta(t.cur[1], p[1])],
@@ -346,7 +347,7 @@ export const pageDetail = defineTool({
                     ['key_events', fmtInt(t.cur[4]), fmtInt(p[4]), fmtDelta(t.cur[4], p[4])],
                 ],
             });
-            sections.push({ title: 'ga4_top_sources', columns: ['source_medium', 'sessions'], rows: gaRows(src).map((r) => [ctx.san.text(r.dims[0], 80), fmtInt(r.mets[0])]) });
+            gaSections.push({ title: 'ga4_top_sources', columns: ['source_medium', 'sessions'], rows: gaRows(src).map((r) => [ctx.san.text(r.dims[0], 80), fmtInt(r.mets[0])]) });
             if (t.cur[0] === 0 && p[0] === 0) ctx.warn(`GA4 has no sessions with pagePath ${path}; check the path (GA4 paths exclude the host and query string)`);
         })() : Promise.resolve();
 
@@ -365,7 +366,7 @@ export const pageDetail = defineTool({
                 noQueries ? Promise.resolve([] as GscRow[]) : g.gscQuery(siteUrl, gscBody(period, { dimensions: ['query'], rowLimit: args.top_queries, ...pageFilter })).then((r) => r.rows || []),
                 g.gscQuery(siteUrl, gscBody(period, { dimensions: ['device'], rowLimit: 10, ...pageFilter })).then((r) => r.rows || []),
             ]);
-            sections.push({
+            gscSections.push({
                 title: 'gsc', columns: ['metric', 'current', 'previous', 'delta_pct'], rows: [
                     ['clicks', fmtInt(a.clicks), fmtInt(b.clicks), fmtDelta(a.clicks, b.clicks)],
                     ['impressions', fmtInt(a.impressions), fmtInt(b.impressions), fmtDelta(a.impressions, b.impressions)],
@@ -374,8 +375,8 @@ export const pageDetail = defineTool({
                 ],
             });
             if (noQueries) ctx.warn('top queries and competing pages are hidden: search queries are not shared with this connection');
-            else sections.push({ title: 'top_queries', columns: ['query', 'clicks', 'impressions', 'ctr_pct', 'position'], rows: queries.map((r) => [ctx.san.text(r.keys?.[0], 120), fmtInt(r.clicks), fmtInt(r.impressions), fmtNum(r.ctr * 100, 2), fmtNum(r.position, 1)]) });
-            sections.push({ title: 'devices', columns: ['device', 'clicks', 'impressions', 'ctr_pct', 'position'], rows: devices.map((r) => [ctx.san.text(r.keys?.[0], 20), fmtInt(r.clicks), fmtInt(r.impressions), fmtNum(r.ctr * 100, 2), fmtNum(r.position, 1)]) });
+            else gscSections.push({ title: 'top_queries', columns: ['query', 'clicks', 'impressions', 'ctr_pct', 'position'], rows: queries.map((r) => [ctx.san.text(r.keys?.[0], 120), fmtInt(r.clicks), fmtInt(r.impressions), fmtNum(r.ctr * 100, 2), fmtNum(r.position, 1)]) });
+            gscSections.push({ title: 'devices', columns: ['device', 'clicks', 'impressions', 'ctr_pct', 'position'], rows: devices.map((r) => [ctx.san.text(r.keys?.[0], 20), fmtInt(r.clicks), fmtInt(r.impressions), fmtNum(r.ctr * 100, 2), fmtNum(r.position, 1)]) });
             if (!noQueries && queries.length) {
                 const qs = queries.slice(0, 10).map((r) => r.keys?.[0] ?? '').filter(Boolean);
                 const qp = await g.gscQuery(siteUrl, gscBody(period, {
@@ -398,7 +399,7 @@ export const pageDetail = defineTool({
                         comp.push([ctx.san.text(q, 120), itemLabel(ctx, 'page', url, site.host), fmtNum((r.impressions / total) * 100, 0), fmtNum(r.position, 1)]);
                     }
                 }
-                sections.push({ title: 'competing_pages', columns: ['query', 'other_page', 'impression_share_pct', 'position'], rows: comp.slice(0, 15) });
+                gscSections.push({ title: 'competing_pages', columns: ['query', 'other_page', 'impression_share_pct', 'position'], rows: comp.slice(0, 15) });
             }
         })() : Promise.resolve();
 
@@ -407,7 +408,7 @@ export const pageDetail = defineTool({
         if (errors.length === results.filter((_, i) => (i === 0 ? site.ga4 : site.gsc)).length) throw errors[0];
         for (const e of errors) ctx.warn(`one source failed: ${e instanceof ToolError ? `${e.code}: ${e.message}` : 'error'}`);
         header.push(headerLine(['page_detail', site.site_id, path, ...desc]));
-        const out = render(header, sections, [ctx.note()]);
+        const out = render(header, [...gaSections, ...gscSections], [ctx.note()]);
         return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, page: path, sources: [site.ga4 ? 'ga4' : null, site.gsc ? 'gsc' : null].filter(Boolean), truncated: out.truncated } };
     },
 });

@@ -234,7 +234,12 @@ export const ga4Realtime = defineTool({
         });
         const types = (report.metricHeaders || []).map((h) => h.type);
         const rows: Cell[][] = gaRows(report).map((r) => [...dims.map((d, i) => gaDimCell(ctx, d, r.dims[i] ?? '')), ...r.mets.map((v, i) => gaMetricCell(v, types[i]))]);
-        const totals = gaTotals(report)[0];
+        let totals = gaTotals(report)[0];
+        if (!totals && gaRows(report).length) {
+            // Some responses omit totals; one dimensionless call gives the true total (users are not additive across pages).
+            const t = await g.ga4Realtime(property, { metrics: metrics.map((name) => ({ name })), minuteRanges: [{ startMinutesAgo: args.minutes - 1, endMinutesAgo: 0 }], ...(filter ? { dimensionFilter: filter } : {}) });
+            totals = gaRows(t)[0]?.mets;
+        }
         const totalActive = totals ? totals[metrics.indexOf('activeUsers')] : undefined;
         const header = [...ctx.banner(), headerLine(['ga4_realtime', site.site_id, property, `last ${args.minutes} minutes`, totalActive !== undefined && metrics.includes('activeUsers') ? `activeUsers ${Math.round(totalActive)}` : null])];
         if (totals) rows.push([...dims.map((_, j) => (j === 0 ? 'TOTAL' : '')), ...totals.map((v, i) => gaMetricCell(v, types[i]))]);

@@ -2,7 +2,7 @@
  * Tool registration wrapper: annotations, cost-unit rate limit, concurrency,
  * deadline, error mapping, demo banner and audit. MCP.md 7.1 and 8.
  */
-import type { McpServer } from '@modelcontextprotocol/server';
+import { fromJsonSchema, type McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod';
 import { recordAudit } from './audit';
 import type { McpPrincipal } from './auth';
@@ -27,9 +27,14 @@ export const dateRangeArg = z.object({
 
 export const formatArg = z.enum(['table', 'json']).default('table').describe('table is compact TSV; json returns columns and rows.');
 
-export const Envelope = z.looseObject({
-    truncated: z.boolean().optional(),
-    warnings: z.array(z.string()).optional(),
+/** Result envelope (structuredContent): small, open-ended, never the rows. */
+export const Envelope = fromJsonSchema<Record<string, unknown>>({
+    type: 'object',
+    properties: {
+        truncated: { type: 'boolean' },
+        warnings: { type: 'array', items: { type: 'string' } },
+    },
+    additionalProperties: true,
 });
 
 // ───────────── context ─────────────
