@@ -160,9 +160,22 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
                                 <SegmentedControl ariaLabel="Embed theme" variant="neutral" size="sm" value={embedTheme} onChange={setEmbedTheme} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
                                 <label className="flex items-center gap-2 text-body-sm text-fg-secondary">Height <input aria-label="Embed height" value={embedHeight} onChange={(e) => setEmbedHeight(e.target.value.replace(/\D/g, '').slice(0, 4))} className="h-8 w-20 rounded-md border border-border bg-surface px-2 text-body-sm text-fg" /> px</label>
                             </div>
-                            <textarea readOnly aria-label="Embed code" value={snippet} rows={8} className="w-full rounded-control border border-border bg-surface-sunken p-3 font-mono text-meta text-fg" onFocus={(e) => e.currentTarget.select()} />
-                            <div className="flex justify-end"><Button variant="secondary" icon={Copy} onClick={() => { void navigator.clipboard?.writeText(snippet); toast.success('Embed code copied'); }}>Copy code</Button></div>
-                            <p className="text-meta text-fg-muted">The embed resizes itself with the 6-line listener above. A password-protected embed asks once per browser tab.</p>
+                            {share.embed.enabled ? (
+                                <>
+                                    <textarea readOnly aria-label="Embed code" value={snippet} rows={8} className="w-full rounded-control border border-border bg-surface-sunken p-3 font-mono text-meta text-fg" onFocus={(e) => e.currentTarget.select()} />
+                                    <div className="flex justify-end"><Button variant="secondary" icon={Copy} onClick={() => { void navigator.clipboard?.writeText(snippet); toast.success('Embed code copied'); }}>Copy code</Button></div>
+                                    <p className="text-meta text-fg-muted">The embed resizes itself with the 6-line listener above. A password-protected embed asks once per browser tab.</p>
+                                    {/* Live preview at 50% (DESIGN 5.10). */}
+                                    <div>
+                                        <p className="mb-1.5 text-body-sm font-medium text-fg">Preview</p>
+                                        <div className="h-[260px] overflow-hidden rounded-control border border-border-subtle bg-surface-sunken">
+                                            <iframe title="Embed preview" src={embedUrl} loading="lazy" className="pointer-events-none h-[520px] w-[200%] origin-top-left scale-50 border-0" />
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="text-body-sm text-fg-muted">Turn on “Allow embedding” to get the embed code and a preview.</p>
+                            )}
                         </>
                     )}
                 </div>

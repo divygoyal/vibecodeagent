@@ -7,6 +7,7 @@ import { Dialog } from 'radix-ui';
 import { cn } from '@/lib/cn';
 import { Button } from './Button';
 import { useHideChatWidget } from './useHideChatWidget';
+import { useReturnFocus } from './useReturnFocus';
 
 export interface DrawerProps {
     open: boolean;
@@ -29,12 +30,14 @@ export interface DrawerProps {
 /** Side panel for row details, "View all" lists and the Ask panel (DESIGN 3.17). */
 export function Drawer({ open, onOpenChange, title, subtitle, children, footer, width = 'default', side = 'right', trigger, bare, className }: DrawerProps) {
     useHideChatWidget(open);
+    const returnFocus = useReturnFocus();
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             {trigger ? <Dialog.Trigger asChild>{trigger}</Dialog.Trigger> : null}
             <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 z-60 bg-overlay animate-fade-in" />
                 <Dialog.Content
+                    {...returnFocus}
                     aria-describedby={undefined}
                     className={cn(
                         'tc-ui fixed inset-y-0 z-60 flex w-full flex-col bg-surface-raised text-body text-fg shadow-modal outline-none',

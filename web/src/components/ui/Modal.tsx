@@ -7,6 +7,7 @@ import { Dialog } from 'radix-ui';
 import { cn } from '@/lib/cn';
 import { Button } from './Button';
 import { useHideChatWidget } from './useHideChatWidget';
+import { useReturnFocus } from './useReturnFocus';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -38,12 +39,14 @@ export interface ModalProps {
  */
 export function Modal({ open, onOpenChange, title, description, children, footer, size = 'md', trigger, hideClose, className }: ModalProps) {
     useHideChatWidget(open);
+    const returnFocus = useReturnFocus();
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             {trigger ? <Dialog.Trigger asChild>{trigger}</Dialog.Trigger> : null}
             <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 z-70 bg-overlay animate-fade-in" />
                 <Dialog.Content
+                    {...returnFocus}
                     aria-describedby={description ? undefined : undefined}
                     className={cn(
                         'tc-ui fixed z-70 flex flex-col bg-surface-raised text-body text-fg shadow-modal outline-none',
