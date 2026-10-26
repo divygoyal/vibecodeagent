@@ -126,5 +126,8 @@ export function sourceLabel(src: SourceRef, dir: SiteDirectory | null, defaultLa
     }
     if (src.type === 'default') return defaultLabel ?? 'Default site';
     const known = dir?.byId.get(src.siteId);
-    return known?.label ?? (src.gsc ? normalizeHost(src.gsc) : src.siteId);
+    if (known) return known.gsc ? known.label : known.ga4Name ?? known.label;
+    if (src.gsc) return normalizeHost(src.gsc);
+    // Never show property digits (siteId 'ga4-123') as a name.
+    return src.siteId.startsWith('ga4-') ? 'Analytics property' : src.siteId;
 }

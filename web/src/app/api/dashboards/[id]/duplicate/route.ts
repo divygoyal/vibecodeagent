@@ -1,47 +1,38 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { sessionUserId } from '@/lib/builder/server/access';
+import { jsonError } from '@/lib/builder/server/service';
+import { createDashboard, duplicateDashboard, getDashboard, propertyIdFor, StoreError, toRecord } from '@/lib/builder/server/store';
+import { resetSources } from '@/lib/builder/docOps';
 
 export const dynamic = 'force-dynamic';
 
-const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Session = { user?: { id: string; [key: string]: any } } | null;
-
 /**
- * POST /api/dashboards/[id]/duplicate — Clone a dashboard
+ * POST /api/dashboards/[id]/duplicate: "Make a copy" (sharing and views are not copied).
+ * ?asTemplate=1 with body { name?, description? }: "Save as my template" - same layout and
+ * config, every source reset to the dashboard default, listed under My templates.
  */
-export async function POST(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const session = await getServerSession(authOptions) as Session;
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const userId = await sessionUserId();
+    if (!userId) return jsonError(401, 'Unauthorized');
     const { id } = await params;
-    const userId = session.user.id;
-
-    const res = await fetch(`${ADMIN_API_URL}/api/custom-dashboards/${id}/duplicate`, {
-      method: 'POST',
-      headers: { 'X-API-Key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_identifier: userId }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('Admin API duplicate dashboard error:', res.status, errText);
-      return NextResponse.json({ error: 'Failed to duplicate dashboard' }, { status: res.status });
+    const asTemplate = new URL(req.url).searchParams.get('asTemplate') === '1';
+    try {
+        if (!asTemplate) {
+            const row = await duplicateDashboard(userId, id);
+            return NextResponse.json({ dashboard: toRecord(row) });
+        }
+        const body = (await req.json().catch(() => ({}))) as { name?: unknown; description?: unknown };
+        const row = await getDashboard(userId, id);
+        if (!row) return jsonError(404, 'Dashboard not found');
+        const rec = toRecord(row);
+        const doc = resetSources(rec.doc, rec.doc.defaultSource);
+        doc.name = typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 200) : `${rec.doc.name} template`;
+        if (typeof body.description === 'string') doc.description = body.description.slice(0, 2000);
+        doc.meta = { createdFrom: `dashboard:${id}` };
+        const created = await createDashboard(userId, doc, { ...propertyIdFor(doc), isTemplate: true });
+        return NextResponse.json({ dashboard: toRecord(created) });
+    } catch (err) {
+        console.error('[dashboards] duplicate failed', err);
+        return jsonError(err instanceof StoreError ? err.status : 500, 'Failed to duplicate dashboard');
     }
-
-    const dashboard = await res.json();
-    return NextResponse.json({ dashboard });
-  } catch (err) {
-    console.error('Duplicate dashboard error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
 }

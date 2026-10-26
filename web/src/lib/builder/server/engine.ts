@@ -581,7 +581,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
         } else if (src.type === 'site') {
             const s = resolveSiteRef(src, dir);
             if (!s) {
-                plan.error = errResult('NO_ACCESS', `You no longer have access to ${src.siteId}. Choose another site.`);
+                plan.error = errResult('NO_ACCESS', `You no longer have access to ${plan.sourceLabel}. Choose another site.`);
                 continue;
             }
             sites = [s];
