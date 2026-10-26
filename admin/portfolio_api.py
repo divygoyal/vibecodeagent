@@ -407,27 +407,38 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
 
             span = w.days
             n_buckets = max(1, math.ceil(span / b))
-            series_rows = (await db.execute(text(
-                """
-                SELECT asset_id,
-                       CAST((julianday(:ce) - julianday(date)) / :b AS INTEGER) AS bi,
-                       SUM(users) AS users, SUM(sessions) AS sessions,
-                       SUM(clicks) AS clicks, SUM(impressions) AS impressions
-                FROM site_daily_metrics
-                WHERE user_id = :u AND asset_kind = :k AND date BETWEEN :cs AND :ce
-                GROUP BY asset_id, bi
-                """
-            ), {**p, "b": b})).fetchall()
-            metrics = ("users", "sessions") if kind == "ga4" else ("clicks", "impressions")
-            series: Dict[str, Dict[str, list]] = {}
-            for r in series_rows:
-                m = r._mapping
-                s = series.setdefault(m["asset_id"], {k: [0] * n_buckets for k in metrics})
-                idx = n_buckets - 1 - int(m["bi"])
-                if 0 <= idx < n_buckets:
-                    for k in metrics:
-                        s[k][idx] = m[k] or 0
-            out["series"][kind] = {"n": n_buckets, "span_days": span, "by_asset": series}
+            metrics = ("users", "sessions") if kind == "ga4" else ("clicks", "impressions", "position_weighted")
+
+            async def bucketed(start: str, end: str) -> Dict[str, Dict[str, list]]:
+                # Buckets count back from `end`: bucket 0 is the newest, so only the oldest can be partial.
+                rows = (await db.execute(text(
+                    """
+                    SELECT asset_id,
+                           CAST((julianday(:end) - julianday(date)) / :b AS INTEGER) AS bi,
+                           SUM(users) AS users, SUM(sessions) AS sessions,
+                           SUM(clicks) AS clicks, SUM(impressions) AS impressions,
+                           SUM(position * impressions) AS position_weighted
+                    FROM site_daily_metrics
+                    WHERE user_id = :u AND asset_kind = :k AND date BETWEEN :start AND :end
+                    GROUP BY asset_id, bi
+                    """
+                ), {"u": user_id, "k": kind, "start": start, "end": end, "b": b})).fetchall()
+                by_asset: Dict[str, Dict[str, list]] = {}
+                for r in rows:
+                    m = r._mapping
+                    s = by_asset.setdefault(m["asset_id"], {k: [0] * n_buckets for k in metrics})
+                    idx = n_buckets - 1 - int(m["bi"])
+                    if 0 <= idx < n_buckets:
+                        for k in metrics:
+                            s[k][idx] = m[k] or 0
+                return by_asset
+
+            out["series"][kind] = {
+                "n": n_buckets,
+                "span_days": span,
+                "by_asset": await bucketed(win["cur_start"], win["cur_end"]),
+                "prev_by_asset": await bucketed(win["prev_start"], win["prev_end"]),
+            }
 
             recent_rows = (await db.execute(text(
                 """

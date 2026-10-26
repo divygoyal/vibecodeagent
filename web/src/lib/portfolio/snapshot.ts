@@ -75,7 +75,17 @@ export interface SnapshotData {
     assets: StoreAsset[];
     windows: Partial<Record<AssetKind, StoreWindow>>;
     totals: TotalsRow[];
-    series: Partial<Record<AssetKind, { n: number; span_days: number; by_asset: Record<string, Record<string, number[]>> }>>;
+    /**
+     * Bucketed sums per asset, oldest bucket first (bucket_days long, counted back
+     * from the window end, so only the oldest bucket can be partial). GA4:
+     * users, sessions. GSC: clicks, impressions, position_weighted (position x impressions).
+     */
+    series: Partial<Record<AssetKind, {
+        n: number;
+        span_days: number;
+        by_asset: Record<string, Record<string, number[]>>;
+        prev_by_asset: Record<string, Record<string, number[]>>;
+    }>>;
     /** Newest `recent_days` daily values (users for GA4, clicks for GSC), oldest first; missing days absent. */
     recent: Partial<Record<AssetKind, Record<string, [string, number][]>>>;
     bucket_days: number;
@@ -116,8 +126,18 @@ export function aggregateSnapshot(assets: StoreAsset[], rows: DailyRow[], req: S
 
         const totals = new Map<string, TotalsRow>();
         const nBuckets = Math.max(1, Math.ceil(wr.days / b));
-        const metrics = kind === 'ga4' ? (['users', 'sessions'] as const) : (['clicks', 'impressions'] as const);
+        const metrics = kind === 'ga4' ? ['users', 'sessions'] : ['clicks', 'impressions', 'position_weighted'];
         const byAsset: Record<string, Record<string, number[]>> = {};
+        const prevByAsset: Record<string, Record<string, number[]>> = {};
+        const bucketAdd = (target: Record<string, Record<string, number[]>>, r: DailyRow, end: string) => {
+            const idx = nBuckets - 1 - Math.floor(daysBetween(r.date, end) / b);
+            if (idx < 0 || idx >= nBuckets) return;
+            const s = target[r.asset_id] ?? (target[r.asset_id] = Object.fromEntries(metrics.map((m) => [m, new Array<number>(nBuckets).fill(0)])));
+            for (const m of metrics) {
+                const v = m === 'position_weighted' ? (r.position ?? 0) * (r.impressions ?? 0) : (r[m as keyof DailyRow] as number | null | undefined) ?? 0;
+                s[m][idx] += v;
+            }
+        };
         const recent: Record<string, [string, number][]> = {};
         const recentStart = addDays(w.cur_end, -(recentDays - 1));
 
@@ -149,11 +169,9 @@ export function aggregateSnapshot(assets: StoreAsset[], rows: DailyRow[], req: S
             add('impressions', r.impressions);
             if (r.position != null && r.impressions != null) add('position_weighted', r.position * r.impressions);
 
+            if (inPrev) bucketAdd(prevByAsset, r, w.prev_end);
             if (inCur) {
-                const bi = Math.floor(daysBetween(r.date, w.cur_end) / b);
-                const idx = nBuckets - 1 - bi;
-                const s = byAsset[r.asset_id] ?? (byAsset[r.asset_id] = Object.fromEntries(metrics.map((m) => [m, new Array<number>(nBuckets).fill(0)])));
-                if (idx >= 0 && idx < nBuckets) for (const m of metrics) s[m][idx] += r[m] ?? 0;
+                bucketAdd(byAsset, r, w.cur_end);
                 if (r.date >= recentStart) {
                     (recent[r.asset_id] ?? (recent[r.asset_id] = [])).push([r.date, (kind === 'ga4' ? r.users : r.clicks) ?? 0]);
                 }
@@ -161,7 +179,7 @@ export function aggregateSnapshot(assets: StoreAsset[], rows: DailyRow[], req: S
         }
         for (const list of Object.values(recent)) list.sort((x, y) => (x[0] < y[0] ? -1 : 1));
         out.totals.push(...totals.values());
-        out.series[kind] = { n: nBuckets, span_days: wr.days, by_asset: byAsset };
+        out.series[kind] = { n: nBuckets, span_days: wr.days, by_asset: byAsset, prev_by_asset: prevByAsset };
         out.recent[kind] = recent;
     }
     return out;

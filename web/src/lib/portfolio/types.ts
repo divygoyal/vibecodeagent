@@ -48,6 +48,14 @@ export interface SiteSeries {
     sessions?: number[];
 }
 
+export interface CombinedSeries {
+    clicks: number[];
+    impressions: number[];
+    position: (number | null)[];
+    users: number[];
+    sessions: number[];
+}
+
 export type AlertMetric = 'clicks' | 'users';
 
 export interface PortfolioAlert {
@@ -143,8 +151,10 @@ export interface PortfolioResponse {
     dates: { search: string[]; traffic: string[] };
     sites: PortfolioSite[];
     totals: PortfolioTotals;
-    /** Sum over visible (not hidden) sites, aligned to `dates`. */
-    combined: Required<SiteSeries>;
+    /** Sum over visible (not hidden) sites, aligned to `dates` (position: impression-weighted). */
+    combined: CombinedSeries;
+    /** Same for the previous period (aligned by bucket index); a metric is absent when no site covers it. */
+    combinedPrev: Partial<CombinedSeries>;
     alerts: PortfolioAlert[];
     demo?: boolean;
 }

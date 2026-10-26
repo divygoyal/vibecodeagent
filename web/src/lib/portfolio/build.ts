@@ -105,15 +105,18 @@ function siteStatus(assets: StoreAsset[], nowS: number): SiteStatus {
 }
 
 /** Series aligned to the window; drops a partial oldest bucket when bucketing by week. */
-function trimmedSeries(snap: SnapshotData, kind: AssetKind, id: string, metrics: readonly string[]): Record<string, number[]> {
+function trimmedSeries(
+    snap: SnapshotData, kind: AssetKind, id: string, metrics: readonly string[], which: 'by_asset' | 'prev_by_asset' = 'by_asset', round = true,
+): Record<string, number[]> {
     const meta = snap.series[kind];
     const out: Record<string, number[]> = {};
     if (!meta) return out;
     const partial = snap.bucket_days > 1 && meta.span_days % snap.bucket_days !== 0;
-    const src = meta.by_asset[id];
+    const src = meta[which]?.[id];
     for (const m of metrics) {
         const arr = src?.[m] ?? new Array<number>(meta.n).fill(0);
-        out[m] = (partial ? arr.slice(1) : arr).map((v) => Math.round(v));
+        const cut = partial ? arr.slice(1) : arr;
+        out[m] = round ? cut.map((v) => Math.round(v)) : cut.slice();
     }
     return out;
 }
@@ -355,24 +358,45 @@ export function buildPortfolio(snap: SnapshotData, opts: BuildOptions): Portfoli
 
     const visible = sites.filter((s) => !s.hidden);
     const dates = { search: seriesDates(snap, 'gsc'), traffic: seriesDates(snap, 'ga4') };
-    const combined = {
-        clicks: new Array<number>(dates.search.length).fill(0),
-        impressions: new Array<number>(dates.search.length).fill(0),
-        users: new Array<number>(dates.traffic.length).fill(0),
-        sessions: new Array<number>(dates.traffic.length).fill(0),
-    };
+    const zeros = (n: number) => new Array<number>(n).fill(0);
+    const nS = dates.search.length;
+    const nT = dates.traffic.length;
+    const cur = { clicks: zeros(nS), impressions: zeros(nS), pw: zeros(nS), users: zeros(nT), sessions: zeros(nT) };
+    const prev = { clicks: zeros(nS), impressions: zeros(nS), pw: zeros(nS), users: zeros(nT), sessions: zeros(nT) };
+    let prevSearch = false, prevTraffic = false;
+    const byKey = new Map(groups.map((g) => [g.key, g]));
     let up = 0, down = 0, fresh = 0, synced = 0;
     for (const s of visible) {
-        addInto(combined.clicks, s.series.clicks);
-        addInto(combined.impressions, s.series.impressions);
-        addInto(combined.users, s.series.users);
-        addInto(combined.sessions, s.series.sessions);
+        const g = byKey.get(s.key);
+        if (s.search && g?.gsc) {
+            const c = trimmedSeries(snap, 'gsc', g.gsc.asset_id, ['clicks', 'impressions', 'position_weighted'], 'by_asset', false);
+            addInto(cur.clicks, c.clicks);
+            addInto(cur.impressions, c.impressions);
+            addInto(cur.pw, c.position_weighted);
+            if (s.search.prev) {
+                prevSearch = true;
+                const p = trimmedSeries(snap, 'gsc', g.gsc.asset_id, ['clicks', 'impressions', 'position_weighted'], 'prev_by_asset', false);
+                addInto(prev.clicks, p.clicks);
+                addInto(prev.impressions, p.impressions);
+                addInto(prev.pw, p.position_weighted);
+            }
+        }
+        if (s.traffic && g?.ga4) {
+            addInto(cur.users, s.series.users);
+            addInto(cur.sessions, s.series.sessions);
+            if (s.traffic.prev) {
+                prevTraffic = true;
+                const p = trimmedSeries(snap, 'ga4', g.ga4.asset_id, ['users', 'sessions'], 'prev_by_asset');
+                addInto(prev.users, p.users);
+                addInto(prev.sessions, p.sessions);
+            }
+        }
         if (s.status === 'synced' || s.status === 'stale') synced += 1;
-        const [cur, prev] = s.search ? [s.search.cur.clicks, s.search.prev?.clicks] : [s.traffic?.cur.users ?? 0, s.traffic?.prev?.users];
-        if (prev === 0 && cur > 0) fresh += 1;
-        else if (prev !== undefined && prev !== null && prev > 0) {
-            if (cur > prev) up += 1;
-            else if (cur < prev) down += 1;
+        const [now_, before] = s.search ? [s.search.cur.clicks, s.search.prev?.clicks] : [s.traffic?.cur.users ?? 0, s.traffic?.prev?.users];
+        if (before === 0 && now_ > 0) fresh += 1;
+        else if (before !== undefined && before !== null && before > 0) {
+            if (now_ > before) up += 1;
+            else if (now_ < before) down += 1;
         }
     }
 
@@ -402,7 +426,21 @@ export function buildPortfolio(snap: SnapshotData, opts: BuildOptions): Portfoli
             traffic: sumTraffic(visible.map((s) => s.traffic).filter((x): x is Compared<TrafficTotals> => x !== null)),
             sites: { total: visible.length, synced, up, down, new: fresh, hidden: sites.length - visible.length },
         },
-        combined,
+        combined: {
+            clicks: cur.clicks.map(Math.round),
+            impressions: cur.impressions.map(Math.round),
+            position: cur.pw.map((v, i) => (cur.impressions[i] > 0 ? v / cur.impressions[i] : null)),
+            users: cur.users,
+            sessions: cur.sessions,
+        },
+        combinedPrev: {
+            ...(prevSearch ? {
+                clicks: prev.clicks.map(Math.round),
+                impressions: prev.impressions.map(Math.round),
+                position: prev.pw.map((v, i) => (prev.impressions[i] > 0 ? v / prev.impressions[i] : null)),
+            } : {}),
+            ...(prevTraffic ? { users: prev.users, sessions: prev.sessions } : {}),
+        },
         alerts,
         demo: opts.demo || undefined,
     };
