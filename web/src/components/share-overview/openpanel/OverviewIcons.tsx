@@ -183,9 +183,13 @@ function buildFaviconTarget(value: string) {
     return null;
 }
 
+/** Same-origin favicon proxy: 204 when the site has no icon, so the <img> falls back without a console 404. */
 function buildFaviconUrl(site: string) {
-    const target = site.startsWith('http') ? site : `https://${site}`;
-    return `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(target)}`;
+    let host = site;
+    try {
+        host = new URL(site.startsWith('http') ? site : `https://${site}`).hostname;
+    } catch { /* keep as is */ }
+    return `/api/favicon?host=${encodeURIComponent(host)}&size=32`;
 }
 
 function buildFlagUrl(country: string) {
