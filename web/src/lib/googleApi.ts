@@ -1483,3 +1483,19 @@ export async function fetchJourneyData(
         exitPages
     };
 }
+
+// ─── Dashboard builder v2 helpers (BUILDER.md 8.3) ───
+// Thin transports only: the builder engine plans, batches, caches and limits the calls
+// (lib/builder/server/engine.ts, lib/googleLimiter.ts). Going through gaFetch keeps the demo
+// shim (TC_DEMO_DATA) working.
+
+/** GA4 batchRunReports: up to 5 reports for ONE property in one HTTP call. */
+export async function runGABatch(token: string, propertyId: string, requests: any[], signal?: AbortSignal) {
+    if (requests.length > 5) throw new Error('runGABatch: at most 5 reports per batch');
+    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:batchRunReports`, token, { requests }, signal);
+}
+
+/** Search Console searchAnalytics.query with the full request body (filters, dataState, paging). */
+export async function runGSCSearchAnalytics(token: string, siteUrl: string, body: Record<string, unknown>, signal?: AbortSignal) {
+    return gaFetch(`${GSC_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, token, body, signal);
+}

@@ -1,44 +1,33 @@
 import { NextResponse } from 'next/server';
+import { checkUnlockKey, clientIp, rateLimited, unlockKeyFrom } from '@/lib/builder/server/access';
+import { directoryFor, jsonError, safeLabeler } from '@/lib/builder/server/service';
+import { getPublicRow, isShareToken, toRecord } from '@/lib/builder/server/store';
+import { publicDoc } from '@/lib/builder/publicDoc';
+import type { PublicDashboard } from '@/lib/builder/types';
 
 export const dynamic = 'force-dynamic';
 
-const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
-
 /**
- * GET /api/dashboards/public/[token] — Public view of a shared dashboard (no auth required)
+ * GET /api/dashboards/public/[token]: the shared dashboard for /view/[token] and embeds.
+ * Never returns the owner, property ids or site URLs (sources become labels). A password-
+ * protected share returns only its name until the viewer unlocks it.
  */
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ token: string }> },
-) {
-  try {
+export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
-
-    if (!token || typeof token !== 'string' || token.length < 32) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 400 });
+    if (!isShareToken(token)) return jsonError(404, 'This dashboard is no longer shared.');
+    if (rateLimited(`pubdoc:${token}:${clientIp(req)}`, 60)) return jsonError(429, 'Too many requests. Please try again later.');
+    const preview = new URL(req.url).searchParams.get('preview') === '1';
+    const row = await getPublicRow(token, false).catch(() => null);
+    if (!row) return jsonError(404, 'This dashboard is no longer shared.');
+    const rec = toRecord(row);
+    const unlocked = !rec.share.hasPassword || checkUnlockKey(token, unlockKeyFrom(req, token));
+    const body: PublicDashboard = { name: rec.doc.name, requiresPassword: rec.share.hasPassword, unlocked };
+    if (unlocked) {
+        const dir = row.ownerIdentifier ? await directoryFor(row.ownerIdentifier) : null;
+        body.doc = publicDoc(rec.doc, safeLabeler(dir));
+        body.share = { allowCopy: rec.share.allowCopy, badge: rec.share.badge && rec.doc.theme.badge.show, viewerControls: rec.share.viewerControls };
+        body.rev = rec.rev;
+        if (!preview) void getPublicRow(token, true).catch(() => null); // count the view
     }
-
-    const res = await fetch(
-      `${ADMIN_API_URL}/api/custom-dashboards/public/${token}`,
-      { headers: { 'X-API-Key': ADMIN_API_KEY } },
-    );
-
-    if (!res.ok) {
-      if (res.status === 404) {
-        return NextResponse.json({ error: 'Dashboard not found or not shared' }, { status: 404 });
-      }
-      console.error('Admin API public dashboard error:', res.status, await res.text());
-      return NextResponse.json({ error: 'Failed to fetch dashboard' }, { status: res.status });
-    }
-
-    const dashboard = await res.json();
-    const publicDashboard = { ...dashboard };
-    delete publicDashboard.ownerIdentifier;
-    delete publicDashboard.userId;
-    return NextResponse.json({ dashboard: publicDashboard });
-  } catch (err) {
-    console.error('Public dashboard error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+    return NextResponse.json({ dashboard: body }, { headers: { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex' } });
 }
