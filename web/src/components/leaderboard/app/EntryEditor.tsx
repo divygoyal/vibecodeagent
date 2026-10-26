@@ -14,7 +14,7 @@ import { Select } from '@/components/ui/Select';
 import { Tabs } from '@/components/ui/Tabs';
 import { toast } from '@/components/ui/Toaster';
 import { fmtDay, fmtFull } from '@/lib/format';
-import { CATEGORIES, CATEGORY_LABELS, OPEN_TO_OPTIONS, SITE_ORIGIN } from '@/lib/leaderboard/constants';
+import { CATEGORIES, CATEGORY_LABELS, OPEN_TO_OPTIONS } from '@/lib/leaderboard/constants';
 import { timeAgo } from '@/lib/leaderboard/format';
 import type { MyEntry, OpenTo, PrivacySettings } from '@/lib/leaderboard/types';
 import { VerificationBadge } from '../shared';
@@ -57,8 +57,10 @@ type TabKey = 'profile' | 'privacy' | 'offers' | 'slots' | 'embed';
 
 export interface FirstCheck { level: string; message: string; fix: string[]; transient?: boolean }
 
-export function EntryEditor({ entry, firstCheck, onChanged, onDeleted }: {
+export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }: {
     entry: MyEntry;
+    /** Absolute public origin (server-side NEXTAUTH_URL); used in copied links and snippets. */
+    origin: string;
     firstCheck: FirstCheck | null;
     onChanged: () => Promise<unknown> | void;
     onDeleted: () => void;
@@ -155,7 +157,7 @@ export function EntryEditor({ entry, firstCheck, onChanged, onDeleted }: {
                 : { tone: 'warn' as const, label: 'Pending verification' };
     const detail = v.detail;
     const newOffers = (inbox.data?.items ?? []).filter((i) => i.entry_id === entry.id && i.status === 'new').length;
-    const publicUrl = `${SITE_ORIGIN}${entry.public_path}`;
+    const publicUrl = `${origin}${entry.public_path}`;
     const showPreview = tab === 'profile' || tab === 'privacy';
 
     return (
@@ -298,7 +300,7 @@ export function EntryEditor({ entry, firstCheck, onChanged, onDeleted }: {
                     {tab === 'slots' ? <SlotsEditor key={entry.id} entryId={entry.id} initial={entry.ad_slots} onSaved={() => void onChanged()} /> : null}
                     {tab === 'embed' ? (
                         v.ranked ? (
-                            <EmbedCard origin={SITE_ORIGIN} slug={entry.slug || String(entry.id)} id={entry.id} name={entry.startup_name} liveEnabled={entry.privacy.live} />
+                            <EmbedCard origin={origin} slug={entry.slug || String(entry.id)} id={entry.id} name={entry.startup_name} liveEnabled={entry.privacy.live} />
                         ) : (
                             <Banner variant="info" title="Available once you are verified">The badge and widget show your verified status, so they switch on when ownership is confirmed.</Banner>
                         )

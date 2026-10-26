@@ -37,6 +37,10 @@ Screenshots go to /root/projects/tc-redesign-research/shots/leaderboard/.
   (dashboard)/dashboard/leaderboard, components/leaderboard/*, components/leaderboard/app/*.
 - Dev: scripts/dev/seed-leaderboard.mjs (called by login.mjs), check_leaderboard_privacy.py, web/tests/leaderboard.test.mjs.
 
+- Absolute URLs: badge/widget snippets, share links and copy-link always use SITE_ORIGIN (NEXTAUTH_URL, read on the server and
+  passed to client components as `origin`; client bundles cannot read it). The on-page badge preview uses a same-origin path.
+  (The old /leaderboard/[id] built a relative badge URL: fixed by the rewrite.)
+
 ## Done
 Everything above is built and committed. Verified: tsc, eslint, node tests (npm test), python unit + API tests, privacy audit
 script (21k assertions, no leaks) against the seeded demo board.

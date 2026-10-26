@@ -318,7 +318,10 @@ export function EmbedCard({ origin, slug, id, name, liveEnabled }: { origin: str
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
     const [variant, setVariant] = useState<'minimal' | 'stats' | 'live'>(liveEnabled ? 'live' : 'stats');
     const profile = `${origin}/leaderboard/${slug}`;
-    const img = `${origin}/api/badges/${id}?variant=${variant}&theme=${theme}`;
+    // Snippets use the absolute public origin (they are pasted on other sites); the preview
+    // loads the same image from this page's own origin so it renders wherever the page is served.
+    const imgPath = `/api/badges/${id}?variant=${variant}&theme=${theme}`;
+    const img = `${origin}${imgPath}`;
     const alt = `${name} on TrafficClaw`;
     const html = `<a href="${profile}" target="_blank" rel="noopener"><img src="${img}" alt="${alt}" height="${variant === 'minimal' ? 48 : 76}" /></a>`;
     const md = `[![${alt}](${img})](${profile})`;
@@ -342,7 +345,7 @@ export function EmbedCard({ origin, slug, id, name, liveEnabled }: { origin: str
             </div>
             <div className={cn('mb-4 flex min-h-24 items-center justify-center rounded-control border border-border-subtle p-4', theme === 'dark' ? 'bg-[#0e1014]' : 'bg-surface-sunken')}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img key={img} src={img} alt={alt} height={variant === 'minimal' ? 48 : 76} className="max-w-full" />
+                <img key={imgPath} src={imgPath} alt={alt} height={variant === 'minimal' ? 48 : 76} className="max-w-full" />
             </div>
             <div className="grid gap-3">
                 <CopyField label="Badge (HTML)" value={html} />

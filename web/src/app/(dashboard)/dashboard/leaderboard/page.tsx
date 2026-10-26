@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import MyLeaderboard from '@/components/leaderboard/app/MyLeaderboard';
+import { SITE_ORIGIN } from '@/lib/leaderboard/constants';
 
 export const metadata: Metadata = { title: 'Leaderboard' };
 
@@ -9,5 +10,6 @@ export const metadata: Metadata = { title: 'Leaderboard' };
  * privacy, "open to" offers and the inbox, ad slots, badge and widget.
  */
 export default function MyLeaderboardPage() {
-    return <MyLeaderboard />;
+    // SITE_ORIGIN is read on the server (NEXTAUTH_URL) and passed down: client bundles cannot see it.
+    return <MyLeaderboard origin={SITE_ORIGIN} />;
 }

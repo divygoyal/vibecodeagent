@@ -48,7 +48,7 @@ function JoinHero({ onStart }: { onStart: () => void }) {
     );
 }
 
-export default function MyLeaderboard() {
+export default function MyLeaderboard({ origin }: { origin: string }) {
     const { data, isLoading, mutate } = useSWR('/api/leaderboard/me', fetcher, { revalidateOnFocus: false });
     const entries = useMemo(() => data?.entries ?? [], [data]);
     const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -152,6 +152,7 @@ export default function MyLeaderboard() {
                         <EntryEditor
                             key={selected.id}
                             entry={selected}
+                            origin={origin}
                             firstCheck={firstCheck}
                             onChanged={refresh}
                             onDeleted={async () => { setSelectedId(null); await refresh(); }}
