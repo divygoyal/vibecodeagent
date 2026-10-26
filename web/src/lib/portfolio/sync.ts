@@ -16,11 +16,11 @@
  * One sync per user at a time per process; concurrent callers share it.
  */
 import { fetchInventory, type FetchLike, type Inventory } from '@/lib/sites/fetchInventory';
-import { normalizeHost, pairSites, type PairingOverrides } from '@/lib/sites/pairing';
+import { normalizeHost, pairSites } from '@/lib/sites/pairing';
 import { adminStore, type AssetUpsert, type StatusUpdate } from './adminStore';
 import { addDays, HISTORY_DAYS, STALE_AFTER_S, syncEndDay } from './ranges';
 import { ga4DailyRequest, ga4RangeUsersRequest, gscDailyRequest, parseGa4Daily, parseGa4RangeUsers, parseGscDaily } from './rows';
-import { NO_PAIR, type DailyRow, type StoreAsset, type StoreWindow } from './snapshot';
+import { pairingOverridesFrom, type DailyRow, type StoreAsset, type StoreWindow } from './snapshot';
 import type { AssetKind } from './types';
 
 const GA_DATA = 'https://analyticsdata.googleapis.com/v1beta';
@@ -171,18 +171,9 @@ async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<v
     }));
 }
 
-function overridesFrom(assets: StoreAsset[]): PairingOverrides {
-    const out: PairingOverrides = {};
-    for (const a of assets) {
-        if (a.asset_kind !== 'ga4' || a.pairing_override === null) continue;
-        out[a.asset_id] = a.pairing_override === NO_PAIR ? null : a.pairing_override;
-    }
-    return out;
-}
-
 /** Pair the inventory with the stored overrides and store it. Returns the stored assets. */
 async function storeInventory(identifier: string, inv: Inventory, current: StoreAsset[]): Promise<StoreAsset[]> {
-    const pairs = pairSites(inv.properties, inv.sites, overridesFrom(current));
+    const pairs = pairSites(inv.properties, inv.sites, pairingOverridesFrom(current));
     const upserts: AssetUpsert[] = [];
     for (const pair of pairs) {
         if (pair.ga4) {

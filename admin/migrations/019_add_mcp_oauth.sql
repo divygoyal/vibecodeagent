@@ -115,12 +115,6 @@ CREATE TABLE IF NOT EXISTS mcp_audit (
 
 CREATE INDEX IF NOT EXISTS idx_mcp_audit_user_ts ON mcp_audit(user_id, ts DESC);
 
-CREATE TABLE IF NOT EXISTS mcp_site_links (
-    user_id INTEGER NOT NULL,
-    site_id TEXT NOT NULL,
-    ga4_property TEXT,
-    gsc_property TEXT,
-    source TEXT NOT NULL CHECK (source IN ('auto', 'manual')),
-    updated_at INTEGER NOT NULL,
-    PRIMARY KEY (user_id, site_id)
-);
+-- Manual GA4 <-> Search Console pairings are NOT stored here: the MCP site
+-- resolver reads portfolio_assets.pairing_override (migration 020), the same
+-- store the portfolio uses (web/src/lib/sites/pairingStore.ts).

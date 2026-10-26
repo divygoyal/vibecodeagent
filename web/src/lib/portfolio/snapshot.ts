@@ -33,6 +33,20 @@ export interface StoreAsset {
 
 export const NO_PAIR = '__none__';
 
+/**
+ * The user's manual GA4 -> Search Console pairings, as stored on the GA4 rows
+ * of portfolio_assets (the one pairing store; the MCP tools read it too).
+ * GA4 property -> GSC site URL, or null for "never pair this property".
+ */
+export function pairingOverridesFrom(assets: Pick<StoreAsset, 'asset_kind' | 'asset_id' | 'pairing_override'>[]): Record<string, string | null> {
+    const out: Record<string, string | null> = {};
+    for (const a of assets) {
+        if (a.asset_kind !== 'ga4' || a.pairing_override === null) continue;
+        out[a.asset_id] = a.pairing_override === NO_PAIR ? null : a.pairing_override;
+    }
+    return out;
+}
+
 /** One day of one asset (site_daily_metrics). */
 export interface DailyRow {
     kind: AssetKind;

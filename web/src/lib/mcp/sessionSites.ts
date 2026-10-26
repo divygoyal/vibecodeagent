@@ -5,7 +5,7 @@
  */
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
 import { fetchInventory, type Inventory } from '@/lib/sites/fetchInventory';
-import { adminStore } from './adminStore';
+import { loadPairingOverrides } from '@/lib/sites/pairingStore';
 import { buildSiteRecords, type SiteRecord } from './siteResolver';
 import type { SessionUser } from './session';
 
@@ -38,13 +38,7 @@ export async function loadSessionSites(user: SessionUser): Promise<SessionSites>
     }
     const inv = await fetchInventory(token, { cacheKey: `session:${user.id}` });
     const reauth = inv.errors.ga4?.status === 401 || inv.errors.gsc?.status === 401;
-    let overrides: Record<string, string | null> = {};
-    try {
-        const { links } = await adminStore.getSiteLinks(user.id);
-        overrides = Object.fromEntries(links.filter((l) => l.ga4_property).map((l) => [l.ga4_property as string, l.gsc_property]));
-    } catch {
-        /* user row may not exist yet */
-    }
+    const overrides = await loadPairingOverrides(user.id);
     return {
         connected: !reauth,
         sites: buildSiteRecords(inv, overrides),

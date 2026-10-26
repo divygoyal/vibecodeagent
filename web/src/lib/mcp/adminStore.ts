@@ -192,6 +192,4 @@ export const adminStore = {
     auditBatch: (rows: AuditRowIn[]) => call<{ inserted: number }>('/audit/batch', { body: { rows } }),
     listAudit: (user: string, limit = 50) => call<{ rows: AuditRowOut[] }>(`/users/${enc(user)}/audit`, { query: { limit } }),
     usage: (user: string) => call<UsageSummary>(`/users/${enc(user)}/usage`),
-
-    getSiteLinks: (user: string) => call<{ links: { site_id: string; ga4_property: string | null; gsc_property: string | null }[] }>(`/users/${enc(user)}/site-links`),
 };

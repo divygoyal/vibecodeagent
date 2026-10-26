@@ -3,6 +3,7 @@ import { adminStore } from '@/lib/portfolio/adminStore';
 import { googleAccessFor, sessionIdentifier } from '@/lib/portfolio/auth';
 import { NO_PAIR, type StoreAsset } from '@/lib/portfolio/snapshot';
 import { repairPairs } from '@/lib/portfolio/sync';
+import { setPairingOverride } from '@/lib/sites/pairingStore';
 import type { SitePatch } from '@/lib/portfolio/types';
 
 export const dynamic = 'force-dynamic';
@@ -99,9 +100,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 }
             }
             for (const o of ga4Overrides) {
-                await adminStore.patchAsset(identifier, o.clear
-                    ? { kind: 'ga4', asset_id: o.id, clear_override: true }
-                    : { kind: 'ga4', asset_id: o.id, pairing_override: o.value });
+                await setPairingOverride(identifier, o.id, o.clear ? 'auto' : o.value === NO_PAIR ? null : (o.value ?? null));
             }
             const access = await googleAccessFor(identifier, req);
             if (!access.ok) return NextResponse.json({ error: 'Google is not connected', code: 'GOOGLE_NOT_CONNECTED' }, { status: 400 });

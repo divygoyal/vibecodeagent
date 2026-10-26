@@ -60,7 +60,7 @@ async def ensure_mcp_schema(conn) -> None:
 
 async def delete_user_mcp_rows(db, user_id: int) -> None:
     """Remove every mcp_* row of a user (called from DELETE /api/users/{id})."""
-    for table in ("mcp_tokens", "mcp_auth_codes", "mcp_grants", "mcp_audit", "mcp_site_links"):
+    for table in ("mcp_tokens", "mcp_auth_codes", "mcp_grants", "mcp_audit"):
         await db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user_id})
 
 
@@ -196,16 +196,6 @@ class AuditRow(BaseModel):
 
 class AuditBatch(BaseModel):
     rows: List[AuditRow]
-
-
-class SiteLink(BaseModel):
-    site_id: str
-    ga4_property: Optional[str] = None
-    gsc_property: Optional[str] = None
-
-
-class SiteLinksPut(BaseModel):
-    links: List[SiteLink]
 
 
 # ───────────────────────── router ─────────────────────────
@@ -725,27 +715,6 @@ def build_mcp_router(get_db: Callable, verify_admin_key: Callable, get_user_by_i
             "errors_30d": int(totals["errors_30d"] or 0), "cached_30d": int(totals["cached_30d"] or 0),
             "by_tool": by_tool, "by_day": by_day,
         }
-
-    # ── pairing overrides ──
-    @router.get("/users/{identifier}/site-links")
-    async def get_site_links(identifier: str, db=Depends(get_db)):
-        user_id = await resolve_user_id(db, identifier)
-        rows = (await db.execute(text("SELECT site_id, ga4_property, gsc_property, source, updated_at FROM mcp_site_links WHERE user_id = :u AND source = 'manual'"), {"u": user_id})).fetchall()
-        return {"links": [_row(r) for r in rows]}
-
-    @router.put("/users/{identifier}/site-links")
-    async def put_site_links(identifier: str, body: SiteLinksPut, db=Depends(get_db)):
-        user_id = await resolve_user_id(db, identifier)
-        await db.execute(text("DELETE FROM mcp_site_links WHERE user_id = :u AND source = 'manual'"), {"u": user_id})
-        for link in body.links[:500]:
-            await db.execute(text(
-                """
-                INSERT OR REPLACE INTO mcp_site_links (user_id, site_id, ga4_property, gsc_property, source, updated_at)
-                VALUES (:u, :s, :g, :c, 'manual', :now)
-                """
-            ), {"u": user_id, "s": link.site_id[:255], "g": link.ga4_property, "c": link.gsc_property, "now": _now()})
-        await db.commit()
-        return {"ok": True, "count": len(body.links[:500])}
 
     @router.post("/maintenance/purge")
     async def purge_endpoint(db=Depends(get_db)):

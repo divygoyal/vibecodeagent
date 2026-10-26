@@ -2,11 +2,12 @@
  * Site catalogue for MCP tools: the user's GA4 properties and Search Console
  * sites paired by host (lib/sites/pairing.ts), the grant's site filter, and
  * resolution of a site argument (site_id, URL, sc-domain:, properties/N or a
- * display name). MCP.md 7.1 "Site identity" and 4.5.
+ * display name). MCP.md 7.1 "Site identity" and 4.5. Manual pairings come from
+ * the portfolio store (lib/sites/pairingStore.ts), the same ones the app shows.
  */
 import { fetchInventory, type Inventory } from '@/lib/sites/fetchInventory';
 import { normalizeHost, pairSites, type PairingOverrides } from '@/lib/sites/pairing';
-import { adminStore } from './adminStore';
+import { loadPairingOverrides } from '@/lib/sites/pairingStore';
 import type { McpPrincipal } from './auth';
 import { ToolError } from './errors';
 import type { GoogleClient } from './google';
@@ -55,23 +56,6 @@ export function buildSiteRecords(inv: Pick<Inventory, 'properties' | 'sites'>, o
     });
 }
 
-const overrideCache = new Map<number, { value: PairingOverrides; until: number }>();
-
-async function loadOverrides(p: McpPrincipal): Promise<PairingOverrides> {
-    if (p.demo || !p.userIdentifier) return {};
-    const hit = overrideCache.get(p.userId);
-    if (hit && hit.until > Date.now()) return hit.value;
-    const out: PairingOverrides = {};
-    try {
-        const { links } = await adminStore.getSiteLinks(p.userIdentifier);
-        for (const l of links) if (l.ga4_property) out[l.ga4_property] = l.gsc_property;
-    } catch {
-        /* no overrides */
-    }
-    overrideCache.set(p.userId, { value: out, until: Date.now() + 10 * 60_000 });
-    return out;
-}
-
 export async function loadCatalog(p: McpPrincipal, google: GoogleClient, opts: { refresh?: boolean } = {}): Promise<SiteCatalog> {
     const inv = await fetchInventory(google.demo ? '' : google.token, {
         demo: google.demo,
@@ -81,7 +65,7 @@ export async function loadCatalog(p: McpPrincipal, google: GoogleClient, opts: {
     if (inv.errors.ga4?.status === 401 || inv.errors.gsc?.status === 401) {
         throw new ToolError('google_reauth_required', 'The Google connection expired or was revoked', 'Ask the user to open TrafficClaw > Connect AI and press "Re-connect Google".');
     }
-    const all = buildSiteRecords(inv, await loadOverrides(p));
+    const all = buildSiteRecords(inv, p.demo ? {} : await loadPairingOverrides(p.userIdentifier));
     const filter = p.siteFilter;
     const sites = filter ? all.filter((s) => filter.includes(s.site_id)) : all;
     return { sites, totalBeforeFilter: all.length, filtered: Boolean(filter), errors: inv.errors };
