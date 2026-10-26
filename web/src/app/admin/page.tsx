@@ -99,10 +99,17 @@ export default function AdminPage() {
     const [activeTab, setActiveTab] = useState<'users' | 'events'>('users');
     const [deleteTarget, setDeleteTarget] = useState<{ githubId: string; label: string } | null>(null);
 
+    const [forbidden, setForbidden] = useState(false);
+
     const fetchData = useCallback(async () => {
         try {
-            const [statusRes, usersRes, eventsRes] = await Promise.all([
-                fetch('/api/admin?endpoint=status'),
+            // One request first: a signed-in non-admin gets 403 and sees "Admins only" (no polling).
+            const statusRes = await fetch('/api/admin?endpoint=status');
+            if (statusRes.status === 401 || statusRes.status === 403) {
+                setForbidden(true);
+                return;
+            }
+            const [usersRes, eventsRes] = await Promise.all([
                 fetch('/api/admin?endpoint=users'),
                 fetch('/api/admin?endpoint=events'),
             ]);
@@ -122,12 +129,12 @@ export default function AdminPage() {
     }, []);
 
     useEffect(() => {
-        if (session?.user) {
+        if (session?.user && !forbidden) {
             fetchData();
             const interval = setInterval(fetchData, 20000);
             return () => clearInterval(interval);
         }
-    }, [session, fetchData]);
+    }, [session, fetchData, forbidden]);
 
     useEffect(() => {
         if (selectedUser) fetchUserDetail(selectedUser);
@@ -177,6 +184,16 @@ export default function AdminPage() {
             <AdminFrame title="Admin">
                 <Card padding="none">
                     <EmptyState icon={Users} variant="page" title="Please sign in first" description="The admin console needs a signed-in administrator account." />
+                </Card>
+            </AdminFrame>
+        );
+    }
+
+    if (forbidden) {
+        return (
+            <AdminFrame title="Admin">
+                <Card padding="none">
+                    <EmptyState icon={Users} variant="page" title="Admins only" description="This console is for TrafficClaw administrators. Your account does not have access." />
                 </Card>
             </AdminFrame>
         );
