@@ -1,13 +1,8 @@
 'use client';
 
-import SeoPage from '../../../seo/page';
-import { LegacySitePage } from '../LegacySitePage';
+import { SearchPage } from '@/components/site/search/SearchPage';
 
-/** Search (GSC, DESIGN 5.5). For now: the old SEO page content. */
+/** Search (GSC), DESIGN 5.5: ?tab=performance|opportunities|cannibalization|movers|indexing. */
 export default function SiteSearchPage() {
-    return (
-        <LegacySitePage section="search">
-            <SeoPage />
-        </LegacySitePage>
-    );
+    return <SearchPage />;
 }
