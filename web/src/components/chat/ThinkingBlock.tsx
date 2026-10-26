@@ -29,19 +29,20 @@ export function ThinkingBlock({ content, isStreaming }: ThinkingBlockProps) {
     const expanded = open || isStreaming;
 
     return (
-        <div className="my-2 rounded-lg border border-white/[0.06] bg-white/[0.015] overflow-hidden">
+        <div className="my-2 overflow-hidden rounded-control border border-border-subtle bg-surface-sunken">
             <button
                 onClick={() => setOpen(!open)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.025] transition-colors"
+                aria-expanded={expanded}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-meta text-fg-muted transition-colors hover:bg-subtle hover:text-fg"
             >
-                <Brain className="w-3 h-3 text-cyan-400 flex-shrink-0" />
+                <Brain aria-hidden className="size-3.5 shrink-0 text-fg-muted" strokeWidth={1.75} />
                 <span className="font-medium">{isStreaming ? 'Thinking…' : 'Reasoning'}</span>
-                <span className="text-[10px] text-zinc-600 tabular-nums ml-auto">{content.length} chars</span>
-                {expanded ? <ChevronDown className="w-3 h-3 text-zinc-600" /> : <ChevronRight className="w-3 h-3 text-zinc-600" />}
+                <span className="ml-auto text-caption text-fg-faint tabular-nums">{content.length} chars</span>
+                {expanded ? <ChevronDown aria-hidden className="size-3.5 text-fg-faint" /> : <ChevronRight aria-hidden className="size-3.5 text-fg-faint" />}
             </button>
             {expanded && (
-                <div className="px-3 py-2 border-t border-white/[0.04]">
-                    <p className="text-[12px] text-zinc-400 leading-relaxed whitespace-pre-wrap font-mono">
+                <div className="border-t border-border-subtle px-3 py-2">
+                    <p className="whitespace-pre-wrap font-mono text-meta leading-relaxed text-fg-muted">
                         {content}
                     </p>
                 </div>

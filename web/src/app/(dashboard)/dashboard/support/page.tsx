@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { useSession } from 'next-auth/react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import {
-    ArrowUp, Check, CheckCheck, Loader2, Mail, BookOpen, Crown, Shield,
-    Clock, ChevronRight, Lock,
-} from 'lucide-react';
+import { ArrowRight, ArrowUp, BookOpen, Check, CheckCheck, Clock, LifeBuoy, Loader2, Lock, Mail } from 'lucide-react';
+
+import { PageHeader } from '@/components/shell/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { cn } from '@/lib/cn';
 import { MAX_INPUT_CHARS, WARN_INPUT_CHARS, ERR_MESSAGE_TOO_LONG } from '@/lib/chatLimits';
 import { BRAND_NAME } from '@/lib/brand';
 
@@ -57,8 +59,8 @@ function dayLabel(iso: string | null): string {
     });
 }
 
-// Group messages from the same sender within 5 min so consecutive replies
-// don't repeat the avatar + name on every line.
+// Group messages from the same sender within 5 minutes so consecutive replies
+// do not repeat the sender name on every line.
 function shouldGroup(prev: SupportMessage | undefined, curr: SupportMessage): boolean {
     if (!prev) return false;
     if (prev.author_type !== curr.author_type) return false;
@@ -66,9 +68,10 @@ function shouldGroup(prev: SupportMessage | undefined, curr: SupportMessage): bo
     return new Date(curr.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000;
 }
 
+/** Support (DESIGN 4.1): a private thread with the team, plus the other ways to reach us. */
 export default function SupportPage() {
     const { data: session } = useSession();
-    const userName = session?.user?.name?.split(' ')[0] || 'You';
+    const userName = session?.user?.name?.split(' ')[0] || 'there';
 
     const { data, isLoading, mutate } = useSWR<{ messages: SupportMessage[]; exists?: boolean }>(
         '/api/support/messages',
@@ -83,6 +86,7 @@ export default function SupportPage() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [autoScroll, setAutoScroll] = useState(true);
 
+    // Opening the page marks the team's replies as read.
     useEffect(() => {
         void fetch('/api/support/messages/read', { method: 'PATCH' });
     }, []);
@@ -94,6 +98,14 @@ export default function SupportPage() {
         el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     }, [messages, autoScroll, sending]);
 
+    // Autosize the composer.
+    useEffect(() => {
+        const el = composerRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    }, [input]);
+
     const length = input.length;
     const tooLong = length > MAX_INPUT_CHARS;
     const nearLimit = length >= WARN_INPUT_CHARS;
@@ -103,7 +115,7 @@ export default function SupportPage() {
         const content = input.trim();
         if (!content || sending) return;
         if (content.length > MAX_INPUT_CHARS) {
-            toast.error(`Message is too long (${content.length.toLocaleString()} chars). Trim or split it.`);
+            toast.error(`Message is too long (${content.length.toLocaleString()} characters). Trim or split it.`);
             return;
         }
         setSending(true);
@@ -132,14 +144,12 @@ export default function SupportPage() {
                 if (payload?.code === ERR_MESSAGE_TOO_LONG) {
                     toast.error(payload.error || 'Message too long.');
                 } else {
-                    toast.error(payload?.error || 'Couldn’t send your message. Try again.');
+                    toast.error(payload?.error || 'Could not send your message. Try again.');
                 }
-                await mutate();
-            } else {
-                await mutate();
             }
+            await mutate();
         } catch {
-            toast.error('Network error — your message wasn’t sent.');
+            toast.error('Network error: your message was not sent.');
             await mutate();
         } finally {
             setSending(false);
@@ -154,321 +164,178 @@ export default function SupportPage() {
     };
 
     return (
-        <div className="px-4 sm:px-6 lg:px-8 py-8 sm:py-10 max-w-6xl mx-auto w-full">
-            {/* Centered hero */}
-            <header className="text-center mb-8">
-                <h1 className="text-[28px] sm:text-[34px] font-semibold tracking-[-0.02em] text-white leading-tight">
-                    Help &amp; Support
-                </h1>
-                <p className="mt-2 text-[14px] text-zinc-400 max-w-xl mx-auto leading-relaxed">
-                    Get help with SEO, analytics, and platform issues.<br className="hidden sm:block" />
-                    We usually reply within 24 hours.
-                </p>
+        <div className="mx-auto max-w-[1040px]">
+            <PageHeader title="Support" subtitle="Ask us anything. We read every message and usually reply within 24 hours." />
 
-                {/* Status pills */}
-                <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12px]">
-                    <span className="inline-flex items-center gap-1.5 text-zinc-400">
-                        <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60" />
-                            <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400" />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+                {/* Conversation */}
+                <Card as="section" padding="none" aria-label="Conversation with support" className="flex h-[calc(100dvh-16rem)] min-h-[460px] max-h-[720px] flex-col overflow-hidden">
+                    <div className="flex items-center gap-3 border-b border-border-subtle px-4 py-3">
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-subtle text-fg-muted">
+                            <LifeBuoy aria-hidden size={18} strokeWidth={1.75} />
                         </span>
-                        We&apos;re online
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 text-zinc-400">
-                        <Clock className="h-3.5 w-3.5 text-zinc-500" />
-                        Replies within 24h
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 text-zinc-400">
-                        <Shield className="h-3.5 w-3.5 text-zinc-500" />
-                        Secure &amp; private
-                    </span>
-                </div>
-            </header>
-
-            {/* Two-column layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
-                {/* Left: chat panel */}
-                <section className="rounded-2xl border border-white/[0.06] bg-[linear-gradient(180deg,rgba(20,196,225,0.04),rgba(255,255,255,0.01))] overflow-hidden flex flex-col h-[min(680px,calc(100vh-280px))] min-h-[480px] shadow-[0_30px_60px_-20px_rgba(20,196,225,0.08)]">
-                    {/* Header strip */}
-                    <div className="flex items-center gap-3 border-b border-white/[0.06] px-5 py-3.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(20,196,225,0.18),rgba(122,217,218,0.10))] ring-1 ring-cyan-400/20 flex-shrink-0">
-                            <Image
-                                src="/icon.svg"
-                                alt={`${BRAND_NAME}`}
-                                width={22}
-                                height={22}
-                                className="rounded-md"
-                            />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="text-[14px] font-semibold text-white">TrafficClaw Support</div>
-                            <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400" />
-                                Online
-                                <span className="text-zinc-700">·</span>
-                                We&apos;ll reply within 24h
-                            </div>
+                        <div className="min-w-0">
+                            <h2 className="text-title-sm text-fg">{BRAND_NAME} support</h2>
+                            <p className="flex items-center gap-1.5 text-meta text-fg-muted"><Clock aria-hidden size={12} />Replies within 24 hours</p>
                         </div>
                     </div>
 
-                    {/* Messages */}
                     <div
                         ref={scrollRef}
                         onScroll={handleScroll}
-                        className="flex-1 overflow-y-auto px-4 sm:px-6 py-6"
+                        role="log"
+                        aria-label="Messages"
+                        aria-live="polite"
+                        className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6"
                     >
                         {isLoading && messages.length === 0 ? (
-                            <div className="flex items-center justify-center h-full text-zinc-600">
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                            <div className="flex flex-col gap-3" aria-busy>
+                                <Skeleton className="h-10 w-2/3" rounded="card" />
+                                <Skeleton className="ml-auto h-10 w-1/2" rounded="card" />
+                                <Skeleton className="h-10 w-3/5" rounded="card" />
                             </div>
                         ) : messages.length === 0 ? (
-                            <EmptyState userName={userName} />
+                            <EmptyState
+                                variant="page"
+                                icon={LifeBuoy}
+                                title={`Hi ${userName}, how can we help?`}
+                                description="Bug reports, billing, a missing site or a feature idea: write it below and a person will answer."
+                                className="h-full justify-center py-0"
+                            />
                         ) : (
                             <ConversationStream messages={messages} sending={sending} />
                         )}
                     </div>
 
-                    {/* Composer */}
-                    <div className="border-t border-white/[0.06] p-3">
+                    <div className="border-t border-border-subtle p-3">
                         <div
-                            className={`flex items-end gap-2 rounded-xl px-3.5 py-2.5 bg-white/[0.03] border transition-colors ${
-                                tooLong
-                                    ? 'border-red-500/40 focus-within:border-red-500/60'
-                                    : 'border-white/[0.06] focus-within:border-cyan-400/40'
-                            }`}
+                            className={cn(
+                                'flex items-end gap-2 rounded-card border bg-surface px-3 py-2 transition-colors duration-120',
+                                tooLong ? 'border-down' : 'border-border focus-within:border-border-strong',
+                            )}
                         >
+                            <label htmlFor="support-composer" className="sr-only">Message to support</label>
                             <textarea
+                                id="support-composer"
                                 ref={composerRef}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                                         e.preventDefault();
                                         if (canSend) void handleSend();
                                     }
                                 }}
-                                placeholder="Type your message..."
-                                className="flex-1 bg-transparent text-[14px] text-white placeholder-zinc-600 focus:outline-none resize-none leading-relaxed"
+                                placeholder="Write a message…"
                                 rows={1}
-                                style={{ minHeight: '24px', maxHeight: '160px' }}
                                 disabled={sending}
+                                aria-invalid={tooLong || undefined}
+                                className="max-h-40 min-h-6 flex-1 resize-none bg-transparent py-1 text-body-lg text-fg outline-none placeholder:text-fg-faint disabled:opacity-60"
                             />
-                            <button
-                                onClick={handleSend}
-                                disabled={!canSend}
-                                className={`h-9 w-9 rounded-lg flex items-center justify-center transition-all flex-shrink-0 ${
-                                    canSend
-                                        ? 'bg-gradient-to-br from-cyan-400 to-[#14C4E1] text-[#031014] shadow-[0_4px_12px_rgba(20,196,225,0.32)] hover:brightness-110 active:scale-95'
-                                        : 'bg-white/[0.05] text-zinc-600 cursor-not-allowed'
-                                }`}
+                            <Button
+                                variant="primary"
+                                iconOnly
+                                icon={ArrowUp}
                                 aria-label="Send message"
-                            >
-                                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4 -rotate-45" strokeWidth={2.5} />}
-                            </button>
+                                onClick={() => void handleSend()}
+                                disabled={!canSend}
+                                loading={sending}
+                                className="size-9 rounded-full"
+                            />
                         </div>
-
-                        <div className="mt-1.5 px-1 flex items-center justify-between gap-3 text-[10px]">
+                        <div className="mt-1.5 flex items-center justify-between gap-3 px-1 text-meta">
                             {nearLimit ? (
                                 <>
-                                    <span className={`font-medium ${tooLong ? 'text-red-400' : 'text-amber-500/80'}`}>
-                                        {tooLong
-                                            ? `Too long — shorten by ${(length - MAX_INPUT_CHARS).toLocaleString()} chars`
-                                            : 'Long message — that’s fine, we’ll read it'}
+                                    <span className={tooLong ? 'text-down' : 'text-warn'}>
+                                        {tooLong ? `Too long: shorten by ${(length - MAX_INPUT_CHARS).toLocaleString()} characters` : 'Long message, that is fine, we will read it'}
                                     </span>
-                                    <span className={`font-mono tabular-nums ${tooLong ? 'text-red-400' : 'text-amber-500/70'}`}>
+                                    <span className={cn('tabular-nums', tooLong ? 'text-down' : 'text-fg-muted')}>
                                         {length.toLocaleString()} / {MAX_INPUT_CHARS.toLocaleString()}
                                     </span>
                                 </>
                             ) : (
-                                <span className="text-zinc-600">
-                                    Press{' '}
-                                    <kbd className="px-1 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] font-mono text-[9px]">Enter</kbd>
-                                    {' to send · '}
-                                    <kbd className="px-1 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] font-mono text-[9px]">Shift+Enter</kbd>
-                                    {' for newline'}
-                                </span>
+                                <span className="text-fg-muted">Enter to send, Shift+Enter for a new line</span>
                             )}
                         </div>
                     </div>
-                </section>
+                </Card>
 
-                {/* Right: support options sidebar */}
-                <aside className="space-y-4">
-                    <div>
-                        <h2 className="text-[13px] font-semibold text-white mb-3 px-1">Support options</h2>
-                        <div className="space-y-2">
-                            <SupportOptionCard
-                                href="mailto:hello@trafficclaw.com"
-                                icon={<Mail className="h-4 w-4 text-cyan-300" />}
-                                title="Email us"
-                                subtitle="hello@trafficclaw.com"
-                                external
-                            />
-                            <SupportOptionCard
-                                href="/dashboard/docs"
-                                icon={<BookOpen className="h-4 w-4 text-cyan-300" />}
-                                title="Knowledge base"
-                                subtitle="Browse guides &amp; articles"
-                            />
-                            <SupportOptionCard
-                                href="/dashboard/plan"
-                                icon={<Crown className="h-4 w-4 text-amber-300" />}
-                                title="Priority support"
-                                subtitle="For urgent, critical issues"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Response time card */}
-                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                        <div className="flex items-center gap-2 mb-1.5">
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60" />
-                                <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400" />
-                            </span>
-                            <h3 className="text-[13px] font-semibold text-white">Response time</h3>
-                        </div>
-                        <p className="text-[12px] font-medium text-cyan-300/90">Usually within 24 hours</p>
-                        <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed">
-                            We&apos;re online during business hours<br />
-                            (Mon–Fri, 9am–6pm UTC)
+                {/* Other ways to get help */}
+                <aside aria-label="Other ways to get help" className="flex flex-col gap-3">
+                    <OptionCard href="/dashboard/docs" icon={BookOpen} title="Docs" subtitle="Guides for every part of the app" />
+                    <OptionCard href="mailto:hello@trafficclaw.com" icon={Mail} title="Email us" subtitle="hello@trafficclaw.com" external />
+                    <Card padding="sm">
+                        <h3 className="flex items-center gap-2 text-title-sm text-fg"><Clock aria-hidden size={16} className="text-fg-muted" />How support works</h3>
+                        <p className="mt-1.5 text-body-sm text-fg-muted">
+                            We answer in this thread, usually within 24 hours, Monday to Friday, 9am to 6pm UTC.
                         </p>
-                    </div>
-
-                    {/* Privacy card */}
-                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 flex items-start gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex-shrink-0">
-                            <Lock className="h-4 w-4 text-cyan-300" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <h3 className="text-[12.5px] font-semibold text-white leading-tight">Your conversations are secure</h3>
-                            <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">
-                                We never share your information.
-                            </p>
-                        </div>
-                    </div>
+                    </Card>
+                    <Card padding="sm">
+                        <h3 className="flex items-center gap-2 text-title-sm text-fg"><Lock aria-hidden size={16} className="text-fg-muted" />Private</h3>
+                        <p className="mt-1.5 text-body-sm text-fg-muted">
+                            Only you and the team can read this conversation. We never share it.
+                        </p>
+                    </Card>
                 </aside>
-            </div>
-
-            {/* Email fallback footer */}
-            <div className="mt-8 text-center">
-                <p className="text-[12px] text-zinc-500 mb-3">Prefer email? Reach us anytime.</p>
-                <div className="inline-flex flex-wrap items-center justify-center gap-2">
-                    <a
-                        href="mailto:hello@trafficclaw.com"
-                        className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-4 py-2 text-[12.5px] text-zinc-300 hover:border-cyan-400/30 hover:bg-cyan-500/[0.06] hover:text-white transition-colors"
-                    >
-                        <Mail className="h-3.5 w-3.5 text-cyan-300/70" />
-                        hello@trafficclaw.com
-                    </a>
-                    <a
-                        href="mailto:trafficclaw@gmail.com"
-                        className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-4 py-2 text-[12.5px] text-zinc-300 hover:border-cyan-400/30 hover:bg-cyan-500/[0.06] hover:text-white transition-colors"
-                    >
-                        <Mail className="h-3.5 w-3.5 text-cyan-300/70" />
-                        trafficclaw@gmail.com
-                    </a>
-                </div>
-                <p className="mt-4 text-[11px] text-zinc-600 inline-flex items-center gap-1.5">
-                    <Shield className="h-3 w-3" />
-                    We value your time and privacy.
-                </p>
             </div>
         </div>
     );
 }
 
-function SupportOptionCard({
-    href,
-    icon,
-    title,
-    subtitle,
-    external,
-}: {
+function OptionCard({ href, icon: Icon, title, subtitle, external }: {
     href: string;
-    icon: React.ReactNode;
+    icon: typeof Mail;
     title: string;
     subtitle: string;
     external?: boolean;
 }) {
     const inner = (
-        <div className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 hover:border-cyan-400/25 hover:bg-cyan-500/[0.04] transition-all">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500/10 border border-cyan-500/15 flex-shrink-0">
-                {icon}
-            </div>
-            <div className="flex-1 min-w-0">
-                <h3 className="text-[13px] font-semibold text-white leading-tight">{title}</h3>
-                <p className="mt-0.5 text-[11px] text-zinc-500 truncate">{subtitle}</p>
-            </div>
-            <ChevronRight className="h-4 w-4 text-zinc-600 group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-        </div>
+        <Card padding="sm" interactive className="group flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-subtle text-fg-muted">
+                <Icon aria-hidden size={16} strokeWidth={1.75} />
+            </span>
+            <span className="min-w-0 flex-1">
+                <span className="block text-body font-medium text-fg">{title}</span>
+                <span className="block truncate text-body-sm text-fg-muted">{subtitle}</span>
+            </span>
+            <ArrowRight aria-hidden size={16} className="shrink-0 text-fg-faint transition-transform duration-120 group-hover:translate-x-0.5 group-hover:text-fg-muted" />
+        </Card>
     );
-    if (external) {
-        return <a href={href}>{inner}</a>;
-    }
-    return <Link href={href}>{inner}</Link>;
-}
-
-function EmptyState({ userName }: { userName: string }) {
-    return (
-        <div className="flex flex-col items-center justify-center h-full text-center px-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-cyan-500/10 border border-cyan-500/20 mb-4">
-                <Image src="/icon.svg" alt="TrafficClaw" width={26} height={26} />
-            </div>
-            <h3 className="text-[15px] font-semibold text-white">Hi {userName}, how can we help?</h3>
-            <p className="mt-1.5 text-[13px] text-zinc-500 max-w-sm leading-relaxed">
-                Bug reports, billing, feature requests &mdash; anything. We read every message personally and reply within 24 hours.
-            </p>
-        </div>
-    );
+    return external
+        ? <a href={href} className="block rounded-card focus-visible:outline-2">{inner}</a>
+        : <Link href={href} className="block rounded-card focus-visible:outline-2">{inner}</Link>;
 }
 
 function ConversationStream({ messages, sending }: { messages: SupportMessage[]; sending: boolean }) {
     return (
         <div className="space-y-1">
-            <AnimatePresence initial={false}>
-                {messages.map((m, i) => {
-                    const prev = messages[i - 1];
-                    const next = messages[i + 1];
-                    const grouped = shouldGroup(prev, m);
-                    const showDay = !prev || dayKey(prev.created_at) !== dayKey(m.created_at);
-                    const isLastInGroup = !next || next.author_type !== m.author_type || !shouldGroup(m, next);
-                    const isOptimistic = m.id < 0;
-                    return (
-                        <div key={m.id}>
-                            {showDay && <DaySeparator iso={m.created_at} />}
-                            <Bubble
-                                msg={m}
-                                grouped={grouped}
-                                isLastInGroup={isLastInGroup}
-                                pending={isOptimistic && sending}
-                                delivered={!isOptimistic}
-                            />
-                        </div>
-                    );
-                })}
-            </AnimatePresence>
+            {messages.map((m, i) => {
+                const prev = messages[i - 1];
+                const next = messages[i + 1];
+                const grouped = shouldGroup(prev, m);
+                const showDay = !prev || dayKey(prev.created_at) !== dayKey(m.created_at);
+                const isLastInGroup = !next || next.author_type !== m.author_type || !shouldGroup(m, next);
+                const isOptimistic = m.id < 0;
+                return (
+                    <div key={m.id}>
+                        {showDay ? <DaySeparator iso={m.created_at} /> : null}
+                        <Bubble msg={m} grouped={grouped} isLastInGroup={isLastInGroup} pending={isOptimistic && sending} delivered={!isOptimistic} />
+                    </div>
+                );
+            })}
         </div>
     );
 }
 
 function DaySeparator({ iso }: { iso: string | null }) {
     return (
-        <div className="flex items-center justify-center my-4 first:mt-0">
-            <span className="text-[10px] uppercase tracking-[0.18em] font-medium text-zinc-600 px-2.5 py-0.5 rounded-full bg-white/[0.02] border border-white/[0.04]">
-                {dayLabel(iso)}
-            </span>
+        <div className="my-4 flex items-center justify-center first:mt-0">
+            <span className="rounded-full bg-subtle px-2.5 py-0.5 text-caption text-fg-muted">{dayLabel(iso)}</span>
         </div>
     );
 }
 
-function Bubble({
-    msg,
-    grouped,
-    isLastInGroup,
-    pending,
-    delivered,
-}: {
+function Bubble({ msg, grouped, isLastInGroup, pending, delivered }: {
     msg: SupportMessage;
     grouped: boolean;
     isLastInGroup: boolean;
@@ -477,41 +344,31 @@ function Bubble({
 }) {
     const isUser = msg.author_type === 'user';
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            className={`flex ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-0.5' : 'mt-3'}`}
-        >
-            <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[78%] sm:max-w-[68%]`}>
-                {!grouped && !isUser && (
-                    <div className="text-[11px] text-zinc-500 mb-1 px-1">
-                        {BRAND_NAME} Support
-                    </div>
-                )}
+        <div className={cn('flex animate-fade-in', isUser ? 'justify-end' : 'justify-start', grouped ? 'mt-0.5' : 'mt-3')}>
+            <div className={cn('flex max-w-[82%] flex-col sm:max-w-[70%]', isUser ? 'items-end' : 'items-start')}>
+                {!grouped && !isUser ? <div className="mb-1 px-1 text-meta text-fg-muted">{BRAND_NAME} support</div> : null}
                 <div
-                    className={`px-3.5 py-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words ${
-                        isUser
-                            ? `bg-gradient-to-br from-cyan-400 to-[#14C4E1] text-[#031014] shadow-[0_4px_18px_rgba(20,196,225,0.22)] ${grouped ? 'rounded-2xl' : 'rounded-2xl rounded-tr-md'}`
-                            : `bg-white/[0.06] text-zinc-100 ${grouped ? 'rounded-2xl' : 'rounded-2xl rounded-tl-md'}`
-                    }`}
+                    className={cn(
+                        'whitespace-pre-wrap break-words rounded-card px-3.5 py-2 text-body-lg',
+                        isUser ? 'bg-subtle-strong text-fg' : 'border border-border-subtle bg-surface text-fg shadow-xs',
+                    )}
                 >
                     {msg.content}
                 </div>
-                {isLastInGroup && (
-                    <div className={`flex items-center gap-1 mt-1 px-1 text-[10px] text-zinc-600 tabular-nums ${isUser ? 'flex-row-reverse' : ''}`}>
+                {isLastInGroup ? (
+                    <div className={cn('mt-1 flex items-center gap-1 px-1 text-caption text-fg-muted tabular-nums', isUser && 'flex-row-reverse')}>
                         <span>{formatTime(msg.created_at)}</span>
-                        {isUser && (
-                            pending ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                            : delivered
-                                ? msg.read_at
-                                    ? <CheckCheck className="h-3 w-3 text-cyan-300" />
-                                    : <Check className="h-3 w-3" />
-                                : null
-                        )}
+                        {isUser ? (
+                            pending ? <Loader2 aria-label="Sending" className="size-3 animate-spin" />
+                                : delivered
+                                    ? msg.read_at
+                                        ? <CheckCheck aria-label="Read" className="size-3.5 text-info" />
+                                        : <Check aria-label="Sent" className="size-3.5" />
+                                    : null
+                        ) : null}
                     </div>
-                )}
+                ) : null}
             </div>
-        </motion.div>
+        </div>
     );
 }

@@ -79,9 +79,9 @@ export function MessageFeedback({ messageId, threadId }: MessageFeedbackProps) {
 
     if (state.kind === 'submitted') {
         return (
-            <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-zinc-500">
-                <Check className="h-3 w-3 text-emerald-400" />
-                <span>Thanks — feedback saved.</span>
+            <div role="status" className="mt-2 inline-flex items-center gap-1.5 text-meta text-fg-muted">
+                <Check aria-hidden className="size-3.5 text-up" />
+                <span>Thanks, feedback saved.</span>
             </div>
         );
     }
@@ -89,9 +89,9 @@ export function MessageFeedback({ messageId, threadId }: MessageFeedbackProps) {
     if (state.kind === 'down_pending') {
         return (
             <div className="mt-2 flex max-w-[460px] flex-col gap-1.5">
-                <div className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400">
-                    <Check className="h-3 w-3 text-emerald-400" />
-                    <span>Saved. <span className="text-zinc-500">What was wrong? (optional)</span></span>
+                <div role="status" className="inline-flex items-center gap-1.5 text-meta text-fg-secondary">
+                    <Check aria-hidden className="size-3.5 text-up" />
+                    <span>Saved. <span className="text-fg-muted">What was wrong? (optional)</span></span>
                 </div>
                 <div className="flex items-center gap-2">
                     <input
@@ -109,13 +109,14 @@ export function MessageFeedback({ messageId, threadId }: MessageFeedbackProps) {
                         }}
                         placeholder="Too generic / wrong number / missed the point…"
                         autoFocus
-                        className="min-w-0 flex-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[12px] text-zinc-200 placeholder:text-zinc-600 outline-none transition-colors focus:border-cyan-400/40"
+                        aria-label="What was wrong with this answer?"
+                        className="tc-control h-8 min-w-0 flex-1 rounded-control border border-border bg-surface px-2.5 text-body-sm text-fg placeholder:text-fg-faint transition-colors hover:border-border-strong focus-visible:outline-2"
                     />
                     <button
                         type="button"
                         onClick={() => void handleCommentSubmit()}
                         disabled={submitting}
-                        className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-white disabled:opacity-50"
+                        className="h-8 rounded-control border border-border bg-surface px-3 text-body-sm font-medium text-fg shadow-xs transition-colors hover:border-border-strong hover:bg-subtle disabled:opacity-50"
                     >
                         Send
                     </button>
@@ -126,17 +127,17 @@ export function MessageFeedback({ messageId, threadId }: MessageFeedbackProps) {
 
     return (
         <div className="mt-3 flex items-center gap-2">
-            <span className="text-[11px] font-medium text-zinc-400">Was this helpful?</span>
+            <span className="text-meta text-fg-muted">Was this helpful?</span>
             <button
                 type="button"
                 onClick={() => void submit('up')}
                 disabled={submitting}
                 aria-label="Helpful answer"
                 title="Helpful"
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-300 disabled:opacity-50"
+                className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 text-meta font-medium text-fg-secondary transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg disabled:opacity-50"
                 data-testid="message-feedback-up"
             >
-                <ThumbsUp className="h-3.5 w-3.5" />
+                <ThumbsUp aria-hidden className="size-3.5" strokeWidth={1.75} />
                 <span>Yes</span>
             </button>
             <button
@@ -145,14 +146,14 @@ export function MessageFeedback({ messageId, threadId }: MessageFeedbackProps) {
                 disabled={submitting}
                 aria-label="Unhelpful answer"
                 title="Not helpful"
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition-all hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 text-meta font-medium text-fg-secondary transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg disabled:opacity-50"
                 data-testid="message-feedback-down"
             >
-                <ThumbsDown className="h-3.5 w-3.5" />
+                <ThumbsDown aria-hidden className="size-3.5" strokeWidth={1.75} />
                 <span>No</span>
             </button>
             {state.kind === 'error' ? (
-                <span className="ml-1.5 text-[11px] text-red-400">{state.message}</span>
+                <span role="alert" className="ml-1.5 text-meta text-down">{state.message}</span>
             ) : null}
         </div>
     );

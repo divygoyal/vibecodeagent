@@ -8,7 +8,7 @@ import {
     CheckCircle2, Loader2, ArrowRight
 } from 'lucide-react';
 import type { Components } from 'react-markdown';
-import { SmartChartPanel } from './chat/ChatCharts';
+import { SmartChartPanel, type StructuredToolResult } from './chat/ChatCharts';
 import { splitContentOnChartTags, renderSnapshotChart } from './chat/SnapshotChartRenderer';
 import type { DashboardSnapshot } from './chat/SnapshotChartRenderer';
 import { ThinkingBlock } from './chat/ThinkingBlock';
@@ -31,15 +31,15 @@ function CodeBlock({ children, className }: { children: string; className?: stri
     };
 
     return (
-        <div className="relative group my-4 rounded-xl overflow-hidden bg-[var(--input-bg)] border border-zinc-800/60">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800/60">
-                <span className="text-[11px] text-zinc-500 font-mono">{language || 'code'}</span>
-                <button onClick={handleCopy} className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-white transition-colors">
-                    {copied ? <><Check className="w-3 h-3 text-emerald-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+        <div className="relative group my-4 overflow-hidden rounded-card border border-border-subtle bg-surface-sunken">
+            <div className="flex items-center justify-between border-b border-border-subtle px-4 py-2">
+                <span className="font-mono text-meta text-fg-muted">{language || 'code'}</span>
+                <button onClick={handleCopy} className="flex items-center gap-1.5 rounded text-meta text-fg-muted transition-colors hover:text-fg">
+                    {copied ? <><Check aria-hidden className="size-3.5 text-up" /> Copied</> : <><Copy aria-hidden className="size-3.5" /> Copy</>}
                 </button>
             </div>
-            <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed">
-                <code className="text-zinc-300 font-mono">{children}</code>
+            <pre className="overflow-x-auto p-4 text-body-sm leading-relaxed">
+                <code className="font-mono text-fg-secondary">{children}</code>
             </pre>
         </div>
     );
@@ -48,9 +48,10 @@ function CodeBlock({ children, className }: { children: string; className?: stri
 /* ─── Tool Call Card ─── */
 export interface ToolCall {
     name: string;
-    args?: any;
-    result?: string;
-    structuredData?: { dimensions: string[]; rows: any[]; totals?: any };
+    args?: unknown;
+    /** A string from the stream, or a parsed object from a saved thread. */
+    result?: string | Record<string, unknown>;
+    structuredData?: { dimensions: string[]; rows: Record<string, unknown>[]; totals?: unknown };
     /** A6: streamed seconds-elapsed heartbeat from server for slow tools */
     elapsedSec?: number;
 }
@@ -80,23 +81,25 @@ const TOOL_NAMES: Record<string, string> = {
     get_custom_dimensions: 'Custom Dimensions',
 };
 
+/** Pretty-print a tool result when it is JSON; otherwise show it as it came. */
+function prettyResult(result: ToolCall['result']): string {
+    if (!result) return '';
+    if (typeof result !== 'string') {
+        try { return JSON.stringify(result, null, 2); } catch { return String(result); }
+    }
+    const trimmed = result.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try { return JSON.stringify(JSON.parse(trimmed), null, 2); } catch { /* not JSON */ }
+    }
+    return result;
+}
+
 export function ToolCallCard({ tool }: { tool: ToolCall }) {
     const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
     const isDone = !!tool.result;
 
-    // Pretty-print JSON when result is parseable; otherwise show as-is.
-    const displayContent = useMemo(() => {
-        if (!tool.result) return '';
-        if (typeof tool.result !== 'string') {
-            try { return JSON.stringify(tool.result, null, 2); } catch { return String(tool.result); }
-        }
-        const trimmed = tool.result.trim();
-        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-            try { return JSON.stringify(JSON.parse(trimmed), null, 2); } catch { /* not JSON */ }
-        }
-        return tool.result;
-    }, [tool.result]);
+    const displayContent = useMemo(() => prettyResult(tool.result), [tool.result]);
 
     const handleCopy = (e: MouseEvent) => {
         e.stopPropagation();
@@ -106,37 +109,38 @@ export function ToolCallCard({ tool }: { tool: ToolCall }) {
     };
 
     return (
-        <div className="my-2 text-sm">
-            <div className="flex items-center gap-2.5">
+        <div className="rounded-control border border-border-subtle bg-surface-sunken text-body-sm">
+            <button
+                type="button"
+                onClick={() => isDone && setExpanded(!expanded)}
+                aria-expanded={isDone ? expanded : undefined}
+                disabled={!isDone}
+                className={`flex w-full items-center gap-2.5 px-3 py-2 text-left ${isDone ? 'cursor-pointer text-fg-secondary hover:text-fg' : 'cursor-default text-fg-muted'} transition-colors`}
+            >
                 {isDone
-                    ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    : <Loader2 className="w-4 h-4 text-zinc-500 flex-shrink-0 animate-spin" />}
-                <button
-                    onClick={() => isDone && setExpanded(!expanded)}
-                    className={`text-zinc-400 ${isDone ? 'hover:text-white cursor-pointer' : ''} transition-colors`}
-                >
-                    {TOOL_NAMES[tool.name] || tool.name}
-                </button>
-                {/* A6: live elapsed-seconds while tool is in flight */}
+                    ? <CheckCircle2 aria-hidden className="size-4 shrink-0 text-up" strokeWidth={1.75} />
+                    : <Loader2 aria-hidden className="size-4 shrink-0 animate-spin text-fg-muted" strokeWidth={1.75} />}
+                <span className="min-w-0 flex-1 truncate">{TOOL_NAMES[tool.name] || tool.name}</span>
+                {/* A6: live elapsed-seconds while the tool is in flight */}
                 {!isDone && typeof tool.elapsedSec === 'number' && tool.elapsedSec > 0 && (
-                    <span className="text-[10px] text-zinc-600 tabular-nums">{tool.elapsedSec}s</span>
+                    <span className="text-meta text-fg-faint tabular-nums">{tool.elapsedSec}s</span>
                 )}
                 {isDone && (expanded
-                    ? <ChevronDown className="w-3 h-3 text-zinc-600" />
-                    : <ChevronRight className="w-3 h-3 text-zinc-600" />
+                    ? <ChevronDown aria-hidden className="size-3.5 text-fg-faint" />
+                    : <ChevronRight aria-hidden className="size-3.5 text-fg-faint" />
                 )}
-            </div>
+            </button>
             {expanded && displayContent && (
-                <div className="mt-1.5 ml-6 relative">
+                <div className="relative border-t border-border-subtle p-2">
                     <button
                         onClick={handleCopy}
-                        className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 px-2 py-1 rounded text-[10px] text-zinc-500 hover:text-white hover:bg-white/[0.05] transition"
+                        className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded px-2 py-1 text-meta text-fg-muted transition-colors hover:bg-subtle hover:text-fg"
                         aria-label="Copy result"
                     >
-                        {copied ? <><Check className="w-3 h-3 text-emerald-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                        {copied ? <><Check aria-hidden className="size-3.5 text-up" /> Copied</> : <><Copy aria-hidden className="size-3.5" /> Copy</>}
                     </button>
-                    {/* No more 500-char clip — full result is visible, scrollable, copyable. */}
-                    <pre className="text-[11px] text-zinc-400 font-mono max-h-64 overflow-y-auto whitespace-pre-wrap bg-[var(--input-bg)] rounded-lg p-3 pr-16">
+                    {/* Full result: scrollable and copyable. */}
+                    <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-surface p-3 pr-20 font-mono text-meta text-fg-secondary">
                         {displayContent}
                     </pre>
                 </div>
@@ -148,91 +152,89 @@ export function ToolCallCard({ tool }: { tool: ToolCall }) {
 /* ─── Markdown Overrides (Grok-inspired: clean, large, readable) ─── */
 const markdownComponents: Components = {
     h1: ({ children }) => (
-        <h1 className="text-xl font-bold text-white mt-8 mb-3">{children}</h1>
+        <h1 className="mb-2 mt-6 text-title text-fg">{children}</h1>
     ),
     h2: ({ children }) => (
-        <h2 className="text-lg font-bold text-white mt-7 mb-3">{children}</h2>
+        <h2 className="mb-2 mt-6 text-title text-fg">{children}</h2>
     ),
     h3: ({ children }) => (
-        <h3 className="text-base font-semibold text-white mt-5 mb-2">{children}</h3>
+        <h3 className="mb-1.5 mt-5 text-title-sm text-fg">{children}</h3>
     ),
     h4: ({ children }) => (
-        <h4 className="text-sm font-semibold text-zinc-200 mt-4 mb-1.5">{children}</h4>
+        <h4 className="mb-1 mt-4 text-body font-semibold text-fg">{children}</h4>
     ),
     p: ({ children }) => (
-        <p className="text-[15px] text-zinc-300 leading-[1.8] my-3">
+        <p className="my-3 text-body-lg text-fg first:mt-0">
             {highlightNumbersInChildren(children, 'p')}
         </p>
     ),
     strong: ({ children }) => (
-        <strong className="text-white font-semibold">
+        <strong className="font-semibold text-fg">
             {highlightNumbersInChildren(children, 'strong')}
         </strong>
     ),
     em: ({ children }) => (
-        <em className="text-zinc-400">{children}</em>
+        <em className="text-fg-muted">{children}</em>
     ),
     a: ({ href, children }) => (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2 decoration-emerald-500/30 hover:decoration-emerald-400/60 inline-flex items-center gap-1 transition-colors">
-            {children}<ExternalLink className="w-3 h-3" />
+        <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-brand-text underline decoration-border-strong underline-offset-2 transition-colors hover:decoration-brand-text">
+            {children}<ExternalLink aria-hidden className="size-3" />
         </a>
     ),
     ul: ({ children }) => (
-        <ul className="space-y-2 my-4">{children}</ul>
+        <ul className="my-3 space-y-2">{children}</ul>
     ),
     ol: ({ children }) => (
-        <ol className="space-y-2 my-4 list-none">{children}</ol>
+        <ol className="my-3 list-none space-y-2">{children}</ol>
     ),
     li: ({ children, ...props }) => {
-        const ordered = (props as any).ordered;
-        const index = (props as any).index;
+        const ordered = (props as { ordered?: boolean }).ordered;
+        const index = (props as { index?: number }).index;
         return (
-            <li className="flex gap-3 text-[15px] text-zinc-300 leading-relaxed">
+            <li className="flex gap-3 text-body-lg text-fg">
                 {ordered ? (
-                    <span className="flex-shrink-0 mt-[2px] w-6 h-6 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center text-[11px] font-bold">
+                    <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-subtle text-meta font-medium text-fg-secondary tabular-nums">
                         {(index ?? 0) + 1}
                     </span>
                 ) : (
-                    <span className="flex-shrink-0 mt-[10px] w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                    <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-full bg-fg-faint" />
                 )}
-                <div className="flex-1 min-w-0">{highlightNumbersInChildren(children, 'li')}</div>
+                <div className="min-w-0 flex-1">{highlightNumbersInChildren(children, 'li')}</div>
             </li>
         );
     },
     blockquote: ({ children }) => (
-        <div className="my-4 pl-4 border-l-2 border-zinc-700 py-1">
-            <div className="text-[14px] text-zinc-400 italic leading-relaxed">{children}</div>
+        <div className="my-4 border-l-2 border-border-strong py-0.5 pl-4">
+            <div className="text-body text-fg-muted italic">{children}</div>
         </div>
     ),
-    hr: () => <hr className="border-zinc-800 my-6" />,
+    hr: () => <hr className="my-6 border-border-subtle" />,
     code: ({ children, className }) => {
         const isBlock = className?.startsWith('language-');
         if (isBlock) return <CodeBlock className={className}>{String(children).replace(/\n$/, '')}</CodeBlock>;
         return (
-            <code className="bg-zinc-800/80 text-emerald-300 px-1.5 py-0.5 rounded text-[13px] font-mono">
+            <code className="rounded bg-subtle px-1.5 py-0.5 font-mono text-[0.9em] text-fg">
                 {children}
             </code>
         );
     },
     pre: ({ children }) => <>{children}</>,
-    // Premium table treatment: no card background, no rounded corners, just
-    // a thin top + bottom rule with subtle row dividers. Headers are zinc-500
-    // small-caps, NOT loud uppercase. Matches the Claude/ChatGPT visual style.
+    // Tables: thin rules, muted headers, tabular numbers; scrolls inside the message.
     table: ({ children }) => (
-        <div className="my-5 -mx-1 overflow-x-auto">
-            <table className="w-full text-[13px] border-collapse">{children}</table>
+        <div className="my-4 overflow-x-auto rounded-card border border-border-subtle">
+            <table className="w-full border-collapse text-body-sm tabular-nums">{children}</table>
         </div>
     ),
     thead: ({ children }) => (
-        <thead className="border-b border-white/[0.08]">{children}</thead>
+        <thead className="border-b border-border-subtle bg-surface-sunken">{children}</thead>
     ),
-    tbody: ({ children }) => <tbody className="divide-y divide-white/[0.04]">{children}</tbody>,
-    tr: ({ children }) => <tr className="transition-colors hover:bg-white/[0.015]">{children}</tr>,
+    tbody: ({ children }) => <tbody className="divide-y divide-border-subtle">{children}</tbody>,
+    tr: ({ children }) => <tr className="transition-colors hover:bg-subtle/50">{children}</tr>,
     th: ({ children }) => (
-        <th className="px-3 py-2 text-left text-[11px] text-zinc-500 font-medium">{children}</th>
+        <th className="whitespace-nowrap px-3 py-2 text-left text-meta font-medium text-fg-muted">{children}</th>
     ),
     td: ({ children }) => (
-        <td className="px-3 py-2.5 text-zinc-300 align-top">
+        <td className="px-3 py-2 align-top text-fg">
             {highlightNumbersInChildren(children, 'td')}
         </td>
     ),
@@ -299,7 +301,7 @@ export default memo(function ChatMessageRenderer({ content, tools, thinking, pla
                 const parsed = t.structuredData || safeParseToolResult(t.result);
                 return parsed?.rows?.length ? { key: t.name, result: parsed } : null;
             })
-            .filter(Boolean) as { key: string; result: any }[];
+            .filter(Boolean) as { key: string; result: StructuredToolResult }[];
     }, [tools]);
 
     const segments = useMemo(() => splitContentOnChartTags(cleanContent || ''), [cleanContent]);
@@ -320,7 +322,7 @@ export default memo(function ChatMessageRenderer({ content, tools, thinking, pla
 
             {/* Tool calls */}
             {tools && tools.length > 0 && (
-                <div className="mb-4 space-y-1">
+                <div className="mb-3 space-y-1.5">
                     {tools.map((tool, i) => (
                         <ToolCallCard key={`${tool.name}-${i}`} tool={tool} />
                     ))}
@@ -355,15 +357,15 @@ export default memo(function ChatMessageRenderer({ content, tools, thinking, pla
 
             {/* Follow-up chips */}
             {suggestions.length > 0 && !isStreaming && onSuggestionClick && (
-                <div className="flex flex-wrap gap-2 mt-6">
+                <div className="mt-5 flex flex-wrap gap-2">
                     {suggestions.map((s, i) => (
                         <button
                             key={i}
                             onClick={() => onSuggestionClick(s)}
-                            className="group text-[13px] text-zinc-400 px-4 py-2.5 rounded-full bg-[var(--input-bg)] hover:bg-[#252525] hover:text-white transition-all flex items-center gap-1.5"
+                            className="group flex min-h-8 items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-left text-body-sm text-fg-secondary shadow-xs transition-colors hover:border-border-strong hover:bg-subtle hover:text-fg"
                         >
                             {s}
-                            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <ArrowRight aria-hidden className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
                         </button>
                     ))}
                 </div>
@@ -371,7 +373,7 @@ export default memo(function ChatMessageRenderer({ content, tools, thinking, pla
 
             {/* Streaming cursor */}
             {isStreaming && (
-                <span className="inline-block w-0.5 h-5 bg-white/60 animate-pulse ml-0.5 align-middle rounded-full" />
+                <span aria-hidden className="ml-0.5 inline-block h-5 w-0.5 animate-pulse rounded-full bg-fg-muted align-middle" />
             )}
 
             {/* B5-full: critic verdict — at the bottom because it judges what

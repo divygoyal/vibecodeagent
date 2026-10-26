@@ -2,13 +2,14 @@ import type { Metadata } from 'next';
 import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-  title: `${BRAND_NAME} Globe — Real-Time Visitors`,
-  description: `Real-time visitor globe powered by ${BRAND_NAME}`,
+  title: `${BRAND_NAME} live visitors`,
+  description: `Real-time visitors, powered by ${BRAND_NAME}`,
 };
 
+/** Chrome-less embed (DESIGN 2.1): light by default, `?theme=dark` for dark (set before paint by the theme script). */
 export default function EmbedLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="w-full h-screen bg-[#080c18] overflow-hidden">
+    <div className="h-screen w-full overflow-hidden bg-canvas text-fg">
       {children}
     </div>
   );
