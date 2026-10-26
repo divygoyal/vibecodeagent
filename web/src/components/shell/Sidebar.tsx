@@ -68,9 +68,14 @@ function NavLink({ href, label, icon: Icon, active, collapsed, badge, disabled, 
     return collapsed ? <Tooltip content={badge ? `${label} (${badge})` : label} side="right">{el}</Tooltip> : el;
 }
 
-function GroupLabel({ children, collapsed }: { children: string; collapsed?: boolean }) {
+function GroupLabel({ children, detail, collapsed }: { children: string; detail?: string | null; collapsed?: boolean }) {
     if (collapsed) return <div aria-hidden className="mx-auto my-3 h-px w-6 bg-border-subtle" />;
-    return <p className="mt-5 mb-1 px-5 text-caption tracking-[0.04em] text-fg-muted uppercase">{children}</p>;
+    return (
+        <p className="mt-5 mb-1 flex min-w-0 items-baseline gap-1.5 px-5 text-caption text-fg-muted">
+            <span className="shrink-0 tracking-[0.04em] uppercase">{children}</span>
+            {detail ? <span className="min-w-0 truncate normal-case" title={detail}>· {detail}</span> : null}
+        </p>
+    );
 }
 
 function AiMeter({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
@@ -157,7 +162,8 @@ export function Sidebar({ collapsed = false, inDrawer = false, onNavigate, local
             <div className="mt-3 flex-1 pb-3">
                 <NavLink {...PORTFOLIO_ITEM} active={isActive(pathname, PORTFOLIO_ITEM)} collapsed={collapsed} onClick={onNavigate} />
 
-                <GroupLabel collapsed={collapsed}>Site</GroupLabel>
+                {/* Off the site pages the switcher says "All sites", so name the site these links open. */}
+                <GroupLabel collapsed={collapsed} detail={!onSitePage && site ? site.label : null}>Site</GroupLabel>
                 {SITE_NAV.map((item) => (
                     <NavLink
                         key={item.section || 'overview'}
