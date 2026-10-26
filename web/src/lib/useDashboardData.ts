@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { useRegistration } from '@/app/(dashboard)/dashboard/layout';
+import { useRegistration } from '@/components/shell/workspaceContext';
 import { useSession } from 'next-auth/react';
 import { DEMO_QUERY_PARAM, DEMO_QUERY_VALUE } from '@/lib/demoWorkspace';
 

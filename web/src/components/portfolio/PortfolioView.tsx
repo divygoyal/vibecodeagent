@@ -12,6 +12,7 @@ import { RANGE_LABEL } from '@/lib/portfolio/ranges';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite, SitePatch } from '@/lib/portfolio/types';
 import { filterSites, SORT_OPTIONS, sortSites, type FilterKey, type SortKey } from '@/lib/portfolio/view';
 import { useIsMobile } from '@/lib/useIsMobile';
+import { PageHeader } from '@/components/shell/PageHeader';
 import { AlertsPanel } from './AlertsPanel';
 import { PairingDialog } from './PairingDialog';
 import { ConnectGoogle, NoSitesFound } from './PortfolioOnboarding';
@@ -50,6 +51,8 @@ export interface PortfolioViewProps {
     onConnectGoogle?: () => void;
     onRetry?: () => void;
     exportHref?: string;
+    /** Root classes. Inside AppShell none are needed; standalone pages add tc-root and padding. */
+    className?: string;
 }
 
 const RANGE_OPTIONS = (['7d', '28d', '3m', '12m'] as const).map((r) => ({ value: r, label: r }));
@@ -75,7 +78,7 @@ function saveLayout(v: PortfolioLayout) {
     }
 }
 
-function Subtitle({ data, range, note }: { data: PortfolioResponse | undefined; range: PortfolioRange; note?: string }) {
+function Subtitle({ data, range }: { data: PortfolioResponse | undefined; range: PortfolioRange }) {
     const parts: React.ReactNode[] = [];
     if (data && data.sites.length) {
         const { total, synced } = data.totals.sites;
@@ -95,17 +98,14 @@ function Subtitle({ data, range, note }: { data: PortfolioResponse | undefined; 
     }
     parts.push(`${RANGE_LABEL[range]} vs previous`);
     return (
-        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm text-fg-muted">
-            <span className="inline-flex flex-wrap items-center gap-x-1.5">
-                {parts.map((p, i) => (
-                    <span key={i} className="inline-flex items-center gap-1.5">
-                        {i > 0 ? <span aria-hidden className="text-fg-faint">·</span> : null}
-                        {p}
-                    </span>
-                ))}
-            </span>
-            {note ? <span className="text-meta italic text-fg-faint">{note}</span> : null}
-        </p>
+        <span className="inline-flex flex-wrap items-center gap-x-1.5">
+            {parts.map((p, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5">
+                    {i > 0 ? <span aria-hidden className="text-fg-faint">·</span> : null}
+                    {p}
+                </span>
+            ))}
+        </span>
     );
 }
 
@@ -119,7 +119,7 @@ export function PortfolioView(props: PortfolioViewProps) {
     const {
         data, loading, refetching, error, range, onRangeChange, filter, onFilterChange, sort, onSortChange,
         readOnly, note, hrefFor = defaultHref, onOpenSite, onToggleStar, onToggleHidden, onSavePairing,
-        onSyncNow, syncBusy, onConnectGoogle, onRetry, exportHref,
+        onSyncNow, syncBusy, onConnectGoogle, onRetry, exportHref, className,
     } = props;
     const isMobile = useIsMobile();
     const [query, setQuery] = useState('');
@@ -191,21 +191,19 @@ export function PortfolioView(props: PortfolioViewProps) {
     }
 
     return (
-        <div className="tc-root mx-auto w-full max-w-[1440px] px-4 py-6 font-sans md:px-6">
-            {/* Header */}
-            <header className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-                <div className="min-w-0">
-                    <h1 className="text-title text-fg md:text-heading">Portfolio</h1>
-                    {firstLoad ? <span className="mt-2 block h-4 w-64 skeleton" aria-hidden /> : <Subtitle data={data} range={range} note={note} />}
-                </div>
-                {showControls ? (
-                    <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
+        <div className={className}>
+            <PageHeader
+                title="Portfolio"
+                subtitle={firstLoad ? <span className="inline-block h-4 w-64 skeleton align-middle" aria-hidden /> : <Subtitle data={data} range={range} />}
+                note={note}
+                actions={showControls ? (
+                    <>
                         <SearchInput
                             value={query}
                             onValueChange={setQuery}
                             placeholder="Search sites"
                             aria-label="Search sites"
-                            className="min-w-0 flex-1 md:w-48 md:flex-none"
+                            className="w-44 shrink-0 md:w-48"
                         />
                         <Select
                             value={sort}
@@ -213,18 +211,12 @@ export function PortfolioView(props: PortfolioViewProps) {
                             options={SORT_OPTIONS}
                             ariaLabel="Sort sites"
                             align="end"
-                            className="min-w-0 md:min-w-40"
+                            className="shrink-0"
                         />
-                        <SegmentedControl
-                            options={RANGE_OPTIONS}
-                            value={range}
-                            onChange={onRangeChange}
-                            ariaLabel="Date range"
-                            className="max-md:order-first max-md:mr-auto"
-                        />
-                    </div>
-                ) : null}
-            </header>
+                        <SegmentedControl options={RANGE_OPTIONS} value={range} onChange={onRangeChange} ariaLabel="Date range" />
+                    </>
+                ) : undefined}
+            />
 
             {banner ? <div className="mb-6">{banner}</div> : null}
 

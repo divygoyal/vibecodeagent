@@ -6,7 +6,8 @@ import { signIn } from 'next-auth/react';
 import useSWR from 'swr';
 
 import { toast } from '@/components/ui';
-import { parseRange } from '@/lib/portfolio/ranges';
+import { useDateRange } from '@/components/shell/DateRangeControl';
+import type { RangePreset } from '@/lib/dateRange';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite, SitePatch } from '@/lib/portfolio/types';
 import { parseFilter, parseSort, type FilterKey, type SortKey } from '@/lib/portfolio/view';
 import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
@@ -43,6 +44,15 @@ function selectSite(site: PortfolioSite) {
     }, { maxAttempts: 2 });
 }
 
+/** Nearest portfolio range for any app range preset. */
+function toPortfolioRange(preset: RangePreset, days: number): PortfolioRange {
+    if (preset === '7d' || preset === '28d' || preset === '3m' || preset === '12m') return preset;
+    if (days <= 10) return '7d';
+    if (days <= 45) return '28d';
+    if (days <= 200) return '3m';
+    return '12m';
+}
+
 function sitePatchUrl(site: PortfolioSite) {
     return `/api/portfolio/assets/${encodeURIComponent(site.key)}`;
 }
@@ -52,7 +62,9 @@ export function PortfolioPage() {
     const router = useRouter();
     const pathname = usePathname();
     const params = useSearchParams();
-    const range = parseRange(params.get('range'));
+    // The app-wide range (URL ?range=, saved to the workspace), mapped to what the portfolio offers.
+    const dateRange = useDateRange();
+    const range = toPortfolioRange(dateRange.value.preset, dateRange.resolved.days);
     const filter = parseFilter(params.get('show'));
     const sort = parseSort(params.get('sort'));
     const [syncBusy, setSyncBusy] = useState(false);
@@ -138,7 +150,7 @@ export function PortfolioPage() {
             refetching={Boolean(data && isValidating && data.range !== range)}
             error={errorText}
             range={range}
-            onRangeChange={(r: PortfolioRange) => setParam('range', r, '3m')}
+            onRangeChange={(r: PortfolioRange) => dateRange.setPreset(r)}
             filter={filter}
             onFilterChange={(f: FilterKey) => setParam('show', f, 'all')}
             sort={sort}

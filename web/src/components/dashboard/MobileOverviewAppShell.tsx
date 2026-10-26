@@ -1179,7 +1179,7 @@ export default function MobileOverviewAppShell({
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Latest mentions</div>
             <div className="mt-1 text-sm text-zinc-400">Social mentions stay lower in the mobile flow, ready when you want them.</div>
           </div>
-          <Link href="/dashboard/ai-chat" className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-cyan-300 transition-all duration-100 active:opacity-70">
+          <Link href="/dashboard/ask" className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-cyan-300 transition-all duration-100 active:opacity-70">
             AI Chat
             <ChevronRight className="h-4 w-4" />
           </Link>
