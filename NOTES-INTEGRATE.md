@@ -55,16 +55,24 @@ The worktree is shared with a robustness agent: commit with `git commit -- <path
   /dashboard/settings?tab=notifications; leaderboard privacy audit 21,356 assertions OK; builder public API 9/9;
   MCP flow 28/28.
 
-## Production env vars (merged from the NOTES files)
-- Set: `TC_MCP_ENABLED=1` (MCP server, OAuth, Connect AI), `TC_MCP_ISSUER=https://trafficclaw.com` (else derived from
-  the request origin), `OAUTH_TOKEN_ENC_KEY` (admin, Fernet; MCP tokens and OAuth secrets), `CRON_SECRET` (Bearer for
-  the new crons), `NEXTAUTH_URL` (absolute URLs: badges, widget/share snippets, /preview-private redirect).
-- New crons (daily, `Authorization: Bearer $CRON_SECRET`): GET /api/cron/portfolio-sync and
-  GET /api/cron/leaderboard-refresh.
+## Production env vars (merged from the NOTES files; matches research/DEPLOY.md)
+- Add (web): `TC_MCP_ENABLED=1` (MCP server, OAuth, Connect AI), `TC_MCP_ISSUER=https://trafficclaw.com`.
+- Must already exist, leave unchanged: `NEXTAUTH_URL` (absolute URLs: badges, widget/share snippets,
+  /preview-private redirect), `NEXTAUTH_SECRET`, `CRON_SECRET`, `ADMIN_API_URL`, `ADMIN_API_KEY`,
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
+- **Do NOT add or change `OAUTH_TOKEN_ENC_KEY`** (web or admin), and do not rotate `ADMIN_API_KEY`: production
+  encrypts the stored Google tokens with a key derived from ADMIN_API_KEY (admin/security/token_crypto.py
+  `load_fernet()`), so a new key makes every stored token unreadable. Checked: the new admin code adds no
+  encrypted columns of its own. MCP stores only SHA-256 hashes of its access/refresh tokens, API keys and
+  auth codes (mcp_api.py), and the leaderboard live lookup reads Google tokens through the existing
+  `OAuthConnection` model (EncryptedToken -> load_fernet()). The dev kit sets OAUTH_TOKEN_ENC_KEY only
+  because its throwaway admin has no production key to match.
+- New daily cron (`Authorization: Bearer $CRON_SECRET`): GET /api/cron/portfolio-sync. The leaderboard refresh
+  (/api/cron/leaderboard-refresh) keeps its existing schedule.
 - Optional: `TC_MCP_TXN_SECRET` (defaults to NEXTAUTH_SECRET), `TC_MCP_DEMO=0` (turn off anonymous demo grants),
-  `TC_MCP_ACCESS_TTL`, `TC_MCP_DCR_LIMIT`, `SHARE_WATERMARK_SECRET` (unchanged).
-- Preview only: `TC_ALLOWED_EMAILS=websitebond@gmail.com,...`, `TC_NOINDEX=1` (set at build time AND runtime).
-- Never in production: `TC_DEMO_DATA`, `TC_DEMO_FAULTS`, `TC_MCP_DEV_CIMD_LOOPBACK`.
+  `TC_MCP_ACCESS_TTL`, `TC_MCP_DCR_LIMIT`.
+- Preview only (never production): `TC_ALLOWED_EMAILS=...`, `TC_NOINDEX=1` (set at build time AND runtime).
+- Never in production: `TC_DEMO_DATA`, `TC_DEMO_FAULTS`, `TC_MCP_DEV_CIMD_LOOPBACK`, `TC_ALLOWED_EMAILS`, `TC_NOINDEX`.
 - Owner/ops (from MCP notes): Google consent wording, Cloudflare WAF skip for /mcp, /oauth, /.well-known; MCP directory
   submissions.
 
