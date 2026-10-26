@@ -7159,6 +7159,12 @@ async def get_weekly_digests(
     }
 
 
+# Site "Actions" task states (migration 023): /api/site-actions/*. See site_actions_api.py.
+# The table is created on first use (CREATE TABLE IF NOT EXISTS), so no startup hook is needed.
+from site_actions_api import build_site_actions_router  # noqa: E402
+app.include_router(build_site_actions_router(get_db, verify_admin_key, get_user_by_identifier))
+
+
 # ============= Health Check =============
 @app.get("/health")
 async def health_check():
