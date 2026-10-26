@@ -22,6 +22,15 @@
  *   demo2  Second Demo User, plan free, 2 properties + 2 sites, workspace Puzzle Hub
  *   admin  Demo Admin, plan pro, same data as demo; ADMIN_GITHUB_ID (for /admin) and a
  *          superadmin token in sessionStorage (for /superadmin)
+ *
+ * Edge-case scenario users (no sample records are seeded for them):
+ *   empty     Google connected, 0 sites          one       1 site (GA4 + Search Console)
+ *   ga4only   GA4 properties, no Search Console  gsconly   Search Console sites, no GA4
+ *   many      200 sites (long names, mixed)      nogoogle  signed in with GitHub, no Google
+ *   nocredits free plan with 0 Ask credits
+ *   f403 f429 f500 ftimeout fempty frevoked fhuge
+ *             the demo account's 18 sites with that Google failure injected on every call
+ *             (token suffix, see web/src/lib/demo/faults.ts)
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,11 +51,23 @@ const USERS = {
         sub: '100000000000000000009', name: 'Demo Admin', email: 'admin@trafficclaw.example', account: 'main', plan: 'pro',
         property: 'properties/412300105', site: 'sc-domain:searchmetrics.example', label: 'Search Metrics', superadmin: true,
     },
+    // Edge-case scenarios (own subs, so their records and caches stay apart from demo's).
+    empty: { sub: '100000000000000000011', name: 'No Sites User', email: 'empty@trafficclaw.example', account: 'empty', plan: 'free', property: null, site: null, label: null, scenario: true },
+    one: { sub: '100000000000000000012', name: 'One Site User', email: 'one@trafficclaw.example', account: 'one', plan: 'free', property: 'properties/412300101', site: 'sc-domain:acmeanalytics.example', label: 'Acme Analytics', scenario: true },
+    ga4only: { sub: '100000000000000000013', name: 'Analytics Only User', email: 'ga4only@trafficclaw.example', account: 'ga4only', plan: 'free', property: 'properties/412300101', site: null, label: 'Acme Analytics', scenario: true },
+    gsconly: { sub: '100000000000000000014', name: 'Search Console Only User', email: 'gsconly@trafficclaw.example', account: 'gsconly', plan: 'free', property: null, site: 'sc-domain:acmeanalytics.example', label: 'Acme Analytics', scenario: true },
+    many: { sub: '100000000000000000015', name: 'Two Hundred Sites User', email: 'many@trafficclaw.example', account: 'many', plan: 'pro', property: 'properties/412400001', site: 'https://site-001.example/', label: 'Site 001', scenario: true },
+    nogoogle: { sub: '100000000000000000016', name: 'GitHub Only User', email: 'nogoogle@trafficclaw.example', account: null, provider: 'github', plan: 'free', property: null, site: null, label: null, scenario: true },
+    nocredits: { sub: '100000000000000000017', name: 'No Credits User', email: 'nocredits@trafficclaw.example', account: 'main', plan: 'free', credits: 0, property: 'properties/412300101', site: 'sc-domain:acmeanalytics.example', label: 'Acme Analytics', scenario: true },
+    ...Object.fromEntries([['f403', '403', 21], ['f429', '429', 22], ['f500', '500', 23], ['ftimeout', 'timeout:15000', 24], ['fempty', 'empty', 25], ['frevoked', 'revoked', 26], ['fhuge', 'huge', 27]].map(([key, faults, n]) => [key, {
+        sub: `1000000000000000000${n}`, name: `Fault ${faults} User`, email: `${key}@trafficclaw.example`, account: 'main', faults, plan: 'pro',
+        property: 'properties/412300101', site: 'sc-domain:acmeanalytics.example', label: 'Acme Analytics', scenario: true,
+    }])),
 };
 
 function usage(msg) {
     if (msg) console.error(`login.mjs: ${msg}`);
-    console.error('usage: node scripts/dev/login.mjs <webPort> [--user demo|demo2|admin] [--no-seed] [--reseed] [--no-board]');
+    console.error(`usage: node scripts/dev/login.mjs <webPort> [--user ${Object.keys(USERS).join('|')}] [--no-seed] [--reseed] [--no-board]`);
     process.exit(2);
 }
 
@@ -115,18 +136,24 @@ async function main() {
     const webUrl = `http://localhost:${args.port}`;
     const adminUrl = inst.ADMIN_URL;
     const adminHeaders = { 'X-API-Key': secrets.ADMIN_API_KEY };
-    const accessToken = `demo-access:${user.account}`;
-    const refreshToken = `demo-refresh:${user.account}`;
+    const provider = user.provider || 'google';
+    const suffix = user.faults ? `~${user.faults}` : '';
+    const accessToken = user.account ? `demo-access:${user.account}${suffix}` : null;
+    const refreshToken = user.account ? `demo-refresh:${user.account}${suffix}` : null;
 
-    // 1. Admin DB: user + Google connection + workspace.
+    // 1. Admin DB: user + Google connection (none for a GitHub-only user: no token at all, so nothing calls GitHub) + workspace.
     let r = await http('POST', `${adminUrl}/api/users`, {
         headers: adminHeaders,
-        body: { provider: 'google', provider_id: user.sub, access_token: accessToken, refresh_token: refreshToken, email: user.email, github_username: user.name, plan: user.plan },
+        body: { provider, provider_id: user.sub, access_token: accessToken, refresh_token: refreshToken, email: user.email, github_username: user.name, plan: user.plan },
     });
     if (!r.ok) throw new Error(`admin POST /api/users failed: ${r.status} ${JSON.stringify(r.data)}`);
     r = await http('PATCH', `${adminUrl}/api/users/${user.sub}`, { headers: adminHeaders, body: { plan: user.plan } });
     if (!r.ok) console.warn(`[login] could not set plan: ${r.status} ${JSON.stringify(r.data).slice(0, 200)}`);
-    if (user.plan === 'pro') {
+    if (user.credits === 0) {
+        const credits = await http('GET', `${adminUrl}/api/users/${user.sub}/credits`, { headers: adminHeaders });
+        const current = Number(credits.data?.credits ?? 0);
+        if (current > 0) await http('POST', `${adminUrl}/api/users/${user.sub}/credits/deduct`, { headers: adminHeaders, body: { amount: current } });
+    } else if (user.plan === 'pro') {
         // A full monthly allowance so credit banners do not dominate screenshots.
         const credits = await http('GET', `${adminUrl}/api/users/${user.sub}/credits`, { headers: adminHeaders });
         const current = Number(credits.data?.credits ?? 0);
@@ -136,7 +163,10 @@ async function main() {
     }
     r = await http('PATCH', `${adminUrl}/api/users/${user.sub}/workspace`, {
         headers: adminHeaders,
-        body: { selected_property_id: user.property, selected_site_url: user.site, selected_range: '30d', workspace_label: user.label, mark_setup_completed: true, mark_welcome_seen: true },
+        body: {
+            selected_property_id: user.property, selected_site_url: user.site, selected_range: '30d', workspace_label: user.label,
+            clear_property: !user.property, clear_site: !user.site, clear_label: !user.label, mark_setup_completed: true, mark_welcome_seen: true,
+        },
     });
     if (!r.ok) throw new Error(`admin PATCH workspace failed: ${r.status} ${JSON.stringify(r.data)}`);
 
@@ -149,17 +179,15 @@ async function main() {
         email: user.email,
         picture: null,
         sub: user.sub,
-        primaryProvider: 'google',
+        primaryProvider: provider,
         primarySub: user.sub,
         primaryName: user.name,
         primaryEmail: user.email,
         primaryImage: null,
-        accessToken,
-        refreshToken,
-        googleAccountId: user.sub,
-        googleAccessToken: accessToken,
-        googleRefreshToken: refreshToken,
-        provider: 'google',
+        ...(provider === 'google'
+            ? { accessToken, refreshToken, googleAccountId: user.sub, googleAccessToken: accessToken, googleRefreshToken: refreshToken }
+            : { githubLogin: user.name.toLowerCase().replace(/\s+/g, '-'), githubAccountId: user.sub }),
+        provider,
         workspaceSetupCompleted: true,
     };
     const jwt = await encode({ token, secret: secrets.NEXTAUTH_SECRET, maxAge });
@@ -181,7 +209,7 @@ async function main() {
     // 4. Sample records, once per instance and user.
     const seedFile = path.join(inst.dir, 'seed.json');
     const seed = fs.existsSync(seedFile) ? JSON.parse(fs.readFileSync(seedFile, 'utf8')) : {};
-    if (args.seed && (args.reseed || !seed[args.user])) {
+    if (args.seed && !user.scenario && (args.reseed || !seed[args.user])) {
         seed[args.user] = await seedRecords(webUrl, cookieHeader, user, args.user, { url: adminUrl, headers: adminHeaders });
         fs.writeFileSync(seedFile, JSON.stringify(seed, null, 2));
     }
@@ -202,8 +230,8 @@ async function main() {
     const expires = Math.floor(Date.now() / 1000) + maxAge;
     const cookies = ['localhost', '127.0.0.1'].map(domain => ({ name: cookieName, value: jwt, domain, path: '/', expires, httpOnly: true, secure: false, sameSite: 'Lax' }));
     const local = [
-        { name: `tc-last-property:${user.sub}`, value: user.property },
-        { name: `tc-last-site:${user.sub}`, value: user.site },
+        ...(user.property ? [{ name: `tc-last-property:${user.sub}`, value: user.property }] : []),
+        ...(user.site ? [{ name: `tc-last-site:${user.sub}`, value: user.site }] : []),
         { name: `tc-last-range:${user.sub}`, value: '30d' },
     ];
     const origins = [`http://localhost:${args.port}`, `http://127.0.0.1:${args.port}`];

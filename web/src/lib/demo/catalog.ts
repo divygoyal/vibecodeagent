@@ -635,6 +635,77 @@ const ACCOUNTS: DemoGoogleAccount[] = [
     }),
 ];
 
+// ─── Edge-case accounts (scripts/dev/login.mjs scenario users) ───
+// 200 generated sites for the 'many' account. They are not part of
+// getDemoSites() (the public demo and tooling keep the hand-made catalogue)
+// but every lookup (getDemoSite, findSiteBy*) finds them.
+
+const BULK_COUNT = 200;
+const BULK_SHAPES: DemoShape[] = ['growing', 'steady', 'declining', 'spiky', 'large', 'new', 'nearZero', 'seasonal'];
+const BULK_USERS = [2400, 180, 35, 14000, 260000, 900, 0, 5200];
+const BULK_GA_ACCOUNTS = 5;
+
+const BULK_SITES: DemoSite[] = Array.from({ length: BULK_COUNT }, (_, i): DemoSite => {
+    const n = String(i + 1).padStart(3, '0');
+    const base = SITES[i % 8];
+    // Every 13th site has a very long host and name (truncation); every 10th is GSC-only, every 7th GA4-only.
+    const long = i % 13 === 5;
+    const host = long ? `a-really-long-subdomain-for-layout-tests-${n}.portfolio-with-two-hundred-sites.example` : `site-${n}.example`;
+    const name = long ? `Portfolio site number ${n} with an unusually long display name that never fits` : `Site ${n}`;
+    const hasGa = i % 10 !== 9;
+    const hasGsc = i % 7 !== 6 || !hasGa;
+    const shape = BULK_SHAPES[i % BULK_SHAPES.length];
+    return {
+        ...base,
+        key: `bulk${n}`,
+        name,
+        host,
+        shape,
+        usersToday: BULK_USERS[i % BULK_USERS.length],
+        launchedDaysAgo: shape === 'new' ? 30 + (i % 20) : undefined,
+        gscIncludes: undefined,
+        ga: hasGa
+            ? { propertyId: `properties/4124${String(i + 1).padStart(5, '0')}`, account: `accounts/1988000${(i % BULK_GA_ACCOUNTS) + 1}`, displayName: name, timeZone: 'UTC', currencyCode: 'USD' }
+            : undefined,
+        gsc: hasGsc
+            ? { siteUrl: i % 2 ? `sc-domain:${host}` : `https://${host}/`, permissionLevel: i % 17 === 3 ? 'siteRestrictedUser' : 'siteOwner' }
+            : undefined,
+    };
+});
+
+const EDGE_ACCOUNTS: DemoGoogleAccount[] = [
+    // Google connected, but no GA4 property and no Search Console site.
+    { key: 'empty', email: 'empty@trafficclaw.example', name: 'No Sites User', gaAccounts: [], gscSiteKeys: [] },
+    // One site with both sources.
+    {
+        key: 'one', email: 'one@trafficclaw.example', name: 'One Site User',
+        gaAccounts: [{ account: 'accounts/198700001', displayName: 'Acme Holdings', siteKeys: ['acme'] }],
+        gscSiteKeys: ['acme'],
+    },
+    // Analytics only (Search Console never connected or no sites).
+    {
+        key: 'ga4only', email: 'ga4only@trafficclaw.example', name: 'Analytics Only User',
+        gaAccounts: [
+            { account: 'accounts/198700001', displayName: 'Acme Holdings', siteKeys: ['acme', 'dataviz'] },
+            { account: 'accounts/198700003', displayName: 'Client Sites', siteKeys: ['creativeprints'] },
+        ],
+        gscSiteKeys: [],
+    },
+    // Search Console only.
+    { key: 'gsconly', email: 'gsconly@trafficclaw.example', name: 'Search Console Only User', gaAccounts: [], gscSiteKeys: ['acme', 'acmedocs', 'recipenest', 'healthlegacy'] },
+    // 200 sites across 5 GA4 accounts.
+    {
+        key: 'many', email: 'many@trafficclaw.example', name: 'Two Hundred Sites User',
+        gaAccounts: Array.from({ length: BULK_GA_ACCOUNTS }, (_, a) => ({
+            account: `accounts/1988000${a + 1}`,
+            displayName: `Agency clients ${a + 1}`,
+            siteKeys: BULK_SITES.filter((s, i) => s.ga && i % BULK_GA_ACCOUNTS === a).map(s => s.key),
+        })),
+        gscSiteKeys: BULK_SITES.filter(s => s.gsc).map(s => s.key),
+    },
+];
+ACCOUNTS.push(...EDGE_ACCOUNTS);
+
 export const DEMO_DEFAULT_ACCOUNT = 'main';
 
 export function getDemoSites(): readonly DemoSite[] {
@@ -642,7 +713,7 @@ export function getDemoSites(): readonly DemoSite[] {
 }
 
 export function getDemoSite(key: string): DemoSite | undefined {
-    return SITES.find(s => s.key === key);
+    return SITES.find(s => s.key === key) ?? BULK_SITES.find(s => s.key === key);
 }
 
 export function getDemoAccounts(): readonly DemoGoogleAccount[] {
@@ -657,14 +728,16 @@ export function getDemoAccount(key: string | null | undefined): DemoGoogleAccoun
 export function findSiteByPropertyId(propertyId: string): DemoSite | undefined {
     const digits = /(\d+)/.exec(propertyId || '')?.[1];
     if (!digits) return undefined;
-    return SITES.find(s => s.ga?.propertyId === `properties/${digits}`);
+    const id = `properties/${digits}`;
+    return SITES.find(s => s.ga?.propertyId === id) ?? BULK_SITES.find(s => s.ga?.propertyId === id);
 }
 
 /** Matches an exact GSC siteUrl, tolerating a missing trailing slash. */
 export function findSiteBySiteUrl(siteUrl: string): DemoSite | undefined {
     const want = (siteUrl || '').trim();
     const norm = (u: string) => u.replace(/\/+$/, '').toLowerCase();
-    return SITES.find(s => s.gsc && norm(s.gsc.siteUrl) === norm(want));
+    const match = (s: DemoSite) => Boolean(s.gsc && norm(s.gsc.siteUrl) === norm(want));
+    return SITES.find(match) ?? BULK_SITES.find(match);
 }
 
 /** Whether the account may read this GA4 property / GSC site. */
@@ -708,7 +781,8 @@ export function demoRefreshToken(accountKey: string = DEMO_DEFAULT_ACCOUNT): str
 
 export function accountKeyFromToken(token: string | null | undefined): string | null {
     if (!token) return null;
-    const m = /^demo-(?:access|refresh):([a-z0-9_-]+)$/i.exec(token.trim());
+    // An optional '~<faults>' suffix selects injected failures (see faults.ts).
+    const m = /^demo-(?:access|refresh):([a-z0-9_-]+)(?:~.*)?$/i.exec(token.trim());
     if (m) return m[1];
     return token.startsWith('demo-') ? DEMO_DEFAULT_ACCOUNT : null;
 }

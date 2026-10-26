@@ -186,3 +186,33 @@ curl -H "Authorization: Bearer $(grep ^CRON_SECRET /root/.trafficclaw-dev/dev.en
 The community sites (PixelForge, ByteBrief, ShipFast, LearnLoop, Promptly, Green Grocer, Quiet Labs)
 live in `web/src/lib/demo/catalog.ts`, each with its own demo Google account `founder-<key>`.
 Quiet Labs has restricted Search Console access on purpose.
+
+## 7. Edge cases: Google faults and scenario users
+
+Make the demo Google APIs fail like the real ones (`web/src/lib/demo/faults.ts`):
+
+| where | scope |
+|---|---|
+| `TC_DEMO_FAULTS=<spec>` in the server env | whole server (restart) |
+| cookie `tc_demo_faults=<spec>` | one browser, no restart (`check-mobile.mjs --cookie tc_demo_faults=429`) |
+| token suffix `demo-access:main~<spec>` | one demo user, also background syncs/crons (the `f*` users below) |
+
+`<spec>` = comma list of `[scope:]fault[:ms]`; faults `403` `429` `500` `timeout[:ms]` (default 30 s,
+honours the caller's AbortSignal, then 504) `empty` `revoked` (refresh → `invalid_grant`, data → 401)
+`huge` (counts × 10 M); scopes `ga4` `gsc` `psi` `list` (account/site lists) `all`. No scope = every
+data call (lists still work). E.g. `gsc:403`, `ga4:timeout:8000,gsc:empty`, `all:500`.
+
+Scenario users for `login.mjs --user` (no sample records seeded): `empty` (Google, 0 sites), `one`,
+`ga4only`, `gsconly`, `many` (200 generated sites, some with very long names), `nogoogle` (GitHub
+sign-in, no Google), `nocredits` (free, 0 credits), and `f403 f429 f500 ftimeout fempty frevoked fhuge`
+(the demo account's sites with that fault on every Google call).
+
+## 8. Checks
+
+```bash
+(cd web && npm run check:rsc)        # Server Component -> Client Component props that cannot serialize
+node scripts/dev/check-mobile.mjs 3101 [--only /a,/b] [--user u]   # phone layout audit, see the file header
+node scripts/dev/check-scenarios.mjs 3101 [--users empty,f429]     # every app page per scenario user
+(cd web && npm run check:all -- --base http://localhost:3101)      # tsc, lint (changed files), tests, rsc, mobile
+```
+Reports go to `/root/projects/tc-redesign-research/robust/`.

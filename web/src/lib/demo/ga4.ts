@@ -15,8 +15,13 @@ import { dailySeries, hourProfile, siteRates } from './series';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export class DemoApiError extends Error {
-    constructor(public status: number, public googleStatus: string, message: string) {
+    // Plain fields (no parameter properties) so node --test can load this file by stripping types.
+    status: number;
+    googleStatus: string;
+    constructor(status: number, googleStatus: string, message: string) {
         super(message);
+        this.status = status;
+        this.googleStatus = googleStatus;
     }
     toJSON() {
         return { error: { code: this.status, message: this.message, status: this.googleStatus } };
