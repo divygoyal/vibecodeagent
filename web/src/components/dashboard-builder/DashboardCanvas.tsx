@@ -28,8 +28,12 @@ export function pxHeight(h: number): number {
     return h * (ROW_H + MARGIN) - MARGIN;
 }
 
+/**
+ * 12 columns from 900px of canvas: a 1280px desktop with the sidebar open (about 980px of
+ * content) shows the same grid as the editor's desktop view and the public link.
+ */
 export function bpForWidth(width: number): Bp {
-    if (width >= 1000) return 'lg';
+    if (width >= 900) return 'lg';
     if (width >= 600) return 'md';
     return 'sm';
 }

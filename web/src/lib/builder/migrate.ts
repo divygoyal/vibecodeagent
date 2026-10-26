@@ -91,7 +91,7 @@ function migrateWidget(raw: Obj): WidgetDef {
 
     switch (type) {
         case 'kpi':
-            return { ...common, type: 'scorecard', config: { metric, comparison: { show: raw.showComparison !== false, display: 'percent' }, sparkline: { show: false, kind: 'area' } } };
+            return { ...common, type: 'scorecard', config: { metric, comparison: { show: raw.showComparison !== false, display: 'percent' }, sparkline: { show: true, kind: 'area' } } };
         case 'area-chart': {
             const dimension = migrateDimension(str(raw.dimension), 'date');
             const chartType = str(raw.chartType);
@@ -134,19 +134,16 @@ function migrateWidget(raw: Obj): WidgetDef {
     }
 }
 
-function migrateLayoutItems(raw: unknown, ids: Set<string>, kind: 'lg' | 'md' | 'sm'): LayoutItem[] | undefined {
+/** v1 lg layout (12 columns, half-height rows) to v2 rows of 32px. */
+function migrateLayoutItems(raw: unknown, ids: Set<string>): LayoutItem[] | undefined {
     if (!Array.isArray(raw)) return undefined;
     const out: LayoutItem[] = [];
     for (const it of raw) {
         if (!isObj(it) || !str(it.i) || !ids.has(it.i as string)) continue;
-        let x = Math.max(0, Math.round(num(it.x, 0)));
-        let w = Math.max(1, Math.round(num(it.w, 3)));
+        const w = Math.min(12, Math.max(1, Math.round(num(it.w, 3))));
+        const x = Math.min(Math.max(0, Math.round(num(it.x, 0))), 12 - w);
         const y = Math.max(0, Math.round(num(it.y, 0))) * 2;
         const h = Math.max(1, Math.round(num(it.h, 2))) * 2;
-        if (kind === 'md') w = Math.min(w, 6);
-        if (kind === 'sm') { x = 0; w = 1; }
-        if (kind === 'lg') { w = Math.min(w, 12); x = Math.min(x, 12 - w); }
-        if (kind === 'md') x = Math.min(x, 6 - w);
         out.push({ i: it.i as string, x, y, w, h });
     }
     return out;
@@ -203,7 +200,7 @@ export function migrateV1toV2(row: V1Row, now: Date = new Date()): DashboardDocV
     }
     const ids = new Set(Object.keys(widgets));
     const gl = isObj(row.gridLayouts) ? row.gridLayouts : {};
-    const lg = migrateLayoutItems(gl.lg, ids, 'lg') ?? [];
+    const lg = migrateLayoutItems(gl.lg, ids) ?? [];
     // Widgets missing from lg get stacked at the bottom so nothing disappears.
     const placed = new Set(lg.map((l) => l.i));
     let bottom = lg.reduce((mx, l) => Math.max(mx, l.y + l.h), 0);
@@ -212,11 +209,10 @@ export function migrateV1toV2(row: V1Row, now: Date = new Date()): DashboardDocV
         lg.push({ i: id, x: 0, y: bottom, w: 6, h: 6 });
         bottom += 6;
     }
+    // Only lg carries over. v1 md/sm layouts came from the old grid (other column counts,
+    // often every item at x=0), so tablet and phone layouts are derived from lg the same way
+    // the editor derives them (docOps.layoutFor): view, editor and public link match.
     const layouts: GridLayouts = { lg };
-    const md = migrateLayoutItems(gl.md, ids, 'md');
-    const sm = migrateLayoutItems(gl.sm, ids, 'sm');
-    if (md && md.length === ids.size) layouts.md = md;
-    if (sm && sm.length === ids.size) layouts.sm = sm;
 
     const propertyId = str(row.propertyId);
     const siteUrl = str(row.siteUrl);
