@@ -3,7 +3,7 @@
 import { useState, FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Sparkles, ArrowLeft, Search, Quote, List, Image, Shield } from 'lucide-react';
+import { Sparkles, ArrowLeft, Search, Quote, List, Image as ImageIcon, Shield } from 'lucide-react';
 
 interface CategoryResult {
     name: string;
@@ -79,7 +79,7 @@ function ScoreBar({ score, label }: { score: number; label: string }) {
 const categoryIcons: Record<string, React.ReactNode> = {
     'Citability': <Quote className="w-4 h-4" />,
     'Structural Readability': <List className="w-4 h-4" />,
-    'Multi-modal Content': <Image className="w-4 h-4" />,
+    'Multi-modal Content': <ImageIcon aria-hidden className="w-4 h-4" />,
     'Authority Signals': <Shield className="w-4 h-4" />,
 };
 

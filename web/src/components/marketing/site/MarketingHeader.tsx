@@ -37,7 +37,7 @@ function SignInButton({ className, onNavigate }: { className?: string; onNavigat
     );
 }
 
-/** Sticky white top bar (DESIGN 5.16): nav at lg and up, a drawer menu below. */
+/** Sticky white top bar (DESIGN 5.16): full nav from xl, a drawer menu below that. */
 export function MarketingHeader() {
     const pathname = usePathname() || '/';
     const { status } = useSession();
@@ -63,7 +63,7 @@ export function MarketingHeader() {
             <div className="mx-auto flex h-16 max-w-[1200px] items-center gap-6 px-4 md:px-6">
                 <BrandMark />
 
-                <nav aria-label="Main" className="hidden flex-1 items-center justify-center gap-1 lg:flex">
+                <nav aria-label="Main" className="hidden flex-1 items-center justify-center gap-0.5 xl:flex">
                     {HEADER_NAV.map((link) => {
                         const active = isActive(pathname, link.href);
                         return (
@@ -72,7 +72,7 @@ export function MarketingHeader() {
                                 href={link.href}
                                 aria-current={active ? 'page' : undefined}
                                 className={cn(
-                                    'rounded-control px-3 py-2 text-body font-medium transition-colors duration-120',
+                                    'rounded-control px-2.5 py-2 text-body font-medium whitespace-nowrap transition-colors duration-120',
                                     active ? 'text-fg' : 'text-fg-secondary hover:bg-subtle hover:text-fg',
                                 )}
                             >
@@ -82,14 +82,12 @@ export function MarketingHeader() {
                     })}
                 </nav>
 
-                <div className="ml-auto hidden items-center gap-2 lg:flex">
-                    {signedIn ? null : <SignInButton />}
-                    <ConnectGoogleButton size="md" />
-                </div>
-
-                <div className="ml-auto flex items-center gap-1 lg:hidden">
-                    {signedIn ? null : <SignInButton className="hidden sm:inline-flex" />}
-                    <Button variant="ghost" iconOnly icon={Menu} aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)} />
+                <div className="ml-auto flex items-center gap-2 xl:ml-0">
+                    {signedIn ? null : <span className="hidden sm:block"><SignInButton /></span>}
+                    <span className="hidden md:block"><ConnectGoogleButton size="md" /></span>
+                    <span className="xl:hidden">
+                        <Button variant="ghost" iconOnly icon={Menu} aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)} />
+                    </span>
                 </div>
             </div>
 
@@ -97,7 +95,7 @@ export function MarketingHeader() {
                 open={open}
                 onOpenChange={setOpen}
                 title="Menu"
-                className="lg:hidden"
+                className="xl:hidden"
                 footer={
                     <div className="flex flex-col gap-2">
                         <ConnectGoogleButton size="lg" mark className="w-full" onNavigate={() => setOpen(false)} />
