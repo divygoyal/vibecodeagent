@@ -19,7 +19,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchBrowser, newContext, settle, watchPage } from './pw.mjs';
+import { devIssueCount, hideDevUi, launchBrowser, newContext, settle, watchPage } from './pw.mjs';
 
 const DEV_HOME = process.env.TC_DEV_HOME || '/root/.trafficclaw-dev';
 const THIRD_PARTY = /tawk\.to|cloudflareinsights|googletagmanager|google-analytics\.com|clarity\.ms|bing\.com|platform\.twitter\.com|reddit(media)?\.com|dicebear|googleusercontent|google\.com\/s2\/favicons|mapbox|fonts\.g/;
@@ -112,16 +112,6 @@ function fillRoute(route, seed) {
 
 const slug = r => (r === '/' ? 'home' : r.replace(/^\//, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/_+$/, '')).slice(0, 120);
 
-async function devIssues(page) {
-    return page.evaluate(() => {
-        const portal = document.querySelector('nextjs-portal');
-        const text = portal?.shadowRoot?.textContent || '';
-        const m = /(\d+)\s+Issues?/.exec(text);
-        const overlay = /Unhandled Runtime Error|Runtime Error|Build Error|Console Error/.exec(text);
-        return { issues: m ? Number(m[1]) : 0, overlay: overlay ? overlay[0] : null };
-    }).catch(() => ({ issues: 0, overlay: null }));
-}
-
 async function visit(context, base, route, outFile) {
     const page = await context.newPage();
     const report = watchPage(page, base);
@@ -139,8 +129,8 @@ async function visit(context, base, route, outFile) {
     }
     await settle(page, report, { quietMs: 1500, maxMs: 25_000 });
     if (opts.wait > 0) await page.waitForTimeout(opts.wait);
-    const dev = await devIssues(page);
-    if (!opts.showDevUi) await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' }).catch(() => {});
+    const dev = { issues: await devIssueCount(page) };
+    if (!opts.showDevUi) await hideDevUi(page);
     try {
         await page.screenshot({ path: outFile, fullPage: false, timeout: 30_000 });
     } catch (err) {
@@ -162,7 +152,6 @@ async function visit(context, base, route, outFile) {
         ms: Date.now() - t0,
         error,
         devIssues: dev.issues,
-        devOverlay: dev.overlay,
         pageErrors: report.pageErrors,
         consoleErrors: report.consoleErrors.filter(consoleFirstParty),
         failedRequests: report.failedRequests.filter(firstParty),

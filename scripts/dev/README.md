@@ -11,7 +11,7 @@ Nothing here talks to production, Google, email, Telegram or payments.
 scripts/dev/up.sh <name> <webPort> <adminPort> [--fresh]   start (idempotent)
 node scripts/dev/login.mjs <webPort> [--user demo|demo2|admin]
 node scripts/dev/shot.mjs <url> <out.png> [--state f] [--mobile] [--dark] [--full] [--wait ms]
-node scripts/dev/crawl.mjs <webPort> <outDir> [--user u] [--only /a,/b] [--desktop-only|--mobile-only]
+node scripts/dev/crawl.mjs <webPort> <outDir> [--user u] [--only /a,/b] [--part k/n] [--desktop-only|--mobile-only]
 scripts/dev/status.sh                                       list instances
 scripts/dev/down.sh <name> [--purge]                        stop (and delete data)
 ```
@@ -52,10 +52,14 @@ scripts/dev/up.sh <you> 3102 8102               # ~15 s; first page compile take
 node scripts/dev/login.mjs 3102                 # → /root/.trafficclaw-dev/<you>/state.json
 node scripts/dev/shot.mjs http://localhost:3102/dashboard/analytics /tmp/a.png \
      --state /root/.trafficclaw-dev/<you>/state.json --full
-node scripts/dev/crawl.mjs 3102 /tmp/crawl-<you>   # all routes, desktop + mobile, report.md
+node scripts/dev/crawl.mjs 3102 /tmp/crawl-<you> --only /dashboard/seo   # a few routes, desktop + mobile, report.md
 scripts/dev/down.sh <you>                        # always stop when done (RAM is shared with production)
 ```
 
+- A full crawl (all ~67 routes) compiles every page and grows `next dev` to ~3.5 GB:
+  do it in halves with a restart in between (same outDir, reports merge):
+  `crawl.mjs 3102 /tmp/c --part 1/2; down.sh <you>; up.sh <you> 3102 8102; crawl.mjs 3102 /tmp/c --part 2/2`.
+  The crawl stops itself (exit 3) if free RAM drops below 1.8 GB.
 - `up.sh` runs the code of the git worktree you are standing in (or `TC_REPO=/path`).
   It refuses to reuse a name that is running from another worktree or other ports.
 - `--fresh` deletes that instance's admin DB (users, dashboards, shares …); run `login.mjs` again after it.

@@ -1328,6 +1328,9 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
     
     def get_all_containers(self) -> list:
         """Get all ClawBot containers"""
+        if self.client is None:
+            # Docker stub mode (e.g. local dev): no containers to report.
+            return []
         containers = self.client.containers.list(
             all=True,
             filters={"label": f"clawbot.user"}
