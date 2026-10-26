@@ -1,0 +1,359 @@
+/**
+ * The only number and date formatter (DESIGN.md 6.4). Pure, no imports, so the
+ * unit tests in web/tests/format.test.mjs run on plain Node.
+ *
+ * Inputs:
+ *  - counts are plain numbers;
+ *  - rates (CTR, engagement rate) are RATIOS: 0.034 means 3.4%;
+ *  - positions are GSC average positions (1 = top);
+ *  - durations are seconds;
+ *  - dates are Date objects, epoch ms, 'YYYY-MM-DD' or GA4 'YYYYMMDD' strings.
+ *    Date strings are calendar days and are formatted in UTC so they never
+ *    shift by a day in the viewer's timezone.
+ *
+ * null / undefined / NaN always format as an en dash '–'.
+ */
+
+export type MetricFormat = 'count' | 'percent' | 'position' | 'duration';
+
+export const DASH = '–';
+const ARROW_UP = '▲';
+const ARROW_DOWN = '▼';
+
+const fullFormatter = new Intl.NumberFormat('en-US');
+
+type Num = number | null | undefined;
+
+function isNum(n: Num): n is number {
+    return typeof n === 'number' && Number.isFinite(n);
+}
+
+/** Drop a trailing ".0" ("12.0" -> "12", "1.50" -> "1.5"). */
+function stripZeros(s: string): string {
+    return s.includes('.') ? s.replace(/\.?0+$/, '') : s;
+}
+
+/** `1,282` · `503,118`. Exact, for tables and tooltips. */
+export function fmtFull(n: Num): string {
+    if (!isNum(n)) return DASH;
+    return fullFormatter.format(n);
+}
+
+const UNITS: [number, string][] = [
+    [1e12, 'T'],
+    [1e9, 'B'],
+    [1e6, 'M'],
+    [1e3, 'K'],
+];
+
+function compactParts(abs: number, maxDecimals: number | null): string {
+    for (let i = 0; i < UNITS.length; i++) {
+        const [size, suffix] = UNITS[i];
+        if (abs < size) continue;
+        let v = Number((abs / size).toPrecision(3));
+        if (maxDecimals !== null) v = Math.round(v * 10 ** maxDecimals) / 10 ** maxDecimals;
+        if (v >= 1000 && i > 0) {
+            // 999,950 rounds to "1000K": promote to the next unit ("1M").
+            const [nextSize, nextSuffix] = UNITS[i - 1];
+            let w = Number((abs / nextSize).toPrecision(3));
+            if (maxDecimals !== null) w = Math.round(w * 10 ** maxDecimals) / 10 ** maxDecimals;
+            return `${stripZeros(String(w))}${nextSuffix}`;
+        }
+        return `${stripZeros(String(v))}${suffix}`;
+    }
+    return String(abs);
+}
+
+/**
+ * Cards, tiles, leaderboard: under 10,000 the full number, else 3 significant
+ * digits + K/M/B. `1,282` · `12.3K` · `51.8K` · `503K` · `1.24M`.
+ */
+export function fmtCompact(n: Num): string {
+    if (!isNum(n)) return DASH;
+    const abs = Math.abs(n);
+    const sign = n < 0 ? '-' : '';
+    if (abs < 10_000) return sign + fullFormatter.format(Math.round(abs));
+    return sign + compactParts(abs, null);
+}
+
+/** Axis ticks: compact with at most 1 decimal. `0` · `500` · `1K` · `1.5K` · `503K` · `1.5M`. */
+export function fmtAxis(n: Num): string {
+    if (!isNum(n)) return DASH;
+    const abs = Math.abs(n);
+    const sign = n < 0 ? '-' : '';
+    if (abs < 1000) return sign + stripZeros((Math.round(abs * 10) / 10).toFixed(1));
+    return sign + compactParts(abs, 1);
+}
+
+export interface PercentOptions {
+    /** KPI tiles: rates of 10% or more drop the decimal (`44%`). */
+    tile?: boolean;
+}
+
+/**
+ * A ratio as a percent. `3.4%`, `<0.1%` for tiny non-zero values, `0%`.
+ * Trailing `.0` is dropped (`5%`). With `tile`, values >= 10% have no decimal.
+ */
+export function fmtPercent(ratio: Num, opts: PercentOptions = {}): string {
+    if (!isNum(ratio)) return DASH;
+    if (ratio === 0) return '0%';
+    const pct = ratio * 100;
+    const abs = Math.abs(pct);
+    if (abs < 0.1) return pct < 0 ? '>-0.1%' : '<0.1%';
+    if (opts.tile && abs >= 9.95) return `${Math.round(pct)}%`;
+    return `${stripZeros(pct.toFixed(1))}%`;
+}
+
+/** GSC average position, 1 decimal: `23.2`, `3.0`. */
+export function fmtPosition(p: Num): string {
+    if (!isNum(p)) return DASH;
+    return p.toFixed(1);
+}
+
+/** `53s` · `1m 56s` · `1h 4m`. */
+export function fmtDuration(seconds: Num): string {
+    if (!isNum(seconds)) return DASH;
+    const t = Math.max(0, Math.round(seconds));
+    if (t < 60) return `${t}s`;
+    if (t < 3600) return `${Math.floor(t / 60)}m ${t % 60}s`;
+    return `${Math.floor(t / 3600)}h ${Math.floor((t % 3600) / 60)}m`;
+}
+
+/** Format a value by its metric format. Counts are full unless `compact`. */
+export function fmtValue(format: MetricFormat, value: Num, opts: { compact?: boolean; tile?: boolean } = {}): string {
+    switch (format) {
+        case 'percent':
+            return fmtPercent(value, { tile: opts.tile });
+        case 'position':
+            return fmtPosition(value);
+        case 'duration':
+            return fmtDuration(value);
+        default:
+            return opts.compact ? fmtCompact(value) : fmtFull(value);
+    }
+}
+
+// ─── Deltas ────────────────────────────────────────────────────────────────
+
+/**
+ * - `percent`: relative change (counts). `18.4%`, `174%`, `>999%`.
+ * - `points`: difference of two ratios in percentage points (CTR, engagement). `0.1 pt`.
+ * - `absolute`: plain difference, 1 decimal (position). `0.4`.
+ */
+export type DeltaMode = 'percent' | 'points' | 'absolute';
+
+export interface DeltaOptions {
+    mode?: DeltaMode;
+    /** Which direction is good. Default 'up'. Position is 'down'. */
+    better?: 'up' | 'down';
+    /** Previous values below this are noise: tone becomes neutral. Default 0 (off). */
+    noiseFloor?: number;
+}
+
+export interface DeltaResult {
+    /** change: a real delta; flat: |change| below the threshold; new: previous was 0; none: no data. */
+    state: 'change' | 'flat' | 'new' | 'none';
+    /** Direction of the arrow. For `absolute` + better 'down' (position) the arrow shows improvement. */
+    direction: 'up' | 'down' | 'flat';
+    tone: 'good' | 'bad' | 'neutral';
+    /** Without arrow: `18.4%`, `0.1 pt`, `0.4`, `0%`, `new`, `–`. */
+    text: string;
+    /** With a text arrow for plain-text contexts (CSV, tooltips, tests): `▲ 18.4%`. */
+    label: string;
+    /** Screen-reader phrase without the comparison period: `up 18.4 percent`. */
+    srText: string;
+    /** Raw change in the mode's unit (percent, points or absolute), null when undefined. */
+    change: number | null;
+}
+
+function none(text: string, state: 'none' | 'new'): DeltaResult {
+    return {
+        state,
+        direction: 'flat',
+        tone: 'neutral',
+        text,
+        label: text,
+        srText: state === 'new' ? 'new this period' : 'no comparison data',
+        change: null,
+    };
+}
+
+function fmtPercentChange(absPct: number): string {
+    if (absPct >= 999.5) return '>999%';
+    if (absPct >= 99.95) return `${Math.round(absPct)}%`;
+    return `${stripZeros(absPct.toFixed(1))}%`;
+}
+
+export function computeDelta(current: Num, previous: Num, opts: DeltaOptions = {}): DeltaResult {
+    const mode = opts.mode ?? 'percent';
+    const better = opts.better ?? 'up';
+    if (!isNum(current) || !isNum(previous)) return none(DASH, 'none');
+
+    let change: number;
+    let text: string;
+    let spoken: string;
+
+    if (mode === 'points') {
+        change = (current - previous) * 100;
+        const abs = Math.abs(change);
+        if (abs < 0.05) {
+            return { state: 'flat', direction: 'flat', tone: 'neutral', text: '0 pt', label: '0 pt', srText: 'no change', change: 0 };
+        }
+        text = `${stripZeros(abs.toFixed(1))} pt`;
+        spoken = `${stripZeros(abs.toFixed(1))} percentage points`;
+    } else {
+        if (previous === 0 && current === 0) return none(DASH, 'none');
+        if (previous === 0) return none('new', 'new');
+        if (mode === 'absolute') {
+            change = current - previous;
+            const abs = Math.abs(change);
+            if (abs < 0.05) {
+                return { state: 'flat', direction: 'flat', tone: 'neutral', text: '0', label: '0', srText: 'no change', change: 0 };
+            }
+            text = abs.toFixed(1);
+            spoken = text;
+        } else {
+            change = ((current - previous) / Math.abs(previous)) * 100;
+            const abs = Math.abs(change);
+            if (abs < 0.05) {
+                return { state: 'flat', direction: 'flat', tone: 'neutral', text: '0%', label: '0%', srText: 'no change', change: 0 };
+            }
+            text = fmtPercentChange(abs);
+            spoken = text === '>999%' ? 'more than 999 percent' : `${text.replace('%', '')} percent`;
+        }
+    }
+
+    const rose = change > 0;
+    const good = better === 'up' ? rose : !rose;
+    // Position: the arrow points the way the rank moved (▲ = better), not the number.
+    const direction: 'up' | 'down' = mode === 'absolute' && better === 'down' ? (good ? 'up' : 'down') : rose ? 'up' : 'down';
+    const noisy = opts.noiseFloor !== undefined && Math.abs(previous) < opts.noiseFloor;
+    const tone = noisy ? 'neutral' : good ? 'good' : 'bad';
+    const word = mode === 'absolute' && better === 'down' ? (good ? 'improved' : 'worse by') : rose ? 'up' : 'down';
+
+    return {
+        state: 'change',
+        direction,
+        tone,
+        text,
+        label: `${direction === 'up' ? ARROW_UP : ARROW_DOWN} ${text}`,
+        srText: `${word} ${spoken}`,
+        change,
+    };
+}
+
+/** Percent change with arrow: `▲ 18.4%` · `▼ 49.7%` · `▲ 174%` · `new` · `–`. */
+export function fmtDelta(current: Num, previous: Num): string {
+    return computeDelta(current, previous, { mode: 'percent' }).label;
+}
+
+/** Rate change in percentage points: `▼ 0.1 pt`. Inputs are ratios. */
+export function fmtDeltaPoints(current: Num, previous: Num): string {
+    return computeDelta(current, previous, { mode: 'points' }).label;
+}
+
+/** Position change: absolute, 1 decimal, arrow = improvement (`▲ 0.4` when it went 8.8 -> 8.4). */
+export function fmtDeltaPosition(current: Num, previous: Num): string {
+    return computeDelta(current, previous, { mode: 'absolute', better: 'down' }).label;
+}
+
+/** The delta mode and polarity a metric format implies. */
+export function deltaOptionsFor(format: MetricFormat, better: 'up' | 'down' = 'up'): DeltaOptions {
+    if (format === 'percent') return { mode: 'points', better };
+    if (format === 'position') return { mode: 'absolute', better: 'down' };
+    return { mode: 'percent', better, noiseFloor: format === 'count' ? 20 : undefined };
+}
+
+// ─── Dates ─────────────────────────────────────────────────────────────────
+
+export type DateInput = Date | string | number;
+
+/** Parse a date. 'YYYY-MM-DD' and 'YYYYMMDD' become UTC midnight of that day. */
+export function toDate(input: DateInput): Date {
+    if (input instanceof Date) return input;
+    if (typeof input === 'number') return new Date(input);
+    const s = input.trim();
+    let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (!m) m = /^(\d{4})(\d{2})(\d{2})$/.exec(s);
+    if (m) return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    return new Date(s);
+}
+
+/** 'YYYY-MM-DD' of a date in UTC. */
+export function toIsoDay(input: DateInput): string {
+    return toDate(input).toISOString().slice(0, 10);
+}
+
+const dayFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const dayYearFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const longFmt = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const monthFmt = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });
+const monthYearFmt = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+/** `Oct 13` */
+export function fmtDay(d: DateInput): string {
+    return dayFmt.format(toDate(d));
+}
+
+/** `Oct 13, 2026` */
+export function fmtDayYear(d: DateInput): string {
+    return dayYearFmt.format(toDate(d));
+}
+
+/** Tooltip header: `Tue, Oct 13, 2026` */
+export function fmtDayLong(d: DateInput): string {
+    return longFmt.format(toDate(d));
+}
+
+/** `Oct` */
+export function fmtMonth(d: DateInput): string {
+    return monthFmt.format(toDate(d));
+}
+
+/** `Jan 2026` */
+export function fmtMonthYear(d: DateInput): string {
+    return monthYearFmt.format(toDate(d));
+}
+
+/**
+ * `Jul 13 – Oct 10` (en dash with spaces). The year is added when the range is
+ * not in the current year (`Jul 13 – Oct 10, 2025`) or crosses years
+ * (`Dec 3, 2025 – Jan 2, 2026`). `now` is for tests.
+ */
+export function fmtDateRange(start: DateInput, end: DateInput, now: Date = new Date()): string {
+    const a = toDate(start);
+    const b = toDate(end);
+    const ya = a.getUTCFullYear();
+    const yb = b.getUTCFullYear();
+    const current = now.getUTCFullYear();
+    const sameDay = toIsoDay(a) === toIsoDay(b);
+    if (ya !== yb) return `${fmtDayYear(a)} – ${fmtDayYear(b)}`;
+    if (sameDay) return ya === current ? fmtDay(a) : fmtDayYear(a);
+    if (ya !== current) return `${fmtDay(a)} – ${fmtDayYear(b)}`;
+    return `${fmtDay(a)} – ${fmtDay(b)}`;
+}
+
+/**
+ * Tick label maker for a date axis (DESIGN 6.3): ranges of about 3 months or
+ * less show `Oct 13`; longer ranges show `Oct`, with the year on January and on
+ * the first tick (`Jan 2026`). Ranges crossing a year show the year on the
+ * first tick.
+ */
+export function makeDateTickFormatter(dates: DateInput[]): (value: DateInput, index: number) => string {
+    if (dates.length === 0) return (v) => fmtDay(v);
+    const first = toDate(dates[0]);
+    const last = toDate(dates[dates.length - 1]);
+    const spanDays = Math.abs(last.getTime() - first.getTime()) / 86_400_000;
+    const crossesYear = first.getUTCFullYear() !== last.getUTCFullYear();
+    if (spanDays <= 93) {
+        return (value, index) => {
+            const d = toDate(value);
+            return index === 0 && crossesYear ? fmtDayYear(d) : fmtDay(d);
+        };
+    }
+    return (value, index) => {
+        const d = toDate(value);
+        if (index === 0 || d.getUTCMonth() === 0) return fmtMonthYear(d);
+        return fmtMonth(d);
+    };
+}

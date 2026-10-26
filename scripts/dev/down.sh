@@ -42,6 +42,8 @@ stop_one admin "$INST"
 # The slot lock dies with the web server; tidy its owner note.
 slot="$(cat "$INST/web.slot" 2>/dev/null || true)"
 if [ -n "$slot" ]; then
+    # Child processes (next-server) can take a few seconds to exit after the group is signalled.
+    for _ in $(seq 1 30); do slot_free "$slot" && break; sleep 0.5; done
     if slot_free "$slot"; then
         rm -f "$TC_SLOTS_DIR/slot$slot.owner"
         log "released dev slot $slot"

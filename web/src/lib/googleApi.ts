@@ -50,6 +50,16 @@ export function resolveRange(range: string): { startDate: string; endDate: strin
             return rollingRange(60);
         case '90d':
             return rollingRange(90);
+        // Redesign presets (lib/dateRange.ts). Approximations of calendar
+        // months for the GA4 relative-date API.
+        case '24h':
+            return { startDate: 'yesterday', endDate: 'today' };
+        case '28d':
+            return rollingRange(28);
+        case '3m':
+            return rollingRange(91);
+        case '16m':
+            return rollingRange(487);
         case '6m':
             return rollingRange(180);
         case '12m':
@@ -109,6 +119,14 @@ export function resolvePrevRange(range: string): { startDate: string; endDate: s
             return previousRollingRange(60);
         case '90d':
             return previousRollingRange(90);
+        case '24h':
+            return { startDate: '3daysAgo', endDate: '2daysAgo' };
+        case '28d':
+            return previousRollingRange(28);
+        case '3m':
+            return previousRollingRange(91);
+        case '16m':
+            return previousRollingRange(487);
         case '6m':
             return previousRollingRange(180);
         case '12m':
