@@ -6,6 +6,7 @@ import { Dialog } from 'radix-ui';
 
 import { cn } from '@/lib/cn';
 import { Button } from './Button';
+import { useHideChatWidget } from './useHideChatWidget';
 
 export interface DrawerProps {
     open: boolean;
@@ -27,6 +28,7 @@ export interface DrawerProps {
 
 /** Side panel for row details, "View all" lists and the Ask panel (DESIGN 3.17). */
 export function Drawer({ open, onOpenChange, title, subtitle, children, footer, width = 'default', side = 'right', trigger, bare, className }: DrawerProps) {
+    useHideChatWidget(open);
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             {trigger ? <Dialog.Trigger asChild>{trigger}</Dialog.Trigger> : null}

@@ -30,7 +30,11 @@ export interface SelectProps<T extends string = string> {
     align?: 'start' | 'center' | 'end';
 }
 
-/** Select with a menu styled like DropdownMenu (DESIGN 3.9). Type-ahead and arrows built in. */
+/**
+ * Select with a menu styled like DropdownMenu (DESIGN 3.9). Type-ahead and arrows built in.
+ * The menu is z-75, above Drawer (60) and Modal (70), so a Select inside a sheet opens on top
+ * of the sheet's overlay and taps reach its options (below toasts 80 and tooltips 90).
+ */
 export function Select<T extends string = string>({
     value, onValueChange, options, label, placeholder = 'Select', size = 'md', ariaLabel, disabled, className, contentClassName, align = 'start',
 }: SelectProps<T>) {
@@ -61,7 +65,7 @@ export function Select<T extends string = string>({
                     align={align}
                     collisionPadding={8}
                     className={cn(
-                        'tc-ui z-50 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden',
+                        'tc-ui z-75 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden',
                         'rounded-popover border border-border-subtle bg-surface-raised p-1 text-body text-fg shadow-popover animate-pop-in',
                         contentClassName,
                     )}

@@ -23,7 +23,7 @@ export const DropdownMenuGroup = D.Group;
 export const DropdownMenuSub = D.Sub;
 export const DropdownMenuRadioGroup = D.RadioGroup;
 
-const panel = 'tc-ui z-50 min-w-[200px] overflow-hidden rounded-popover border border-border-subtle bg-surface-raised p-1 text-body text-fg shadow-popover animate-pop-in';
+const panel = 'tc-ui z-75 min-w-[200px] overflow-hidden rounded-popover border border-border-subtle bg-surface-raised p-1 text-body text-fg shadow-popover animate-pop-in';
 const itemBase =
     'relative flex h-8 cursor-default select-none items-center gap-2 rounded-md px-2 outline-none data-[highlighted]:bg-subtle data-[highlighted]:text-fg data-[disabled]:pointer-events-none data-[disabled]:text-fg-faint';
 

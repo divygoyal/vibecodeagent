@@ -6,6 +6,7 @@ import { Dialog } from 'radix-ui';
 
 import { cn } from '@/lib/cn';
 import { Button } from './Button';
+import { useHideChatWidget } from './useHideChatWidget';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -36,6 +37,7 @@ export interface ModalProps {
  * Below 768px it is a bottom sheet with a drag handle.
  */
 export function Modal({ open, onOpenChange, title, description, children, footer, size = 'md', trigger, hideClose, className }: ModalProps) {
+    useHideChatWidget(open);
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             {trigger ? <Dialog.Trigger asChild>{trigger}</Dialog.Trigger> : null}

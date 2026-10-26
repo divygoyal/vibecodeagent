@@ -14,6 +14,7 @@ import { useAppTheme } from '@/lib/theme';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
 import { Button } from '@/components/ui/Button';
+import { useHideChatWidget } from '@/components/ui/useHideChatWidget';
 import { BrandMark, Wordmark } from './BrandMark';
 import { LegacyFrame } from './LegacyFrame';
 import { MobileTabBar } from './MobileTabBar';
@@ -54,6 +55,7 @@ function useGoShortcuts() {
 function NavDrawer() {
     const { navOpen, setNavOpen } = useShell();
     const pathname = usePathname();
+    useHideChatWidget(navOpen);
     useEffect(() => {
         setNavOpen(false);
     }, [pathname, setNavOpen]);
@@ -94,12 +96,8 @@ function ShellBody({ children }: { children: ReactNode }) {
     const content = (
         <ErrorBoundary>
             <Suspense fallback={<PageSkeleton />}>
-                {legacy ? (
-                    <LegacyFrame>
-                        {!isSetup ? <WorkspaceIncompleteBanner /> : null}
-                        {children}
-                    </LegacyFrame>
-                ) : children}
+                {!isSetup ? <WorkspaceIncompleteBanner className="mb-4" /> : null}
+                {legacy ? <LegacyFrame>{children}</LegacyFrame> : children}
             </Suspense>
         </ErrorBoundary>
     );
