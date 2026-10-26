@@ -41,7 +41,7 @@ export function Tooltip({ content, children, side = 'top', align = 'center', dis
                     sideOffset={6}
                     collisionPadding={8}
                     className={cn(
-                        'z-90 max-w-60 rounded-md bg-inverse px-2 py-1 text-meta font-medium text-fg-inverse',
+                        'tc-ui z-90 max-w-60 rounded-md bg-inverse px-2 py-1 text-meta font-medium text-fg-inverse',
                         'animate-fade-in select-none',
                         className,
                     )}

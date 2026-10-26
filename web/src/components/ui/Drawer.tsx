@@ -35,7 +35,7 @@ export function Drawer({ open, onOpenChange, title, subtitle, children, footer, 
                 <Dialog.Content
                     aria-describedby={undefined}
                     className={cn(
-                        'fixed inset-y-0 z-60 flex w-full flex-col bg-surface-raised text-body text-fg shadow-modal outline-none',
+                        'tc-ui fixed inset-y-0 z-60 flex w-full flex-col bg-surface-raised text-body text-fg shadow-modal outline-none',
                         side === 'right' ? 'right-0 animate-drawer-in md:rounded-l-modal' : 'left-0 animate-drawer-in-left md:rounded-r-modal',
                         width === 'wide' ? 'md:max-w-[640px]' : 'md:max-w-[480px]',
                         className,
