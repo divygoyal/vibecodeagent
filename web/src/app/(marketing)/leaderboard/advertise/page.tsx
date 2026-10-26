@@ -13,6 +13,7 @@ import { PctDelta } from '@/components/leaderboard/shared';
 import { billingPeriodSuffix, formatAvailability, formatCents, type AdSlot } from '@/lib/adSlots';
 import { fmtCompact, fmtFull } from '@/lib/format';
 import { lbAdmin } from '@/lib/leaderboard/admin';
+import { jsonLdString } from '@/lib/leaderboard/jsonld';
 import { CATEGORIES, CATEGORY_LABELS, SITE_ORIGIN } from '@/lib/leaderboard/constants';
 import { AdvertiseFilters } from './AdvertiseFilters';
 
@@ -65,7 +66,7 @@ export default async function AdvertisePage({ searchParams }: { searchParams: Se
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{
-                    __html: JSON.stringify({
+                    __html: jsonLdString({
                         '@context': 'https://schema.org',
                         '@type': 'ItemList',
                         name: `Ad slots on verified sites | ${BRAND_NAME}`,

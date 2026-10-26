@@ -15,6 +15,7 @@ import { SITE_ORIGIN } from '@/lib/leaderboard/constants';
 import { fmtDay } from '@/lib/format';
 import { metricText } from '@/lib/leaderboard/format';
 import { getProfile, parseRange } from '@/lib/leaderboard/server';
+import { jsonLdString } from '@/lib/leaderboard/jsonld';
 
 // Server rendered per request; the data fetch is cached 60 s.
 export const dynamic = 'force-dynamic';
@@ -80,7 +81,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
 
     return (
         <main className="mx-auto w-full max-w-[1100px] px-4 pb-24 pt-8 sm:px-6">
-            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
 
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-body-sm text-fg-muted">

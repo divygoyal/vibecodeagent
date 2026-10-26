@@ -12,6 +12,7 @@ import { SITE_ORIGIN, TABS } from '@/lib/leaderboard/constants';
 import { fmtFull } from '@/lib/format';
 import { getBoard, parseRange, parseTab } from '@/lib/leaderboard/server';
 import { timeAgo } from '@/lib/leaderboard/format';
+import { jsonLdString } from '@/lib/leaderboard/jsonld';
 
 // Cached 60 s by the data fetch; the page itself renders per request (it reads the URL).
 export const dynamic = 'force-dynamic';
@@ -75,7 +76,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
 
     return (
         <main id="leaderboard" className="mx-auto w-full max-w-[1100px] px-4 pb-24 pt-10 sm:px-6 md:pt-14">
-            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList) }} />
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(itemList) }} />
 
             <header>
                 <span className="inline-flex h-6 items-center gap-1 rounded-full bg-brand-soft px-2.5 text-meta font-semibold text-brand-soft-fg">
