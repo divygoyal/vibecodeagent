@@ -17,6 +17,7 @@ import { Thumbnail, type ThumbItem } from '@/components/dashboard-builder/Thumbn
 import { fetchJson } from '@/components/dashboard-builder/useWidgetData';
 import { BLANK_TEMPLATE, TEMPLATES, buildFromTemplate, type TemplateCategory, type TemplateMeta } from '@/lib/builder/templates';
 import type { DashboardRecord } from '@/lib/builder/types';
+import PREVIEWS from '@/lib/builder/templatePreviews.json';
 import type { SiteOption } from '@/components/dashboard-builder/editor/Fields';
 
 const CATEGORIES: Array<'All' | TemplateCategory | 'My templates'> = ['All', 'Overview', 'Search', 'Traffic', 'Content', 'Portfolio', 'Reporting', 'My templates'];
@@ -30,7 +31,7 @@ function thumbFor(id: string): ThumbItem[] {
             : w.type === 'kpi-strip' || w.type === 'bar' || w.type === 'portfolio-grid' ? w.config.metrics[0]?.id
                 : w.type === 'timeseries' ? w.config.series[0]?.metric.id
                     : w.type === 'table' ? w.config.columns.find((c) => c.kind === 'metric')?.ref : undefined;
-        return { x: l.x, y: l.y, w: l.w, h: l.h, type: w.type, metric };
+        return { x: l.x, y: l.y, w: l.w, h: l.h, type: w.type, metric, values: (PREVIEWS as Record<string, Record<string, number[]>>)[id]?.[l.i] };
     });
 }
 
