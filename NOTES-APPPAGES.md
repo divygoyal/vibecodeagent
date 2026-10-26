@@ -58,3 +58,15 @@ Ask, Settings, Plan, Support, Docs, Setup wizard, embed/[siteId]; admin + supera
 - Docs (/dashboard/docs): rewritten as one page with an "on this page" list: Getting started, Portfolio, Site pages,
   Dashboards, Leaderboard, Connect AI, Ask, Help. No Telegram. Example questions link to /dashboard/ask?q=...&prefill=1.
   Removed '/dashboard/support' and '/dashboard/docs' from LEGACY_ROUTE_PREFIXES.
+- Setup (/dashboard/setup, focused layout from the shell): two steps, "Connect Google" and "Your sites" (setup/{page,
+  Stepper,ConnectStep,SitesStep}.tsx). Nothing to pick: step 2 lists every site from the workspace site directory with its
+  Search Console / GA4 pairing (name heuristic today; it becomes stream-URI pairing when tc/portfolio lands, no change
+  needed here). "Go to portfolio" saves one site as the default for the per-site pages only when none is saved (never
+  blocks on a slow save), marks setup completed server-side and refreshes the JWT claim, then hard-navigates to
+  `?returnTo=` (same-origin /dashboard paths only) or /dashboard. Empty inventory shows Check again / Use another account /
+  demo data; inventory failure shows Try again / Reconnect Google. In-app demo workspace button kept for no-Google users.
+  Removed '/dashboard/setup' from LEGACY_ROUTE_PREFIXES.
+- embed/[siteId]: same data, polling and map (RealtimeGlobeMaplibre is shared, unchanged, dark basemap); overlays are
+  token cards, `?theme=light|dark` through the theme script (default light), bg-canvas layout. Hydration fix: the
+  "x minutes ago" labels use a clock that is 0 on the server/hydration and ticks every 15 s after mount; demo activity is
+  stored as ages, not module-load timestamps. Dropped the invented "est. value $N" figure.
