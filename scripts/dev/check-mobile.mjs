@@ -15,11 +15,12 @@
  *   error        an error boundary ("Something went wrong"), HTTP >= 500 or an uncaught exception
  *   badText      "NaN", "undefined", "Infinity", "[object Object]", "Invalid Date" on screen
  *   loading      spinners/skeletons still visible after the page settled
+ *   api          same-origin /api/* answers >= 500, or any error answer that is not JSON
  *
  *   node scripts/dev/check-mobile.mjs <webPort | baseUrl> [--label name] [--out dir]
  *        [--widths 360,390,414] [--themes light,dark] [--user demo|demo2|admin] [--state file]
  *        [--host h1,h2] [--only /a,/b] [--skip /a,/b] [--part k/n] [--wait ms] [--no-shots]
- *        [--fail-on error,overflow,offscreen]
+ *        [--fail-on error,overflow,offscreen] [--settle ms] [--cookie name=value]
  *
  * One page load per route and theme; the viewport is resized to each width.
  * Output: <out>/mobile-<label>.json, <out>/mobile-<label>.md and offender
@@ -38,7 +39,7 @@ const THIRD_PARTY = /tawk\.to|cloudflareinsights|googletagmanager|google-analyti
 
 function usage(msg) {
     if (msg) console.error(`check-mobile: ${msg}`);
-    console.error('usage: node scripts/dev/check-mobile.mjs <webPort|baseUrl> [--label name] [--out dir] [--widths 360,390,414] [--themes light,dark] [--user u] [--state f] [--host h1,h2] [--only /a,/b] [--skip /a] [--part k/n] [--wait ms] [--no-shots] [--fail-on error,overflow,offscreen]');
+    console.error('usage: node scripts/dev/check-mobile.mjs <webPort|baseUrl> [--label name] [--out dir] [--widths 360,390,414] [--themes light,dark] [--user u] [--state f|none] [--host h1,h2] [--only /a,/b] [--skip /a] [--part k/n] [--wait ms] [--no-shots] [--fail-on error,overflow,offscreen]');
     process.exit(2);
 }
 
@@ -46,7 +47,7 @@ const argv = process.argv.slice(2);
 const opts = {
     target: null, label: null, out: '/root/projects/tc-redesign-research/robust', widths: [390, 360, 414], themes: ['light', 'dark'],
     user: 'demo', state: null, hosts: ['acmeanalytics.example'], only: null, skip: [], part: null, wait: 800, shots: true,
-    failOn: ['error', 'overflow', 'offscreen'],
+    failOn: ['error', 'overflow', 'offscreen'], settleMs: 25_000, cookies: [],
 };
 for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -67,6 +68,11 @@ for (let i = 0; i < argv.length; i++) {
     } else if (a === '--wait') opts.wait = Number(argv[++i]);
     else if (a === '--no-shots') opts.shots = false;
     else if (a === '--fail-on') opts.failOn = list();
+    else if (a === '--settle') opts.settleMs = Number(argv[++i]);
+    else if (a === '--cookie') {
+        const [name, ...rest] = argv[++i].split('=');
+        opts.cookies.push({ name, value: rest.join('=') });
+    }
     else if (a.startsWith('--')) usage(`unknown option ${a}`);
     else if (!opts.target) opts.target = a;
     else usage(`unexpected argument ${a}`);
@@ -86,8 +92,8 @@ if (/^\d+$/.test(opts.target)) {
 }
 const baseUrl = new URL(base);
 const repo = inst?.REPO || path.resolve(here, '../..');
-let stateFile = opts.state;
-if (!stateFile && inst) {
+let stateFile = opts.state === 'none' ? null : opts.state;
+if (!stateFile && opts.state !== 'none' && inst) {
     const f = path.join(inst.dir, opts.user === 'demo' ? 'state.json' : `state-${opts.user}.json`);
     if (fs.existsSync(f)) stateFile = f;
 }
@@ -123,7 +129,8 @@ function pageAudit() {
         if (!el.dataset.mcId) el.dataset.mcId = String(++window.__mcSeq);
         return el.dataset.mcId;
     };
-    const IGNORE = 'nextjs-portal, script, style, noscript, template, iframe, [data-mc-ignore]';
+    // Map libraries clip their own markers and tiles on purpose.
+    const IGNORE = 'nextjs-portal, script, style, noscript, template, iframe, [data-mc-ignore], .maplibregl-map, .mapboxgl-map, .leaflet-container';
     const INTERACTIVE = 'a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=link], [role=tab], [role=checkbox], [role=radio], [role=switch], [role=menuitem], [role=option], [role=slider], [tabindex]:not([tabindex="-1"])';
     const cssPath = (el) => {
         const parts = [];
@@ -244,7 +251,7 @@ function pageAudit() {
         const clipsY = cs.overflowY === 'hidden' || cs.overflowY === 'clip';
         const lineClamp = cs.webkitLineClamp && cs.webkitLineClamp !== 'none';
         if (textRight > r.right - padR + 2) {
-            if (clipsX) { if (cs.textOverflow !== 'ellipsis') out.textClipped.push(desc(el, { axis: 'x', over: Math.round(textRight - r.right) })); }
+            if (clipsX) { if (cs.textOverflow !== 'ellipsis' && !lineClamp) out.textClipped.push(desc(el, { axis: 'x', over: Math.round(textRight - r.right) })); }
             else if (!scrollerAncestor(el)) out.textSpill.push(desc(el, { over: Math.round(textRight - r.right) }));
         }
         if (clipsY && !lineClamp && el.scrollHeight > el.clientHeight + 3 && cs.textOverflow !== 'ellipsis') {
@@ -252,11 +259,29 @@ function pageAudit() {
         }
     }
 
-    // Tap targets.
-    const seenTargets = new Map();
-    for (const el of vis) {
-        if (!interactive(el) || el.disabled || el.getAttribute('aria-disabled') === 'true') continue;
+    // Tap targets. A positioned ::before/::after (e.g. `pointer-coarse:after:-inset-3`) widens the hit area.
+    const hitRect = (el) => {
         const r = el.getBoundingClientRect();
+        let { left, top, right, bottom } = r;
+        if (getComputedStyle(el).position !== 'static') {
+            for (const pseudo of ['::before', '::after']) {
+                const ps = getComputedStyle(el, pseudo);
+                if (ps.content === 'none' || ps.position !== 'absolute' || ps.display === 'none' || ps.pointerEvents === 'none') continue;
+                const [t, b, l, rr] = [ps.top, ps.bottom, ps.left, ps.right].map(parseFloat);
+                if (!Number.isNaN(t)) top = Math.min(top, r.top + t);
+                if (!Number.isNaN(b)) bottom = Math.max(bottom, r.bottom - b);
+                if (!Number.isNaN(l)) left = Math.min(left, r.left + l);
+                if (!Number.isNaN(rr)) right = Math.max(right, r.right - rr);
+            }
+        }
+        return { width: right - left, height: bottom - top };
+    };
+    out.coarse = matchMedia('(pointer: coarse)').matches;
+    const seenTargets = new Map();
+    const TAPPABLE = INTERACTIVE.replace(/, \[tabindex\]:not\(\[tabindex="-1"\]\)$/, ''); // tabindex-only spans are tooltip/focus stops, not tap targets
+    for (const el of vis) {
+        if (!el.matches(TAPPABLE) || el.disabled || el.getAttribute('aria-disabled') === 'true') continue;
+        const r = hitRect(el);
         if (r.width >= 32 && r.height >= 32) continue;
         const cs = getComputedStyle(el);
         const parent = el.parentElement;
@@ -295,7 +320,8 @@ function pageAudit() {
         for (const el of vis) {
             if (el === bar || bar.contains(el) || el.contains(bar)) continue;
             const cs = getComputedStyle(el);
-            if (cs.position !== 'fixed' && cs.position !== 'sticky') continue;
+            // Fixed elements, and sticky ones pinned to the bottom (a sticky first table column scrolls under the bar, which is fine).
+            if (cs.position !== 'fixed' && !(cs.position === 'sticky' && cs.bottom !== 'auto')) continue;
             const r = el.getBoundingClientRect();
             const ox = Math.min(r.right, br.right) - Math.max(r.left, br.left);
             const oy = Math.min(r.bottom, br.bottom) - Math.max(r.top, br.top);
@@ -377,6 +403,7 @@ async function makeContext(browser, theme) {
     await context.addInitScript((t) => {
         try { localStorage.setItem('tc-theme', t); } catch { /* ignore */ }
     }, theme);
+    if (opts.cookies.length) await context.addCookies(opts.cookies.map((c) => ({ ...c, domain: baseUrl.hostname, path: '/' })));
     const session = state?.sessionStorage || [];
     if (session.length) {
         await context.addInitScript((entries) => {
@@ -392,14 +419,28 @@ const issueCount = (w) => (w.overflow ? 1 : 0) + w.offscreen.length + w.clipped.
 async function visit(context, route, theme) {
     const page = await context.newPage();
     const watch = watchPage(page, base);
-    const res = { route: route.pattern, path: route.path, theme, status: 0, finalPath: null, navError: null, pageErrors: [], consoleErrors: [], failedRequests: [], widths: {}, shots: [] };
+    const res = { route: route.pattern, path: route.path, theme, status: 0, finalPath: null, navError: null, pageErrors: [], consoleErrors: [], failedRequests: [], api: [], widths: {}, shots: [] };
+    const apiSeen = new Set();
+    page.on('response', async (r) => {
+        const u = r.url();
+        if (!u.startsWith(`${base}/api/`) || r.status() < 400) return;
+        const ct = r.headers()['content-type'] || '';
+        const json = ct.includes('json');
+        if (r.status() < 500 && json) return;
+        const key = `${r.status()} ${r.request().method()} ${u.replace(base, '').split('?')[0]}`;
+        if (apiSeen.has(key)) return;
+        apiSeen.add(key);
+        let body = '';
+        try { body = (await r.text()).slice(0, 160).replace(/\s+/g, ' '); } catch { /* streamed or gone */ }
+        res.api.push({ status: r.status(), method: r.request().method(), path: u.replace(base, '').slice(0, 200), contentType: ct.split(';')[0], body });
+    });
     try {
         const r = await page.goto(base + route.path, { waitUntil: 'load', timeout: 150_000 });
         res.status = r?.status() ?? 0;
     } catch (err) {
         res.navError = err.message.split('\n')[0];
     }
-    await settle(page, watch, { quietMs: 1200, maxMs: 25_000 });
+    await settle(page, watch, { quietMs: 1200, maxMs: opts.settleMs });
     if (opts.wait) await page.waitForTimeout(opts.wait);
     res.finalPath = page.url().replace(base, '');
     await withTimeout(page.addStyleTag({ content: 'nextjs-portal{display:none!important} [data-mc-hit]{outline:3px solid #ff1744!important;outline-offset:-1px!important} [data-mc-small]{outline:2px dashed #ff9100!important}' }), 5000);
@@ -465,7 +506,7 @@ try {
 
 const esc = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 function categories(r) {
-    const c = { error: 0, overflow: 0, offscreen: 0, clipped: 0, textClipped: 0, textSpill: 0, smallTargets: 0, tabbar: 0, badText: 0, loading: 0 };
+    const c = { error: 0, overflow: 0, offscreen: 0, clipped: 0, textClipped: 0, textSpill: 0, smallTargets: 0, tabbar: 0, badText: 0, loading: 0, api: (r.api || []).length };
     if (r.status >= 500 || r.pageErrors.length || r.navError) c.error++;
     for (const w of Object.values(r.widths)) {
         if (w.auditError) { c.error++; continue; }
@@ -485,7 +526,7 @@ function categories(r) {
 function writeReports() {
     const ordered = [...results].sort((a, b) => (a.route + a.theme).localeCompare(b.route + b.theme));
     fs.writeFileSync(jsonFile, JSON.stringify({ base, user: opts.user, label: opts.label, widths: opts.widths, updatedAt: new Date().toISOString(), results: ordered }, null, 2));
-    const cols = ['error', 'overflow', 'offscreen', 'clipped', 'textClipped', 'textSpill', 'smallTargets', 'tabbar', 'badText', 'loading'];
+    const cols = ['error', 'overflow', 'offscreen', 'clipped', 'textClipped', 'textSpill', 'smallTargets', 'tabbar', 'badText', 'loading', 'api'];
     const totals = Object.fromEntries(cols.map((k) => [k, 0]));
     const rows = ordered.map((r) => {
         const c = categories(r);
@@ -509,11 +550,12 @@ function writeReports() {
     ];
     for (const r of ordered) {
         const c = categories(r);
-        if (!cols.some((k) => c[k] && k !== 'smallTargets' && k !== 'loading') && !c.smallTargets && !c.loading) continue;
+        if (!cols.some((k) => c[k])) continue;
         lines.push(`### ${r.path} (${r.theme})`, '');
         if (r.navError) lines.push(`- navigation: ${esc(r.navError)}`);
         for (const e of r.pageErrors) lines.push(`- uncaught: ${esc(e.split('\n')[0])}`);
         for (const e of r.consoleErrors.slice(0, 5)) lines.push(`- console: ${esc(e.slice(0, 200))}`);
+        for (const x of r.api || []) lines.push(`- api: ${x.status} ${x.method} \`${esc(x.path)}\` ${esc(x.contentType)} ${esc(x.body.slice(0, 120))}`);
         for (const [width, w] of Object.entries(r.widths)) {
             if (w.auditError) { lines.push(`- ${width}: audit failed: ${esc(w.auditError)}`); continue; }
             const items = [];
