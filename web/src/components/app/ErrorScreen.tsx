@@ -7,6 +7,9 @@ import { Button, EmptyState } from '@/components/ui';
 
 export type ErrorScope = 'app' | 'site' | 'marketing' | 'global';
 
+const CHUNK_ERROR = /ChunkLoadError|Loading chunk [\w-]+ failed|Failed to load chunk|Failed to fetch dynamically imported module|Importing a module script failed/i;
+const CHUNK_RELOAD_KEY = 'tc-chunk-reload-at';
+
 /**
  * Records an error-boundary hit: browser console, Clarity (when loaded) and one
  * line in the server log via /api/client-error, so a crash on a phone shows up
@@ -52,6 +55,16 @@ export function ErrorScreen({
 }) {
     useEffect(() => {
         reportClientError(scope, error);
+        // A tab opened before a deploy asks for chunk files that no longer exist: reload once to get the new build.
+        if (CHUNK_ERROR.test(`${error?.name ?? ''} ${error?.message ?? ''}`)) {
+            try {
+                const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0);
+                if (Date.now() - last > 60_000) {
+                    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+                    window.location.reload();
+                }
+            } catch { /* storage blocked: the Reload button still works */ }
+        }
     }, [error, scope]);
 
     return (
