@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
-import { AlertTriangle, Check, Laptop, ShieldCheck, X } from 'lucide-react';
+import { Check, Laptop, X } from 'lucide-react';
 import { ConsentForm, type ConsentSite } from '@/components/connect-ai/ConsentForm';
-import { cx, s } from '@/components/connect-ai/styles';
-import '@/components/connect-ai/connect-ai.css';
+import { Banner, Card, VerifiedBadge } from '@/components/ui';
 import { dashboardConnectPath, demoGrantsEnabled, issuer, mcpEnabled } from '@/lib/mcp/config';
 import { getSessionUser } from '@/lib/mcp/session';
 import { loadSessionSites, type SessionSites } from '@/lib/mcp/sessionSites';
@@ -16,11 +15,11 @@ export const metadata: Metadata = { title: 'Connect an AI app · TrafficClaw', r
 
 function Shell({ children }: { children: React.ReactNode }) {
     return (
-        <div className={cx('tc-cai min-h-screen px-4 py-8 sm:py-14', s.canvas)}>
+        <div className="tc-root min-h-dvh bg-canvas px-4 py-8 text-fg sm:py-14">
             <div className="mx-auto w-full max-w-[520px]">
                 <div className="mb-5 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--tc-brand)] text-[13px] font-semibold text-[var(--tc-brand-fg)]" aria-hidden>T</span>
-                    <span className="text-[15px] font-semibold tracking-[-0.02em]">TrafficClaw</span>
+                    <span aria-hidden className="flex size-7 items-center justify-center rounded-control bg-brand text-body-sm font-semibold text-brand-fg">T</span>
+                    <span className="text-title-sm tracking-[-0.02em] text-fg">TrafficClaw</span>
                 </div>
                 {children}
             </div>
@@ -31,10 +30,10 @@ function Shell({ children }: { children: React.ReactNode }) {
 function ErrorCard({ title, message }: { title: string; message: string }) {
     return (
         <Shell>
-            <div className={cx(s.card, 'p-6')} role="alert">
-                <h1 className={s.title}>{title}</h1>
-                <p className={cx(s.bodySm, 'mt-2')}>{message}</p>
-            </div>
+            <Card padding="lg" role="alert">
+                <h1 className="text-title text-fg">{title}</h1>
+                <p className="mt-2 text-body text-fg-secondary">{message}</p>
+            </Card>
         </Shell>
     );
 }
@@ -44,8 +43,7 @@ export default async function ConsentPage({ searchParams }: { searchParams: Prom
     const params = await searchParams;
     const rawTxn = typeof params.txn === 'string' ? params.txn : '';
     const txn = decodeTxn(rawTxn);
-    const jar = await cookies();
-    const csrf = jar.get(csrfCookieName())?.value ?? '';
+    const csrf = (await cookies()).get(csrfCookieName())?.value ?? '';
     if (!txn || !csrf || !safeEqual(csrfBinding(csrf), txn.n)) {
         return <ErrorCard title="This approval link expired" message="Start the connection again from your AI app. Links work for 30 minutes in the browser that opened them." />;
     }
@@ -79,53 +77,47 @@ export default async function ConsentPage({ searchParams }: { searchParams: Prom
 
     return (
         <Shell>
-            <main className={cx(s.card, 'p-5 sm:p-6')}>
+            <Card as="section" className="p-5 sm:p-6" aria-labelledby="consent-title">
                 <div className="flex flex-wrap items-center gap-2">
-                    <h1 className={s.title}>{appName}</h1>
-                    {verifiedName ? (
-                        <span className={cx(s.pill, 'bg-[var(--tc-brand-soft)] text-[var(--tc-brand-soft-fg)]')}><ShieldCheck size={14} strokeWidth={1.75} aria-hidden />Verified app</span>
-                    ) : null}
+                    <h1 id="consent-title" className="text-title text-fg">{appName}</h1>
+                    {verifiedName ? <VerifiedBadge label="Verified app" tooltip={`TrafficClaw recognises this app's identity (${identity ?? 'known client'}).`} /> : null}
                 </div>
-                <p className={cx(s.bodySm, 'mt-1')}>
+                <p className="mt-1 text-body text-fg-secondary">
                     wants to connect to your TrafficClaw account.{' '}
-                    {identity ? <>App identity: <span className={s.mono}>{identity}</span>. </> : null}
-                    Sends you back to <span className={cx(s.mono, 'text-[var(--tc-fg)]')}>{redirectLabel}</span>.
+                    {identity ? <>App identity: <span className="font-mono text-[13px] text-fg">{identity}</span>. </> : null}
+                    Sends you back to <span className="font-mono text-[13px] text-fg">{redirectLabel}</span>.
                 </p>
 
                 {!verifiedName ? (
-                    <div className="mt-4 flex gap-3 rounded-lg border border-[color-mix(in_oklab,var(--tc-warn)_25%,transparent)] bg-[var(--tc-warn-soft)] p-3.5" role="note">
-                        <AlertTriangle size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-[var(--tc-warn)]" aria-hidden />
-                        <div className="text-[13px] leading-[18px] text-[var(--tc-fg)]">
-                            <p className="font-medium">TrafficClaw can&apos;t verify this app.</p>
-                            <p className="mt-0.5 text-[var(--tc-fg-secondary)]">{client.kind === 'dcr' ? 'It registered itself and its name is not checked. ' : ''}Only continue if you just started this from your AI tool.</p>
-                        </div>
-                    </div>
+                    <Banner variant="warn" className="mt-4" title="TrafficClaw can't verify this app">
+                        {client.kind === 'dcr' ? 'It registered itself and its name is not checked. ' : ''}Only continue if you just started this from your AI tool.
+                    </Banner>
                 ) : null}
                 {local ? (
-                    <p className={cx(s.bodySm, 'mt-3 flex items-center gap-2')}><Laptop size={14} strokeWidth={1.75} aria-hidden />This app runs on your computer ({redirectLabel}).</p>
+                    <p className="mt-3 flex items-center gap-2 text-body-sm text-fg-muted"><Laptop aria-hidden size={14} strokeWidth={1.75} />This app runs on your computer ({redirectLabel}).</p>
                 ) : null}
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                     <div>
-                        <h2 className={cx(s.meta, 'mb-2 font-medium uppercase tracking-[0.04em]')}>It will be able to</h2>
+                        <h2 className="mb-2 text-caption uppercase tracking-[0.04em] text-fg-muted">It will be able to</h2>
                         <ul className="space-y-1.5">
                             {['See which Analytics properties and Search Console sites you have', 'Read traffic, engagement and search numbers for them'].map((t) => (
-                                <li key={t} className={cx(s.body, 'flex gap-2')}><Check size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-[var(--tc-up)]" aria-hidden />{t}</li>
+                                <li key={t} className="flex gap-2 text-body text-fg"><Check aria-hidden size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-up" />{t}</li>
                             ))}
                         </ul>
                     </div>
                     <div>
-                        <h2 className={cx(s.meta, 'mb-2 font-medium uppercase tracking-[0.04em]')}>It can not</h2>
+                        <h2 className="mb-2 text-caption uppercase tracking-[0.04em] text-fg-muted">It can not</h2>
                         <ul className="space-y-1.5">
                             {['Change anything in Analytics, Search Console or TrafficClaw', 'See Gmail, Drive or any other Google data'].map((t) => (
-                                <li key={t} className={cx(s.body, 'flex gap-2')}><X size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-[var(--tc-fg-muted)]" aria-hidden />{t}</li>
+                                <li key={t} className="flex gap-2 text-body text-fg"><X aria-hidden size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-fg-muted" />{t}</li>
                             ))}
                         </ul>
                     </div>
                 </div>
-                <p className={cx(s.meta, 'mt-3')}>GA4 provides no visitor-level personal data.</p>
+                <p className="mt-3 text-meta text-fg-muted">GA4 provides no visitor-level personal data.</p>
 
-                <div className="mt-5 border-t border-[var(--tc-border-subtle)] pt-5">
+                <div className="mt-5 border-t border-border-subtle pt-5">
                     <ConsentForm
                         txn={rawTxn}
                         csrf={csrf}
@@ -137,9 +129,9 @@ export default async function ConsentPage({ searchParams }: { searchParams: Prom
                         returnUrl={returnUrl}
                     />
                 </div>
-            </main>
-            <p className={cx(s.meta, 'mt-4 px-1')}>
-                {appName} writes the answers itself. TrafficClaw only sends it the numbers it asks for, and {appName}&apos;s own privacy policy applies to what it does with them. Disconnect any time at <span className={s.mono}>{dash}</span>.
+            </Card>
+            <p className="mt-4 px-1 text-meta text-fg-muted">
+                {appName} writes the answers itself. TrafficClaw only sends it the numbers it asks for, and {appName}&apos;s own privacy policy applies to what it does with them. Disconnect any time at <span className="font-mono">{dash}</span>.
             </p>
         </Shell>
     );
