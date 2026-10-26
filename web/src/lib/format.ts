@@ -208,7 +208,8 @@ export function computeDelta(current: Num, previous: Num, opts: DeltaOptions = {
             change = current - previous;
             const abs = Math.abs(change);
             if (abs < 0.05) {
-                return { state: 'flat', direction: 'flat', tone: 'neutral', text: '0', label: '0', srText: 'no change', change: 0 };
+                // A bare "0" next to a position reads like a value; show the no-change dash instead.
+                return { state: 'flat', direction: 'flat', tone: 'neutral', text: DASH, label: DASH, srText: 'no change', change: 0 };
             }
             text = abs.toFixed(1);
             spoken = text;

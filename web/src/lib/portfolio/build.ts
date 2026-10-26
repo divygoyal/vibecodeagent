@@ -238,10 +238,17 @@ function addInto(target: number[], src: number[] | undefined) {
     for (let i = 0; i < target.length && i < src.length; i++) target[i] += src[i];
 }
 
-/** "http://x.com", "x.com/blog" or "sc-domain:x.com" for a host shared by several properties. */
-function prefixLabel(siteUrl: string): string {
-    if (siteUrl.startsWith('sc-domain:')) return siteUrl;
-    return siteUrl.replace(/^https:\/\//, '').replace(/\/$/, '');
+/** Tells apart properties that share a host: "http", "www", "/blog", "domain", or "GA4". */
+function variantChip(siteUrl: string | undefined, ga4: StoreAsset | undefined): string {
+    if (!siteUrl) return ga4 ? 'GA4' : '';
+    if (siteUrl.startsWith('sc-domain:')) return 'domain';
+    const m = /^([a-z]+):\/\/([^/]+)(\/.*)?$/i.exec(siteUrl);
+    if (!m) return siteUrl;
+    const path = (m[3] ?? '/').replace(/\/$/, '');
+    if (path) return path;
+    if (m[1].toLowerCase() === 'http') return 'http';
+    if (m[2].toLowerCase().startsWith('www.')) return 'www';
+    return 'https';
 }
 
 export function propertyNumber(property: string): string {
@@ -295,7 +302,8 @@ export function buildPortfolio(snap: SnapshotData, opts: BuildOptions): Portfoli
         const n = (slugCount.get(baseSlug) ?? 0) + 1;
         slugCount.set(baseSlug, n);
         const slug = n === 1 ? baseSlug : `${baseSlug}--${n}`;
-        const label = gsc && (hostCount.get(host) ?? 0) > 1 && n > 1 ? prefixLabel(gsc.asset_id) : host || ga4?.display_name || key;
+        const label = host || ga4?.display_name || key;
+        const variant = (hostCount.get(host) ?? 0) > 1 && n > 1 ? variantChip(gsc?.asset_id, ga4) : null;
 
         const gscInfo: SiteGsc | null = gsc ? {
             siteUrl: gsc.asset_id,
@@ -338,6 +346,7 @@ export function buildPortfolio(snap: SnapshotData, opts: BuildOptions): Portfoli
             key,
             host,
             label,
+            variant,
             slug,
             name: ga4?.display_name || host || key,
             gsc: gscInfo,

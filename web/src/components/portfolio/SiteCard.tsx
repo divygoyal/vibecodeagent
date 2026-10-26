@@ -94,6 +94,15 @@ function TrafficMetrics({ site, withEngagement, small }: { site: PortfolioSite; 
     );
 }
 
+/** Lowercase chip that tells apart sites sharing a host ("http", "www", "/blog"). */
+export function VariantChip({ text, className }: { text: string; className?: string }) {
+    return (
+        <span className={cn('inline-flex h-5 shrink-0 items-center rounded-badge bg-subtle px-1.5 text-caption text-fg-secondary', className)}>
+            {text}
+        </span>
+    );
+}
+
 export function alertChipText(site: PortfolioSite): string | null {
     const a = site.alerts[0];
     if (!a) return null;
@@ -179,7 +188,8 @@ export const SiteCard = memo(function SiteCard({
 
             <div className="flex min-w-0 items-center gap-2">
                 <Favicon host={site.host || site.label} size={20} />
-                <h3 className="min-w-0 truncate text-title-sm text-fg" title={site.label}>{site.label}</h3>
+                <h3 className="min-w-0 truncate text-title-sm text-fg" title={site.gsc?.siteUrl ?? site.ga4?.displayName ?? site.label}>{site.label}</h3>
+                {site.variant ? <VariantChip text={site.variant} /> : null}
                 {site.gsc ? (
                     <Badge>{site.gsc.propertyType === 'domain' ? 'Domain' : 'Prefix'}</Badge>
                 ) : (

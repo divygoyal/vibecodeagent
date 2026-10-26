@@ -9,7 +9,7 @@ import { fmtFull, fmtPosition } from '@/lib/format';
 import type { MetricKey } from '@/lib/metrics';
 import type { PortfolioSite } from '@/lib/portfolio/types';
 import { SiteStatusPill } from './SiteStatusPill';
-import type { CardView } from './SiteCard';
+import { VariantChip, type CardView } from './SiteCard';
 
 export interface SitesTableProps {
     sites: PortfolioSite[];
@@ -46,7 +46,8 @@ export function SitesTable({ sites, dates, view, syncing, onOpen, exportHref, em
             cell: (s) => (
                 <span className="flex min-w-0 items-center gap-2">
                     <Favicon host={s.host || s.label} size={16} />
-                    <span className="min-w-0 max-w-[140px] truncate font-medium sm:max-w-[240px]" title={s.label}>{s.label}</span>
+                    <span className="min-w-0 max-w-[140px] truncate font-medium sm:max-w-[240px]" title={s.gsc?.siteUrl ?? s.label}>{s.label}</span>
+                    {s.variant ? <VariantChip text={s.variant} /> : null}
                     <Badge className="max-sm:hidden!">{s.gsc ? (s.gsc.propertyType === 'domain' ? 'Domain' : 'Prefix') : 'GA4'}</Badge>
                     {s.starred ? <Star aria-label="Starred" size={14} strokeWidth={1.75} className="shrink-0 fill-star text-star" /> : null}
                     {s.alerts.length ? <span aria-label={s.alerts.map((a) => a.message).join(', ')} title={s.alerts.map((a) => a.message).join(', ')} className={`size-2 shrink-0 rounded-full ${s.alerts[0].severity === 'critical' ? 'bg-down' : 'bg-warn'}`} /> : null}

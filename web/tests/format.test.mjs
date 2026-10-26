@@ -116,6 +116,10 @@ test('position delta: absolute, 1 decimal, arrow = improvement', () => {
     assert.equal(better.tone, 'good');
     const worse = computeDelta(23.2, 17.1, { mode: 'absolute', better: 'down' });
     assert.equal(worse.tone, 'bad');
+    const flat = computeDelta(16.21, 16.19, { mode: 'absolute', better: 'down' });
+    assert.equal(flat.state, 'flat');
+    assert.equal(flat.text, '–');
+    assert.equal(flat.srText, 'no change');
 });
 
 test('computeDelta: polarity, noise floor and screen-reader text', () => {

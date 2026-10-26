@@ -35,7 +35,7 @@ export function headlineChange(s: PortfolioSite): number | null {
 export function matchesQuery(s: PortfolioSite, q: string): boolean {
     if (!q) return true;
     const needle = q.trim().toLowerCase();
-    return [s.label, s.host, s.name, s.gsc?.siteUrl, s.ga4?.displayName, s.ga4?.propertyId]
+    return [s.label, s.host, s.name, s.variant, s.gsc?.siteUrl, s.ga4?.displayName, s.ga4?.propertyId]
         .some((v) => typeof v === 'string' && v.toLowerCase().includes(needle));
 }
 

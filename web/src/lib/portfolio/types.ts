@@ -103,8 +103,10 @@ export interface PortfolioSite {
     /** Stable key (pairing key): "gsc:<siteUrl>" or "ga4:properties/<id>". */
     key: string;
     host: string;
-    /** What the card shows: the host, or the full prefix ("http://x.com", "x.com/blog") when the host alone is ambiguous. */
+    /** Card title: the normalized host (or the GA4 name when there is no host). */
     label: string;
+    /** Short chip that tells apart sites sharing a host: "http", "www", "/blog", "domain". */
+    variant: string | null;
     /** URL segment for /dashboard/s/[slug] (host, "--2" on collisions). */
     slug: string;
     /** GA4 display name when there is one, else the host. */

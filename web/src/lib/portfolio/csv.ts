@@ -34,7 +34,7 @@ function row(s: PortfolioSite, res: PortfolioResponse): (string | number | null 
     const tr = s.traffic;
     const w = res.windows;
     return [
-        s.label, s.gsc?.siteUrl, s.gsc ? (s.gsc.propertyType === 'domain' ? 'Domain' : 'URL prefix') : null,
+        s.variant ? `${s.label} (${s.variant})` : s.label, s.gsc?.siteUrl, s.gsc ? (s.gsc.propertyType === 'domain' ? 'Domain' : 'URL prefix') : null,
         s.ga4?.propertyId, s.ga4?.displayName, s.starred ? 'yes' : 'no', s.hidden ? 'yes' : 'no', s.status,
         sc?.cur.clicks, sc?.prev?.clicks, pct(sc?.cur.clicks, sc?.prev?.clicks),
         sc?.cur.impressions, sc?.prev?.impressions, pct(sc?.cur.impressions, sc?.prev?.impressions),
