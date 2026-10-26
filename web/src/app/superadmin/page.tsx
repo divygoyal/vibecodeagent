@@ -45,7 +45,10 @@ interface StatusData {
     total_users: number
     running_containers: number
     max_users: number
-    plans: { free: number; starter: number; pro: number }
+    /** Older shape of the plan counts. */
+    plans?: Record<string, number>
+    /** What the admin API returns today. */
+    plan_breakdown?: Record<string, number>
 }
 
 interface UserData {
@@ -436,6 +439,14 @@ function formatNumber(value?: number | null): string {
     return fmtFull(value ?? 0)
 }
 
+/** Users per plan, in plan order. The admin API sends `plan_breakdown`; older builds sent `plans`. */
+function planCounts(status: StatusData): Array<[string, number]> {
+    const source: Record<string, number> = status.plan_breakdown ?? status.plans ?? {}
+    const order = ['free', 'starter', 'growth', 'pro']
+    const keys = [...order.filter(k => k in source || k !== 'growth'), ...Object.keys(source).filter(k => !order.includes(k))]
+    return keys.map(k => [k, source[k] ?? 0])
+}
+
 function formatPercent(value?: number | null): string {
     if (value === null || value === undefined) return '—'
     const normalized = Math.abs(value) <= 1 ? value * 100 : value
@@ -693,7 +704,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
             {/* Stats Row */}
             <section aria-label="System overview" className="grid grid-cols-2 gap-4 lg:grid-cols-5">
                 <AdminStat icon={Users} label="Total users" value={status?.total_users ?? '–'} loading={initialLoading} />
-                <AdminStat icon={Bot} label="Running containers" value={status?.running_containers ?? '–'} loading={initialLoading} />
+                <AdminStat icon={Bot} label="Running" value={status?.running_containers ?? '–'} sub="containers" loading={initialLoading} />
                 <AdminStat
                     icon={Coins}
                     label="Plan breakdown"
@@ -702,9 +713,12 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
                     value={
                         status ? (
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body">
-                                <span className="inline-flex items-center gap-1.5"><PlanBadge plan="free" /><span className="font-medium tabular-nums">{status.plans?.free ?? 0}</span></span>
-                                <span className="inline-flex items-center gap-1.5"><PlanBadge plan="starter" /><span className="font-medium tabular-nums">{status.plans?.starter ?? 0}</span></span>
-                                <span className="inline-flex items-center gap-1.5"><PlanBadge plan="pro" /><span className="font-medium tabular-nums">{status.plans?.pro ?? 0}</span></span>
+                                {planCounts(status).map(([name, count]) => (
+                                    <span key={name} className="inline-flex items-center gap-1.5">
+                                        <PlanBadge plan={name} />
+                                        <span className="font-medium tabular-nums">{count}</span>
+                                    </span>
+                                ))}
                             </div>
                         ) : '–'
                     }
@@ -1018,7 +1032,6 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh, loading }: {
                 <thead>
                     <tr>
                         <Th sticky>User</Th>
-                        <Th>Email</Th>
                         <Th>Plan</Th>
                         <Th>Credits</Th>
                         <Th>Signals</Th>
@@ -1031,14 +1044,14 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh, loading }: {
                     {loading && users.length === 0 && Array.from({ length: 6 }, (_, i) => (
                         <tr key={`sk-${i}`} className="border-b border-border-subtle last:border-0">
                             <td className="px-4 py-3"><Skeleton className="h-8 w-40" /></td>
-                            {Array.from({ length: 7 }, (_, j) => (
+                            {Array.from({ length: 6 }, (_, j) => (
                                 <td key={j} className="px-3 py-3"><Skeleton className="h-4 w-20" /></td>
                             ))}
                         </tr>
                     ))}
                     {!loading && users.length === 0 && (
                         <tr>
-                            <td colSpan={8}>
+                            <td colSpan={7}>
                                 <EmptyState
                                     variant="inline"
                                     icon={Users}
@@ -1077,7 +1090,7 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh, loading }: {
                                 />
                                 {isExpanded && (
                                     <tr className="border-b border-border-subtle bg-surface-sunken last:border-0">
-                                        <td colSpan={8} className="px-4 py-3">
+                                        <td colSpan={7} className="px-4 py-3">
                                             <FeedbackExpandPanel detail={detail} />
                                         </td>
                                     </tr>
@@ -1205,16 +1218,15 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
             <Td sticky>
                 <div className="flex items-center gap-3">
                     <Avatar name={user.username} src={user.avatar_url} size={32} />
-                    <div className="min-w-0">
-                        <button onClick={onOpenDetails} className="rounded text-left font-medium text-fg hover:underline">
+                    <div className="min-w-0 max-w-[210px]">
+                        <button onClick={onOpenDetails} className="block max-w-full truncate rounded text-left font-medium text-fg hover:underline">
                             {name}
                         </button>
+                        <div className="truncate text-meta text-fg-secondary" title={user.email || undefined}>{user.email || 'No email'}</div>
                         <div className="truncate font-mono text-meta text-fg-muted">ID {user.github_id}</div>
                     </div>
                 </div>
             </Td>
-
-            <Td className="max-w-[240px] truncate text-fg-secondary">{user.email || '–'}</Td>
 
             <Td>
                 <Select
@@ -2922,7 +2934,7 @@ function SystemTab({ status, capacity }: { status: StatusData | null; capacity: 
         )
     }
 
-    const plans = status.plans || { free: 0, starter: 0, pro: 0 }
+    const plans = planCounts(status)
 
     return (
         <div className="space-y-6">
@@ -2941,12 +2953,8 @@ function SystemTab({ status, capacity }: { status: StatusData | null; capacity: 
                 <BarList
                     metric="neutral"
                     showShare
-                    limit={3}
-                    items={[
-                        { key: 'free', label: 'Free', value: plans.free },
-                        { key: 'starter', label: 'Starter', value: plans.starter },
-                        { key: 'pro', label: 'Pro', value: plans.pro },
-                    ]}
+                    limit={6}
+                    items={plans.map(([name, count]) => ({ key: name, label: name.charAt(0).toUpperCase() + name.slice(1), value: count }))}
                 />
             </Card>
         </div>
