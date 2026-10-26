@@ -16,12 +16,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const DEFAULT_TITLE = `${BRAND_NAME}: All your sites. One screen. Free.`;
+const DESCRIPTION =
+  'Every Google Analytics 4 property and Search Console site you own on one free screen. Build dashboards you can share, show verified traffic on a public leaderboard, and ask ChatGPT or Claude about your numbers.';
+const SHORT_DESCRIPTION = 'All your Google Analytics and Search Console sites on one free screen, with dashboards, a verified leaderboard and a ChatGPT/Claude connector.';
+
 export const metadata: Metadata = {
   title: {
-    default: `${BRAND_NAME} — AI-Powered SEO & Analytics Platform`,
+    default: DEFAULT_TITLE,
     template: `%s | ${BRAND_NAME}`,
   },
-  description: "AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated fixes. Start free.",
+  description: DESCRIPTION,
+  applicationName: BRAND_NAME,
   icons: {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },
@@ -30,28 +36,16 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL(SITE_URL),
   openGraph: {
-    title: `${BRAND_NAME} — AI-Powered SEO & Analytics Platform`,
-    description: 'Monitor Google Analytics & Search Console, get AI-powered insights, traffic drop alerts, and automated SEO fixes.',
+    title: DEFAULT_TITLE,
+    description: SHORT_DESCRIPTION,
     siteName: `${BRAND_NAME}`,
     type: 'website',
     locale: 'en_US',
-    images: [
-      {
-        url: '/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: `${BRAND_NAME} — AI-Powered SEO & Analytics Dashboard`,
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${BRAND_NAME} — AI-Powered SEO & Analytics Platform`,
-    description: 'Monitor Google Analytics & Search Console, get AI-powered insights, traffic drop alerts, and automated SEO fixes.',
-    images: ['/og-image.png'],
-  },
-  other: {
-    'theme-color': '#000000',
+    title: DEFAULT_TITLE,
+    description: SHORT_DESCRIPTION,
   },
   manifest: '/manifest.json',
   robots: {
@@ -73,6 +67,11 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   viewportFit: 'cover',
+  // Light surfaces by default (public pages are always light); the app in dark mode.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b0c0f' },
+  ],
 };
 
 export default function RootLayout({
@@ -110,30 +109,12 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
-              '@type': 'SoftwareApplication',
-              name: `${BRAND_NAME}`,
-              applicationCategory: 'BusinessApplication',
-              operatingSystem: 'Web',
-              url: `${SITE_URL}`,
-              description: 'AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated fixes.',
-              featureList: 'Portfolio of every site, Dashboard builder, Verified traffic leaderboard, ChatGPT and Claude connector (MCP), AI chat assistant, Site audit, Smart alerts',
-              offers: [
-                { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '50 AI credits/month', url: `${SITE_URL}/pricing` },
-                { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '100 AI credits/month', url: `${SITE_URL}/pricing` },
-              ],
-            }),
-          }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
               '@type': 'Organization',
+              '@id': `${SITE_URL}/#organization`,
               name: `${BRAND_NAME}`,
               url: `${SITE_URL}`,
               logo: `${SITE_URL}/icon.svg`,
-              description: 'AI-powered SEO & analytics platform for growth teams.',
+              description: SHORT_DESCRIPTION,
               contactPoint: {
                 '@type': 'ContactPoint',
                 email: 'support@trafficclaw.com',
@@ -150,10 +131,9 @@ export default function RootLayout({
               '@context': 'https://schema.org',
               '@type': 'WebSite',
               name: `${BRAND_NAME}`,
-              alternateName: `${BRAND_NAME} — AI-Powered SEO & Analytics Platform`,
+              alternateName: DEFAULT_TITLE,
               url: `${SITE_URL}`,
-              description:
-                'AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated SEO fixes.',
+              description: DESCRIPTION,
               inLanguage: 'en-US',
               publisher: {
                 '@id': `${SITE_URL}/#organization`,
