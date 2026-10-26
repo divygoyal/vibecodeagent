@@ -40,6 +40,7 @@ from services.github_app_tokens import (
 from services import brevo as brevo_service
 from security.github_app_jwt import is_configured as github_app_is_configured
 from docker_manager import docker_manager
+from mcp_api import build_mcp_router, ensure_mcp_schema, delete_user_mcp_rows
 
 
 # ============= Database Setup =============
@@ -308,6 +309,9 @@ async def init_db():
                 await conn.execute(text(ddl))
             except Exception as exc:
                 print(f"[startup] ad slot DDL skipped: {type(exc).__name__}: {exc}")
+
+        # 019_add_mcp_oauth.sql — hosted MCP server (Connect AI). See mcp_api.py.
+        await ensure_mcp_schema(conn)
 
 
 async def get_db():
@@ -618,6 +622,10 @@ async def get_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[
         
     print(f"[DEBUG] User not found for identifier: {identifier}")
     return None
+
+
+# Hosted MCP server storage (Connect AI): /api/mcp/*. See mcp_api.py.
+app.include_router(build_mcp_router(get_db, verify_admin_key, get_user_by_identifier))
 
 
 async def log_container_event(db: AsyncSession, user_id: int, container_id: str, event_type: str, details: str = None):
@@ -2700,7 +2708,8 @@ async def delete_user(
     except Exception as e:
         print(f"[WARN] Container cleanup failed for {user.github_id}: {e}")
 
-    # 2. Delete OAuth connections
+    # 2. Delete OAuth connections and MCP grants, tokens, keys and audit rows
+    await delete_user_mcp_rows(db, user.id)
     from models import OAuthConnection
     await db.execute(
         OAuthConnection.__table__.delete().where(OAuthConnection.user_id == user.id)
