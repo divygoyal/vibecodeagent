@@ -125,7 +125,7 @@ export function PagesPage() {
                         <button key={s.value} type="button" aria-pressed={active} disabled={disabled}
                             title={disabled ? 'Turn on a comparison period' : s.value === 'decaying' ? 'Search clicks fell in each of the last three 28-day periods, 30%+ in total' : undefined}
                             onClick={() => void setSeg(s.value === 'all' ? null : s.value)}
-                            className={cn('inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-body-sm transition-colors duration-120 disabled:opacity-50',
+                            className={cn('inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-body-sm pointer-coarse:h-8 transition-colors duration-120 disabled:opacity-50',
                                 active ? 'border-transparent bg-brand-soft text-brand-soft-fg' : 'border-border-subtle bg-surface text-fg-secondary hover:bg-subtle')}>
                             {s.label}
                             <span className="text-meta tabular-nums opacity-80">{loading ? '…' : fmtFull(counts[s.value])}</span>

@@ -220,7 +220,7 @@ export function PerformanceTab() {
                             disabled={(p === 'lost' || p === 'new') && !compareOn}
                             title={(p === 'lost' || p === 'new') && !compareOn ? 'Turn on a comparison period to see lost and new queries' : undefined}
                             className={cn(
-                                'inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-body-sm transition-colors duration-120 disabled:opacity-50',
+                                'inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-body-sm pointer-coarse:h-8 transition-colors duration-120 disabled:opacity-50',
                                 active ? 'border-transparent bg-brand-soft text-brand-soft-fg' : 'border-border-subtle bg-surface text-fg-secondary hover:bg-subtle',
                             )}
                         >
