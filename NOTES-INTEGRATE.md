@@ -110,8 +110,17 @@ The worktree is shared with a robustness agent: commit with `git commit -- <path
 The coordinator restarted the integrate admin and web (current code) after the merges; web/.next was cleared
 after a Turbopack panic. Admin changes are also covered by the migration-upgrade script (own throwaway admins).
 
-## Crawl
-(see "Crawl results" below)
+## Crawl (final, 2026-10-26 on HEAD 2c5ae57, scripts/dev/crawl.mjs 3101, 3 parts + admin)
+- demo: 65 routes x desktop+mobile, every route 200, no 500s. Problems left: /admin as demo = one expected 403
+  ("Admins only" page); /view and /embed/d with the seed's old public token = 404 (the builder public-API test
+  rotated it; seed.json now has the new token, both 200); /share/<token> desktop hit a dev-server memory restart
+  mid-load (ChunkLoadError / connection reset; clean on re-run and on mobile).
+- admin: /admin and /superadmin 0 problems.
+- /dashboard/s/** checked for a GA4+GSC site, a GSC-only site and a GA4-only site (ga4-<id>): all 200, 0 problems.
+- Known dev-only issues: `/?callbackUrl=` with "dashboard"/"leaderboard" in it 500s on next dev (QA-01; the
+  production preview answers 200), and an occasional first-load hydration-attribute warning (QA-18). next dev
+  restarts itself under memory pressure during full crawls (19 times this session), which shows up as
+  connection resets.
 
 ## Migration upgrade check (019-023)
 `/root/.trafficclaw-dev/venv/bin/python scripts/dev/check_migrations.py` (own throwaway admins on 8130/8131, temp dir,
