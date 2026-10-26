@@ -16,3 +16,8 @@ for f in "$TC_DEV_HOME"/*/instance.env; do
     pid_alive "$ap" || ap="-"
     printf '%-12s %-6s %-6s %-8s %-8s %s\n' "$name" "$web" "$admin" "$wp" "$ap" "$repo"
 done
+
+echo
+echo "Next dev slots (max $TC_MAX_SLOTS on this box):"
+mkdir -p "$TC_SLOTS_DIR"
+slot_report
