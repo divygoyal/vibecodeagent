@@ -12,7 +12,7 @@
 --   missing          1 when the asset was absent from the latest inventory
 --                    (row kept so flags survive a temporary access loss)
 --
--- site_daily_metrics: one row per (user, asset kind, asset id, date) with the
+-- site_daily_metrics: one row per (user, asset kind, date, asset id) with the
 -- day's metrics. GA4 rows fill users..engagement_rate, GSC rows fill
 -- clicks..position. Missing days count as zero when summed.
 --
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS site_daily_metrics (
     ctr REAL,
     position REAL,
     updated_at INTEGER NOT NULL,
-    PRIMARY KEY (user_id, asset_kind, asset_id, date)
-);
-
-CREATE INDEX IF NOT EXISTS ix_site_daily_metrics_user_date ON site_daily_metrics(user_id, date);
+    -- Clustered by (user, kind, date): the portfolio reads date ranges of all
+    -- of a user's assets, which becomes one contiguous range scan.
+    PRIMARY KEY (user_id, asset_kind, date, asset_id)
+) WITHOUT ROWID;

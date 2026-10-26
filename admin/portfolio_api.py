@@ -21,13 +21,14 @@ Wiring (main.py):
 """
 from __future__ import annotations
 
+import json
 import math
 import os
 import time
 from datetime import date as _date, timedelta
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -39,6 +40,34 @@ NO_PAIR = "__none__"
 MAX_ASSETS = 5000
 MAX_ROWS_PER_CALL = 20000
 MAX_BUCKET_DAYS = 31
+
+# Daily columns per kind, the sums the snapshot returns and the per-bucket series.
+RAW_COLUMNS = {
+    "ga4": ("users", "sessions", "pageviews", "key_events", "engagement_rate"),
+    "gsc": ("clicks", "impressions", "position"),
+}
+SUM_COLUMNS = {
+    "ga4": ("users", "sessions", "pageviews", "key_events", "engaged_weighted"),
+    "gsc": ("clicks", "impressions", "position_weighted"),
+}
+SUM_SQL = {
+    "ga4": ("SUM(users) AS users", "SUM(sessions) AS sessions", "SUM(pageviews) AS pageviews",
+            "SUM(key_events) AS key_events", "SUM(engagement_rate * sessions) AS engaged_weighted"),
+    "gsc": ("SUM(clicks) AS clicks", "SUM(impressions) AS impressions", "SUM(position * impressions) AS position_weighted"),
+}
+SERIES_COLUMNS = {"ga4": ("users", "sessions"), "gsc": ("clicks", "impressions", "position_weighted")}
+
+
+def _derived(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
+    """One daily row as the summable values (weighted rate and position)."""
+    if kind == "ga4":
+        er, s = raw.get("engagement_rate"), raw.get("sessions")
+        raw["engaged_weighted"] = er * s if er is not None and s is not None else None
+    else:
+        p, i = raw.get("position"), raw.get("impressions")
+        raw["position_weighted"] = p * i if p is not None and i is not None else None
+    return raw
+
 
 ASSET_COLUMNS = (
     "asset_kind, asset_id, display_name, host, account_name, permission_level, paired_with, "
@@ -337,7 +366,7 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
                     key_events, engagement_rate, clicks, impressions, ctr, position, updated_at)
                 VALUES (:u, :k, :a, :d, :users, :sessions, :pageviews, :key_events, :er, :clicks, :impressions,
                     :ctr, :position, :now)
-                ON CONFLICT(user_id, asset_kind, asset_id, date) DO UPDATE SET
+                ON CONFLICT(user_id, asset_kind, date, asset_id) DO UPDATE SET
                     users = excluded.users, sessions = excluded.sessions, pageviews = excluded.pageviews,
                     key_events = excluded.key_events, engagement_rate = excluded.engagement_rate,
                     clicks = excluded.clicks, impressions = excluded.impressions, ctr = excluded.ctr,
@@ -349,19 +378,22 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
 
     @router.post("/users/{identifier}/snapshot")
     async def snapshot(identifier: str, body: SnapshotQuery, db=Depends(get_db)):
-        """Assets plus, per asset: current and previous window sums, a bucketed
-        current-window series and the last `recent_days` daily values.
+        """Assets plus, per asset: current and previous window sums, bucketed
+        series for both windows and the last `recent_days` daily values.
 
         Windows are per kind because Search Console lags GA4 by 2-3 days.
-        Buckets count back from cur_end (bucket 0 = the newest), so only the
-        oldest bucket can be partial.
+        Buckets count back from each window's end (index n-1 is the newest), so
+        only the oldest bucket can be partial. One range scan per kind: the
+        table is clustered by (user, kind, date), so 500 sites x 3 months is a
+        few hundred milliseconds.
         """
         user_id = await resolve_user_id(db, identifier)
         b = max(1, min(int(body.bucket_days), MAX_BUCKET_DAYS))
         recent_days = max(1, min(int(body.recent_days), 31))
-        out = {"assets": await list_assets(db, user_id), "totals": [], "series": {}, "recent": {}, "bucket_days": b}
+        out: Dict[str, Any] = {
+            "assets": await list_assets(db, user_id), "windows": {}, "totals": [], "series": {}, "recent": {}, "bucket_days": b,
+        }
 
-        out["windows"] = {}
         for kind, w in body.windows.items():
             _check_kind(kind)
             end = w.end
@@ -381,81 +413,87 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
             cs = ce - timedelta(days=w.days - 1)
             pe = cs - timedelta(days=1)
             ps = pe - timedelta(days=w.days - 1)
-            win = {"cur_start": cs.isoformat(), "cur_end": ce.isoformat(), "prev_start": ps.isoformat(), "prev_end": pe.isoformat()}
-            out["windows"][kind] = win
-            p = {"u": user_id, "k": kind, "cs": win["cur_start"], "ce": win["cur_end"], "ps": win["prev_start"], "pe": win["prev_end"]}
+            out["windows"][kind] = {"cur_start": cs.isoformat(), "cur_end": ce.isoformat(), "prev_start": ps.isoformat(), "prev_end": pe.isoformat()}
 
-            totals = (await db.execute(text(
-                """
-                SELECT asset_id,
-                       CASE WHEN date >= :cs THEN 'cur' ELSE 'prev' END AS w,
-                       COUNT(*) AS days,
-                       SUM(users) AS users, SUM(sessions) AS sessions, SUM(pageviews) AS pageviews,
-                       SUM(key_events) AS key_events, SUM(engagement_rate * sessions) AS engaged_weighted,
-                       SUM(clicks) AS clicks, SUM(impressions) AS impressions,
-                       SUM(position * impressions) AS position_weighted
-                FROM site_daily_metrics
-                WHERE user_id = :u AND asset_kind = :k
-                  AND ((date BETWEEN :cs AND :ce) OR (date BETWEEN :ps AND :pe))
-                GROUP BY asset_id, w
-                """
-            ), p)).fetchall()
-            for r in totals:
-                m = dict(r._mapping)
-                m["kind"] = kind
-                out["totals"].append(m)
+            n = max(1, math.ceil(w.days / b))
+            sum_cols = SUM_COLUMNS[kind]
+            series_cols = SERIES_COLUMNS[kind]
+            totals: Dict[tuple, Dict[str, float]] = {}
+            cur_series: Dict[str, Dict[str, list]] = {}
+            prev_series: Dict[str, Dict[str, list]] = {}
+            recent: Dict[str, list] = {}
+            ce_o, pe_o, cs_iso = ce.toordinal(), pe.toordinal(), cs.isoformat()
+            recent_from = (ce - timedelta(days=recent_days - 1)).isoformat()
 
-            span = w.days
-            n_buckets = max(1, math.ceil(span / b))
-            metrics = ("users", "sessions") if kind == "ga4" else ("clicks", "impressions", "position_weighted")
+            def add(asset: str, window: str, idx: int, vals: Dict[str, float], days: int) -> None:
+                t = totals.get((asset, window))
+                if t is None:
+                    t = totals[(asset, window)] = {"days": 0, **{c: None for c in sum_cols}}
+                t["days"] += days
+                for c in sum_cols:
+                    v = vals.get(c)
+                    if v is not None:
+                        t[c] = (t[c] or 0) + v
+                if 0 <= idx < n:
+                    target = cur_series if window == "cur" else prev_series
+                    arrs = target.get(asset)
+                    if arrs is None:
+                        arrs = target[asset] = {c: [0] * n for c in series_cols}
+                    for c in series_cols:
+                        arrs[c][idx] += vals.get(c) or 0
 
-            async def bucketed(start: str, end: str) -> Dict[str, Dict[str, list]]:
-                # Buckets count back from `end`: bucket 0 is the newest, so only the oldest can be partial.
+            params = {"u": user_id, "k": kind, "ps": ps.isoformat(), "ce": ce.isoformat()}
+            if b == 1:
                 rows = (await db.execute(text(
-                    """
+                    f"SELECT asset_id, date, {', '.join(RAW_COLUMNS[kind])} FROM site_daily_metrics "
+                    "WHERE user_id = :u AND asset_kind = :k AND date BETWEEN :ps AND :ce"
+                ), params)).fetchall()
+                ordinals: Dict[str, int] = {}
+                for r in rows:
+                    asset, d = r[0], r[1]
+                    o = ordinals.get(d)
+                    if o is None:
+                        o = ordinals[d] = _date.fromisoformat(d).toordinal()
+                    vals = _derived(kind, dict(zip(RAW_COLUMNS[kind], r[2:])))
+                    if d >= cs_iso:
+                        add(asset, "cur", n - 1 - (ce_o - o), vals, 1)
+                        if d >= recent_from:
+                            recent.setdefault(asset, []).append([d, (vals.get("users") if kind == "ga4" else vals.get("clicks")) or 0])
+                    else:
+                        add(asset, "prev", n - 1 - (pe_o - o), vals, 1)
+            else:
+                rows = (await db.execute(text(
+                    f"""
                     SELECT asset_id,
-                           CAST((julianday(:end) - julianday(date)) / :b AS INTEGER) AS bi,
-                           SUM(users) AS users, SUM(sessions) AS sessions,
-                           SUM(clicks) AS clicks, SUM(impressions) AS impressions,
-                           SUM(position * impressions) AS position_weighted
+                           CASE WHEN date >= :cs THEN CAST((julianday(:ce) - julianday(date)) / :b AS INTEGER)
+                                ELSE 100000 + CAST((julianday(:pe) - julianday(date)) / :b AS INTEGER) END AS bi,
+                           COUNT(*) AS days, {', '.join(SUM_SQL[kind])}
                     FROM site_daily_metrics
-                    WHERE user_id = :u AND asset_kind = :k AND date BETWEEN :start AND :end
+                    WHERE user_id = :u AND asset_kind = :k AND date BETWEEN :ps AND :ce
                     GROUP BY asset_id, bi
                     """
-                ), {"u": user_id, "k": kind, "start": start, "end": end, "b": b})).fetchall()
-                by_asset: Dict[str, Dict[str, list]] = {}
+                ), {**params, "cs": cs_iso, "pe": pe.isoformat(), "b": b})).fetchall()
                 for r in rows:
                     m = r._mapping
-                    s = by_asset.setdefault(m["asset_id"], {k: [0] * n_buckets for k in metrics})
-                    idx = n_buckets - 1 - int(m["bi"])
-                    if 0 <= idx < n_buckets:
-                        for k in metrics:
-                            s[k][idx] = m[k] or 0
-                return by_asset
+                    bi = int(m["bi"])
+                    window = "prev" if bi >= 100000 else "cur"
+                    add(m["asset_id"], window, n - 1 - (bi - 100000 if window == "prev" else bi), {c: m[c] for c in sum_cols}, int(m["days"]))
+                recent_rows = (await db.execute(text(
+                    "SELECT asset_id, date, users, clicks FROM site_daily_metrics "
+                    "WHERE user_id = :u AND asset_kind = :k AND date BETWEEN :rf AND :ce ORDER BY date"
+                ), {"u": user_id, "k": kind, "rf": recent_from, "ce": ce.isoformat()})).fetchall()
+                for r in recent_rows:
+                    recent.setdefault(r[0], []).append([r[1], (r[2] if kind == "ga4" else r[3]) or 0])
 
-            out["series"][kind] = {
-                "n": n_buckets,
-                "span_days": span,
-                "by_asset": await bucketed(win["cur_start"], win["cur_end"]),
-                "prev_by_asset": await bucketed(win["prev_start"], win["prev_end"]),
-            }
-
-            recent_rows = (await db.execute(text(
-                """
-                SELECT asset_id, date, users, sessions, clicks, impressions
-                FROM site_daily_metrics
-                WHERE user_id = :u AND asset_kind = :k AND date BETWEEN date(:ce, :back) AND :ce
-                ORDER BY asset_id, date
-                """
-            ), {**p, "back": f"-{recent_days - 1} days"})).fetchall()
-            recent: Dict[str, list] = {}
-            for r in recent_rows:
-                m = r._mapping
-                v = (m["users"] if kind == "ga4" else m["clicks"]) or 0
-                recent.setdefault(m["asset_id"], []).append([m["date"], v])
+            for (asset, window), t in totals.items():
+                out["totals"].append({"kind": kind, "asset_id": asset, "w": window, **t})
+            for lst in recent.values():
+                lst.sort(key=lambda x: x[0])
+            out["series"][kind] = {"n": n, "span_days": w.days, "by_asset": cur_series, "prev_by_asset": prev_series}
             out["recent"][kind] = recent
 
-        return out
+        # Large portfolios produce MBs of numbers: skip FastAPI's per-item encoder.
+        return Response(content=json.dumps(out, separators=(",", ":")), media_type="application/json")
 
     # ── cron support ──
     @router.get("/stale-users")
