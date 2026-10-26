@@ -87,9 +87,6 @@ export const LEGACY_ROUTE_PREFIXES: string[] = [
     '/dashboard/docs',
     '/dashboard/setup',
     '/dashboard/weekly',
-    '/dashboard/analytics',
-    '/dashboard/seo',
-    '/dashboard/audit',
 ];
 
 export function isLegacyRoute(pathname: string): boolean {

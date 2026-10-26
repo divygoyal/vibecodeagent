@@ -343,6 +343,8 @@ async def lifespan(app: FastAPI):
     await init_db()
     # 020_add_portfolio.sql: portfolio snapshot store. See portfolio_api.py.
     await ensure_portfolio_schema(engine)
+    # 023_add_site_action_states.sql: site "Actions" done/dismissed states.
+    await ensure_site_actions_schema(engine)
 
     # Auto-encrypt any pre-existing plaintext OAuth tokens.
     # Idempotent — skips rows that are already Fernet ciphertext.
@@ -675,6 +677,7 @@ def get_user_runtime_identifier(user: User) -> str:
 
 # Portfolio snapshot store (app home): /api/portfolio/*. See portfolio_api.py.
 from portfolio_api import build_portfolio_router, ensure_portfolio_schema, delete_user_portfolio_rows  # noqa: E402
+from site_actions_api import build_site_actions_router, ensure_site_actions_schema, delete_user_site_action_rows  # noqa: E402
 app.include_router(build_portfolio_router(get_db, verify_admin_key, get_user_by_identifier))
 
 
@@ -2735,8 +2738,9 @@ async def delete_user(
         OAuthConnection.__table__.delete().where(OAuthConnection.user_id == user.id)
     )
 
-    # 3. Delete user record (and the portfolio snapshot rows)
+    # 3. Delete user record (and the portfolio snapshot rows and site action states)
     await delete_user_portfolio_rows(db, user.id)
+    await delete_user_site_action_rows(db, user.id)
     await db.delete(user)
     await db.commit()
 
@@ -6891,6 +6895,11 @@ async def get_weekly_digests(
         "digests": [_serialize_weekly_digest_summary(d) for d in digests],
         "exists": True,
     }
+
+
+# Site "Actions" task states (migration 023): /api/site-actions/*. See site_actions_api.py.
+# The table is created at startup (lifespan) and, as a fallback, on first use.
+app.include_router(build_site_actions_router(get_db, verify_admin_key, get_user_by_identifier))
 
 
 # ============= Health Check =============

@@ -1,13 +1,8 @@
 'use client';
 
-import AuditPage from '../../../audit/page';
-import { LegacySitePage } from '../LegacySitePage';
+import { ActionsPage } from '@/components/site/actions/ActionsPage';
 
-/** Actions ("What to fix next", DESIGN 5.8). For now: the old site audit. */
+/** Actions (DESIGN 5.8): ?status=open|done|dismissed&type=&impact=. */
 export default function SiteActionsPage() {
-    return (
-        <LegacySitePage section="actions">
-            <AuditPage />
-        </LegacySitePage>
-    );
+    return <ActionsPage />;
 }
