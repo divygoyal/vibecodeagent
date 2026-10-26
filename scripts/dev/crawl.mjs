@@ -136,7 +136,12 @@ async function visit(context, base, route, outFile) {
     } catch (err) {
         error = error || `screenshot: ${err.message.split('\n')[0]}`;
     }
-    const firstParty = x => !THIRD_PARTY.test(x);
+    // First party = mentions no URL, or only URLs on this dev server.
+    const firstParty = x => {
+        const urls = String(x).match(/https?:\/\/[^\s'"),]+/g) || [];
+        if (THIRD_PARTY.test(x) && !urls.some(u => u.startsWith(base))) return false;
+        return urls.length === 0 || urls.some(u => u.startsWith(base));
+    };
     const result = {
         status,
         finalPath: page.url().replace(base, ''),

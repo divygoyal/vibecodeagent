@@ -103,6 +103,7 @@ else
         cd "$REPO/web"
         env -i "${BASE_ENV[@]}" \
             NODE_OPTIONS="--max-old-space-size=1536" \
+            TC_TURBOPACK_MEMORY_LIMIT_MB="${TC_TURBOPACK_MEMORY_LIMIT_MB:-1024}" \
             NEXT_TELEMETRY_DISABLED=1 \
             NEXTAUTH_URL="http://localhost:$WEB_PORT" \
             NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
