@@ -7,8 +7,9 @@
 # - Data, logs and pids live in /root/.trafficclaw-dev/<name>/ (never in the repo).
 # - --fresh deletes that instance's admin DB first.
 # - Idempotent: running it again leaves healthy processes alone.
-# - At most 3 next dev servers run on the box at once (slot locks in
+# - At most 2 next dev servers run on the box at once (slot locks in
 #   /root/.trafficclaw-dev/slots); waits up to TC_SLOT_WAIT_MIN (10) minutes for one.
+# - Refuses to start a dev server when MemAvailable < 2500 MB.
 # See scripts/dev/README.md.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -61,6 +62,10 @@ BASE_ENV=(PATH="/usr/local/bin:/usr/bin:/bin" HOME="$HOME" LANG=C.UTF-8 TZ=UTC T
 # ─── Dev-server slot (before starting anything, so a refusal leaves nothing behind) ───
 SLOT=""
 if ! { web_pid_now="$(owned_pid "$INST/web.pid" "$REPO/web")" && port_listening "$WEB_PORT"; }; then
+    avail="$(mem_available_mb)"
+    if [ "$avail" -lt "$TC_MIN_AVAILABLE_MB" ]; then
+        die "only ${avail} MB RAM available (need ${TC_MIN_AVAILABLE_MB} MB; production runs on this box). Stop idle dev servers (scripts/dev/status.sh, down.sh) and try again."
+    fi
     # Take one of the $TC_MAX_SLOTS dev-server slots (waits up to TC_SLOT_WAIT_MIN minutes, default 10).
     mkdir -p "$TC_SLOTS_DIR"
     exec 8>"$TC_SLOTS_DIR/.alloc.lock"
