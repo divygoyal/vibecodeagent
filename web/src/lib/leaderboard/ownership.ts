@@ -3,7 +3,7 @@
  * web/tests/leaderboard.test.mjs).
  */
 import { siteCoversHost, siteKind } from '@/lib/sites/pairing';
-import type { VerificationDetail } from './types';
+import type { VerificationDetail, VerificationLevel } from './types';
 
 const GSC_OWNER_LEVELS = new Set(['siteOwner', 'siteFullUser']);
 
@@ -80,3 +80,26 @@ export function buildFix(detail: VerificationDetail): string[] {
     return steps;
 }
 
+
+/**
+ * The GA4 data stream counts as matching when its host is the claimed host (checked by
+ * the caller) or a host the verified Search Console property covers: a Domain property
+ * for example.com also covers the stream for app.example.com.
+ */
+export function ga4StreamIsOwned(streamHosts: string[], ownerSite: GscSiteEntry | null): boolean {
+    return !!ownerSite && streamHosts.some((h) => siteCoversHost(ownerSite.siteUrl, h));
+}
+
+/**
+ * The verification level from both signals. Search Console ownership ranks you, unless Google
+ * Analytics definitively says the property tracks some other site: then the numbers are not
+ * this site's, so the entry stays unranked (a property we merely could not read does not count
+ * against you).
+ */
+export function decideLevel(detail: VerificationDetail): VerificationLevel {
+    const ga4 = detail.ga4;
+    const ga4Contradicts = !!ga4 && !ga4.ok && (ga4.reason === 'host_mismatch' || ga4.reason === 'no_web_stream');
+    if (detail.gsc?.ok && !ga4Contradicts) return 'owner';
+    if (ga4?.ok) return 'ga4';
+    return 'none';
+}

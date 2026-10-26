@@ -1,6 +1,6 @@
 import { getValidAccessToken, listSearchConsoleSites } from '@/lib/googleApi';
 import { normalizeHost as pairingHost, siteKind } from '@/lib/sites/pairing';
-import { buildFix, gscCoverage, type GscSiteEntry } from '@/lib/leaderboard/ownership';
+import { buildFix, decideLevel, ga4StreamIsOwned, gscCoverage, type GscSiteEntry } from '@/lib/leaderboard/ownership';
 import type { OwnershipOutcome, VerificationDetail, VerificationLevel } from '@/lib/leaderboard/types';
 
 const GA_ADMIN_BASE = 'https://analyticsadmin.googleapis.com/v1beta';
@@ -191,9 +191,11 @@ export async function checkOwnership(input: CheckOwnershipInput): Promise<Owners
 
     // Search Console ownership.
     let sites: GscSiteEntry[] = [];
+    let ownerSite: GscSiteEntry | null = null;
     try {
         sites = (await listSearchConsoleSites(token, AbortSignal.timeout(15_000))) as GscSiteEntry[];
         const cov = gscCoverage(sites, host);
+        ownerSite = cov.ok ? cov.site : null;
         detail.gsc = {
             ok: cov.ok,
             reason: cov.reason,
@@ -218,17 +220,22 @@ export async function checkOwnership(input: CheckOwnershipInput): Promise<Owners
         } else if (ga.status === 'failed') {
             // Could not read the property at all. Keep the Search Console result but note it.
             detail.ga4 = { ok: false, reason: 'api_error', hosts: [] };
+        } else if (ga.status === 'host_mismatch' && ga4StreamIsOwned(ga.actualHosts || [], ownerSite)) {
+            // The stream is for a subdomain the verified Search Console property covers.
+            detail.ga4 = { ok: true, reason: 'ok', hosts: ga.actualHosts || [] };
         } else {
             detail.ga4 = { ok: false, reason: ga.status, hosts: ga.actualHosts || [] };
         }
     }
 
-    const level: VerificationLevel = detail.gsc?.ok ? 'owner' : detail.ga4?.ok ? 'ga4' : 'none';
+    const level: VerificationLevel = decideLevel(detail);
     const fix = level === 'owner' ? [] : buildFix(detail);
     let message: string;
     if (level === 'owner') {
         message = `Verified: you are an owner of ${detail.gsc?.site_url} in Search Console.`;
         if (detail.ga4 && !detail.ga4.ok) message += ' The Google Analytics property could not be matched, so the GA4 badge is off.';
+    } else if (detail.gsc?.ok) {
+        message = `You own ${detail.gsc.site_url} in Search Console, but the Google Analytics property tracks ${detail.ga4?.hosts.join(', ') || 'a different site'}, not ${host}. The numbers must come from this site's own property.`;
     } else if (level === 'ga4') {
         message = `Google Analytics matches ${host}, but we could not confirm you own it in Search Console. Only verified owners are ranked.`;
     } else {

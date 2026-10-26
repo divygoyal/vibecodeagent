@@ -4,7 +4,7 @@ import './_register-alias.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { gscCoverage, buildFix } = await import('../src/lib/leaderboard/ownership.ts');
+const { gscCoverage, buildFix, decideLevel, ga4StreamIsOwned } = await import('../src/lib/leaderboard/ownership.ts');
 const { metricText, metricExact, deltaText, engagementText } = await import('../src/lib/leaderboard/format.ts');
 const { badgeSvg } = await import('../src/lib/leaderboard/badgeSvg.ts');
 
@@ -58,6 +58,31 @@ test('fix-it steps say what to do for each failure', () => {
     const mismatch = buildFix({ expected_host: 'acme.com', ga4: { ok: false, reason: 'host_mismatch', hosts: ['other.com'] } });
     assert.match(mismatch[0], /tracks other\.com, not acme\.com/);
     assert.deepEqual(buildFix({ expected_host: 'acme.com', gsc: { ok: true, reason: 'ok', site_url: 'x', permission: 'siteOwner' } }), []);
+});
+
+test('level: Search Console ownership ranks, unless GA4 says the numbers belong to another site', () => {
+    const gscOk = { ok: true, reason: 'ok', site_url: 'sc-domain:acme.com', permission: 'siteOwner' };
+    const gscNo = { ok: false, reason: 'not_in_search_console', site_url: null, permission: null };
+    const ga4Ok = { ok: true, reason: 'ok', hosts: ['acme.com'] };
+    assert.equal(decideLevel({ gsc: gscOk, ga4: ga4Ok }), 'owner');
+    assert.equal(decideLevel({ gsc: gscOk }), 'owner');
+    assert.equal(decideLevel({ gsc: gscNo, ga4: ga4Ok }), 'ga4');
+    assert.equal(decideLevel({ gsc: gscNo, ga4: { ok: false, reason: 'host_mismatch', hosts: ['x.com'] } }), 'none');
+    assert.equal(decideLevel({ gsc: gscNo }), 'none');
+    // owner of acme.com whose GA4 property tracks other.com: the visitors are not acme.com's
+    assert.equal(decideLevel({ gsc: gscOk, ga4: { ok: false, reason: 'host_mismatch', hosts: ['other.com'] } }), 'none');
+    assert.equal(decideLevel({ gsc: gscOk, ga4: { ok: false, reason: 'no_web_stream', hosts: [] } }), 'none');
+    // a property we could not read is not evidence against the owner
+    assert.equal(decideLevel({ gsc: gscOk, ga4: { ok: false, reason: 'api_error', hosts: [] } }), 'owner');
+});
+
+test('a GA4 stream on a subdomain the verified property covers counts as a match', () => {
+    const site = { siteUrl: 'sc-domain:acme.com', permissionLevel: 'siteOwner' };
+    assert.equal(ga4StreamIsOwned(['app.acme.com'], site), true);
+    assert.equal(ga4StreamIsOwned(['acme.com.evil.test'], site), false);
+    assert.equal(ga4StreamIsOwned(['other.com'], site), false);
+    assert.equal(ga4StreamIsOwned(['app.acme.com'], null), false);
+    assert.equal(ga4StreamIsOwned(['app.acme.com'], { siteUrl: 'https://acme.com/', permissionLevel: 'siteOwner' }), false);
 });
 
 test('shared metrics read as the number or the band, never both', () => {
