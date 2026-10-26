@@ -161,3 +161,22 @@ like the real API. Edit sites, shapes and topics in `web/src/lib/demo/catalog.ts
 
 Harmless warnings in `web.log`: "Next.js inferred your workspace root …
 /root/package-lock.json" and "middleware file convention is deprecated".
+
+## 6. Leaderboard seed (public board for screenshots and tests)
+
+`login.mjs` (demo user, first run) also seeds a populated public leaderboard: 15 listings
+(13 ranked across 10 categories, 2 left on "Pending verification" to show the fix-it messages),
+with a mix of exact / range / hidden privacy, ad slots and offers in the inbox. It goes
+through the real routes (`POST /api/leaderboard/me`, PATCH, publish) and runs the daily cron
+once, so the whole pipeline runs against the demo Google generator. Skip it with `--no-board`.
+
+```bash
+node scripts/dev/seed-leaderboard.mjs 3105          # idempotent; run again to refresh
+python3 scripts/dev/check_leaderboard_privacy.py 3105 <instance>   # fails on any leak of hidden/banded values
+curl -H "Authorization: Bearer $(grep ^CRON_SECRET /root/.trafficclaw-dev/dev.env | cut -d= -f2)" \
+     http://localhost:3105/api/cron/leaderboard-refresh   # the daily refresh, by hand
+```
+
+The community sites (PixelForge, ByteBrief, ShipFast, LearnLoop, Promptly, Green Grocer, Quiet Labs)
+live in `web/src/lib/demo/catalog.ts`, each with its own demo Google account `founder-<key>`.
+Quiet Labs has restricted Search Console access on purpose.
