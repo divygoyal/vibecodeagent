@@ -57,7 +57,7 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
 
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://trafficclaw.com';
     const link = share.token ? `${origin}/view/${share.token}` : '';
-    const embedUrl = share.token ? `${origin}/view/${share.token}?embed=1&theme=${embedTheme}` : '';
+    const embedUrl = share.token ? `${origin}/embed/d/${share.token}?theme=${embedTheme}` : '';
     const snippet = useMemo(() => [
         `<iframe id="tc-dashboard" src="${embedUrl}" width="100%" height="${embedHeight}" style="border:0" loading="lazy" title="${doc.name.replace(/"/g, '')}"></iframe>`,
         '<script>',
