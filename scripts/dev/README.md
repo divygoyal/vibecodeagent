@@ -141,7 +141,11 @@ like the real API. Edit sites, shapes and topics in `web/src/lib/demo/catalog.ts
 - Not configured on purpose: Gemini/Vertex, Brevo, Telegram, Dodo, Twitter/X,
   GitHub app, Coolify, Upstash, Umami, Brave. Features that need them show
   their fallback. Google/GitHub client ids are dummies (OAuth buttons go nowhere).
-- `next dev` gets `NODE_OPTIONS=--max-old-space-size=1536`; expect ~0.5–1.5 GB RSS.
+- `next dev` gets `NODE_OPTIONS=--max-old-space-size=1536` and a Turbopack cache
+  target of 1 GB (`TC_TURBOPACK_MEMORY_LIMIT_MB`, read by `web/next.config.ts`,
+  unset in production). Expect 1–2.5 GB RSS per instance once many routes are
+  compiled (a full crawl compiles all of them). **The box also runs production:
+  keep at most 2–3 instances up at once and run `down.sh` as soon as you finish.**
 
 Harmless warnings in `web.log`: "Next.js inferred your workspace root …
 /root/package-lock.json" and "middleware file convention is deprecated".
