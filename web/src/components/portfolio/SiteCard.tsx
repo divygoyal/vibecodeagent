@@ -164,7 +164,7 @@ export const SiteCard = memo(function SiteCard({
 
     return (
         <article
-            className={cn(cardBaseClass, !readOnly && cardInteractiveClass, '@container relative flex min-w-0 flex-col gap-3 p-4')}
+            className={cn(cardBaseClass, !readOnly && cardInteractiveClass, 'group/card @container relative flex min-w-0 flex-col gap-3 p-4')}
             data-site={site.slug}
         >
             {readOnly ? null : (
@@ -207,7 +207,7 @@ export const SiteCard = memo(function SiteCard({
             {metrics}
 
             <div
-                className={cn('relative', !readOnly && 'z-[1] cursor-pointer', greyed && 'opacity-50')}
+                className={cn('relative mt-auto', !readOnly && 'z-[1] cursor-pointer', greyed && 'opacity-50')}
                 onClick={readOnly ? undefined : () => onOpen?.(site)}
             >
                 {loadingData ? (
@@ -219,8 +219,8 @@ export const SiteCard = memo(function SiteCard({
                 )}
             </div>
 
-            <div className="mt-auto flex min-w-0 items-center gap-2">
-                <SiteStatusPill site={site} syncing={syncing} />
+            <div className="flex min-w-0 items-center gap-1.5">
+                <SiteStatusPill site={site} syncing={syncing} className="shrink-0" />
                 {chip ? (
                     <Tooltip content={site.alerts.map((a) => a.message).join(' · ')}>
                         <span className="relative z-[1] inline-flex min-w-0" tabIndex={0}>
@@ -230,7 +230,7 @@ export const SiteCard = memo(function SiteCard({
                         </span>
                     </Tooltip>
                 ) : window && !loadingData ? (
-                    <span className="truncate text-meta text-fg-muted tabular-nums">
+                    <span className="min-w-0 truncate text-meta whitespace-nowrap text-fg-muted">
                         {greyed && site.lastSyncedAt ? `Last data ${fmtDay(new Date(site.lastSyncedAt * 1000))}` : fmtDateRange(window.curStart, window.curEnd)}
                     </span>
                 ) : null}
@@ -242,7 +242,13 @@ export const SiteCard = memo(function SiteCard({
                         </span>
                     </Tooltip>
                 ) : null}
-                {menu && !readOnly ? <SiteMenu site={site} actions={menu} className="relative z-[1]" /> : null}
+                {menu && !readOnly ? (
+                    <SiteMenu
+                        site={site}
+                        actions={menu}
+                        className="relative z-[1] size-6! pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:opacity-100 data-[state=open]:opacity-100"
+                    />
+                ) : null}
                 {readOnly ? null : compact ? (
                     <ChevronRight aria-hidden size={16} className="relative z-0 text-fg-muted" />
                 ) : (
@@ -251,7 +257,7 @@ export const SiteCard = memo(function SiteCard({
                         prefetch={false}
                         onClick={open}
                         tabIndex={-1}
-                        className="relative z-[1] inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary underline-offset-4 hover:text-fg hover:underline"
+                        className="relative z-[1] inline-flex shrink-0 items-center gap-1 text-body-sm font-medium text-fg-secondary underline-offset-4 hover:text-fg hover:underline"
                     >
                         Details
                         <ArrowRight aria-hidden size={14} strokeWidth={1.75} />

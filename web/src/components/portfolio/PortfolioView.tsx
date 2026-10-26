@@ -137,7 +137,7 @@ export function PortfolioView(props: PortfolioViewProps) {
     const visibleCount = sites.filter((s) => !s.hidden).length;
     const hiddenCount = sites.length - visibleCount;
 
-    const activeLayout: PortfolioLayout = isMobile ? 'grid' : layout ?? (visibleCount >= 25 ? 'table' : 'grid');
+    const activeLayout: PortfolioLayout = layout ?? (!isMobile && visibleCount >= 25 ? 'table' : 'grid');
 
     const view: CardView = filter === 'ga4' ? 'traffic' : 'search';
     const [metricState, setMetricState] = useState<{ view: CardView; metric: TotalsMetric } | null>(null);
@@ -203,7 +203,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                             onValueChange={setQuery}
                             placeholder="Search sites"
                             aria-label="Search sites"
-                            className="w-44 shrink-0 md:w-48"
+                            className="w-44 shrink-0 md:w-36 lg:w-44"
                         />
                         <Select
                             value={sort}
@@ -211,7 +211,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                             options={SORT_OPTIONS}
                             ariaLabel="Sort sites"
                             align="end"
-                            className="shrink-0"
+                            className="w-[164px] min-w-0 shrink-0"
                         />
                         <SegmentedControl options={RANGE_OPTIONS} value={range} onChange={onRangeChange} ariaLabel="Date range" />
                     </>
@@ -285,7 +285,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                                     />
                                 </Tooltip>
                             )}
-                            {isMobile ? null : (
+                            {(
                                 <SegmentedControl<PortfolioLayout>
                                     variant="neutral"
                                     size="sm"

@@ -29,7 +29,7 @@ export function SiteMenu({ site, actions, className }: { site: PortfolioSite; ac
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" iconOnly icon={MoreHorizontal} aria-label={`More for ${site.label}`} className={`size-7 ${className ?? ''}`} />
+                <Button variant="ghost" size="sm" iconOnly icon={MoreHorizontal} aria-label={`More for ${site.label}`} className={className ?? 'size-7'} />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
                 <DropdownMenuItem icon={Link2} onSelect={() => actions.onEditPairing(site)}>
