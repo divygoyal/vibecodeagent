@@ -47,7 +47,7 @@ export function ShareBrand({ branding, size = 24 }: { branding?: ShareBrandingLi
         );
     }
     return (
-        <a href={HOME_URL} target="_blank" rel="noopener noreferrer" className="flex shrink-0 items-center gap-2" aria-label={`${BRAND_NAME} home`}>
+        <a href={HOME_URL} target="_blank" rel="noopener noreferrer" className="tap-area flex shrink-0 items-center gap-2" aria-label={`${BRAND_NAME} home`}>
             <BrandMark size={size} />
             <Wordmark />
         </a>
@@ -111,7 +111,7 @@ export function ShareHeader({
 export function ShareFooter({ compact = false, className }: { compact?: boolean; className?: string }) {
     return (
         <footer className={cn('text-center', compact ? 'py-4' : 'py-8', className)}>
-            <a href={HOME_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-meta text-fg-muted transition-colors hover:text-fg">
+            <a href={HOME_URL} target="_blank" rel="noopener noreferrer" className="tap-area inline-flex items-center gap-1.5 text-meta text-fg-muted transition-colors hover:text-fg">
                 <BrandMark size={14} />
                 Built with {BRAND_NAME}
             </a>

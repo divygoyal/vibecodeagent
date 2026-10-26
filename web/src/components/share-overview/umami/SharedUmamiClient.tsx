@@ -81,7 +81,7 @@ function KpiTile({
                 <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: METRICS[metric].color }} />
                 <span className="truncate text-body-sm font-medium text-fg-secondary">{label}</span>
             </div>
-            <span className="text-stat text-fg">{value}</span>
+            <span className="min-w-0 truncate text-stat tabular-nums text-fg">{value}</span>
             <div className="flex items-center gap-1.5">
                 <ChangeChip change={change} better={better} />
                 {change !== null && !Number.isNaN(change) ? <span className="text-meta text-fg-muted">vs previous period</span> : null}

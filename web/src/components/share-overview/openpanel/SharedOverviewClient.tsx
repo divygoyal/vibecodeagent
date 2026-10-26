@@ -95,6 +95,11 @@ function toDisplayValue(format: OverviewFormat, value: number) {
     return format === 'percent' ? value / 100 : value;
 }
 
+/** Table value cells are 64-72px wide: exact up to 999,999, compact (339B) beyond so huge counts stay inside. */
+function fmtCell(n: number): string {
+    return Math.abs(n) < 1_000_000 ? fmtFull(n) : fmtCompact(n);
+}
+
 function fmtOverview(format: OverviewFormat, value: number | null | undefined, opts: { compact?: boolean } = {}) {
     if (value === null || value === undefined || !Number.isFinite(value)) return '–';
     if (format === 'percent') return fmtPercent(value / 100, { tile: opts.compact });
@@ -522,13 +527,13 @@ function BreakdownTable<T>({ rows, rowKey, labelHeader, label, labelText, column
         <div role="table" aria-label={labelHeader} className="text-body-sm">
             <div role="row" className={cn(grid, 'h-9 border-b border-border-subtle text-meta font-medium text-fg-muted')}>
                 <span role="columnheader" aria-sort={ariaSort('__label')}>
-                    <button type="button" onClick={() => toggle('__label')} className="inline-flex items-center gap-1 hover:text-fg">
+                    <button type="button" onClick={() => toggle('__label')} className="tap-area inline-flex items-center gap-1 hover:text-fg">
                         {labelHeader}{sortIcon('__label')}
                     </button>
                 </span>
                 {columns.map((c) => (
                     <span key={c.key} role="columnheader" aria-sort={ariaSort(c.key)} className={cn('text-right', c.desktopOnly && 'max-md:hidden')}>
-                        <button type="button" onClick={() => toggle(c.key)} className="ml-auto inline-flex items-center gap-1 hover:text-fg">
+                        <button type="button" onClick={() => toggle(c.key)} className="tap-area ml-auto inline-flex items-center gap-1 hover:text-fg">
                             {c.header}{sortIcon(c.key)}
                         </button>
                     </span>
@@ -545,8 +550,13 @@ function BreakdownTable<T>({ rows, rowKey, labelHeader, label, labelText, column
                                 <span className="relative flex min-w-0 items-center gap-2 px-2">{label(row)}</span>
                             </span>
                             {columns.map((c) => (
-                                <span key={c.key} role="cell" className={cn('text-right text-fg tabular-nums', c.desktopOnly && 'max-md:hidden')}>
-                                    {c.format ? c.format(row) : fmtFull(c.value(row))}
+                                <span
+                                    key={c.key}
+                                    role="cell"
+                                    title={c.format ? undefined : fmtFull(c.value(row))}
+                                    className={cn('min-w-0 truncate text-right text-fg tabular-nums', c.desktopOnly && 'max-md:hidden')}
+                                >
+                                    {c.format ? c.format(row) : fmtCell(c.value(row))}
                                 </span>
                             ))}
                         </>
@@ -838,7 +848,7 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
                                 </>
                             ) : (
                                 <>
-                                    <span className={cn('mt-1 block text-stat text-fg', refetching && 'opacity-60')}>{fmtOverview(m.format, current, { compact: true })}</span>
+                                    <span className={cn('mt-1 block min-w-0 truncate text-stat tabular-nums text-fg', refetching && 'opacity-60')}>{fmtOverview(m.format, current, { compact: true })}</span>
                                     <span className="mt-0.5 block">
                                         <MetricDelta
                                             current={current === null ? null : toDisplayValue(m.format, current)}
@@ -1314,7 +1324,7 @@ function RealtimeWidget({ liveData, loading, error }: { liveData?: LiveResponse;
                                                 key={c.country}
                                                 type="button"
                                                 onClick={() => onBubble(c.country, 'country')}
-                                                className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-full bg-subtle px-2.5 text-meta text-fg-secondary hover:bg-subtle-strong"
+                                                className="tap-area inline-flex h-6 max-w-full items-center gap-1.5 rounded-full bg-subtle px-2.5 text-meta text-fg-secondary hover:bg-subtle-strong"
                                             >
                                                 <OverviewCountryFlag country={c.country} />
                                                 <span className="truncate">{c.country}</span>

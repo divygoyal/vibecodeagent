@@ -151,7 +151,7 @@ export function LeaderboardPreview() {
                                             <Sparkline height={28} series={[{ metric: 'users', values: row.spark, label: 'Visitors' }]} interactive={false} />
                                         </span>
                                     ) : null}
-                                    <span className="w-20 shrink-0 text-right">
+                                    <span className="min-w-20 shrink-0 text-right">
                                         {row.visitors ? <span className="block whitespace-nowrap text-stat-sm tabular-nums text-fg">{row.visitors}</span> : null}
                                         <Delta pct={row.deltaPct} />
                                     </span>

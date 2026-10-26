@@ -20,7 +20,7 @@ export function DashboardBrandHeader({ doc }: { doc: { theme: ThemeV2 } }) {
 /** "Made with TrafficClaw" (default on, can be turned off; free either way). */
 export function MadeWithBadge() {
     return (
-        <a href="https://trafficclaw.com/?ref=dashboard" target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 py-1 text-meta text-fg-muted shadow-xs hover:text-fg">
+        <a href="https://trafficclaw.com/?ref=dashboard" target="_blank" rel="noopener" className="tap-area inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 py-1 text-meta text-fg-muted shadow-xs hover:text-fg">
             <span aria-hidden className="size-2 rounded-full bg-brand" />
             Made with TrafficClaw
         </a>

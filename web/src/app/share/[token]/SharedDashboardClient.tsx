@@ -393,7 +393,7 @@ function KpiTile({
                 <span className="truncate text-body-sm font-medium text-fg-secondary">{label}</span>
             </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="text-stat text-fg" title={title}>{value}</span>
+                <span className="min-w-0 max-w-full truncate text-stat tabular-nums text-fg" title={title}>{value}</span>
                 <ChangeChip value={change} inverse={changeInverse} unit={changeUnit} />
             </div>
             {helper ? <p className="text-meta text-fg-muted">{helper}</p> : null}
