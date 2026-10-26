@@ -28,3 +28,20 @@ Ask, Settings, Plan, Support, Docs, Setup wizard, embed/[siteId]; admin + supera
   - Removed '/dashboard/ask' + '/dashboard/ai-chat' from LEGACY_ROUTE_PREFIXES (components/shell/nav.ts).
 - Dead (unmounted, left for the Phase 2 clean-up): components/AIChatbot.tsx and components/chat/{ChatHeader,ChatInput,
   HistoryPanel,MessageBubble,QuickPrompts,ThinkingIndicator,ConnectorIntentNudge}.tsx.
+- Settings (/dashboard/settings): tabs Profile, Google, Appearance, Notifications, Data & privacy, Danger zone in `?tab=`
+  (profile is the default and has no param). Old values: account -> profile, connections/sites -> google,
+  leaderboard -> redirect to /dashboard/leaderboard. Telegram, GitHub, Vercel, WordPress and bot-error rows are gone.
+  - Hydration fix: invite link origin via useSyncExternalStore (server snapshot ''), referral counter and notification
+    prefs via lib/useLocalStorage.ts (null on the server / during hydration).
+  - Google tab: connected account (session email when Google is the sign-in provider), Reconnect, scopes explained
+    (webmasters.readonly, analytics.readonly, openid email profile), link to Google permissions.
+  - Appearance: Light / Dark / System radio cards, previews drawn with data-theme wrappers, uses lib/theme.
+  - Data & privacy: "Export my data" builds a JSON file in the browser from existing endpoints (plan, workspace,
+    dashboards, Ask threads + memory, support messages, device settings).
+  - Danger zone: sign out; Delete account is a REQUEST (typed DELETE -> POST /api/support/messages). There was no
+    self-serve deletion before; the admin DELETE /api/users/{id} (superadmin console) still performs it, and the privacy
+    policy promises 30 days.
+  - Left in place on purpose: settings/{LeaderboardOptIn,AdSlotsEditor,AdSlotRequestsInbox}.tsx. They are still imported by
+    dashboard/leaderboard/page.tsx and (marketing)/leaderboard/join/page.tsx in this branch; tc/leaderboard replaces
+    both, then these three files can be deleted.
+  - Removed '/dashboard/settings' from LEGACY_ROUTE_PREFIXES.
