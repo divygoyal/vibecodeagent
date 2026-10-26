@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CheckCircle2, ClipboardCheck, ListChecks } from 'lucide-react';
 
 import { fmtCompact, fmtFull } from '@/lib/format';
@@ -27,6 +27,8 @@ type TypeFilter = 'all' | SiteAction['type'];
 type ImpactFilter = 'all' | ActionImpact;
 
 /** Actions (DESIGN 5.8): ranked "what to fix next" with evidence, impact, fix, Ask and Done. */
+
+const PAGE_SIZE = 8;
 export function ActionsPage() {
     const site = useSite();
     const [status, setStatus] = useTabParam(STATUSES, { name: 'status' });
@@ -45,6 +47,10 @@ export function ActionsPage() {
     const ranked = status === 'open'
         ? [...shown].sort((a, b) => ({ high: 3, medium: 2, low: 1 }[b.impact] - { high: 3, medium: 2, low: 1 }[a.impact]) || b.score - a.score)
         : [...shown].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+    // Long lists show the top 8 first (QA: 18 expanded cards made a 6k px page); filters reset it.
+    const listKey = `${status}|${type}|${impact}`;
+    const [limitFor, setLimitFor] = useState<{ key: string; n: number }>({ key: listKey, n: PAGE_SIZE });
+    const limit = limitFor.key === listKey ? limitFor.n : PAGE_SIZE;
     const top5 = byStatus.open.filter((a) => /clicks/.test(a.expectedImpact)).slice(0, 5).reduce((s, a) => s + (a.type === 'audit' ? 0 : a.score), 0);
     const loading = actions.state === 'loading';
     const types = useMemo(() => [...new Set(list.map((a) => a.type))], [list]);
@@ -104,7 +110,7 @@ export function ActionsPage() {
                 </Card>
             ) : (
                 <div className="flex flex-col gap-3">
-                    {ranked.map((a) => (
+                    {ranked.slice(0, limit).map((a) => (
                         <ActionCard
                             key={a.id}
                             action={a}
@@ -113,6 +119,14 @@ export function ActionsPage() {
                             onStatus={(s: ActionStatus, undo: ActionStatus) => void save(a, s, { undo })}
                         />
                     ))}
+                    {ranked.length > limit ? (
+                        <div className="flex justify-center">
+                            <Button variant="secondary" onClick={() => setLimitFor({ key: listKey, n: limit + PAGE_SIZE })}>
+                                Show {Math.min(PAGE_SIZE, ranked.length - limit)} more
+                                <span className="text-fg-muted tabular-nums">· {fmtFull(ranked.length - limit)} left</span>
+                            </Button>
+                        </div>
+                    ) : null}
                 </div>
             )}
             {actions.data ? (
