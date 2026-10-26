@@ -33,6 +33,11 @@ const EMBEDDABLE_HEADERS = [
 const nextConfig: NextConfig = {
   output: 'standalone',
   trailingSlash: false,
+  // Local dev kit only (scripts/dev/up.sh): cap Turbopack's cache memory on the
+  // shared box. Unset everywhere else, so production builds are unchanged.
+  ...(process.env.TC_TURBOPACK_MEMORY_LIMIT_MB
+    ? { experimental: { turbopackMemoryLimit: Number(process.env.TC_TURBOPACK_MEMORY_LIMIT_MB) * 1024 * 1024 } }
+    : {}),
   // Allow external images (user avatars)
   images: {
     remotePatterns: [
