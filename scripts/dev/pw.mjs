@@ -47,6 +47,11 @@ export async function newContext(browser, { stateFile, mobile = false, dark = fa
         locale: 'en-US',
         storageState: state ? { cookies: state.cookies || [], origins: state.origins || [] } : undefined,
     });
+    // The app's theme follows localStorage['tc-theme'] (lib/themeScript.ts), not prefers-color-scheme:
+    // set it before any page script runs. (/embed, /share and /view take ?theme=dark instead.)
+    await context.addInitScript((t) => {
+        try { localStorage.setItem('tc-theme', t); } catch { /* storage blocked */ }
+    }, dark ? 'dark' : 'light');
     const session = state?.sessionStorage || [];
     if (session.length) {
         await context.addInitScript(entries => {

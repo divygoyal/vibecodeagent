@@ -189,6 +189,7 @@ function pageAudit() {
 
     const out = { vw, vh, scrollWidth: Math.max(doc.scrollWidth, document.body.scrollWidth), overflow: false, offscreen: [], clipped: [], textClipped: [], textSpill: [], smallTargets: [], tabbar: [], error: null, badText: [], loading: [] };
     out.overflow = out.scrollWidth > vw + 1;
+    out.appliedTheme = doc.getAttribute('data-theme'); // proves the dark pass really ran dark
 
     // offscreen: past the viewport edge, not inside a scroll container.
     const offscreenSet = new Set();
@@ -621,7 +622,8 @@ try {
             const t0 = Date.now();
             let r = await visit(contexts[theme], route, theme);
             // The dev server restarts itself near its memory limit: wait for it and visit once more.
-            if (r.navError && /ERR_(EMPTY_RESPONSE|CONNECTION_REFUSED|CONNECTION_RESET)|Timeout \d+ms exceeded/.test(r.navError) && await serverUp()) {
+            const down = (r.navError && /ERR_(EMPTY_RESPONSE|CONNECTION_REFUSED|CONNECTION_RESET)|Timeout \d+ms exceeded/.test(r.navError)) || String(r.finalPath).startsWith('chrome-error:');
+            if (down && await serverUp()) {
                 r = await visit(contexts[theme], route, theme);
             }
             const c = categories(r);

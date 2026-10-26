@@ -7,7 +7,7 @@
  *
  * --state  Playwright state from login.mjs (e.g. /root/.trafficclaw-dev/kit/state.json)
  * --mobile 390x844 iPhone-like viewport (default 1440x900 desktop)
- * --dark   prefers-color-scheme: dark
+ * --dark   dark theme (localStorage tc-theme=dark + prefers-color-scheme: dark; /embed, /share, /view need ?theme=dark)
  * --full   full-page screenshot
  * --wait   extra milliseconds after the page settles (default 1500)
  * --show-dev-ui  keep the Next.js dev badge/overlay in the image (hidden by default;
