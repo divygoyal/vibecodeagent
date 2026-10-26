@@ -76,7 +76,7 @@ export function PreviewPanel({ entry, draft, range = '28d' }: { entry: MyEntry; 
                     <div>
                         <p className="mb-1.5 text-meta font-medium text-fg-muted">Leaderboard row</p>
                         {data.row ? (
-                            <Card padding="none" className="overflow-hidden">
+                            <Card padding="none" className="@container overflow-hidden">
                                 <ul><BoardRowItem row={data.row} focus="visitors" range={range} showNew={false} /></ul>
                             </Card>
                         ) : <p className="text-body-sm text-fg-muted">No preview yet.</p>}

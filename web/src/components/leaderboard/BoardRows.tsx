@@ -13,7 +13,9 @@ import { fmtFull } from '@/lib/format';
 import type { BoardResponse, BoardRow, SponsoredCard } from '@/lib/leaderboard/types';
 import { CategoryBadge, CountValue, Ga4Badge, OpenToChips, PctDelta, RankMark, RowSpark, VerificationBadge } from './shared';
 
-const GRID = 'md:grid md:grid-cols-[44px_minmax(0,1fr)_150px_150px_170px] md:items-center md:gap-4';
+// Rows lay out by the width of the list (container query), not the viewport, so the same row
+// works in the public board and in the narrow "Public preview" column of /dashboard/leaderboard.
+const GRID = '@3xl:grid @3xl:grid-cols-[44px_minmax(0,1fr)_150px_150px_170px] @3xl:items-center @3xl:gap-4';
 
 function hostOf(url: string | null): string {
     return (url || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
@@ -29,8 +31,8 @@ export function BoardRowItem({ row, focus, range, showNew }: { row: BoardRow; fo
     const label = focus === 'clicks' ? 'search clicks' : 'visitors';
     return (
         <li className={cn('relative border-b border-border-subtle px-4 py-3.5 last:border-b-0 transition-colors duration-120 hover:bg-subtle/40', GRID)}>
-            <div className="flex items-start gap-3 md:contents">
-                <div className="flex w-7 shrink-0 justify-center pt-1 md:block md:pt-0"><RankMark rank={row.rank} /></div>
+            <div className="flex items-start gap-3 @3xl:contents">
+                <div className="flex w-7 shrink-0 justify-center pt-1 @3xl:block @3xl:pt-0"><RankMark rank={row.rank} /></div>
                 <div className="flex min-w-0 flex-1 items-start gap-3">
                     <Favicon host={host || row.name} size={32} className="mt-0.5" />
                     <div className="min-w-0">
@@ -45,13 +47,13 @@ export function BoardRowItem({ row, focus, range, showNew }: { row: BoardRow; fo
                                 {showNew ? <Badge variant="up">New</Badge> : null}
                             </span>
                         </div>
-                        {row.description ? <p className="mt-0.5 line-clamp-2 text-body-sm text-fg-muted md:line-clamp-1">{row.description}</p> : null}
+                        {row.description ? <p className="mt-0.5 line-clamp-2 text-body-sm text-fg-muted @3xl:line-clamp-1">{row.description}</p> : null}
                         {row.topic_labels.length ? <p className="mt-0.5 truncate text-meta text-fg-faint">{row.topic_labels.join(' · ')}</p> : null}
                     </div>
                 </div>
             </div>
 
-            <div className="mt-3 flex items-end justify-between gap-4 md:mt-0 md:block">
+            <div className="mt-3 flex items-end justify-between gap-4 @3xl:mt-0 @3xl:block">
                 <div>
                     <div className="flex items-baseline gap-2">
                         <CountValue m={m} className="text-stat-sm text-fg" />
@@ -59,12 +61,12 @@ export function BoardRowItem({ row, focus, range, showNew }: { row: BoardRow; fo
                     </div>
                     <p className="text-meta text-fg-muted">{label} · {RANGE_NAMES[range].replace('last ', '')}</p>
                 </div>
-                <div className="w-32 shrink-0 md:hidden"><RowSpark spark={row.spark} height={32} /></div>
+                <div className="w-32 shrink-0 @3xl:hidden"><RowSpark spark={row.spark} height={32} /></div>
             </div>
 
-            <div className="hidden md:block"><RowSpark spark={row.spark} height={32} /></div>
+            <div className="hidden @3xl:block"><RowSpark spark={row.spark} height={32} /></div>
 
-            <div className="relative z-10 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 md:mt-0 md:flex-col md:items-start">
+            <div className="relative z-10 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 @3xl:mt-0 @3xl:flex-col @3xl:items-start">
                 <OpenToChips items={row.open_to} limit={2} />
                 {row.min_slot_price_cents !== null && row.ad_slot_count > 0 ? (
                     <span className="text-meta text-fg-muted">Ads from {formatCents(row.min_slot_price_cents)}</span>
@@ -78,7 +80,7 @@ function SponsoredRow({ card }: { card: SponsoredCard }) {
     const host = card.site.name;
     return (
         <li className={cn('relative border-b border-border-subtle bg-warn-soft/40 px-4 py-3 transition-colors duration-120 hover:bg-warn-soft/70', GRID)}>
-            <div className="hidden md:block" />
+            <div className="hidden @3xl:block" />
             <div className="flex min-w-0 items-center gap-3">
                 <Favicon host={host} size={32} />
                 <div className="min-w-0">
@@ -93,9 +95,9 @@ function SponsoredRow({ card }: { card: SponsoredCard }) {
                     </p>
                 </div>
             </div>
-            <div className="hidden md:block" />
-            <div className="hidden md:block" />
-            <div className="mt-2 md:mt-0 md:text-right">
+            <div className="hidden @3xl:block" />
+            <div className="hidden @3xl:block" />
+            <div className="mt-2 @3xl:mt-0 @3xl:text-right">
                 <span className="inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary">View slot <ArrowRight aria-hidden size={14} /></span>
             </div>
         </li>
@@ -137,7 +139,7 @@ export function BoardRows({ data, hasFilters, clearHref }: { data: BoardResponse
         if (showSponsoredInline && i === 14 && data.sponsored[1]) items.push(<SponsoredRow key={`sp-b`} card={data.sponsored[1]} />);
     });
     return (
-        <Card padding="none" className="overflow-hidden">
+        <Card padding="none" className="@container overflow-hidden">
             <Header focus={data.focus} />
             <ul>{items}</ul>
         </Card>
