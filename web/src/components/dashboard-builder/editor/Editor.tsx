@@ -14,7 +14,7 @@ import useSWR from 'swr';
 import { toast } from 'sonner';
 import {
     ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, LayoutTemplate, Loader2, Monitor, MoreHorizontal, Pencil,
-    Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter,
+    Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -32,6 +32,7 @@ import { useElementWidth } from '../useElementWidth';
 import { fetchJson, useInlineResult, QueryHttpError, type InlineCtx } from '../useWidgetData';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
 import { LeftPanel } from './LeftPanel';
+import { VersionsDialog } from './VersionsDialog';
 import { PropertiesPanel } from './PropertiesPanel';
 import type { SiteOption } from './Fields';
 
@@ -73,6 +74,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const { doc, pageId, selectedId, preview, viewport, controls, status } = s;
     const [shareOpen, setShareOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [versionsOpen, setVersionsOpen] = useState(false);
     const [renaming, setRenaming] = useState<string | null>(null);
     const [nameEdit, setNameEdit] = useState(false);
     const [resolvedDates, setResolvedDates] = useState<import('@/lib/builder/types').ResolvedDates | undefined>();
@@ -262,6 +264,14 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                             <DropdownMenuItem icon={Copy} onSelect={async () => { await save(); const r = await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${s.id}/duplicate`, { method: 'POST', body: '{}' }); router.push(`/dashboard/dashboards/${r.dashboard.id}/edit`); }}>Duplicate</DropdownMenuItem>
                             <DropdownMenuItem icon={LayoutTemplate} onSelect={async () => { await save(); await fetchJson(`/api/dashboards/${s.id}/duplicate?asTemplate=1`, { method: 'POST', body: '{}' }); toast.success('Saved to My templates'); }}>Save as my template</DropdownMenuItem>
                             <DropdownMenuItem icon={Settings2} onSelect={() => { s.select(null); s.selectControl(null); }}>Dashboard settings</DropdownMenuItem>
+                            <DropdownMenuItem icon={History} onSelect={() => setVersionsOpen(true)}>Version history</DropdownMenuItem>
+                            <DropdownMenuItem icon={FileJson} onSelect={() => {
+                                const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+                                const a = document.createElement('a');
+                                a.href = URL.createObjectURL(blob);
+                                a.download = `${doc.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.dashboard.json`;
+                                a.click();
+                            }}>Export JSON</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem icon={Trash2} destructive onSelect={() => setConfirmDelete(true)}>Delete</DropdownMenuItem>
                         </DropdownMenuContent>
@@ -388,6 +398,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                 <ShareDialog open={shareOpen} onOpenChange={setShareOpen} dashboardId={s.id} doc={doc} share={s.share} views={s.views} onShareChange={s.setShare}
                     onDocChange={(next: DashboardDocV2) => s.apply(() => next)} />
             ) : null}
+            {s.id ? <VersionsDialog open={versionsOpen} onOpenChange={setVersionsOpen} dashboardId={s.id} /> : null}
             <ConfirmModal open={confirmDelete} onOpenChange={setConfirmDelete} title="Delete this dashboard?" description="Its public link stops working. This cannot be undone." confirmLabel="Delete"
                 onConfirm={async () => { await fetchJson(`/api/dashboards/${s.id}`, { method: 'DELETE' }); router.push('/dashboard/dashboards'); }} />
         </div>

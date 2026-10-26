@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { AlertTriangle, Info, Link2, PlugZap, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Download, Info, Link2, PlugZap, RefreshCw } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Button, Skeleton, Tooltip } from '@/components/ui';
@@ -53,6 +53,25 @@ export function WidgetError({ result, onRetry, onChooseSource, compact }: { resu
     );
 }
 
+/** CSV of the widget's main frame (P1 "Download CSV"). */
+export function downloadCsv(widget: WidgetDef, r: WidgetResultOk) {
+    const frame = r.parts.rows ?? r.parts.series ?? r.parts.sites ?? r.parts.total;
+    if (!frame) return;
+    const keys = frame.seriesKeys?.length ? [frame.columns[0]?.id, ...frame.seriesKeys].filter(Boolean) as string[] : frame.columns.map((c) => c.id);
+    const labelOf = (k: string) => frame.columns.find((c) => c.id === k)?.label ?? k.replace(/^[dmb]:/, '');
+    const esc = (v: unknown) => {
+        const t = v === null || v === undefined ? '' : String(v);
+        return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+    };
+    const lines = [keys.map((k) => esc(labelOf(k))).join(','), ...frame.rows.map((row) => keys.map((k) => esc(frame.labels?.[String(row[k])] ?? row[k])).join(','))];
+    const blob = new Blob([`${lines.join('\n')}\n`], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${widgetTitle(widget).replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'widget'}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 /** Footnotes for honest data (BUILDER.md 11.9). */
 export function flagNotes(r: WidgetResultOk | undefined, widget: WidgetDef): string[] {
     if (!r) return [];
@@ -91,7 +110,7 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
     return (
         <div
             className={cn(
-                'relative flex h-full min-h-0 flex-col overflow-hidden',
+                'group/frame relative flex h-full min-h-0 flex-col overflow-hidden',
                 transparent ? 'bg-transparent' : 'bg-surface',
                 widget.style?.border === false || transparent ? '' : 'rounded-card border border-border-subtle shadow-card',
                 'rounded-card',
@@ -112,7 +131,18 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                     {ok?.sourceLabel && props.mode !== 'public' && widget.source?.type && widget.source.type !== 'default' ? (
                         <span className="mt-0.5 truncate rounded-badge bg-subtle px-1.5 text-caption text-fg-muted">{ok.sourceLabel}</span>
                     ) : null}
-                    {actions ? <div className="ml-auto flex shrink-0 items-center gap-1">{actions}</div> : null}
+                    {actions || (ok && props.mode !== 'edit') ? (
+                        <div className="ml-auto flex shrink-0 items-center gap-1" data-pdf-ignore="true">
+                            {actions}
+                            {ok && props.mode !== 'edit' ? (
+                                <Tooltip content="Download CSV">
+                                    <button type="button" aria-label={`Download ${widgetTitle(widget)} as CSV`} onClick={() => downloadCsv(widget, ok)} className="rounded p-0.5 text-fg-faint opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100">
+                                        <Download aria-hidden size={14} />
+                                    </button>
+                                </Tooltip>
+                            ) : null}
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
             <div className={cn('relative min-h-0 flex-1', refetching && 'opacity-60 transition-opacity', bodyClassName)}>
