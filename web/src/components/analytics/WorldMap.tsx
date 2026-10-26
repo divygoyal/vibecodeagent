@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, memo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useMemo, useEffect, memo } from 'react';
 
 // ─── Mercator Projection (bounded) ───
 const MAP_W = 960;
@@ -23,7 +22,15 @@ function project(lon: number, lat: number): [number, number] {
 }
 
 // ─── Minimal TopoJSON Decoder (zero-dependency) ───
-function decodeTopo(topo: any): string[] {
+type TopoGeometry = { type: string; arcs: NestedArcs };
+type NestedArcs = number | NestedArcs[];
+interface Topology {
+    transform?: { scale: [number, number]; translate: [number, number] };
+    arcs?: number[][][];
+    objects: { land: TopoGeometry & { geometries?: TopoGeometry[] } };
+}
+
+function decodeTopo(topo: Topology): string[] {
     if (!topo?.transform || !topo?.arcs) return [];
     const { scale, translate } = topo.transform;
     const arcs = topo.arcs.map((arc: number[][]) => {
@@ -49,10 +56,11 @@ function decodeTopo(topo: any): string[] {
     const paths: string[] = [];
     const land = topo.objects.land;
     const geoms = land.geometries || [land];
-    geoms.forEach((g: any) => {
-        const walk = (a: any, depth: number) => {
-            if (depth === 0) paths.push(toPath(ring(a)));
-            else a.forEach((s: any) => walk(s, depth - 1));
+    geoms.forEach((g: TopoGeometry) => {
+        const walk = (a: NestedArcs, depth: number) => {
+            if (!Array.isArray(a)) return;
+            if (depth === 0) paths.push(toPath(ring(a as number[])));
+            else a.forEach((s) => walk(s, depth - 1));
         };
         if (g.type === 'Polygon') walk(g.arcs, 1);
         else if (g.type === 'MultiPolygon') walk(g.arcs, 2);
@@ -135,41 +143,25 @@ const WorldMap = memo(function WorldMap({ byCountry, byCity, onBubbleClick, acti
     const getR = (u: number) => Math.max(5, Math.min(26, (u / maxUsers) * 26));
 
     return (
-        <div className="relative w-full h-full select-none overflow-hidden">
-            <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-                <rect width={MAP_W} height={MAP_H} fill="#0c0c18" />
-
-                {/* Subtle grid */}
-                {Array.from({ length: 37 }).map((_, i) => (
-                    <line key={`v${i}`} x1={(i * MAP_W) / 36} y1={0} x2={(i * MAP_W) / 36} y2={MAP_H} stroke="rgba(255,255,255,0.02)" strokeWidth={0.3} />
-                ))}
-                {Array.from({ length: 19 }).map((_, i) => (
-                    <line key={`h${i}`} x1={0} y1={(i * MAP_H) / 18} x2={MAP_W} y2={(i * MAP_H) / 18} stroke="rgba(255,255,255,0.02)" strokeWidth={0.3} />
-                ))}
-
-                {/* Real landmasses from TopoJSON */}
+        <div className="relative h-full w-full select-none overflow-hidden bg-surface-sunken">
+            <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="h-full w-full" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map of users by location">
+                {/* Landmasses from TopoJSON */}
                 {landPaths.map((d, i) => (
-                    <path key={i} d={d} fill="#1a1a30" stroke="#2a2a48" strokeWidth={0.4} strokeLinejoin="round" />
+                    <path key={i} d={d} fill="var(--tc-subtle-strong)" stroke="var(--tc-border)" strokeWidth={0.4} strokeLinejoin="round" />
                 ))}
 
-                {/* Bubbles */}
+                {/* Bubbles: users colour, sized by users */}
                 {bubbles.map((b, i) => {
                     const r = getR(b.users);
                     const isActive = activeCountry && b.name.includes(activeCountry);
                     const isDimmed = activeCountry && !isActive;
-                    const color = isActive ? '#34d399' : '#3b82f6';
                     return (
                         <g key={`${b.name}-${i}`}>
-                            <circle cx={b.x} cy={b.y} r={r} fill="none" stroke={color} strokeWidth={0.6}>
-                                <animate attributeName="r" values={`${r};${r + 9};${r}`} dur={`${2 + (i % 4) * 0.5}s`} repeatCount="indefinite" />
-                                <animate attributeName="opacity" values="0.4;0;0.4" dur={`${2 + (i % 4) * 0.5}s`} repeatCount="indefinite" />
-                            </circle>
-                            <circle cx={b.x} cy={b.y} r={r * 2} fill={color} opacity={isDimmed ? 0.01 : 0.05} />
                             <circle
                                 cx={b.x} cy={b.y} r={r}
-                                fill={color} fillOpacity={isDimmed ? 0.1 : 0.55}
-                                stroke={color} strokeWidth={isDimmed ? 0.4 : 1.2} strokeOpacity={isDimmed ? 0.1 : 0.8}
-                                className="cursor-pointer" style={{ transition: 'all 0.3s' }}
+                                fill="var(--tc-m-users)" fillOpacity={isDimmed ? 0.12 : isActive ? 0.85 : 0.55}
+                                stroke="var(--tc-m-users)" strokeWidth={isActive ? 1.6 : 1} strokeOpacity={isDimmed ? 0.2 : 0.9}
+                                className="cursor-pointer" style={{ transition: 'fill-opacity 120ms, stroke-opacity 120ms' }}
                                 onClick={() => onBubbleClick?.(b.name.split(',')[0].trim(), b.type)}
                                 onMouseEnter={(e) => {
                                     const rect = (e.target as SVGElement).closest('svg')?.getBoundingClientRect();
@@ -179,8 +171,8 @@ const WorldMap = memo(function WorldMap({ byCountry, byCity, onBubbleClick, acti
                             />
                             {b.users > 0 && r >= 9 && (
                                 <text x={b.x} y={b.y} textAnchor="middle" dominantBaseline="central"
-                                    fill="white" fontSize={Math.max(8, r * 0.5)} fontWeight="bold"
-                                    className="pointer-events-none" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+                                    fill="#fff" fontSize={Math.max(8, r * 0.5)} fontWeight={600}
+                                    className="pointer-events-none tabular-nums">
                                     {b.users}
                                 </text>
                             )}
@@ -189,21 +181,15 @@ const WorldMap = memo(function WorldMap({ byCountry, byCity, onBubbleClick, acti
                 })}
             </svg>
 
-            {/* Tooltip */}
-            <AnimatePresence>
-                {tooltip && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute pointer-events-none z-30 bg-[#0a0a14]/95 backdrop-blur-sm border border-white/[0.12] rounded-xl px-3 py-2 shadow-2xl"
-                        style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-                    >
-                        <p className="text-xs font-semibold text-white">{tooltip.name}</p>
-                        <p className="text-[11px] text-blue-400 tabular-nums">{tooltip.users} active users</p>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {tooltip && (
+                <div
+                    className="pointer-events-none absolute z-30 rounded-popover border border-border-subtle bg-surface-raised px-3 py-2 shadow-popover animate-fade-in"
+                    style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
+                >
+                    <p className="text-meta font-medium text-fg">{tooltip.name}</p>
+                    <p className="text-meta text-fg-muted tabular-nums">{tooltip.users.toLocaleString()} active users</p>
+                </div>
+            )}
         </div>
     );
 });

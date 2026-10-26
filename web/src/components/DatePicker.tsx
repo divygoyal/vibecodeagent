@@ -1,7 +1,18 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+
+import { cn } from '@/lib/cn';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu';
 
 interface DatePickerProps {
     range: string;
@@ -128,201 +139,95 @@ export function getDateRangeText(range: string): string {
 
 export default function DatePicker({ range, setRange, compact = false, chevrons = true }: DatePickerProps) {
     const [open, setOpen] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    // Close dropdown on click outside
-    useEffect(() => {
-        if (!open) return;
-        const handler = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                setOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, [open]);
-
-    // Keyboard handlers for the open dropdown:
-    //   Escape       — close
-    //   D/E/W/T/M/Y/6/0/A — jump to that preset and close (OpenPanel-style)
-    // We only listen while the dropdown is open so single-letter keys don't
-    // hijack typing elsewhere on the page.
-    useEffect(() => {
-        if (!open) return;
-        const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                setOpen(false);
-                return;
-            }
-            // Bail if focused inside a text input — never steal letter keys
-            // from a user typing.
-            const target = e.target as HTMLElement | null;
-            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-                return;
-            }
-            const key = e.key.toUpperCase();
-            const match = PRESETS.find(
-                (p): p is { label: string; value: string; shortcut?: string } =>
-                    'value' in p && !!p.shortcut && p.shortcut === key,
-            );
-            if (match) {
-                e.preventDefault();
-                setRange(match.value);
-                setOpen(false);
-            }
-        };
-        document.addEventListener('keydown', handler);
-        return () => document.removeEventListener('keydown', handler);
-    }, [open, setRange]);
 
     const currentIndex = PRESET_VALUES.indexOf(range);
     const canGoBack = currentIndex < PRESET_VALUES.length - 1;
     const canGoForward = currentIndex > 0;
-
-    const goBack = () => {
-        if (canGoBack) {
-            setRange(PRESET_VALUES[currentIndex + 1]);
-        }
-    };
-
-    const goForward = () => {
-        if (canGoForward) {
-            setRange(PRESET_VALUES[currentIndex - 1]);
-        }
-    };
-
     const dateText = getDateRangeText(range);
+    const flanked = chevrons && !compact;
 
-    // Main button corner-radius depends on whether the chevron buttons
-    // flank it: with chevrons we round only the inner edges so the three
-    // buttons read as a single pill; without, the main button is fully
-    // rounded on all sides.
-    const mainButtonClass = chevrons
-        ? `dashboard-hover-action flex h-10 border border-white/[0.1] bg-[#0b1015]/95 text-zinc-400 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100 ${
-              compact
-                  ? 'w-full items-center justify-between gap-2 rounded-[14px] px-3 sm:max-w-[180px]'
-                  : 'min-w-[170px] items-center gap-2 border-x-0 px-3.5 text-left'
-          }`
-        : `dashboard-hover-action flex h-10 items-center gap-2 rounded-[14px] border border-white/[0.1] bg-[#0b1015]/95 px-3 text-zinc-400 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100 ${
-              compact ? 'w-full justify-between sm:max-w-[180px]' : 'text-left'
-          }`;
+    // Single-letter shortcuts while the menu is open (D, E, W, T, M, Y, 6, 0, A).
+    // Handled before Radix's type-ahead, which would otherwise take the key.
+    const onMenuKeyDown = (e: React.KeyboardEvent) => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        const key = e.key.toUpperCase();
+        const match = PRESETS.find(
+            (p): p is { label: string; value: string; shortcut?: string } => 'value' in p && !!p.shortcut && p.shortcut === key,
+        );
+        if (match) {
+            e.preventDefault();
+            setRange(match.value);
+            setOpen(false);
+        }
+    };
+
+    // One pill of three parts when flanked by the step buttons; no conflicting utilities (cn has no merge).
+    const part = 'inline-flex h-9 items-center border border-border bg-surface text-fg shadow-xs transition-colors duration-120 ease-standard hover:border-border-strong hover:bg-subtle disabled:pointer-events-none disabled:opacity-50';
+    const stepClass = cn(part, 'w-9 justify-center text-fg-secondary');
 
     return (
-        <div className="relative" ref={containerRef}>
-            <div className={compact ? 'w-full' : 'inline-flex items-center'}>
-                {chevrons && !compact && (
-                    <button
-                        type="button"
-                        onClick={goBack}
-                        disabled={!canGoBack}
-                        className="dashboard-hover-action flex h-10 w-10 items-center justify-center rounded-l-[14px] border border-r-0 border-white/[0.1] bg-[#0b1015]/95 text-zinc-400 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-35"
-                        aria-label="Previous date range"
-                        data-variant="ghost"
-                    >
-                        <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                )}
-
+        <div className={cn(compact ? 'w-full sm:w-auto' : 'inline-flex', 'items-center')}>
+            {flanked ? (
                 <button
                     type="button"
-                    onClick={() => setOpen(!open)}
-                    className={mainButtonClass}
-                    data-variant="ghost"
+                    onClick={() => canGoBack && setRange(PRESET_VALUES[currentIndex + 1])}
+                    disabled={!canGoBack}
+                    className={cn(stepClass, 'rounded-l-control')}
+                    aria-label="Previous date range"
                 >
-                    <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                        <div className="truncate text-[12px] font-medium text-zinc-100">
-                            {getRangeLabel(range)}
-                        </div>
-                        {chevrons && !compact && dateText ? (
-                            <div className="truncate text-[10px] text-zinc-500">
-                                {dateText}
-                            </div>
-                        ) : null}
-                    </div>
-                    {chevrons ? (
-                        <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-                    ) : null}
+                    <ChevronLeft aria-hidden size={16} strokeWidth={1.75} />
                 </button>
-
-                {chevrons && !compact && (
+            ) : null}
+            <DropdownMenu open={open} onOpenChange={setOpen}>
+                <DropdownMenuTrigger asChild>
                     <button
                         type="button"
-                        onClick={goForward}
-                        disabled={!canGoForward}
-                        className="dashboard-hover-action flex h-10 w-10 items-center justify-center rounded-r-[14px] border border-l-0 border-white/[0.1] bg-[#0b1015]/95 text-zinc-400 shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-35"
-                        aria-label="Next date range"
-                        data-variant="ghost"
+                        className={cn(
+                            part,
+                            'gap-2 px-3 text-left text-body font-medium',
+                            flanked ? 'border-x-0' : 'rounded-control',
+                            compact ? 'w-full sm:max-w-[200px]' : 'min-w-[150px]',
+                        )}
                     >
-                        <ChevronRight className="h-3.5 w-3.5" />
+                        <CalendarDays aria-hidden size={16} strokeWidth={1.75} className="shrink-0 text-fg-muted" />
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate">{getRangeLabel(range)}</span>
+                            {flanked && dateText ? <span className="block truncate text-meta font-normal text-fg-muted tabular-nums max-sm:hidden">{dateText}</span> : null}
+                        </span>
+                        {chevrons ? (
+                            <ChevronDown aria-hidden size={14} strokeWidth={1.75} className={cn('shrink-0 text-fg-muted transition-transform duration-120', open && 'rotate-180')} />
+                        ) : null}
                     </button>
-                )}
-            </div>
-
-            {open && (
-                <>
-                    <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-                    <div className="absolute left-0 z-50 mt-2 max-h-[440px] min-w-[230px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-white/[0.1] bg-[#0b1015]/98 p-1.5 shadow-[0_28px_56px_rgba(0,0,0,0.42)] backdrop-blur-xl">
-                        <div className="px-3 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                            Time window
-                        </div>
-                        {PRESETS.map((item, i) => {
-                            if ('separator' in item) {
-                                return <div key={`sep-${i}`} className="my-1.5 border-t border-white/[0.06]" />;
-                            }
-                            return (
-                                <button
-                                    key={item.value}
-                                    type="button"
-                                    onClick={() => { setRange(item.value); setOpen(false); }}
-                                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-[12px] transition ${
-                                        range === item.value
-                                            ? 'border border-cyan-400/20 bg-cyan-400/[0.12] text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-                                            : 'border border-transparent text-zinc-300 hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-white'
-                                    }`}
-                                >
-                                    <span>{item.label}</span>
-                                    {item.shortcut ? (
-                                        <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">
-                                            {item.shortcut}
-                                        </span>
-                                    ) : null}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </>
-            )}
-        </div>
-    );
-}
-
-/** Mobile-friendly date picker rendered as pill buttons */
-export function MobileDatePicker({ range, setRange }: DatePickerProps) {
-    return (
-        <div className="px-3 pt-2 pb-0.5">
-            <label className="mb-1.5 block px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Date Range</label>
-            <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex w-max gap-1.5 pb-1 pr-2">
-                    {PRESETS.map((item) => {
-                        if ('separator' in item) return null;
-                        return (
-                            <button
-                                key={item.value}
-                                type="button"
-                                onClick={() => setRange(item.value)}
-                                className={`min-h-[32px] shrink-0 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-[11px] transition ${
-                                    range === item.value
-                                        ? 'border-emerald-500/[0.15] bg-emerald-500/[0.1] text-emerald-400'
-                                        : 'border-white/[0.06] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06]'
-                                }`}
-                            >
-                                {item.label}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="max-h-[min(440px,70dvh)] min-w-[230px] overflow-y-auto" onKeyDown={onMenuKeyDown}>
+                    <DropdownMenuLabel>Time window</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={range} onValueChange={setRange}>
+                        {PRESETS.map((item, i) =>
+                            'separator' in item ? (
+                                <DropdownMenuSeparator key={`sep-${i}`} />
+                            ) : (
+                                <DropdownMenuRadioItem key={item.value} value={item.value} className="pr-2">
+                                    <span className="flex w-full items-center justify-between gap-3 pr-6">
+                                        <span>{item.label}</span>
+                                        {item.shortcut ? <span className="text-meta text-fg-muted">{item.shortcut}</span> : null}
+                                    </span>
+                                </DropdownMenuRadioItem>
+                            ),
+                        )}
+                    </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            {flanked ? (
+                <button
+                    type="button"
+                    onClick={() => canGoForward && setRange(PRESET_VALUES[currentIndex - 1])}
+                    disabled={!canGoForward}
+                    className={cn(stepClass, 'rounded-r-control')}
+                    aria-label="Next date range"
+                >
+                    <ChevronRight aria-hidden size={16} strokeWidth={1.75} />
+                </button>
+            ) : null}
         </div>
     );
 }

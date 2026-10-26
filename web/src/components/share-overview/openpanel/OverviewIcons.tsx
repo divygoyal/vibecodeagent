@@ -214,7 +214,7 @@ function IconFrame({
 
 function FallbackIcon({ children, title }: { children: ReactNode; title?: string }) {
     return (
-        <IconFrame title={title} className="text-zinc-400">
+        <IconFrame title={title} className="text-fg-muted">
             {children}
         </IconFrame>
     );

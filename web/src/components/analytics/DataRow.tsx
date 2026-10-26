@@ -12,15 +12,7 @@ interface DataRowProps {
   href?: string;         // external link
   onClick?: () => void;
   active?: boolean;
-  barColor?: string;     // custom bar color (hex/rgb), overrides default emerald
-}
-
-function withAlpha(color: string, alpha: string) {
-  if (!color.startsWith('#')) return color;
-  const normalized = color.length === 4
-    ? `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`
-    : color;
-  return `${normalized}${alpha}`;
+  barColor?: string;     // bar colour (any CSS colour); neutral when absent
 }
 
 export default function DataRow({
@@ -35,48 +27,45 @@ export default function DataRow({
   barColor,
 }: DataRowProps) {
   const ratio = maxPercentage > 0 ? 100 / maxPercentage : 1;
-  const resolvedColor = barColor || '#34d399';
+  const color = barColor || 'var(--tc-fg-muted)';
 
   return (
     <div
-      className={`data-row group ${active ? 'bg-emerald-500/5 border-l-2 border-emerald-500' : ''}`}
+      className={`group relative flex h-8 items-center rounded-md px-2 ${onClick ? 'cursor-pointer' : ''} ${active ? 'bg-subtle' : 'hover:bg-subtle'}`}
       onClick={onClick}
     >
-      {/* Percentage bar behind text */}
+      {/* Share bar behind the text: the row's colour at low strength, no gradient */}
       <div
-        className="data-bar"
-        style={{
-          width: `${percentage * ratio}%`,
-          background: `linear-gradient(90deg, ${withAlpha(resolvedColor, '38')} 0%, ${withAlpha(resolvedColor, '20')} 68%, rgba(255,255,255,0.02) 100%)`,
-          boxShadow: `inset 0 0 0 1px ${withAlpha(resolvedColor, '18')}`,
-        }}
+        aria-hidden
+        className="absolute inset-y-0 left-0 rounded-md transition-[width] duration-400"
+        style={{ width: `${percentage * ratio}%`, background: `color-mix(in oklab, ${color} 14%, transparent)` }}
       />
 
-      {/* Content on top */}
-      <div className="relative z-10 flex justify-between items-center text-xs w-full gap-2">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+      <div className="relative flex w-full items-center justify-between gap-2 text-body-sm">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {barColor && !icon && (
-            <span className="w-2 h-2 rounded-[2px] flex-shrink-0 shadow-[0_0_10px_currentColor]" style={{ backgroundColor: barColor, color: barColor }} />
+            <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: barColor }} />
           )}
           {icon}
-          <span className="truncate text-zinc-200">{label}</span>
+          <span className="truncate text-fg">{label}</span>
           {href && (
             <a
               href={href}
               rel="noopener noreferrer"
               target="_blank"
               onClick={e => e.stopPropagation()}
-              className="data-link shrink-0"
+              className="shrink-0 text-fg-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-fg focus-visible:opacity-100"
+              aria-label={`Open ${label}`}
             >
-              <SquareArrowOutUpRight className="w-3 h-3 text-zinc-600 hover:text-zinc-300" strokeWidth={2.5} />
+              <SquareArrowOutUpRight className="size-3" strokeWidth={1.75} />
             </a>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="data-pct text-xs text-zinc-500 tabular-nums">
+        <div className="flex shrink-0 items-center gap-2 tabular-nums">
+          <span className="text-meta text-fg-muted">
             {Math.round(percentage)}%
           </span>
-          <span className="text-xs font-medium tabular-nums text-zinc-200 min-w-[32px] text-right">
+          <span className="min-w-[32px] text-right font-medium text-fg">
             <NumberFlow value={value} format={{ notation: 'compact' }} respectMotionPreference={false} />
           </span>
         </div>
