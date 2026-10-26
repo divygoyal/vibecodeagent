@@ -2,9 +2,6 @@
 
 import { LegacySiteRedirect } from '@/components/shell/LegacySiteRedirect';
 
-// The analytics sub-pages import their context from '../layout'.
-export { AnalyticsContext, useAnalyticsContext } from './AnalyticsFrame';
-
 function tabFromPath(pathname: string) {
     const sub = pathname.replace(/^\/dashboard\/analytics\/?/, '').split('/')[0];
     if (sub === 'pages') return { section: 'pages' as const };
@@ -13,8 +10,9 @@ function tabFromPath(pathname: string) {
 
 /**
  * /dashboard/analytics/* moved to /dashboard/s/<host>/traffic?tab=<sub>
- * (and /pages to /dashboard/s/<host>/pages). The old page files stay as the
- * content of the new routes until they are rebuilt.
+ * (/pages to /dashboard/s/<host>/pages). The Traffic page maps the old sub-page
+ * names (goals -> events, sessions -> sources, performance -> the audit).
+ * Waits for the user's own saved site; no site -> Portfolio. Never shows a demo site.
  */
 export default function AnalyticsLegacyLayout() {
     return <LegacySiteRedirect section="traffic" tabFromPath={tabFromPath} />;

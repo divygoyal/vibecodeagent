@@ -2,7 +2,7 @@
 
 import { LegacySiteRedirect } from '@/components/shell/LegacySiteRedirect';
 
-/** /dashboard/seo moved to /dashboard/s/<host>/search (the page file is that route's content for now). */
+/** /dashboard/seo moved to /dashboard/s/<host>/search (keeps the query). Waits for the saved site; never shows a demo site. */
 export default function SeoLegacyLayout() {
     return <LegacySiteRedirect section="search" />;
 }
