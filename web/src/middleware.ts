@@ -13,7 +13,7 @@ const SITE_COOKIE = 'tc_site';
 function movedSitePath(pathname: string, host: string): { path: string; tab?: string } | null {
     const base = `/dashboard/s/${encodeURIComponent(host)}`;
     if (pathname === '/dashboard/seo' || pathname.startsWith('/dashboard/seo/')) return { path: `${base}/search` };
-    if (pathname === '/dashboard/audit' || pathname.startsWith('/dashboard/audit/')) return { path: `${base}/actions` };
+    if (pathname === '/dashboard/audit' || pathname.startsWith('/dashboard/audit/')) return { path: `${base}/actions/audit` };
     if (pathname === '/dashboard/analytics' || pathname.startsWith('/dashboard/analytics/')) {
         const sub = pathname.replace(/^\/dashboard\/analytics\/?/, '').split('/')[0];
         if (sub === 'pages') return { path: `${base}/pages` };
