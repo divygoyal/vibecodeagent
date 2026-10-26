@@ -31,7 +31,7 @@ export function McpSection({ portfolio }: { portfolio: DemoPortfolio }) {
 
     return (
         <Section id="ai" tone="surface" labelledBy="ai-title">
-            <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
+            <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-2 lg:gap-16">
                 <div>
                     <SectionHeading
                         id="ai-title"

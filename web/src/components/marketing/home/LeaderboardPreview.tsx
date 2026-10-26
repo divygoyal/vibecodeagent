@@ -104,7 +104,7 @@ export function LeaderboardPreview() {
 
     return (
         <Section id="leaderboard" labelledBy="lb-title">
-            <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+            <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
                 <div>
                     <SectionHeading
                         id="lb-title"
