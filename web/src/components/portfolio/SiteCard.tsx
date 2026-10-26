@@ -198,10 +198,11 @@ export const SiteCard = memo(function SiteCard({
                 <Favicon host={site.host || site.label} size={20} />
                 <h3 className="min-w-0 truncate text-title-sm text-fg" title={site.gsc?.siteUrl ?? site.ga4?.displayName ?? site.label}>{site.label}</h3>
                 {site.variant ? <VariantChip text={site.variant} /> : null}
+                {/* Narrow cards (3 columns) keep the room for the host; the full URL is in its tooltip. */}
                 {site.gsc ? (
-                    <Badge>{site.gsc.propertyType === 'domain' ? 'Domain' : 'Prefix'}</Badge>
+                    <Badge className="hidden @xs:inline-flex">{site.gsc.propertyType === 'domain' ? 'Domain' : 'Prefix'}</Badge>
                 ) : (
-                    <Badge>GA4</Badge>
+                    <Badge className="hidden @xs:inline-flex">GA4</Badge>
                 )}
                 <span className="flex-1" />
                 {readOnly ? (
@@ -210,7 +211,7 @@ export const SiteCard = memo(function SiteCard({
                     <button
                         type="button"
                         aria-pressed={site.starred}
-                        aria-label={site.starred ? `Unstar ${site.label}` : `Star ${site.label}`}
+                        aria-label={`Star ${site.label}${site.variant ? ` (${site.variant})` : ''}`}
                         onClick={() => onToggleStar?.(site)}
                         className={cn(
                             'relative z-[1] -mr-1 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors duration-120 hover:bg-subtle pointer-coarse:size-11',

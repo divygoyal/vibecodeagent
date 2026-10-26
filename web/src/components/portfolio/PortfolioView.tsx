@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, LayoutGrid, List, Loader2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Download, LayoutGrid, List, Loader2, RefreshCw } from 'lucide-react';
 
 import {
     Banner, Button, EmptyState, SearchInput, SegmentedControl, Select, Tooltip, useDebouncedValue,
@@ -380,7 +380,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                                 </Button>
                             ) : null}
                             {exportHref && activeLayout === 'grid' ? (
-                                <Button asChild variant="link" size="sm"><a href={exportHref} download>Export CSV</a></Button>
+                                <Button asChild variant="secondary" size="sm" icon={Download}><a href={exportHref} download>Export CSV</a></Button>
                             ) : null}
                         </div>
                     </section>
