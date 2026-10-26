@@ -12,12 +12,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { sendTransactional, isBrevoConfigured } from '@/lib/brevo';
-import { formatCents, billingPeriodSuffix } from '@/lib/adSlots';
+import { sendSlotRequestEmails } from '@/lib/leaderboard/notify';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
-const SITE_URL = (process.env.NEXTAUTH_URL || 'https://trafficclaw.com').replace(/\/$/, '');
 
 export const dynamic = 'force-dynamic';
 
@@ -43,15 +41,6 @@ function checkRate(key: string): boolean {
 function clientIp(req: Request): string {
     const fwd = req.headers.get('x-forwarded-for') || '';
     return fwd.split(',')[0].trim() || req.headers.get('x-real-ip') || 'unknown';
-}
-
-function escapeHtml(input: string): string {
-    return input
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
 }
 
 type AdminRequestResponse = {
@@ -137,55 +126,24 @@ export async function POST(req: Request) {
         );
     }
 
-    // Notify both parties. Best-effort: BREVO_API_KEY / BREVO_SENDER_EMAIL are
-    // absent in local dev, so sendTransactional no-ops and the request still
-    // lands in the publisher's dashboard inbox.
+    // Notify both parties (best effort; see lib/leaderboard/notify.ts).
     const record = data.request;
     const publisher = data.publisher;
-    if (record && publisher && isBrevoConfigured()) {
-        const slotName = record.slot_name_at_request || 'an ad slot';
-        const priceLine = `${formatCents(record.price_cents_at_request)} ${billingPeriodSuffix(record.billing_period_at_request)}`;
-        const profileUrl = `${SITE_URL}/leaderboard/${publisher.slug || ''}`;
-        const safeSlot = escapeHtml(slotName);
-        const safePrice = escapeHtml(priceLine);
-        const safeSite = escapeHtml(publisher.startup_name);
-        const safeBuyer = escapeHtml(buyerName || buyerEmail);
-        const safeMessage = message ? escapeHtml(message).replace(/\n/g, '<br />') : '';
-
-        const sends: Promise<unknown>[] = [];
-
-        if (publisher.contact_email && EMAIL_RE.test(publisher.contact_email)) {
-            sends.push(
-                sendTransactional({
-                    toEmail: publisher.contact_email,
-                    toName: publisher.founder_name || publisher.startup_name,
-                    subject: `New ad slot request: ${slotName} on ${publisher.startup_name}`,
-                    htmlContent: `
-                        <p><strong>${safeBuyer}</strong> wants to book <strong>${safeSlot}</strong> on ${safeSite}.</p>
-                        <p>Listed at <strong>${safePrice}</strong> when they sent this.</p>
-                        ${safeMessage ? `<p><em>${safeMessage}</em></p>` : ''}
-                        <p>Reply to them directly at <a href="mailto:${escapeHtml(buyerEmail)}">${escapeHtml(buyerEmail)}</a>, then mark the deal accepted or paid in your TrafficClaw dashboard under Settings &rarr; Leaderboard.</p>
-                    `,
-                }).catch((err) => console.error('[ad-slot-requests] publisher email failed:', err)),
-            );
-        }
-
-        sends.push(
-            sendTransactional({
-                toEmail: buyerEmail,
-                toName: buyerName || undefined,
-                subject: `Your request for ${slotName} on ${publisher.startup_name}`,
-                htmlContent: `
-                    <p>We passed your request for <strong>${safeSlot}</strong> on ${safeSite} to the publisher.</p>
-                    <p>Listed at <strong>${safePrice}</strong>.</p>
-                    <p>They'll reply to you directly. Arrangement and payment happen between the two of you — TrafficClaw just makes the introduction.</p>
-                    ${publisher.slug ? `<p><a href="${profileUrl}">View the listing</a></p>` : ''}
-                `,
-            }).catch((err) => console.error('[ad-slot-requests] buyer email failed:', err)),
-        );
-
-        // Don't block the response on email delivery.
-        void Promise.allSettled(sends);
+    if (record && publisher) {
+        sendSlotRequestEmails({
+            slotName: record.slot_name_at_request || 'an ad slot',
+            priceCents: record.price_cents_at_request,
+            billingPeriod: record.billing_period_at_request,
+            buyerName,
+            buyerEmail,
+            message,
+            publisher: {
+                startup_name: publisher.startup_name,
+                contact_email: publisher.contact_email,
+                founder_name: publisher.founder_name,
+                slug: publisher.slug,
+            },
+        });
     }
 
     return NextResponse.json({ success: true, request: record });

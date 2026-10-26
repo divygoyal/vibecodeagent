@@ -131,6 +131,15 @@ export async function GET(req: Request) {
             return NextResponse.json(await res.json())
         }
 
+        if (endpoint === 'leaderboard-inquiries') {
+            // Offers sent from public profiles (stored for the superadmin even when the owner has no email channel).
+            const res = await fetch(`${ADMIN_API_URL}/api/lb/superadmin/inquiries`, {
+                headers: { 'X-API-Key': ADMIN_API_KEY }
+            })
+            if (!res.ok) throw new Error('Failed to get leaderboard inquiries')
+            return NextResponse.json(await res.json())
+        }
+
         if (endpoint === 'user-profile') {
             const githubId = searchParams.get('id')
             if (!githubId) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
