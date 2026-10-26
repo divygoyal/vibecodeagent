@@ -200,8 +200,6 @@ async def _load_candidates(db, range_key: str, *, include_unlisted: bool = False
         )
     ).all()
     slots = {r[0]: (int(r[1] or 0), int(r[2]) if r[2] is not None else None) for r in slot_rows}
-    audience_rows = {a.entry_id: a for a in (await db.execute(select(LeaderboardAudience))).scalars().all()}
-
     out: List[Candidate] = []
     for e in entries:
         ed = entry_dict(e)
@@ -220,10 +218,20 @@ async def _load_candidates(db, range_key: str, *, include_unlisted: bool = False
             stat=stat,
             slot_count=slot_count,
             min_price=min_price,
-            audience=audience_rows.get(e.id),
+            audience=None,  # attached only for the rows that are rendered (see attach_audience)
         )
         out.append(c)
     return out
+
+
+async def attach_audience(db, cands: List[Candidate]) -> None:
+    """Load the (large) audience JSON only for the candidates a response actually renders."""
+    ids = [c["entry"]["id"] for c in cands]
+    if not ids:
+        return
+    rows = {a.entry_id: a for a in (await db.execute(select(LeaderboardAudience).where(LeaderboardAudience.entry_id.in_(ids)))).scalars().all()}
+    for c in cands:
+        c["audience"] = rows.get(c["entry"]["id"])
 
 
 def _open_to(c: Candidate) -> List[str]:
@@ -411,6 +419,7 @@ async def build_board(
     total = len(pool)
     start = (page - 1) * page_size
     page_items = pool[start:start + page_size]
+    await attach_audience(db, page_items)
     daily = await _daily_for(db, [c["entry"]["id"] for c in page_items], _today() - timedelta(days=days))
 
     rows = []
@@ -1124,6 +1133,7 @@ def build_router(
         me = next((c for c in cands if c["entry"]["id"] == entry.id), None)
         row = None
         if me is not None:
+            await attach_audience(db, [me])
             if isinstance(draft.get("privacy"), dict):
                 me["settings"] = {**me["settings"], "privacy": core.normalize_privacy(draft["privacy"], me["settings"]["privacy"])}
             if isinstance(draft.get("open_to"), list):
