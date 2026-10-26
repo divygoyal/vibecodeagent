@@ -20,8 +20,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { devIssueCount, hideDevUi, launchBrowser, newContext, settle, watchPage } from './pw.mjs';
+import { discoverRoutes, fillRoute as fillRouteFor, findInstance, memAvailableMb, routeSlug as slug } from './routes.mjs';
 
-const DEV_HOME = process.env.TC_DEV_HOME || '/root/.trafficclaw-dev';
 const THIRD_PARTY = /tawk\.to|cloudflareinsights|googletagmanager|google-analytics\.com|clarity\.ms|bing\.com|platform\.twitter\.com|reddit(media)?\.com|dicebear|googleusercontent|google\.com\/s2\/favicons|mapbox|fonts\.g/;
 
 function usage(msg) {
@@ -55,65 +55,7 @@ for (let i = 0; i < argv.length; i++) {
 }
 if (!opts.port || !opts.out) usage();
 
-function readEnvFile(file) {
-    const env = {};
-    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-        const m = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
-        if (m) env[m[1]] = m[2];
-    }
-    return env;
-}
-
-function findInstance(port) {
-    for (const name of fs.existsSync(DEV_HOME) ? fs.readdirSync(DEV_HOME) : []) {
-        const f = path.join(DEV_HOME, name, 'instance.env');
-        if (fs.existsSync(f) && Number(readEnvFile(f).WEB_PORT) === port) return { dir: path.dirname(f), ...readEnvFile(f) };
-    }
-    return null;
-}
-
-/** All page routes under web/src/app, with route groups removed. */
-function discoverRoutes(appDir) {
-    const routes = [];
-    const walk = (dir, segs) => {
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-            if (entry.isDirectory()) {
-                if (entry.name === 'api' && segs.length === 0) continue;
-                if (entry.name.startsWith('_')) continue;
-                const seg = /^\(.*\)$/.test(entry.name) ? null : entry.name;
-                walk(path.join(dir, entry.name), seg ? [...segs, seg] : segs);
-            } else if (/^page\.(tsx|ts|jsx|js|mdx)$/.test(entry.name)) {
-                routes.push('/' + segs.join('/'));
-            }
-        }
-    };
-    walk(appDir, []);
-    return [...new Set(routes)].sort();
-}
-
-function fillRoute(route, seed) {
-    const s = seed.demo || seed[opts.user] || {};
-    const fills = {
-        '/dashboard/dashboards/[id]': s.dashboardId,
-        '/dashboard/share/[token]': s.shareToken,
-        '/share/[token]': s.shareToken,
-        '/share/[token]/events': s.shareToken,
-        '/view/[token]': s.dashboardPublicToken,
-        '/leaderboard/[id]': s.leaderboardSlug || s.leaderboardId,
-        '/embed/[siteId]': s.embedToken ? `demo?token=${s.embedToken}` : null,
-    };
-    if (route in fills) {
-        const v = fills[route];
-        if (v === undefined || v === null) return route.replace(/\[[^\]]+\]/g, 'missing-seed');
-        if (route === '/embed/[siteId]') return `/embed/${v}`;
-        return route.replace(/\[[^\]]+\]/, encodeURIComponent(String(v)));
-    }
-    // Site pages: one demo site (--host, default acmeanalytics.example: GA4 + Search Console).
-    if (route.startsWith('/dashboard/s/[host]')) return route.replace('[host]', encodeURIComponent(opts.host));
-    return route.replace(/\[\.\.\.[^\]]+\]/g, 'x').replace(/\[[^\]]+\]/g, 'demo-token');
-}
-
-const slug = r => (r === '/' ? 'home' : r.replace(/^\//, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/_+$/, '')).slice(0, 120);
+const fillRoute = (route, seed) => fillRouteFor(route, seed, { user: opts.user, host: opts.host });
 
 async function visit(context, base, route, outFile) {
     const page = await context.newPage();
@@ -186,13 +128,6 @@ if (opts.part) {
 fs.mkdirSync(opts.out, { recursive: true });
 const variants = [...(opts.desktop ? ['desktop'] : []), ...(opts.mobile ? ['mobile'] : [])];
 for (const v of variants) fs.mkdirSync(path.join(opts.out, v), { recursive: true });
-
-const memAvailableMb = () => {
-    try {
-        const m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/proc/meminfo', 'utf8'));
-        return m ? Math.floor(Number(m[1]) / 1024) : Infinity;
-    } catch { return Infinity; }
-};
 
 // Results from earlier parts in the same outDir are kept and merged.
 const reportJson = path.join(opts.out, 'report.json');
