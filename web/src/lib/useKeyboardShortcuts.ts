@@ -9,7 +9,7 @@ const chordRoutes: Record<string, string> = {
   o: '/dashboard',
   a: '/dashboard/analytics',
   s: '/dashboard/seo',
-  c: '/dashboard/ai-chat',
+  c: '/dashboard/ask',
   b: '/dashboard/bot',
 };
 

@@ -211,7 +211,7 @@ export default function WeeklyBriefingPage() {
                         </p>
                     </div>
                     <Link
-                        href="/dashboard/ai-chat?q=Give%20me%20this%20week%27s%20update%20%E2%80%94%20what%20moved%2C%20what%20to%20do%20next%2C%20and%20any%20wins%20or%20losses%20I%20should%20know%20about."
+                        href="/dashboard/ask?q=Give%20me%20this%20week%27s%20update%20%E2%80%94%20what%20moved%2C%20what%20to%20do%20next%2C%20and%20any%20wins%20or%20losses%20I%20should%20know%20about."
                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-sm font-semibold text-black hover:opacity-90 transition-opacity"
                     >
                         <MessageSquare className="w-4 h-4" />
