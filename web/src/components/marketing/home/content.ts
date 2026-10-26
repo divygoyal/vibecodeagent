@@ -39,7 +39,7 @@ export const HOMEPAGE_CONTENT = {
             "Stop hunting through reports and dashboards. Ask plain-English questions and instantly know what's happening with your traffic — and what to do about it.",
         videoSrc: '/home/ai-chat-final.mp4',
         posterSrc: '/home/ai-chat-demo-poster.jpg',
-        frameLabel: 'trafficclaw.com/dashboard/ai-chat',
+        frameLabel: 'trafficclaw.com/dashboard/ask',
         frameMeta: 'Reason 1',
         highlights: [
             {
@@ -87,38 +87,6 @@ export const HOMEPAGE_CONTENT = {
     compactReasons: [
         {
             number: '03',
-            kind: 'mention',
-            icon: 'x',
-            eyebrow: 'X mention embeds',
-            title: 'Boost conversions with live, real-time X mentions',
-            description:
-                'Instantly turn your best X mentions into convincing social proof.',
-            imageSrc: '/home/twittor2new.png',
-            previewLabel: 'AUTO-UPDATING FEED',
-            previewValue: 'SHOWING 4 OF 3',
-            chips: ['No-code embed'],
-            buttonLabel: 'See your X mentions',
-            buttonTheme: 'green',
-            href: '/x',
-        },
-        {
-            number: '04',
-            kind: 'mention',
-            icon: 'reddit',
-            eyebrow: 'Reddit mention embeds',
-            title: 'Track all your real-time Reddit mentions',
-            description:
-                'Show real customer conversations and turn community buzz into trust signals.',
-            imageSrc: '/home/redditpost2new.png',
-            previewLabel: 'CURATED, LIVE BUZZ',
-            previewValue: '22D AGO',
-            chips: ['No-code embed'],
-            buttonLabel: 'See your Reddit mentions',
-            buttonTheme: 'orange',
-            href: '/reddit',
-        },
-        {
-            number: '05',
             kind: 'seo',
             eyebrow: 'Autonomous AI Agent',
             title: 'Meet your dedicated SEO Bot.',

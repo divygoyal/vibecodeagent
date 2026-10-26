@@ -68,7 +68,7 @@ export function classifyRedirectUri(uri: unknown): { ok: true; kind: RedirectKin
         return { ok: false, reason: 'http redirect_uri is only allowed for loopback (127.0.0.1, [::1], localhost)' };
     }
     if (BLOCKED_SCHEMES.has(scheme)) return { ok: false, reason: `scheme ${scheme}: is not allowed` };
-    if (KNOWN_APP_SCHEMES.has(scheme) || /[.-]/.test(scheme)) return { ok: true, kind: 'custom', host: `${scheme}:` };
+    if (KNOWN_APP_SCHEMES.has(scheme) || /[.-]/.test(scheme)) return { ok: true, kind: 'custom', host: `${scheme}://` };
     return { ok: false, reason: 'custom schemes must be an app scheme (for example cursor:// or com.example.app://)' };
 }
 

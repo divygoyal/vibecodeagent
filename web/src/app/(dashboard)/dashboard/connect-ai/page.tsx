@@ -5,12 +5,7 @@ import { mcpEnabled, resourceUrl } from '@/lib/mcp/config';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Connect AI · TrafficClaw' };
 
+/** Connect AI (DESIGN 5.13): MCP setup, connected apps, API keys and usage. */
 export default function ConnectAiPage() {
-    return (
-        <div className="tc-root min-h-full bg-canvas px-4 py-6 text-fg md:px-6 md:py-8">
-            <div className="mx-auto w-full max-w-[1120px]">
-                <ConnectAiClient endpoint={resourceUrl()} enabled={mcpEnabled()} />
-            </div>
-        </div>
-    );
+    return <ConnectAiClient endpoint={resourceUrl()} enabled={mcpEnabled()} />;
 }

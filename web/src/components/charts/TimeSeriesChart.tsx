@@ -161,11 +161,16 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
     };
 
     return (
-        <figure aria-label={ariaLabel} className={cn('relative m-0', className)} style={{ height }}>
+        <figure
+            aria-label={ariaLabel}
+            // Mobile caps charts at 220px (DESIGN 3.7); the chart follows its box.
+            className={cn('relative m-0 h-[var(--ts-h)] max-md:h-[min(var(--ts-h),220px)]', className)}
+            style={{ ['--ts-h' as string]: `${height}px` }}
+        >
             <ComposedChart
                 responsive
                 data={rows}
-                style={{ width: '100%', height }}
+                style={{ width: '100%', height: '100%' }}
                 margin={{ top: 8, right: 8, bottom: 0, left: showY ? 0 : 8 }}
                 accessibilityLayer
             >

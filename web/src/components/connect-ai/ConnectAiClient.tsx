@@ -9,6 +9,7 @@ import {
     Badge, Banner, Button, Card, CardHeader, Checkbox, ConfirmModal, EmptyState, Modal, Pill, Select, Skeleton, Switch, Table, VerifiedBadge,
     type TableColumn,
 } from '@/components/ui';
+import { PageHeader } from '@/components/shell/PageHeader';
 import { CodeBlock, CopyButton } from './CopyButton';
 import { SetupTabs } from './SetupTabs';
 import { EXAMPLE_PROMPTS } from './setupClients';
@@ -109,7 +110,12 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
     }, [mutate]);
 
     if (!enabled) {
-        return <EmptyState variant="page" icon={Plug} title="Connect AI is not enabled" description="This server does not have the MCP connector turned on (TC_MCP_ENABLED)." />;
+        return (
+            <>
+                <PageHeader title="Connect AI" />
+                <Card padding="none"><EmptyState variant="page" icon={Plug} title="Connect AI is not enabled" description="This server does not have the MCP connector turned on (TC_MCP_ENABLED)." /></Card>
+            </>
+        );
     }
 
     const grants = data?.grants ?? [];
@@ -136,13 +142,11 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
 
     return (
         <div className="space-y-6">
-            <header className="flex flex-wrap items-end justify-between gap-3">
-                <div className="min-w-0">
-                    <h1 className="text-heading text-fg">Connect AI</h1>
-                    <p className="mt-1 max-w-[640px] text-body text-fg-muted">Ask ChatGPT, Claude and other MCP apps about your Analytics and Search Console data. Read-only, free, and you choose which sites each app sees.</p>
-                </div>
-                {data ? <Pill tone={grants.length ? 'brand' : 'neutral'} icon={<Plug aria-hidden size={12} strokeWidth={1.75} />}>{grants.length ? `${grants.length} connected` : 'Nothing connected yet'}</Pill> : null}
-            </header>
+            <PageHeader
+                title="Connect AI"
+                subtitle="Ask ChatGPT, Claude and other MCP apps about your Analytics and Search Console data. Read-only, free, and you choose which sites each app sees."
+                badges={data ? <Pill tone={grants.length ? 'brand' : 'neutral'} icon={<Plug aria-hidden size={12} strokeWidth={1.75} />}>{grants.length ? `${grants.length} connected` : 'Nothing connected yet'}</Pill> : null}
+            />
 
             {error ? (
                 <Banner variant="danger" title="Could not load your connections" actions={<Button size="sm" onClick={() => mutate()}>Retry</Button>} />
@@ -239,21 +243,22 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                                     </div>
                                 ))}
                             </dl>
-                            <div className="mt-4">
-                                <Table
-                                    card={false}
-                                    density="compact"
-                                    caption="Recent tool calls"
-                                    columns={activityColumns}
-                                    rows={(data?.activity ?? []).slice(0, 8)}
-                                    rowKey={(a, i) => `${a.ts}-${i}`}
-                                    empty={<EmptyState variant="inline" title="No calls yet" />}
-                                />
-                            </div>
+                            <p className="mt-3 text-body-sm text-fg-muted">TrafficClaw logs which tool ran, when and for which site, never the question or the answer. Kept for 30 days.</p>
                         </>
                     )}
                 </Card>
             </div>
+
+            <Table
+                caption="Recent tool calls"
+                toolbar={<CardHeader as="h2" title="Recent activity" className="mb-0" />}
+                density="compact"
+                loading={isLoading}
+                columns={activityColumns}
+                rows={(data?.activity ?? []).slice(0, 10)}
+                rowKey={(a, i) => `${a.ts}-${i}`}
+                empty={<EmptyState variant="inline" title="No calls yet" description="Calls from your AI apps show up here." />}
+            />
 
             <Card>
                 <CardHeader

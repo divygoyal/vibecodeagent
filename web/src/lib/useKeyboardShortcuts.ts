@@ -9,8 +9,7 @@ const chordRoutes: Record<string, string> = {
   o: '/dashboard',
   a: '/dashboard/analytics',
   s: '/dashboard/seo',
-  c: '/dashboard/ai-chat',
-  b: '/dashboard/bot',
+  c: '/dashboard/ask',
 };
 
 export default function useKeyboardShortcuts() {
