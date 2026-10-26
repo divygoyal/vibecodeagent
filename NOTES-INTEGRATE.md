@@ -45,6 +45,29 @@ The worktree is shared with a robustness agent: commit with `git commit -- <path
 - Dev only: web/.env.development.local (gitignored) copied from tc-mcp (TC_MCP_ENABLED=1, loopback CIMD) so /mcp,
   /oauth and Connect AI run on 3101. MCP flow test against 3101: 28/28.
 
+## Later commits
+- 085bcaa merge tc/sweep (old dark UI swept; superadmin offers panel kept). d9f81c8 LegacyFrame/isLegacyRoute/.legacy
+  removed. 0a08ba0 styles/legacy.css pruned 1637 -> 216 lines (dead classes, all [data-legacy-theme] rules, orphan
+  keyframes; library + element rules kept). 96fb53d share overview favicons via /api/favicon.
+- d978878 scripts/dev/check_migrations.py (below). afaf129 no new lint errors in changed files.
+- Checked by hand on 3101: /share/<token> (+/events), /view, /embed/demo, /embed/d, /embed/leaderboard all 200 with
+  0 problems desktop+mobile; Cmd/Ctrl+K palette (search, Enter navigates, Esc closes); /dashboard/weekly(/*) 308 ->
+  /dashboard/settings?tab=notifications; leaderboard privacy audit 21,356 assertions OK; builder public API 9/9;
+  MCP flow 28/28.
+
+## Production env vars (merged from the NOTES files)
+- Set: `TC_MCP_ENABLED=1` (MCP server, OAuth, Connect AI), `TC_MCP_ISSUER=https://trafficclaw.com` (else derived from
+  the request origin), `OAUTH_TOKEN_ENC_KEY` (admin, Fernet; MCP tokens and OAuth secrets), `CRON_SECRET` (Bearer for
+  the new crons), `NEXTAUTH_URL` (absolute URLs: badges, widget/share snippets, /preview-private redirect).
+- New crons (daily, `Authorization: Bearer $CRON_SECRET`): GET /api/cron/portfolio-sync and
+  GET /api/cron/leaderboard-refresh.
+- Optional: `TC_MCP_TXN_SECRET` (defaults to NEXTAUTH_SECRET), `TC_MCP_DEMO=0` (turn off anonymous demo grants),
+  `TC_MCP_ACCESS_TTL`, `TC_MCP_DCR_LIMIT`, `SHARE_WATERMARK_SECRET` (unchanged).
+- Preview only: `TC_ALLOWED_EMAILS=websitebond@gmail.com,...`, `TC_NOINDEX=1` (set at build time AND runtime).
+- Never in production: `TC_DEMO_DATA`, `TC_DEMO_FAULTS`, `TC_MCP_DEV_CIMD_LOOPBACK`.
+- Owner/ops (from MCP notes): Google consent wording, Cloudflare WAF skip for /mcp, /oauth, /.well-known; MCP directory
+  submissions.
+
 ## Admin restart needed on 8101
 The auto-mode classifier blocked restarting the shared integrate admin; the running admin on 8101 still has the
 pre-integration Python (no /connections endpoint, old site_links code, schema hook). Web code tolerates it.
