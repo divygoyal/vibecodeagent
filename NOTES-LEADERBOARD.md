@@ -45,6 +45,15 @@ Screenshots go to /root/projects/tc-redesign-research/shots/leaderboard/.
 Everything above is built and committed. Verified: tsc, eslint, node tests (npm test), python unit + API tests, privacy audit
 script (21k assertions, no leaks) against the seeded demo board.
 
+## Status at PAUSE (usage limit)
+- Everything is committed. tc/foundation merged again (Geist-on-<html> font fix included). Dev server taken down.
+- First visual check done on /leaderboard (top tab, desktop): layout good. Fixed: server pages crashed on buttonClasses (client export) -> Button asChild.
+- Known small things to do on resume: (1) login.mjs old-route leaderboard seed overwrites seeded descriptions for demo2/admin
+  (skip the old seeding when the board seed runs/has run); (2) "New" badge shows on every row in the fresh demo seed (is_new = 30 days; consider 14);
+  (3) re-shoot ALL pages after the font fix: /leaderboard tabs, profile (acme exact+sections, health/bytebrief range, dataviz defaults, pending creativeprints),
+  embed widget, badge, /dashboard/leaderboard (join picker, profile, privacy, offers, ad slots, embed; light+dark; mobile) into
+  /root/projects/tc-redesign-research/shots/leaderboard/; run python3 scripts/dev/check_leaderboard_privacy.py 3105 leaderboard; delete web/.next.
+
 ## Left / for the coordinator
 - Screenshots + visual pass of every page (needs a free dev slot).
 - Redirects wanted from the foundation agent: /dashboard/settings?tab=leaderboard -> /dashboard/leaderboard; then delete
