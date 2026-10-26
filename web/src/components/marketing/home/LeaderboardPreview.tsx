@@ -152,7 +152,7 @@ export function LeaderboardPreview() {
                                         </span>
                                     ) : null}
                                     <span className="w-20 shrink-0 text-right">
-                                        {row.visitors ? <span className="block text-stat-sm tabular-nums text-fg">{row.visitors}</span> : null}
+                                        {row.visitors ? <span className="block whitespace-nowrap text-stat-sm tabular-nums text-fg">{row.visitors}</span> : null}
                                         <Delta pct={row.deltaPct} />
                                     </span>
                                 </Link>

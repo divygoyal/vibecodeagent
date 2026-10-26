@@ -83,7 +83,7 @@ export function CountValue({ m, className, bold = true }: { m: CountMetric | nul
     if (m.mode === 'range') {
         return (
             <Tooltip content="The owner shares a range, not the exact number.">
-                <span tabIndex={0} className={cn('tabular-nums', bold && 'font-semibold', className)}>{text}</span>
+                <span tabIndex={0} className={cn('whitespace-nowrap tabular-nums', bold && 'font-semibold', className)}>{text}</span>
             </Tooltip>
         );
     }

@@ -6,10 +6,9 @@ export interface NavLink {
 }
 
 export const HEADER_NAV: NavLink[] = [
-    { label: 'Product', href: '/#product' },
     { label: 'Demo', href: '/demo' },
     { label: 'Leaderboard', href: '/leaderboard' },
-    { label: 'ChatGPT & Claude', href: '/ai' },
+    { label: 'Connect AI', href: '/ai' },
     { label: 'Free tools', href: '/tools' },
     { label: 'Pricing', href: '/pricing' },
 ];
@@ -29,13 +28,13 @@ export const FOOTER_COLUMNS: Array<{ title: string; links: NavLink[] }> = [
         links: [
             { label: 'Verified leaderboard', href: '/leaderboard' },
             { label: 'Add your site', href: '/leaderboard/join' },
-            { label: 'Advertise', href: '/sponsor' },
+            { label: 'Advertise', href: '/leaderboard/advertise' },
         ],
     },
     {
         title: 'Resources',
         links: [
-            { label: 'ChatGPT & Claude', href: '/ai' },
+            { label: 'Connect AI (ChatGPT & Claude)', href: '/ai' },
             { label: 'Free SEO tools', href: '/tools' },
             { label: 'llms.txt', href: '/llms.txt' },
         ],
