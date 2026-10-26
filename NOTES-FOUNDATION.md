@@ -4,17 +4,12 @@ Specs: /root/projects/tc-redesign-research/{DESIGN,PRODUCT}.md. Screenshots go t
 /root/projects/tc-redesign-research/shots/foundation/.
 
 ## Done
-- Fast-forwarded to work/live 2719c3a (dev kit: README, shot.mjs, crawl.mjs, pw.mjs).
-- Read DESIGN 2/3/4/9, PRODUCT, root layout, dashboard layout, middleware, next.config, legacy globals.css.
-- radix-ui: picked radix-ui@1.6.7 (Jul 2026, mature). Lockfile computed in scratch
-  (`npm install radix-ui@1.6.7 --package-lock-only`): 0 removed / 0 changed / 79 added entries.
-  Packages installed in scratch only (/tmp/claude-0/-root/b497b626-1524-45cc-9ce3-b9467df6997d/scratchpad/radixinst).
-  NOT yet copied into web/node_modules, NOT yet in package.json. Next step: copy package.json +
-  package-lock.json from scratch/lock, then copy the NEW dirs from scratch/radixinst/node_modules
-  (@floating-ui, @radix-ui, aria-hidden, detect-node-es, get-nonce, radix-ui, react-remove-scroll*,
-  react-style-singleton, use-callback-ref, use-sidecar; tslib only if missing) into web/node_modules.
-  Never `npm install` in web/ (node_modules is hard-linked with other worktrees).
-  If the scratch dir is gone, redo both commands.
+- 176a55f tokens.css, globals.css, styles/legacy.css, theme script (lib/themeScript.ts + lib/theme.ts),
+  radix-ui 1.6.7 copied in (new dirs only, hard links untouched), lib/cn, lib/format (+tests),
+  lib/metrics, lib/dateRange (+tests), `npm test` (node --test tests/*.test.mjs).
+- 7ea0a0b components/ui/* and components/charts/* (barrels: '@/components/ui', '@/components/charts'),
+  /api/favicon, Toaster + TooltipProvider in app/providers.tsx. tsc + eslint clean on these files.
+  -> other agents can build on 7ea0a0b now (not visually verified yet; styleguide next).
 
 ## Decisions (keep)
 - Legacy CSS: move globals.css to styles/legacy.css, but (a) drop its `@import "tailwindcss"`,
