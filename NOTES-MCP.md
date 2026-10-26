@@ -18,7 +18,12 @@ Spec: /root/projects/tc-redesign-research/MCP.md + PRODUCT.md section 4. Design:
 - Grants carry exclude_queries (per-connection option to hide search queries) and site_filter.
 - Consent: /oauth/authorize (route) validates, sets CSRF cookie, 302 -> /oauth/consent?txn=<signed>; form POST -> /oauth/authorize/decision.
 
+## Dev setup
+- web/.env.development.local (gitignored) sets TC_MCP_ENABLED=1 and TC_MCP_DEV_CIMD_LOOPBACK=1 (up.sh uses env -i).
+- work/live kit merged (scripts/dev).
+
 ## Done (committed unless noted)
+- web/src/lib/sites/fetchInventory.ts: own commit 8145bd0 (for cherry-pick by portfolio).
 - admin/mcp_api.py + migrations/019_add_mcp_oauth.sql + main.py wiring (include_router, ensure_mcp_schema, delete-user cascade). Not yet run.
 - web/src/lib/mcp/{config,adminStore,rateLimit,session}.ts
 - web/src/lib/oauth/{primitives,ssrf,clients,txn,metadata,authorize}.ts
