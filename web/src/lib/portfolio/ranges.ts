@@ -72,22 +72,3 @@ export function windowRequests(range: PortfolioRange, now: number = Date.now()):
 export function syncEndDay(now: number = Date.now()): string {
     return addDays(todayIso(now), -1);
 }
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/** "Jul 13 – Oct 10"; adds years when the range is not inside the current year. */
-export function formatDateRange(start: string, end: string, now: number = Date.now()): string {
-    const [ys, ms, ds] = start.split('-').map(Number);
-    const [ye, me, de] = end.split('-').map(Number);
-    const thisYear = new Date(now).getUTCFullYear();
-    const withYear = ys !== ye || ye !== thisYear;
-    const a = `${MONTHS[ms - 1]} ${ds}${withYear ? `, ${ys}` : ''}`;
-    const b = `${MONTHS[me - 1]} ${de}${withYear ? `, ${ye}` : ''}`;
-    return `${a} – ${b}`;
-}
-
-/** "Oct 13" */
-export function formatDay(iso: string): string {
-    const [, m, d] = iso.split('-').map(Number);
-    return `${MONTHS[m - 1]} ${d}`;
-}

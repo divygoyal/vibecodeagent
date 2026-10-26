@@ -1,7 +1,14 @@
-import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 
-// Overview was removed — the dashboard root now lands on AI Chat,
-// which is the primary surface for new users.
-export default function DashboardRoot() {
-  redirect('/dashboard/ai-chat');
+import { PortfolioPage } from '@/components/portfolio/PortfolioPage';
+
+export const metadata = { title: 'Portfolio' };
+
+/** App home: every GA4 property and Search Console site on one screen. */
+export default function DashboardHome() {
+    return (
+        <Suspense fallback={null}>
+            <PortfolioPage />
+        </Suspense>
+    );
 }
