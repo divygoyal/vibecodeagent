@@ -29,7 +29,13 @@ export const THIRD_PARTY_NOTE = '# note: queries, URLs and names above come from
 
 const INVISIBLE_RE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f­​-‏‪-‮⁠-⁤⁦-⁩﻿]|\udb40[\udc00-\udc7f]/g;
 const INSTRUCTION_RE = /(ignore|disregard|forget)\s+(all\s+|any\s+)?(the\s+)?(previous|prior|above|earlier|preceding)\s+(instructions?|prompts?|rules?|messages?|context)|system\s+prompt|you\s+are\s+now\b|^\s*(assistant|system|user)\s*:|<\|[a-z_]+\|>|\[\/?INST\]|call\s+the\s+[a-z_]+\s+tool|new\s+instructions?\s*:/i;
-const BASE64_BLOB_RE = /[A-Za-z0-9+/=_-]{80,}/;
+const BASE64_BLOB_RE = /[A-Za-z0-9+/=]{60,}/;
+
+/** Long mixed-case alphanumeric runs (encoded payloads), not hyphenated slugs or plain words. */
+function looksLikeBlob(s: string): boolean {
+    const m = BASE64_BLOB_RE.exec(s);
+    return !!m && /[a-z]/.test(m[0]) && /[A-Z]/.test(m[0]) && /\d/.test(m[0]);
+}
 
 export class Sanitizer {
     flagged = 0;
@@ -41,7 +47,7 @@ export class Sanitizer {
         s = s.replace(/[\t\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
         if (opts.pii !== false) s = maskPii(s).masked;
         s = s.replace(/</g, '‹').replace(/>/g, '›').replace(/`/g, 'ʹ');
-        if (INSTRUCTION_RE.test(s) || BASE64_BLOB_RE.test(s)) {
+        if (INSTRUCTION_RE.test(s) || looksLikeBlob(s)) {
             this.flagged += 1;
             return '[omitted: instruction-like text]';
         }
