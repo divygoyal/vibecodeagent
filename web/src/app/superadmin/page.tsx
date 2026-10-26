@@ -1130,7 +1130,7 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh, loading }: {
                 open={!!deleteTarget}
                 onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
                 title={`Delete ${deleteTarget?.username || deleteTarget?.github_id || 'user'}?`}
-                description={`${deleteTarget?.username || 'This user'} (${deleteTarget?.github_id ?? ''}): this permanently deletes the user, their Telegram bot and all data. It cannot be undone.`}
+                description={`${deleteTarget?.username || 'This user'} (${deleteTarget?.github_id ?? ''}): this permanently deletes the user, their bot container (if any) and all data. It cannot be undone.`}
                 confirmLabel="Delete user"
                 loading={!!deleteTarget && actionLoading === `delete-${deleteTarget.github_id}`}
                 onConfirm={() => deleteTarget ? handleDelete(deleteTarget) : undefined}
@@ -1160,7 +1160,7 @@ function UserSignals({ user }: { user: UserData }) {
     return (
         <div className="flex flex-wrap gap-1.5">
             {user.has_google && <SignalPill tone="up">Google</SignalPill>}
-            {(user.embed_token_count || 0) > 0 && <SignalPill tone="info">Globe {user.embed_token_count}</SignalPill>}
+            {(user.embed_token_count || 0) > 0 && <SignalPill tone="info">Embeds {user.embed_token_count}</SignalPill>}
             {(user.shared_dashboard_count || 0) > 0 && <SignalPill>Shared {user.shared_dashboard_count}</SignalPill>}
             {(user.custom_dashboard_count || 0) > 0 && <SignalPill tone="brand">Dashboards {user.custom_dashboard_count}</SignalPill>}
             {user.leaderboard_active && <SignalPill tone="up">Leaderboard</SignalPill>}
@@ -2064,7 +2064,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                 )}
                             </DrawerSection>
 
-                            <DrawerSection icon={Activity} title="Globe, embed and share usage">
+                            <DrawerSection icon={Activity} title="Embed and share usage">
                                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                                     <DetailStat label="Active embeds" value={String(profile.globe_assets.summary.active_embed_tokens)} />
                                     <DetailStat label="Embeds used" value={String(profile.globe_assets.summary.used_embed_tokens)} sub="Tokens with last_used_at" />
