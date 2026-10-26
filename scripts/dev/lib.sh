@@ -98,9 +98,7 @@ ensure_venv() {
         fi
         if [ "$(cat "$TC_VENV/.requirements-hash" 2>/dev/null)" != "$hash" ]; then
             log "installing admin requirements into venv"
-            # greenlet: SQLAlchemy >= 2.1 no longer pulls it in, but the async
-            # engine needs it (admin/requirements.txt does not list it).
-            "$TC_VENV/bin/pip" install -q --disable-pip-version-check -r "$req" greenlet >&2
+            "$TC_VENV/bin/pip" install -q --disable-pip-version-check -r "$req" >&2
             echo "$hash" > "$TC_VENV/.requirements-hash"
         fi
     ) 9>"$TC_DEV_HOME/.venv.lock"
