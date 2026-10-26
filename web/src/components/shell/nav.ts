@@ -60,7 +60,6 @@ export const ROUTE_TITLES: [prefix: string, title: string][] = [
     ['/dashboard/analytics', 'Traffic'],
     ['/dashboard/seo', 'Search'],
     ['/dashboard/audit', 'Actions'],
-    ['/dashboard/weekly', 'Weekly'],
 ];
 
 export function routeTitle(pathname: string): string | null {
@@ -72,15 +71,10 @@ export function routeTitle(pathname: string): string | null {
 
 /**
  * Pages that still use the old dark styling. AppShell wraps their content in
- * <LegacyFrame> (data-theme="dark" + the old black background) so they keep
- * rendering correctly inside the new light shell.
- *
- * WHEN YOU MIGRATE A PAGE TO THE TOKENS, DELETE ITS PREFIX HERE.
- * (/dashboard/s/** pages wrap their own legacy content; see app/(dashboard)/dashboard/s.)
+ * <LegacyFrame> (data-theme="dark" + the old black background).
+ * Empty: every app page uses the tokens now. Keep it empty.
  */
-export const LEGACY_ROUTE_PREFIXES: string[] = [
-    '/dashboard/weekly',
-];
+export const LEGACY_ROUTE_PREFIXES: string[] = [];
 
 export function isLegacyRoute(pathname: string): boolean {
     return LEGACY_ROUTE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));

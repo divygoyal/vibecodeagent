@@ -973,7 +973,7 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh, loading }: {
     const handleGenerateWeeklyDigest = async (githubId: string) => {
         // Ad-hoc trigger of the same pipeline the weekly cron runs — fetches
         // GSC/GA4 for last completed ISO week, calls Gemini for headline + 3
-        // actions, persists to admin → user's /dashboard/weekly tab. Synchronous
+        // actions, persists to admin (weekly_digests). Synchronous
         // (10-40 s typically). Persistence reason / headline preview surfaced
         // inline on completion.
         const key = `weekly-digest-${githubId}`
@@ -987,7 +987,7 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh, loading }: {
                 const reasonLine = res?.snapshotEmpty
                     ? `Empty snapshot: ${res?.snapshotReason || 'unknown'}`
                     : ''
-                toast.success(`${wk} digest persisted to /dashboard/weekly.`, {
+                toast.success(`${wk} digest saved.`, {
                     description: [headlineLine, reasonLine].filter(Boolean).join(' · ') || undefined,
                     duration: 8000,
                 })
@@ -1366,7 +1366,7 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
                             {/* Writes to the DB rather than sending an email. */}
                             <DropdownMenuItem className="h-auto! py-1.5" onSelect={onGenerateWeeklyDigest}>
                                 <span className="block font-medium">Generate weekly digest</span>
-                                <span className="block text-meta text-fg-muted">Saves a digest to /dashboard/weekly</span>
+                                <span className="block text-meta text-fg-muted">Saves this week&rsquo;s digest to the database</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
