@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Search, LayoutDashboard, Bot, BarChart3, MessageSquare,
-  ScanSearch, Settings, Book, Newspaper, Command, ArrowRight,
-  Sparkles
+  Search, LayoutDashboard, LayoutGrid, BarChart3, MessageSquare,
+  ScanSearch, Settings, Book, Command, ArrowRight,
+  Sparkles, Trophy, Plug
 } from 'lucide-react';
 import { buildAskAiUrl } from '@/lib/askAi';
 
@@ -33,15 +33,16 @@ export default function CommandPalette() {
   }, [router]);
 
   const commands = useMemo<CommandItem[]>(() => [
-    { id: 'overview', label: 'Overview', description: 'Dashboard overview', icon: LayoutDashboard, action: () => navigate('/dashboard'), section: 'Navigation', keywords: ['home', 'dashboard'] },
-    { id: 'ai-chat', label: 'AI Chat', description: 'Talk to AI analyst', icon: MessageSquare, action: () => navigate('/dashboard/ai-chat'), section: 'Navigation', keywords: ['chat', 'ai', 'ask'] },
-    { id: 'analytics', label: 'Analytics', description: 'Traffic & sources', icon: BarChart3, action: () => navigate('/dashboard/analytics'), section: 'Navigation', keywords: ['traffic', 'visitors', 'ga4'] },
-    { id: 'seo', label: 'SEO', description: 'Keywords & rankings', icon: Search, action: () => navigate('/dashboard/seo'), section: 'Navigation', keywords: ['search', 'keywords', 'gsc', 'rankings'] },
-    { id: 'audit', label: 'Site Audit', description: '50+ SEO checks', icon: ScanSearch, action: () => navigate('/dashboard/audit'), section: 'Navigation', keywords: ['audit', 'check', 'health'] },
-    { id: 'bot', label: 'Bot Setup', description: 'Configure Telegram bot', icon: Bot, action: () => navigate('/dashboard/bot'), section: 'Navigation', keywords: ['telegram', 'bot', 'setup'] },
+    { id: 'portfolio', label: 'Portfolio', description: 'All your sites', icon: LayoutGrid, action: () => navigate('/dashboard'), section: 'Navigation', keywords: ['home', 'dashboard', 'sites', 'portfolio'] },
+    { id: 'traffic', label: 'Traffic', description: 'GA4 for the current site', icon: BarChart3, action: () => navigate('/dashboard/analytics'), section: 'Navigation', keywords: ['traffic', 'visitors', 'ga4', 'analytics'] },
+    { id: 'search', label: 'Search', description: 'Search Console for the current site', icon: Search, action: () => navigate('/dashboard/seo'), section: 'Navigation', keywords: ['search', 'keywords', 'gsc', 'rankings', 'seo'] },
+    { id: 'actions', label: 'Actions', description: 'What to fix next', icon: ScanSearch, action: () => navigate('/dashboard/audit'), section: 'Navigation', keywords: ['audit', 'check', 'health', 'actions'] },
+    { id: 'dashboards', label: 'Dashboards', description: 'Build and share dashboards', icon: LayoutDashboard, action: () => navigate('/dashboard/dashboards'), section: 'Navigation', keywords: ['dashboard', 'report', 'share'] },
+    { id: 'ask', label: 'Ask', description: 'Talk to the AI analyst', icon: MessageSquare, action: () => navigate('/dashboard/ask'), section: 'Navigation', keywords: ['chat', 'ai', 'ask'] },
+    { id: 'leaderboard', label: 'Leaderboard', description: 'Your public profile', icon: Trophy, action: () => navigate('/dashboard/leaderboard'), section: 'Navigation', keywords: ['leaderboard', 'profile', 'verify'] },
+    { id: 'connect-ai', label: 'Connect AI', description: 'Use your data in ChatGPT and Claude', icon: Plug, action: () => navigate('/dashboard/connect-ai'), section: 'Navigation', keywords: ['mcp', 'chatgpt', 'claude', 'connect'] },
     { id: 'settings', label: 'Settings', description: 'Account settings', icon: Settings, action: () => navigate('/dashboard/settings'), section: 'Navigation', keywords: ['account', 'profile', 'preferences'] },
     { id: 'docs', label: 'Docs', description: 'Documentation', icon: Book, action: () => navigate('/dashboard/docs'), section: 'Resources', keywords: ['help', 'documentation', 'guide'] },
-    { id: 'blog', label: 'Blog', description: 'Latest updates', icon: Newspaper, action: () => navigate('/dashboard/blog'), section: 'Resources', keywords: ['news', 'updates', 'articles'] },
     { id: 'ask-ai', label: 'Ask AI: What should I do today?', description: 'Get AI recommendation', icon: Sparkles, action: () => {
       navigate(buildAskAiUrl('What is the ONE thing I should do today to grow?'));
     }, section: 'Actions', keywords: ['ai', 'recommend', 'grow', 'action'] },

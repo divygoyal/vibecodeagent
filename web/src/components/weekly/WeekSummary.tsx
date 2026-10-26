@@ -6,7 +6,7 @@
  * Layout:
  *   1. Gradient headline (the cron-generated one-liner)
  *   2. "Do these 3 things this week" — vertical action stack with
- *      "Ask AI about this" buttons that deep-link into /dashboard/ai-chat?q=…
+ *      "Ask AI about this" buttons that deep-link into /dashboard/ask?q=…
  *   3. Supporting KPI tiles (most-changed metrics)
  *   4. Linked artifacts — winners/losers/cannibalization, each row
  *      linking into the SEO surface with query params pre-applied.
@@ -51,7 +51,7 @@ function deltaToneClass(n: number | null | undefined, opts?: { invertGoodness?: 
 
 /** Build the /ai-chat URL for an "Ask AI about this" button.
  *
- * The chat page accepts `?q=` (see web/src/app/(dashboard)/dashboard/ai-chat/page.tsx:659).
+ * The chat page accepts `?q=` (see web/src/app/(dashboard)/dashboard/ask/page.tsx:659).
  * We tack on a `context` hint that the chat may or may not honor today — it's
  * harmless either way (the chat URL-scrubs unknown params).
  *
@@ -61,7 +61,7 @@ function deltaToneClass(n: number | null | undefined, opts?: { invertGoodness?: 
 function askAiUrl(prompt: string, contextLabel?: string): string {
     const params = new URLSearchParams({ q: prompt });
     if (contextLabel) params.set('context', contextLabel);
-    return `/dashboard/ai-chat?${params.toString()}`;
+    return `/dashboard/ask?${params.toString()}`;
 }
 
 function seoUrlWithFilter(siteUrl: string | null, params: Record<string, string>): string {
