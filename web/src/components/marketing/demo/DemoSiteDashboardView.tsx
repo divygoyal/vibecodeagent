@@ -39,17 +39,17 @@ export function DemoSiteDashboardView({ dashboard }: { dashboard: DemoSiteDashbo
         if ((selected === 'clicks' || selected === 'impressions') && search) {
             const cur = selected === 'clicks' ? search.clicks : search.impressions;
             const prev = selected === 'clicks' ? search.prevClicks : search.prevImpressions;
-            return { window: search.window, rows: search.dates.map((date, i) => ({ date, value: cur[i], prev: prev[i], prevDate: search.prevDates[i] })) };
+            return { win: search.window, rows: search.dates.map((date, i) => ({ date, value: cur[i], prev: prev[i], prevDate: search.prevDates[i] })) };
         }
         if (TRAFFIC_KEYS.includes(selected) && traffic) {
             const cur = selected === 'users' ? traffic.users : selected === 'sessions' ? traffic.sessions : traffic.pageviews;
             const prev = selected === 'users' ? traffic.prevUsers : selected === 'sessions' ? traffic.prevSessions : traffic.prevPageviews;
-            return { window: traffic.window, rows: traffic.dates.map((date, i) => ({ date, value: cur[i], prev: prev[i], prevDate: traffic.prevDates[i] })) };
+            return { win: traffic.window, rows: traffic.dates.map((date, i) => ({ date, value: cur[i], prev: prev[i], prevDate: traffic.prevDates[i] })) };
         }
         return null;
     }, [selected, search, traffic]);
 
-    const window = traffic?.window ?? search?.window;
+    const win = traffic?.window ?? search?.window;
 
     return (
         <div className="space-y-6">
@@ -63,7 +63,7 @@ export function DemoSiteDashboardView({ dashboard }: { dashboard: DemoSiteDashbo
                     </div>
                     <p className="mt-1 text-body-sm text-fg-muted">
                         Sample dashboard · {site.name}
-                        {window ? ` · ${fmtDateRange(window.curStart, window.curEnd)} vs previous 28 days` : ''}
+                        {win ? ` · ${fmtDateRange(win.curStart, win.curEnd)} vs previous 28 days` : ''}
                     </p>
                 </div>
             </div>
@@ -76,7 +76,7 @@ export function DemoSiteDashboardView({ dashboard }: { dashboard: DemoSiteDashbo
                             series={[{ metric: selected, key: 'value', compareKey: 'prev' }]}
                             compareDateKey="prevDate"
                             height={260}
-                            ariaLabel={`${METRICS[selected].label} per day${chart.window ? `, ${fmtDateRange(chart.window.curStart, chart.window.curEnd)}` : ''}`}
+                            ariaLabel={`${METRICS[selected].label} per day${chart.win ? `, ${fmtDateRange(chart.win.curStart, chart.win.curEnd)}` : ''}`}
                         />
                     ) : (
                         <PositionNote search={search} />

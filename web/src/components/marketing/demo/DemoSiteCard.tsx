@@ -43,7 +43,7 @@ export function DemoSiteCard({ site, portfolio, view = 'search', sparkHeight = 7
 }) {
     const showSearch = view === 'search' ? Boolean(site.search) : !site.traffic && Boolean(site.search);
     const showTraffic = !showSearch && Boolean(site.traffic);
-    const window = showSearch ? portfolio.windows.search : portfolio.windows.traffic;
+    const win = showSearch ? portfolio.windows.search : portfolio.windows.traffic;
     const dates = showSearch ? portfolio.dates.search : portfolio.dates.traffic;
     const badge = site.gsc ? (site.gsc.propertyType === 'domain' ? 'Domain' : 'Prefix') : 'GA4';
     const alert = site.alerts[0];
@@ -105,7 +105,7 @@ export function DemoSiteCard({ site, portfolio, view = 'search', sparkHeight = 7
 
             <div className="flex items-center gap-2">
                 <StatusPill status="synced" />
-                {window ? <span className="truncate text-meta text-fg-muted">{fmtDateRange(window.curStart, window.curEnd)}</span> : null}
+                {win ? <span className="truncate text-meta text-fg-muted">{fmtDateRange(win.curStart, win.curEnd)}</span> : null}
                 <span className="flex-1" />
                 {linked ? (
                     <span className="inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary group-hover:text-fg">

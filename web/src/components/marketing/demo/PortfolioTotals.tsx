@@ -30,7 +30,7 @@ export function PortfolioTotals({ portfolio, chartHeight = 240 }: { portfolio: D
 
     const isSearch = METRICS[selected].group === 'search';
     const rowDates = isSearch ? dates.search : dates.traffic;
-    const window = isSearch ? windows.search : windows.traffic;
+    const win = isSearch ? windows.search : windows.traffic;
     const data = useMemo(() => {
         const cur = combined[selected];
         const prev = combinedPrev[selected] ?? [];
@@ -48,7 +48,7 @@ export function PortfolioTotals({ portfolio, chartHeight = 240 }: { portfolio: D
             ariaLabel="Portfolio totals"
         >
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-meta text-fg-muted">
-                <span>{METRICS[selected].label}, all sites{window ? ` · ${fmtDateRange(window.curStart, window.curEnd)}` : ''}{portfolio.bucketDays > 1 ? ' · weekly' : ''}</span>
+                <span>{METRICS[selected].label}, all sites{win ? ` · ${fmtDateRange(win.curStart, win.curEnd)}` : ''}{portfolio.bucketDays > 1 ? ' · weekly' : ''}</span>
                 <span className="inline-flex items-center gap-3">
                     <span className="inline-flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-3 rounded-full" style={{ background: METRICS[selected].color }} />This period</span>
                     <span className="inline-flex items-center gap-1.5"><span aria-hidden className="h-0 w-3 border-t border-dashed" style={{ borderColor: METRICS[selected].color }} />{long.replace(/^previous/, 'Previous')}</span>
@@ -58,7 +58,7 @@ export function PortfolioTotals({ portfolio, chartHeight = 240 }: { portfolio: D
                 data={data}
                 series={[{ metric: selected, key: 'value', compareKey: 'prev' }]}
                 height={chartHeight}
-                ariaLabel={`${METRICS[selected].label} across all sites${window ? `, ${fmtDateRange(window.curStart, window.curEnd)}` : ''}, ${fmtMetric(selected, total ?? null)} in total`}
+                ariaLabel={`${METRICS[selected].label} across all sites${win ? `, ${fmtDateRange(win.curStart, win.curEnd)}` : ''}, ${selected === 'position' ? `average position ${fmtMetric(selected, total ?? null)}` : `${fmtMetric(selected, total ?? null)} in total`}`}
             />
         </KpiStrip>
     );
