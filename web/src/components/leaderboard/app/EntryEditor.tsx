@@ -21,6 +21,7 @@ import { VerificationBadge } from '../shared';
 import { EmbedCard } from '../ProfileClient';
 import { InboxPanel, useInbox } from './InboxPanel';
 import { PreviewPanel } from './Preview';
+import { useIsMobile } from '@/lib/useIsMobile';
 import { PrivacyForm } from './PrivacyForm';
 import { SlotsEditor } from './SlotsEditor';
 
@@ -159,6 +160,8 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
     const newOffers = (inbox.data?.items ?? []).filter((i) => i.entry_id === entry.id && i.status === 'new').length;
     const publicUrl = `${origin}${entry.public_path}`;
     const showPreview = tab === 'profile' || tab === 'privacy';
+    const isPhone = useIsMobile();
+    const previewDraft = { startup_name: draft.startup_name, description: draft.description, category: draft.category, logo_url: draft.logo_url, privacy: draft.privacy, open_to: draft.open_to };
 
     return (
         <div className="flex flex-col gap-4">
@@ -308,12 +311,23 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                 </div>
 
                 {showPreview ? (
-                    <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
-                        <PreviewPanel
-                            entry={entry}
-                            draft={{ startup_name: draft.startup_name, description: draft.description, category: draft.category, logo_url: draft.logo_url, privacy: draft.privacy, open_to: draft.open_to }}
-                        />
-                    </aside>
+                    isPhone ? (
+                        // Phones: the preview sits under the form, collapsed (DESIGN 5.12).
+                        <details className="group min-w-0 rounded-card border border-border-subtle bg-surface p-4">
+                            <summary className="flex cursor-pointer list-none items-center justify-between text-title-sm text-fg">
+                                Preview
+                                <span className="text-body-sm text-fg-muted group-open:hidden">Show</span>
+                                <span className="hidden text-body-sm text-fg-muted group-open:inline">Hide</span>
+                            </summary>
+                            <div className="mt-3">
+                                <PreviewPanel entry={entry} draft={previewDraft} />
+                            </div>
+                        </details>
+                    ) : (
+                        <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
+                            <PreviewPanel entry={entry} draft={previewDraft} />
+                        </aside>
+                    )
                 ) : null}
             </div>
 
