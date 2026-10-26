@@ -45,6 +45,8 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
   chart shows the error and Try again).
 - 7ebd3f4 ChunkLoadError (a tab opened before a deploy asks for chunks the new build no longer has) showed "Something went
   wrong"; the error screen now reloads once (60 s guard in sessionStorage) for chunk-load errors.
+- cce8bdc Dashboards: the pie widget's donut and legend were cut top and bottom on phones (legend below needs more
+  height than the cell); the donut leaves room for 3 legend rows and the rest folds into "Other".
 - 890b76d `shot.mjs`/`crawl.mjs --dark` produced light pages (theme is `localStorage['tc-theme']`); pw.newContext sets it.
 
 ## Server log audit (integrate + preview web.log)
@@ -60,5 +62,20 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
 | `middleware file convention is deprecated` / `inferred your workspace root` | 15 | Next 16 rename / lockfile in /root | harmless (README) |
 | MCP `{"evt":"mcp_tool",…"status":"error:rate_limited|site_not_in_grant|…"}` | ~25 | structured logs of the MCP tests' expected refusals | harmless |
 
-## Open
-(see the end of this file after the final sweep)
+## Open (severity)
+- Medium: a sync interrupted by a restart or deploy leaves assets `syncing`; the portfolio then reports `syncing` and
+  polls every 2 s for up to 15 min (SYNC_STUCK_S in build.ts/sync.ts) before a new sync runs. With one web process,
+  "syncing in the store but no sync running in this process" means interrupted and could resync at once; not changed
+  here because it assumes a single instance.
+- Low: the Tawk.to greeting ("Hi! How can we help?" + two buttons) opens over half of a phone screen on every app page
+  and hides content (seen in every mobile screenshot). Tawk dashboard setting: turn the greeting off on mobile.
+- Low: `/api/analytics?mode=list` and `/api/seo?mode=list` answer 502 with the raw Google JSON inside `error`
+  (`Google API error 401: {"error":…}`), also for a revoked token where 401 + "Reconnect Google" would be right. JSON,
+  not shown in the UI.
+- Low: standalone text links are 18–20px tall ("Open the full demo", "See pricing", breadcrumbs) and the marketing logo
+  link 28px; footer, toggles, tabs, table headers, segmented controls and pills are fixed (touch only).
+- Low (dev only): `/` 500s for some URL lengths (see the log table). Prod build unaffected.
+- Info: ~70 responsive grids still have no `grid-cols-1` base; none overflowed with the tested data (90-character hosts
+  at 390px, counts × 10M at 360px), but unusual content could. Fix as found: `grid-cols-1` / `minmax(0,…)`.
+- Info: the synthetic `nogoogle` user (GitHub session without a token) gets 503 from /api/auth/register-provider
+  (`missing-session-data`, handled as degraded); a real GitHub sign-in carries a token.
