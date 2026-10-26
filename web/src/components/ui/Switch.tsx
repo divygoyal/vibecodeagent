@@ -32,6 +32,8 @@ export function Switch({ checked, onCheckedChange, label, description, size = 'm
             aria-describedby={description ? `${sid}-desc` : undefined}
             className={cn(
                 'relative inline-flex shrink-0 items-center rounded-full bg-border-strong p-0.5 transition-colors duration-120 ease-standard',
+                // Touch: a 44px hit area around the 20px track (no layout change).
+                'pointer-coarse:after:absolute pointer-coarse:after:-inset-3',
                 'data-[state=checked]:bg-brand disabled:cursor-not-allowed disabled:opacity-50',
                 size === 'md' ? 'h-5 w-9' : 'h-4 w-7',
             )}

@@ -30,7 +30,9 @@ export function Checkbox({ checked, onCheckedChange, label, description, disable
             aria-label={label ? undefined : ariaLabel}
             aria-describedby={description ? `${cid}-desc` : undefined}
             className={cn(
-                'flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-border-strong bg-surface text-white',
+                'relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-border-strong bg-surface text-white',
+                // Touch: a 40px hit area around the 16px box (no layout change).
+                'pointer-coarse:after:absolute pointer-coarse:after:-inset-3',
                 'transition-colors duration-80 data-[state=checked]:border-brand data-[state=checked]:bg-brand',
                 'data-[state=indeterminate]:border-brand data-[state=indeterminate]:bg-brand data-[state=checked]:text-brand-fg data-[state=indeterminate]:text-brand-fg',
                 'disabled:cursor-not-allowed disabled:opacity-50',

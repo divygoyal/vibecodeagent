@@ -6,7 +6,7 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { Favicon } from '@/components/ui/Favicon';
 import { BarList } from '@/components/charts/BarList';
 import { billingPeriodSuffix, formatCents } from '@/lib/adSlots';
-import { fmtDay, fmtFull, fmtPercent } from '@/lib/format';
+import { fmtDay, fmtFull } from '@/lib/format';
 import { OPEN_TO_OPTIONS, profilePath, RANGE_PREV_NAMES } from '@/lib/leaderboard/constants';
 import { durationText, engagementText } from '@/lib/leaderboard/format';
 import { channelColor, deviceColor, type MetricKey } from '@/lib/metrics';
@@ -153,7 +153,7 @@ export function Breakdowns({ p }: { p: ProfilePayload }) {
         );
     }
     if (cards.length === 0) return null;
-    return <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{cards}</div>;
+    return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">{cards}</div>;
 }
 
 export function GrowthCard({ p }: { p: ProfilePayload }) {
@@ -233,11 +233,11 @@ export function SimilarCard({ p }: { p: ProfilePayload }) {
     return (
         <Card>
             <CardHeader title="Similar sites" description={p.category ? `More in ${p.category}` : undefined} />
-            <ul className="flex flex-col gap-2.5">
+            <ul className="flex flex-col gap-2.5 pointer-coarse:gap-0">
                 {p.similar.map((s) => (
                     <li key={s.id} className="flex items-center gap-2.5">
                         <Favicon host={s.name} size={24} />
-                        <Link href={profilePath(s)} className="min-w-0 flex-1 truncate text-body font-medium text-fg hover:underline">{s.name}</Link>
+                        <Link href={profilePath(s)} className="min-w-0 flex-1 truncate text-body font-medium text-fg hover:underline pointer-coarse:py-1.5">{s.name}</Link>
                         <span className="text-body-sm text-fg-secondary"><CountValue m={s.visitors} bold={false} /></span>
                     </li>
                 ))}
@@ -252,7 +252,7 @@ export function OpenToLine({ p }: { p: ProfilePayload }) {
         <p className="flex flex-wrap items-center gap-2 text-body-sm text-fg-secondary">
             <span className="font-medium text-fg">Open to</span>
             {p.open_to.map((o) => (
-                <a key={o} href={o === 'sponsorships' && p.ad_slots.length ? '#sponsor' : '#offers'} className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-meta font-medium text-fg-secondary transition-colors hover:border-border-strong hover:text-fg">
+                <a key={o} href={o === 'sponsorships' && p.ad_slots.length ? '#sponsor' : '#offers'} className="relative rounded-full border border-border bg-surface px-2.5 py-0.5 text-meta font-medium text-fg-secondary transition-colors hover:border-border-strong hover:text-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-x-0.5 pointer-coarse:after:-inset-y-1.5">
                     {OPEN_TO_OPTIONS.find((x) => x.value === o)?.label}
                 </a>
             ))}

@@ -71,7 +71,7 @@ export function ActionCard({ action, site, onStatus, compact, canSave = true, cl
                             type="button"
                             onClick={() => setOpen((v) => !v)}
                             aria-expanded={open}
-                            className="mt-3 inline-flex items-center gap-1 rounded text-body-sm font-medium text-fg-secondary hover:text-fg"
+                            className="relative mt-3 inline-flex items-center gap-1 rounded text-body-sm font-medium text-fg-secondary hover:text-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-2"
                         >
                             Suggested fix
                             <ChevronDown aria-hidden size={14} className={cn('transition-transform duration-120', open && 'rotate-180')} />

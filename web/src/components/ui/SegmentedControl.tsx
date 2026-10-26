@@ -74,7 +74,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, v
                         onClick={() => onChange(o.value)}
                         onKeyDown={(e) => move(e, i)}
                         className={cn(
-                            'relative flex h-full min-w-10 items-center justify-center gap-1.5 rounded-full px-3 text-body-sm font-medium',
+                            'relative flex h-full min-w-10 items-center justify-center gap-1.5 rounded-full px-3 text-body-sm font-medium pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1.5',
                             'transition-colors duration-120 ease-standard disabled:opacity-50',
                             active ? (variant === 'brand' ? 'text-brand-fg' : 'text-fg') : 'text-fg-muted hover:text-fg',
                         )}

@@ -31,7 +31,7 @@ export function BrandIcon({ size = 28, className }: { size?: number; className?:
 
 export function BrandMark({ className, href = '/' }: { className?: string; href?: string }) {
     return (
-        <Link href={href} className={cn('inline-flex items-center gap-2 rounded-control', className)} aria-label={`${BRAND_NAME} home`}>
+        <Link href={href} className={cn('relative inline-flex items-center gap-2 rounded-control pointer-coarse:after:absolute pointer-coarse:after:-inset-y-1', className)} aria-label={`${BRAND_NAME} home`}>
             {isDefaultBrand() ? (
                 <BrandIcon />
             ) : (

@@ -153,13 +153,13 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
 
                     <div className="mt-6 flex flex-col gap-4">
                         <Breakdowns p={p} />
-                        <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <GrowthCard p={p} />
                             <AboutCard p={p} />
                         </div>
                         <SlotsCard p={p} />
                         <OfferSection idOrSlug={slug} siteName={p.name} openTo={p.open_to} slots={p.ad_slots} initialSlotId={Number(Array.isArray(sp.slot) ? sp.slot[0] : sp.slot) || null} />
-                        <div className="grid gap-4 md:grid-cols-[3fr_2fr]">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
                             <EmbedCard origin={SITE_ORIGIN} slug={slug} id={p.id} name={p.name} liveEnabled={p.live.enabled} />
                             <SimilarCard p={p} />
                         </div>

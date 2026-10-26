@@ -21,10 +21,10 @@ export function MarketingFooter() {
                         {FOOTER_COLUMNS.map((col) => (
                             <div key={col.title}>
                                 <h2 className="text-body-sm font-semibold text-fg">{col.title}</h2>
-                                <ul className="mt-3 space-y-2">
+                                <ul className="mt-3 space-y-2 pointer-coarse:mt-1.5 pointer-coarse:space-y-0">
                                     {col.links.map((link) => (
                                         <li key={link.href}>
-                                            <Link href={link.href} className="text-body-sm text-fg-muted transition-colors duration-120 hover:text-fg">
+                                            <Link href={link.href} className="text-body-sm text-fg-muted transition-colors duration-120 hover:text-fg pointer-coarse:inline-flex pointer-coarse:min-h-8 pointer-coarse:items-center">
                                                 {link.label}
                                             </Link>
                                         </li>

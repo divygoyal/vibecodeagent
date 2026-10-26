@@ -34,7 +34,7 @@ function Tile({ m, total, spark, showDelta, showSpark, sparkHeight, big, mode, c
                 <span className="truncate text-body-sm font-medium text-fg-secondary">{label}</span>
                 {def?.description ? (
                     <Tooltip content={def.description}>
-                        <button type="button" aria-label={`About ${label}`} className="ml-auto shrink-0 rounded text-fg-faint hover:text-fg-muted"><Info aria-hidden size={14} strokeWidth={1.75} /></button>
+                        <button type="button" aria-label={`About ${label}`} className="relative ml-auto shrink-0 rounded text-fg-faint hover:text-fg-muted pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5"><Info aria-hidden size={14} strokeWidth={1.75} /></button>
                     </Tooltip>
                 ) : null}
             </div>

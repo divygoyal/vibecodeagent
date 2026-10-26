@@ -145,7 +145,7 @@ export function ProfileCharts({ series, range, name }: { series: NonNullable<Pro
         </ChartCard>
     );
     return (
-        <div className={cn('grid gap-4', visitors && clicks ? 'lg:grid-cols-2' : '')}>
+        <div className={cn('grid grid-cols-1 gap-4', visitors && clicks ? 'lg:grid-cols-2' : '')}>
             {visitors ? block(visitors, 'users', 'Visitors', 'users', true) : null}
             {clicks ? block(clicks, 'clicks', 'Search clicks', 'clicks', false) : null}
         </div>

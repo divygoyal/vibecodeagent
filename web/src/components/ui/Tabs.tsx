@@ -74,7 +74,7 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
                     'relative flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors duration-120 ease-standard',
                     underline
                         ? cn('h-10 text-body font-medium', active ? 'text-fg' : 'text-fg-muted hover:text-fg')
-                        : cn('h-7 rounded-md px-2.5 text-body-sm font-medium', active ? 'bg-subtle text-fg' : 'text-fg-muted hover:text-fg'),
+                        : cn('h-7 rounded-md px-2.5 text-body-sm font-medium pointer-coarse:h-8', active ? 'bg-subtle text-fg' : 'text-fg-muted hover:text-fg'),
                     t.disabled && 'pointer-events-none opacity-50',
                 );
                 const inner = (
