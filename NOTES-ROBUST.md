@@ -38,6 +38,11 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
   always true, so every poll started a sync and `syncing` never cleared); an inventory that failed at Google did the
   same while re-listing on every poll. Now: "no sites" after an empty sync (re-check after 10 min or Check again),
   "Couldn't reach Google" + Try again after a failed one (retry after 60 s).
+- 8b2ae64 Portfolio with a property Google refuses (403) re-ran the whole sync every 2 s while the page was open (18
+  Google calls per poll, spinner forever): never-synced `no_access` assets had no back-off in isDue(). Now 30 min (Sync
+  now forces). The exact-users report backs off 5 min after a failed run (429/5xx) instead of restarting per poll.
+- 7f67727 Search tab: with a failed summary (429/403/500) the four metric tiles kept skeletons forever; now a dash (the
+  chart shows the error and Try again).
 - 890b76d `shot.mjs`/`crawl.mjs --dark` produced light pages (theme is `localStorage['tc-theme']`); pw.newContext sets it.
 
 ## Server log audit (integrate + preview web.log)
@@ -47,7 +52,7 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
 | `ChunkLoadError` / `Cannot find module .next/server/chunks/ssr/…` / `Could not find the module … in the React Client Manifest` (preview) | ~300 | `.next` was rebuilt under a running `next start`; the old process asks for chunk files that no longer exist | process: stop the preview, build, start (or build into a fresh dir). Production (Coolify image) is not affected |
 | `"next start" does not work with "output: standalone"` (preview) | 4 | preview runs `next start` on a standalone build | harmless for a preview; production uses the standalone server |
 | `[AUDIENCE] Gemini topics failed: 403 … Gemini API has not been used in project …` (preview) | 2 | the preview's Gemini key belongs to a GCP project with the Generative Language API disabled | config: enable the API on that project or use the production key; AI features fall back meanwhile |
-| `Element type is invalid … got: object` on `GET /?callbackUrl=/dashboard…` (dev) | 42 | dev server only: SSR of the static home page with some `callbackUrl` values (e.g. /dashboard, /leaderboard; not /dash, /admin) | not reproducible on the preview build (200, banner renders); Turbopack dev artifact. Marketing boundary now shows Reload/Go home if it ever happens |
+| `Element type is invalid … got: object` (SSR) / `Lazy element type must resolve to a class or function` (browser) on `GET /?…` (dev) | 42+ | dev server only, still there after a clean `.next`: the home page 500s for some query-string lengths (`?foo=/xxxxxxxxxxxxxxxx` 16–20 chars fails, 15 or 24+ passes; `?callbackUrl=/dashboard` fails, `/dash` passes). Depends only on the URL length, not on the param or the sign-in banner, and only on `/` (a copy of the page at another path never fails): a byte-offset bug in dev streaming of the 430 KB page | production build unaffected (`/` is static; preview returns 200 and the banner renders). Watch item; the marketing boundary shows Reload/Go home if it ever happens |
 | `Module … ShareConversionBar.tsx [app-ssr] was instantiated … deleted in an HMR update` (dev) | 1 | HMR race while the sweep branch was merged | harmless (dev only) |
 | `Server is approaching the used memory threshold, restarting` (dev) | 11 | full crawls compile every route (child reaches ~4.5 GB) | dev only; check scripts wait and retry |
 | `middleware file convention is deprecated` / `inferred your workspace root` | 15 | Next 16 rename / lockfile in /root | harmless (README) |
