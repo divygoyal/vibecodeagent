@@ -2849,6 +2849,8 @@ function LeaderboardTab({
                 }
             />
 
+            <LeaderboardInquiriesPanel />
+
             <ConfirmModal
                 open={!!deleteEntry}
                 onOpenChange={(open) => { if (!open) setDeleteEntry(null) }}
@@ -2863,6 +2865,113 @@ function LeaderboardTab({
                 }}
             />
         </div>
+    )
+}
+
+interface LeaderboardInquiry {
+    id: number
+    entry_id: number
+    site_name: string | null
+    kind: string
+    name: string | null
+    email: string | null
+    company: string | null
+    budget: string | null
+    message: string | null
+    status: string
+    ad_slot_request_id: number | null
+    created_at: string | null
+}
+
+const INQUIRY_KIND_LABELS: Record<string, string> = {
+    sponsorship: 'Sponsorship',
+    acquisition: 'Acquisition',
+    investment: 'Investment',
+    partnership: 'Partnership',
+    advertising: 'Advertising',
+}
+
+/** Offers sent from public leaderboard profiles, across every site (newest first). Read only. */
+function LeaderboardInquiriesPanel() {
+    const [items, setItems] = useState<LeaderboardInquiry[] | null>(null)
+    const [error, setError] = useState('')
+
+    const [reloadKey, setReloadKey] = useState(0)
+
+    useEffect(() => {
+        let cancelled = false
+        apiGet('leaderboard-inquiries')
+            .then((data: { items?: LeaderboardInquiry[] }) => {
+                if (cancelled) return
+                setError('')
+                setItems(data.items ?? [])
+            })
+            .catch((err) => {
+                if (cancelled) return
+                const message = getErrorMessage(err)
+                if (!isSuperadminAuthError(message)) setError(message)
+                setItems((prev) => prev ?? [])
+            })
+        return () => { cancelled = true }
+    }, [reloadKey])
+
+    const columns: TableColumn<LeaderboardInquiry>[] = [
+        {
+            key: 'site',
+            header: 'Site',
+            cell: (it) => <span className="block max-w-[200px] truncate font-medium">{it.site_name ?? `#${it.entry_id}`}</span>,
+        },
+        {
+            key: 'kind',
+            header: 'Offer',
+            cell: (it) => (
+                <span className="inline-flex items-center gap-1.5">
+                    {INQUIRY_KIND_LABELS[it.kind] ?? it.kind}
+                    {it.ad_slot_request_id ? <Badge variant="sponsored">Slot</Badge> : null}
+                </span>
+            ),
+        },
+        {
+            key: 'from',
+            header: 'From',
+            cell: (it) => (
+                <div className="min-w-0">
+                    <div className="max-w-[200px] truncate text-body-sm">{[it.name, it.company].filter(Boolean).join(' · ') || '–'}</div>
+                    {it.email ? <a href={`mailto:${it.email}`} className="block max-w-[200px] truncate text-meta text-fg-muted underline-offset-4 hover:text-fg hover:underline">{it.email}</a> : null}
+                </div>
+            ),
+        },
+        { key: 'budget', header: 'Budget', cell: (it) => <span className="text-body-sm">{it.budget || '–'}</span> },
+        {
+            key: 'message',
+            header: 'Message',
+            cell: (it) => <span className="line-clamp-2 max-w-[360px] text-body-sm text-fg-secondary" title={it.message ?? undefined}>{it.message || '–'}</span>,
+        },
+        { key: 'status', header: 'Status', cell: (it) => <Pill tone={it.status === 'new' ? 'info' : 'neutral'}>{it.status}</Pill> },
+        { key: 'when', header: 'Received', align: 'right', cell: (it) => <TimeAgo value={it.created_at} className="text-meta text-fg-muted" /> },
+    ]
+
+    return (
+        <Card padding="none">
+            <div className="p-4 pb-0">
+                <CardHeader
+                    title="Offers and inquiries"
+                    description="Sent from public profiles to site owners. Owners answer from their own inbox; this list is for spotting abuse."
+                    actions={<Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => setReloadKey((k) => k + 1)}>Refresh</Button>}
+                />
+            </div>
+            {error ? <div className="px-4 pt-3"><Banner variant="danger" onDismiss={() => setError('')}>{error}</Banner></div> : null}
+            <Table<LeaderboardInquiry>
+                caption="Leaderboard offers and inquiries"
+                columns={columns}
+                rows={items ?? []}
+                rowKey={(it) => String(it.id)}
+                loading={items === null}
+                density="comfortable"
+                pagination={{ pageSize: 20 }}
+                empty={<EmptyState variant="inline" icon={Mail} title="No offers yet" description="Offers sent from public profiles show up here." />}
+            />
+        </Card>
     )
 }
 
