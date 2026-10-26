@@ -70,3 +70,20 @@ Ask, Settings, Plan, Support, Docs, Setup wizard, embed/[siteId]; admin + supera
   token cards, `?theme=light|dark` through the theme script (default light), bg-canvas layout. Hydration fix: the
   "x minutes ago" labels use a clock that is 0 on the server/hydration and ticks every 15 s after mount; demo activity is
   stored as ages, not module-load timestamps. Dropped the invented "est. value $N" figure.
+
+## Verification (code only: the coordinator said no dev server, RAM critical)
+- `npx tsc --noEmit` clean; `npx eslint` clean on every file this branch touched except app/api/ai-chat/route.ts (only a
+  string changed there; the file already had ~60 `any` errors, left alone); `npm test` 24/24.
+- NOT done: screenshots (1280/390, light/dark, Ask unavailable + ?q=), console / hydration check, route crawl. They are
+  to be taken on the merged integration server. Things worth a look there: Ask sticky composer height on 390 px, Settings
+  Appearance previews (data-theme wrappers), setup page with a 500-site directory, embed at ?theme=dark.
+
+## Left / for the coordinator
+- Redirect wanted (next.config.ts, foundation): /dashboard/settings?tab=leaderboard -> /dashboard/leaderboard (the page also
+  does it client side). /dashboard/ai-chat -> /dashboard/ask already exists.
+- After tc/leaderboard merges: delete settings/{LeaderboardOptIn,AdSlotsEditor,AdSlotRequestsInbox}.tsx.
+- Merge conflicts to expect: setup/page.tsx and plan/page.tsx (tc/portfolio, tc/leaderboard touched small bits of the old
+  versions; take this branch's files). components/shell/nav.ts: LEGACY_ROUTE_PREFIXES lost ask, ai-chat, settings, plan,
+  support, docs, setup lines.
+- Decisions to confirm: `?q=` sends (as before) unless `&prefill=1`; account deletion is a support request; "Manage billing"
+  not shown (no Dodo customer portal integration); embed keeps the dark map with light/dark token cards.

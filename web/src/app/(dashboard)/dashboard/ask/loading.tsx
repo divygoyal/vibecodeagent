@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 /** Ask while the page loads: header, a row of prompt cards and the composer, same layout as the page. */
 export default function Loading() {
     return (
-        <div aria-hidden className="flex min-h-[calc(100dvh-7rem)] flex-col md:min-h-[calc(100dvh-9.5rem)]">
+        <div aria-hidden className="flex min-h-[calc(100dvh-6rem)] flex-col md:min-h-[calc(100dvh-7.5rem)]">
             <div className="mb-6 flex items-end justify-between gap-4">
                 <div className="flex flex-col gap-2"><Skeleton className="h-7 w-24" /><Skeleton className="h-4 w-64" /></div>
                 <Skeleton className="h-8 w-24" rounded="full" />

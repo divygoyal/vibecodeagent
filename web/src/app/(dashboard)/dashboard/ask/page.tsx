@@ -52,10 +52,10 @@ export default function AskPage() {
     } = useRegistration();
     const { site } = useCurrentSite();
     const { hasGoogleConnection, refresh: refreshContainer } = useContainerStatus();
-    const { credits, refresh: refreshCredits } = useCredits();
+    const { credits, isLoading: creditsLoading, refresh: refreshCredits } = useCredits();
 
     // Is the model configured on this server? (null while the check runs.)
-    const { data: aiStatus } = useSWR<{ available: boolean }>('/api/ai-chat/status', statusFetcher, { revalidateOnFocus: false, shouldRetryOnError: false });
+    const { data: aiStatus, isLoading: aiStatusLoading } = useSWR<{ available: boolean }>('/api/ai-chat/status', statusFetcher, { revalidateOnFocus: false, shouldRetryOnError: false });
     const [unavailableSeen, setUnavailableSeen] = useState(false);
     const aiUnavailable = aiStatus?.available === false || unavailableSeen;
 
@@ -440,10 +440,10 @@ export default function AskPage() {
                     : 'Ask about your traffic…';
 
     return (
-        <div className="flex min-h-[calc(100dvh-7rem)] flex-col md:min-h-[calc(100dvh-9.5rem)]">
+        <div className="flex min-h-[calc(100dvh-6rem)] flex-col md:min-h-[calc(100dvh-7.5rem)]">
             {/* Side effects: must mount on every render path or deep links are dropped when a chat exists. */}
             <Suspense fallback={null}>
-                <QuestionFromQuery ready={!dataLoading} onQuestion={handleQuestion} />
+                <QuestionFromQuery ready={!dataLoading && !aiStatusLoading && !creditsLoading} onQuestion={handleQuestion} />
             </Suspense>
             <Suspense fallback={null}>
                 <ProviderConnectionCallback onConnected={refreshContainer} />

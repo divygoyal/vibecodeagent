@@ -118,7 +118,7 @@ export function highlightNumbersInChildren(children: ReactNode, keyPrefix = 'hn'
             // Pass elements through — don't recurse into <code> / <a> etc.
             // Specifically skip code blocks (numbers in code shouldn't be styled).
             if (isValidElement(child)) {
-                const type = (child as any).type;
+                const type = child.type;
                 const isCode = type === 'code' || (typeof type === 'string' && type.toLowerCase() === 'code');
                 if (isCode) return child;
                 return cloneElement(child, { key: child.key ?? `${keyPrefix}-${i}` });
