@@ -104,3 +104,28 @@ export async function settle(page, report, { quietMs = 1200, maxMs = 20000 } = {
         await page.waitForTimeout(200);
     }
 }
+
+/** Resolve to `fallback` if `promise` takes longer than `ms`. */
+export function withTimeout(promise, ms, fallback = null) {
+    return Promise.race([promise.catch(() => fallback), new Promise(r => setTimeout(() => r(fallback), ms))]);
+}
+
+/** Next.js dev-overlay issue count; 0 for non-HTML documents. */
+export async function devIssueCount(page) {
+    return withTimeout(page.evaluate(() => {
+        if (document.contentType !== 'text/html') return 0;
+        const text = document.querySelector('nextjs-portal')?.shadowRoot?.textContent || '';
+        const m = /(\d+)\s+Issues?/.exec(text);
+        return m ? Number(m[1]) : 0;
+    }), 5000, 0);
+}
+
+/** Hide the Next.js dev badge/overlay before a screenshot (HTML pages only). */
+export async function hideDevUi(page) {
+    await withTimeout(page.evaluate(() => {
+        if (document.contentType !== 'text/html') return;
+        const style = document.createElement('style');
+        style.textContent = 'nextjs-portal{display:none!important}';
+        document.head?.appendChild(style);
+    }), 5000);
+}

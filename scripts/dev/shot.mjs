@@ -16,7 +16,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchBrowser, newContext, settle, watchPage } from './pw.mjs';
+import { devIssueCount, hideDevUi, launchBrowser, newContext, settle, watchPage } from './pw.mjs';
 
 function usage(msg) {
     if (msg) console.error(`shot.mjs: ${msg}`);
@@ -60,12 +60,8 @@ try {
     }
     await settle(page, report);
     if (opts.wait > 0) await page.waitForTimeout(opts.wait);
-    const dev = await page.evaluate(() => {
-        const text = document.querySelector('nextjs-portal')?.shadowRoot?.textContent || '';
-        const m = /(\d+)\s+Issues?/.exec(text);
-        return m ? Number(m[1]) : 0;
-    }).catch(() => 0);
-    if (!opts.showDevUi) await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' }).catch(() => {});
+    const dev = await devIssueCount(page);
+    if (!opts.showDevUi) await hideDevUi(page);
     fs.mkdirSync(path.dirname(path.resolve(opts.out)), { recursive: true });
     await page.screenshot({ path: opts.out, fullPage: opts.full });
     if (status >= 500) exitCode = 1;

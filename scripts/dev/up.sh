@@ -9,7 +9,7 @@
 # - Idempotent: running it again leaves healthy processes alone.
 # - At most 2 next dev servers run on the box at once (slot locks in
 #   /root/.trafficclaw-dev/slots); waits up to TC_SLOT_WAIT_MIN (10) minutes for one.
-# - Refuses to start a dev server when MemAvailable < 2500 MB.
+# - Refuses to start a dev server when MemAvailable < 2500 MB or free disk on / < 3 GB.
 # See scripts/dev/README.md.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -62,6 +62,10 @@ BASE_ENV=(PATH="/usr/local/bin:/usr/bin:/bin" HOME="$HOME" LANG=C.UTF-8 TZ=UTC T
 # ─── Dev-server slot (before starting anything, so a refusal leaves nothing behind) ───
 SLOT=""
 if ! { web_pid_now="$(owned_pid "$INST/web.pid" "$REPO/web")" && port_listening "$WEB_PORT"; }; then
+    disk="$(disk_free_mb)"
+    if [ "$disk" -lt "$TC_MIN_DISK_MB" ]; then
+        die "only ${disk} MB free on / (need ${TC_MIN_DISK_MB} MB). Delete web/.next in worktrees you are not using (scripts/dev/status.sh lists them) and try again."
+    fi
     avail="$(mem_available_mb)"
     if [ "$avail" -lt "$TC_MIN_AVAILABLE_MB" ]; then
         die "only ${avail} MB RAM available (need ${TC_MIN_AVAILABLE_MB} MB; production runs on this box). Stop idle dev servers (scripts/dev/status.sh, down.sh) and try again."
