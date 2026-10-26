@@ -179,7 +179,7 @@ async function main() {
     const seedFile = path.join(inst.dir, 'seed.json');
     const seed = fs.existsSync(seedFile) ? JSON.parse(fs.readFileSync(seedFile, 'utf8')) : {};
     if (args.seed && (args.reseed || !seed[args.user])) {
-        seed[args.user] = await seedRecords(webUrl, cookieHeader, user, args.user);
+        seed[args.user] = await seedRecords(webUrl, cookieHeader, user, args.user, { url: adminUrl, headers: adminHeaders });
         fs.writeFileSync(seedFile, JSON.stringify(seed, null, 2));
     }
 
@@ -207,7 +207,7 @@ async function main() {
     console.log(JSON.stringify({ ok: true, user: args.user, sub: user.sub, state: stateFile, seed: seed[args.user] ? seedFile : null, superadmin: Boolean(superadmin) }, null, 2));
 }
 
-async function seedRecords(webUrl, cookie, user, userKey) {
+async function seedRecords(webUrl, cookie, user, userKey, admin) {
     const out = {};
     const call = async (label, method, p, body) => {
         const r = await http(method, `${webUrl}${p}`, { cookie, body });
@@ -249,8 +249,11 @@ async function seedRecords(webUrl, cookie, user, userKey) {
         });
         if (dash?.dashboard?.id !== undefined) {
             out.dashboardId = dash.dashboard.id;
-            const pub = await call('dashboard share', 'POST', `/api/dashboards/${dash.dashboard.id}/share`, {});
-            const pubToken = pub?.shareToken || pub?.share_token || pub?.token;
+            // The web route sends user_identifier in the body but the admin reads it from the
+            // query string (pre-existing 422), so create the public token on the admin directly.
+            const pub = await http('POST', `${admin.url}/api/custom-dashboards/${dash.dashboard.id}/share?user_identifier=${user.sub}`, { headers: admin.headers });
+            if (!pub.ok) console.warn(`[login] seed dashboard share failed: ${pub.status} ${JSON.stringify(pub.data).slice(0, 160)}`);
+            const pubToken = pub.data?.shareToken || pub.data?.share_token || pub.data?.token;
             if (pubToken) out.dashboardPublicToken = pubToken;
         }
 
