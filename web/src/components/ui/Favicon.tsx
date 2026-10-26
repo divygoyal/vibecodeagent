@@ -35,6 +35,8 @@ const RADIUS: Record<FaviconSize, string> = {
  */
 export function Favicon({ host, size = 20, className }: FaviconProps) {
     const h = cleanHost(host);
+    // Reserved names (demo data) and GA4-only route keys never have icons: skip the request.
+    const noIcon = !h.includes('.') || /\.(example|test|invalid|localhost|local)$/.test(h);
     // Failure is remembered per source, so a new source gets a fresh try.
     const [failedFor, setFailedFor] = useState<string | null>(null);
     const failed = failedFor !== null && failedFor === (h ?? '');
@@ -46,7 +48,7 @@ export function Favicon({ host, size = 20, className }: FaviconProps) {
         }
     }, [h]);
     const box = cn('inline-flex shrink-0 items-center justify-center overflow-hidden', RADIUS[size], className);
-    if (!h || failed) {
+    if (!h || failed || noIcon) {
         return (
             <span
                 aria-hidden

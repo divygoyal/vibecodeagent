@@ -124,6 +124,7 @@ function ShellBody({ children }: { children: ReactNode }) {
             {/* Tawk.to live chat: dashboard only (moved from the old layout). */}
             <Script id="tawk-init" strategy="afterInteractive">
                 {`var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
+                  Tawk_API.customStyle={visibility:{desktop:{position:'br',xOffset:20,yOffset:20},mobile:{position:'br',xOffset:12,yOffset:84}}};
                   (function(){
                     var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
                     s1.async=true;
@@ -144,8 +145,8 @@ function ShellBody({ children }: { children: ReactNode }) {
                 )}
             >
                 <div className="sticky top-0 h-dvh overflow-y-auto overscroll-contain">
-                    <div className="h-full lg:hidden"><Sidebar collapsed localSwitcher /></div>
-                    <div className="hidden h-full lg:block"><Sidebar collapsed={collapsed} /></div>
+                    <div className="min-h-full lg:hidden"><Sidebar collapsed localSwitcher /></div>
+                    <div className="hidden min-h-full lg:block"><Sidebar collapsed={collapsed} /></div>
                 </div>
             </aside>
             <div className="flex min-w-0 flex-1 flex-col">
