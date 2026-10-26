@@ -27,7 +27,7 @@ function JoinHero({ onStart }: { onStart: () => void }) {
                 <h2 className="text-heading text-fg">Get on the verified leaderboard</h2>
                 <p className="mt-1 max-w-[560px] text-body-lg text-fg-secondary">Show real traffic on a public profile, rank against other verified sites, and let sponsors and buyers find you. Free.</p>
             </div>
-            <ul className="grid w-full gap-3 sm:grid-cols-3">
+            <ul className="grid w-full gap-3 grid-cols-1 sm:grid-cols-3">
                 {[
                     [ShieldCheck, 'Verified owner', 'We check Search Console ownership daily, so the numbers can be trusted.'],
                     [SlidersHorizontal, 'You choose what is public', 'Exact, a range, or hidden for every number. Countries and queries stay off until you turn them on.'],

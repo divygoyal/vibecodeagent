@@ -32,7 +32,7 @@ export default async function JoinRedirectPage() {
                 <div className="mt-5"><JoinSignIn /></div>
             </Card>
 
-            <ul className="mt-6 grid gap-3 sm:grid-cols-3">
+            <ul className="mt-6 grid gap-3 grid-cols-1 sm:grid-cols-3">
                 {[
                     [ShieldCheck, 'Verified owner', 'Search Console ownership, checked daily'],
                     [SlidersHorizontal, 'You decide', 'Exact, a range, or hidden for every number'],

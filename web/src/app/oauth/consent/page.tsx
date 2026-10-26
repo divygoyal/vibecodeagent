@@ -98,7 +98,7 @@ export default async function ConsentPage({ searchParams }: { searchParams: Prom
                     <p className="mt-3 flex items-center gap-2 text-body-sm text-fg-muted"><Laptop aria-hidden size={14} strokeWidth={1.75} />This app runs on your computer ({redirectLabel}).</p>
                 ) : null}
 
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div className="mt-5 grid gap-4 grid-cols-1 sm:grid-cols-2">
                     <div>
                         <h2 className="mb-2 text-caption uppercase tracking-[0.04em] text-fg-muted">It will be able to</h2>
                         <ul className="space-y-1.5">

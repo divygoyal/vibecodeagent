@@ -1289,7 +1289,7 @@ function RealtimeWidget({ liveData, loading, error }: { liveData?: LiveResponse;
                     <div className="h-[260px] border-b border-border-subtle max-md:h-[200px]">
                         <WorldMap byCountry={byCountry} byCity={byCity} activeCountry={activeCountry} onBubbleClick={onBubble} />
                     </div>
-                    <div className="grid gap-4 p-4 text-body-sm sm:grid-cols-2">
+                    <div className="grid gap-4 p-4 text-body-sm grid-cols-1 sm:grid-cols-2">
                         <div className="min-w-0 space-y-3">
                             {topReferrers.length ? (
                                 <div>

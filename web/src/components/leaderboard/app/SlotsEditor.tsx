@@ -90,7 +90,7 @@ export function SlotsEditor({ entryId, initial, onSaved }: { entryId: number; in
                                         <Button size="sm" variant="ghost" icon={Trash2} aria-label={`Remove slot ${i + 1}`} onClick={() => setDrafts((all) => all.filter((x) => x.key !== d.key))}>Remove</Button>
                                     </div>
                                 </div>
-                                <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
+                                <div className="grid gap-3 grid-cols-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.2fr)]">
                                     <Field label="What are you selling?"><input className={cn(FIELD, 'h-9')} value={d.name} maxLength={120} placeholder="Header banner" onChange={(e) => patch(d.key, { name: e.target.value })} /></Field>
                                     <Field label="Your price (USD)">
                                         <div className="relative">
@@ -104,11 +104,11 @@ export function SlotsEditor({ entryId, initial, onSaved }: { entryId: number; in
                                         </select>
                                     </Field>
                                 </div>
-                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                <div className="mt-3 grid gap-3 grid-cols-1 sm:grid-cols-2">
                                     <Field label="How many exist"><input type="number" min={1} max={999} className={cn(FIELD, 'h-9')} value={d.quantity_total} onChange={(e) => patch(d.key, { quantity_total: e.target.value })} /></Field>
                                     <Field label="How many are taken"><input type="number" min={0} max={999} className={cn(FIELD, 'h-9')} value={d.quantity_taken} onChange={(e) => patch(d.key, { quantity_taken: e.target.value })} /></Field>
                                 </div>
-                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                <div className="mt-3 grid gap-3 grid-cols-1 sm:grid-cols-2">
                                     <Field label="Where it appears (optional)"><input className={cn(FIELD, 'h-9')} value={d.preview_note} maxLength={500} placeholder="Top of every blog post, 728x90" onChange={(e) => patch(d.key, { preview_note: e.target.value })} /></Field>
                                     <Field label="Preview image URL (optional)"><input className={cn(FIELD, 'h-9')} inputMode="url" autoCapitalize="none" spellCheck={false} value={d.preview_image_url} placeholder="https://example.com/screenshot.png" onChange={(e) => patch(d.key, { preview_image_url: e.target.value })} /></Field>
                                 </div>

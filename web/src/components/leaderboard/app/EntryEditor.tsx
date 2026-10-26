@@ -229,13 +229,13 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                 ]}
             />
 
-            <div className={cn('grid gap-6', showPreview && 'lg:grid-cols-[minmax(0,1fr)_380px]')}>
+            <div className={cn('grid grid-cols-1 gap-6', showPreview && 'lg:grid-cols-[minmax(0,1fr)_380px]')}>
                 <div className="flex min-w-0 flex-col gap-4">
                     {tab === 'profile' ? (
                         <>
                             <Card>
                                 <CardHeader title="Profile" description="What visitors read about this site." />
-                                <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                                     <label className="sm:col-span-2">
                                         <span className="mb-1 block text-body-sm font-medium text-fg-secondary">Name</span>
                                         <input className={cn(FIELD, 'h-9')} value={draft.startup_name} maxLength={100} onChange={(e) => set('startup_name', e.target.value)} />
@@ -269,7 +269,7 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                             </Card>
                             <Card>
                                 <CardHeader title="Open to" description="Shows an “Open to” block and an offer form on your profile. Pick only what you want to hear about." />
-                                <div className="grid gap-3 sm:grid-cols-3">
+                                <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
                                     {OPEN_TO_OPTIONS.map((o) => {
                                         const on = draft.open_to.includes(o.value);
                                         return (

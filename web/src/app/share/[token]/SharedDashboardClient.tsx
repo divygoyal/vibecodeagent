@@ -510,12 +510,12 @@ function LoadingState() {
                 </div>
                 <Skeleton className="h-9 w-56" rounded="md" />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                 {[0, 1, 2, 3].map((item) => (
                     <Skeleton key={item} className="h-[84px]" rounded="card" />
                 ))}
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                 {[0, 1, 2, 3, 4, 5].map((item) => (
                     <Skeleton key={item} className="h-[150px]" rounded="card" />
                 ))}
@@ -913,7 +913,7 @@ export default function SharedDashboardClient({
 
             <div className={cn('space-y-6 transition-opacity duration-120', isRefreshing && 'opacity-60')}>
                 {signalCards.length > 0 ? (
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                         {signalCards.map((signal) => (
                             <SignalCard key={signal.label} label={signal.label} value={signal.value} helper={signal.helper} icon={signal.icon} />
                         ))}
@@ -921,7 +921,7 @@ export default function SharedDashboardClient({
                 ) : null}
 
                 {config.traffic && kpiTiles.length > 0 ? (
-                    <section aria-label="Traffic metrics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <section aria-label="Traffic metrics" className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                         {kpiTiles.map((tile) => (
                             <KpiTile key={tile.label} {...tile} />
                         ))}
@@ -965,7 +965,7 @@ export default function SharedDashboardClient({
                 ) : null}
 
                 {(config.sources || config.pages) && data ? (
-                    <section className={cn('grid gap-4', config.sources && config.pages && 'xl:grid-cols-2')}>
+                    <section className={cn('grid grid-cols-1 gap-4', config.sources && config.pages && 'xl:grid-cols-2')}>
                         {config.sources ? (
                             <PanelFrame<SourceTab>
                                 title="Traffic sources"
@@ -998,7 +998,7 @@ export default function SharedDashboardClient({
                 ) : null}
 
                 {(showTechnology || config.geo) && data ? (
-                    <section className={cn('grid gap-4', showTechnology && config.geo && 'xl:grid-cols-2')}>
+                    <section className={cn('grid grid-cols-1 gap-4', showTechnology && config.geo && 'xl:grid-cols-2')}>
                         {showTechnology ? (
                             <PanelFrame<TechnologyTab>
                                 title="Technology"
@@ -1039,7 +1039,7 @@ export default function SharedDashboardClient({
                             <p className="mt-0.5 text-body-sm text-fg-muted">Search Console highlights for the shared property.</p>
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                             <KpiTile
                                 metric="clicks"
                                 label="Clicks"

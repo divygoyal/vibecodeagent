@@ -158,7 +158,7 @@ export function SponsoredStrip({ cards, openTotal }: { cards: SponsoredCard[]; o
                     Advertise{openTotal > cards.length ? ` · ${fmtFull(openTotal)} open slots` : ''}
                 </Link>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {cards.map((c) => (
                     <Link
                         key={c.slot.id}

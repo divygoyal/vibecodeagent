@@ -22,7 +22,7 @@ export interface SettingsSectionProps {
 export function SettingsSection({ title, description, children, footer, danger, id, className }: SettingsSectionProps) {
     return (
         <Card as="section" id={id} aria-labelledby={id ? `${id}-title` : undefined} className={cn(danger && 'border-down/30', className)}>
-            <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:gap-8">
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] md:gap-8">
                 <div>
                     <h2 id={id ? `${id}-title` : undefined} className="text-title-sm text-fg">{title}</h2>
                     {description ? <p className="mt-1 text-body-sm text-fg-muted">{description}</p> : null}

@@ -226,7 +226,7 @@ function SharedUmamiPage({
                             <KpiTile label="Visit duration" metric="sessions" value={fmtDuration(data.summary.visitDuration.value)} change={data.summary.visitDuration.change} />
                         </section>
 
-                        <section className="grid gap-4 md:gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]">
+                        <section className="grid gap-4 md:gap-6 grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]">
                             <ChartCard
                                 title="Traffic"
                                 subtitle={`Pageviews and visits per day, last ${RANGE_LABELS[range]}`}
@@ -274,7 +274,7 @@ function SharedUmamiPage({
                             </Card>
                         </section>
 
-                        <section className="grid gap-4 md:gap-6 lg:grid-cols-2 2xl:grid-cols-4">
+                        <section className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4">
                             <BreakdownCard title="Top pages" items={data.breakdowns.pages} />
                             <BreakdownCard title="Referrers" items={data.breakdowns.referrers} />
                             <BreakdownCard title="Devices" items={data.breakdowns.devices} />
@@ -282,7 +282,7 @@ function SharedUmamiPage({
                         </section>
 
                         {realtime ? (
-                            <section className="grid gap-4 md:gap-6 lg:grid-cols-3">
+                            <section className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-3">
                                 <BreakdownCard title="Live pages" items={realtime.pages} />
                                 <BreakdownCard title="Live referrers" items={realtime.referrers} />
                                 <BreakdownCard title="Live countries" items={realtime.countries} />

@@ -221,7 +221,7 @@ export function OfferSection({ idOrSlug, siteName, openTo, slots, initialSlotId 
             {state === 'sent' ? (
                 <Banner variant="success" title="Offer sent">The owner will reply to the email you gave. Check your spam folder if you do not hear back.</Banner>
             ) : (
-                <form ref={formRef} onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
+                <form ref={formRef} onSubmit={submit} className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                     <div className="sm:col-span-2">
                         <span className="mb-1.5 block text-body-sm font-medium text-fg-secondary">What kind of offer?</span>
                         <SegmentedControl

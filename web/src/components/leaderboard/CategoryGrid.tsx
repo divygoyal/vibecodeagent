@@ -13,7 +13,7 @@ function hostOf(url: string | null): string {
 /** The Categories tab: one card per category with its biggest sites. */
 export function CategoryGrid({ cards, range }: { cards: CategoryCard[]; range: string }) {
     return (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map((c) => (
                 <Card key={c.name} className="flex flex-col">
                     <div className="flex items-baseline justify-between gap-2">

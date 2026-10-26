@@ -250,7 +250,7 @@ export function StyleguideClient() {
             </Section>
 
             <Section id="cards" title="Cards">
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                     <Card>
                         <CardHeader title="Card title" description="Description in body-sm muted." actions={<Button size="sm" variant="ghost" iconOnly icon={MoreHorizontal} aria-label="More" />} />
                         <p className="text-body text-fg-secondary">Default padding p-5, subtle border, card shadow.</p>
@@ -290,7 +290,7 @@ export function StyleguideClient() {
                     <MetricDelta variant="chip" size="md" metric="position" current={8.4} previous={8.8} />
                     <MetricDelta variant="chip" metric="clicks" current={120} previous={0} />
                 </Row>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                     <StatCard metric="users" value={12400} previous={10473} comparisonLabel="previous 3 months" info sparkline={USERS} sparklineDates={D90} />
                     <StatCard metric="clicks" value={1282} previous={2548} comparisonLabel="previous 3 months" info />
                     <StatCard metric="ctr" value={0.0255} previous={0.0262} comparisonLabel="previous 3 months" />
@@ -343,7 +343,7 @@ export function StyleguideClient() {
                     </div>
                     <Tabs variant="pills" ariaLabel="Breakdown" value={pillTab} onValueChange={setPillTab} items={[{ value: 'channel', label: 'Channel' }, { value: 'referrer', label: 'Referrer' }, { value: 'campaign', label: 'Campaign' }]} />
                 </Row>
-                <div className="grid gap-6 md:grid-cols-3">
+                <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
                     <div className="flex flex-col gap-4">
                         <Switch checked={sw} onCheckedChange={setSw} label="Public profile" description="Anyone with the link can see visitors and clicks." />
                         <Switch checked={sw2} onCheckedChange={setSw2} label="Weekly email" size="sm" />
@@ -379,7 +379,7 @@ export function StyleguideClient() {
                     }
                     empty={<EmptyState variant="inline" icon={SearchIcon} title={`No queries match '${q}'`} actions={<Button size="sm" onClick={() => setQ('')}>Clear filter</Button>} />}
                 />
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
                     <Table caption="Loading" columns={columns.slice(0, 4)} rows={[] as QueryRow[]} rowKey={(r) => r.query} loading density="compact" />
                     <Table caption="Empty" columns={columns.slice(0, 4)} rows={[] as QueryRow[]} rowKey={(r) => r.query} empty={<EmptyState variant="inline" title="No clicks in the last 28 days" description="Try a longer range." />} />
                 </div>
@@ -393,7 +393,7 @@ export function StyleguideClient() {
                     <Banner variant="success">Profile is now public.</Banner>
                     <Banner variant="neutral" title="You're looking at demo data" actions={<Button size="sm" variant="primary">Connect your sites</Button>} />
                 </div>
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                     <Card padding="none"><EmptyState variant="card" icon={LayoutGrid} title="No sites yet" description="Connect Google once and we build a card for each site." actions={<><Button variant="google"><GoogleMark /> Continue with Google</Button><Button variant="link">Explore the demo</Button></>} /></Card>
                     <Card padding="none"><EmptyState variant="inline" title="No sites match 'acm'" actions={<Button size="sm">Clear search</Button>} /></Card>
                     <Card padding="sm" className="flex flex-col gap-3">
@@ -485,7 +485,7 @@ export function StyleguideClient() {
             </Section>
 
             <Section id="charts" title="Charts" description="Sparklines are hand-rolled SVG; full charts wrap Recharts with the section 6 rules.">
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
                     {[72, 56, 40, 28].map((h) => (
                         <Card key={h} padding="sm">
                             <p className="mb-2 text-meta text-fg-muted">height {h}{h >= 56 ? ' · hover me' : ''}</p>
@@ -509,7 +509,7 @@ export function StyleguideClient() {
                 >
                     <TimeSeriesChart data={TS_DATA} series={[{ metric: 'clicks', key: 'clicks', compareKey: 'clicksPrev' }]} partialFrom={88} height={340} annotations={[{ date: D90[40], label: 'Core update' }, { date: D90[70], label: 'New pricing page' }]} ariaLabel="Clicks per day" />
                 </ChartCard>
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
                     <ChartCard title="Search overlay" subtitle="Clicks and impressions on separate scales">
                         <TimeSeriesChart data={TS_DATA} mode="overlay" series={[{ metric: 'clicks', key: 'clicks' }, { metric: 'impressions', key: 'impressions' }]} />
                     </ChartCard>
@@ -523,13 +523,13 @@ export function StyleguideClient() {
                         <TimeSeriesChart data={TS_DATA.slice(-28)} series={[{ metric: 'users', key: 'users' }]} height={200} />
                     </ChartCard>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
                     <ChartCard title="Loading" state="loading" height="compact" />
                     <ChartCard title="Refetching" state="refetching" height="compact"><TimeSeriesChart data={TS_DATA.slice(-28)} series={[{ metric: 'sessions', key: 'sessions' }]} height={200} /></ChartCard>
                     <ChartCard title="Empty" state="empty" height="compact" empty={{ title: 'No clicks in the last 28 days', description: 'Try a longer range.' }} />
                     <ChartCard title="Error" state="error" height="compact" error={{ onRetry: () => toast('Retrying') }} />
                 </div>
-                <div className="grid gap-4 lg:grid-cols-3">
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
                     <ChartCard title="Top queries" subtitle="By clicks">
                         <BarList metric="clicks" items={QUERIES.map((r) => ({ key: r.query, label: r.query, text: r.query, value: r.clicks }))} showShare labelHeader="Query" viewAllTitle="All queries" />
                     </ChartCard>
@@ -540,7 +540,7 @@ export function StyleguideClient() {
                         <Donut legend="bottom" centerLabel="Users" items={[['Desktop', 6200], ['Mobile', 4800], ['Tablet', 400]].map(([l, v]) => ({ key: String(l), label: String(l), value: Number(v), color: deviceColor(String(l)) }))} />
                     </ChartCard>
                 </div>
-                <Card><CardHeader title="BarList loading / empty" /><div className="grid gap-6 md:grid-cols-2"><BarList metric="users" items={[]} loading /><BarList metric="users" items={[]} empty={<EmptyState variant="inline" title="No countries yet" />} /></div></Card>
+                <Card><CardHeader title="BarList loading / empty" /><div className="grid gap-6 grid-cols-1 md:grid-cols-2"><BarList metric="users" items={[]} loading /><BarList metric="users" items={[]} empty={<EmptyState variant="inline" title="No countries yet" />} /></div></Card>
             </Section>
         </div>
     );

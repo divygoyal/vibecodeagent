@@ -79,14 +79,14 @@ export default function DashboardsListPage() {
             </div>
 
             {isLoading ? (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-64" rounded="card" />)}</div>
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-64" rounded="card" />)}</div>
             ) : !all.length ? (
                 <EmptyState variant="page" icon={LayoutDashboard} title="No dashboards yet" description="Start from a template: Site overview, Search performance, Client report and more. Every widget can use any of your sites."
                     actions={<><Button asChild variant="primary" icon={Plus}><Link href="/dashboard/dashboards/new">New dashboard</Link></Button><Button asChild variant="secondary"><Link href="/dashboard/dashboards/new?template=site-overview">Start from a template</Link></Button></>} />
             ) : !list.length ? (
                 <EmptyState variant="card" title="Nothing matches" description="Try another search or filter." />
             ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                     {list.map((d) => (
                         <article key={d.id} className="group relative flex flex-col overflow-hidden rounded-card border border-border-subtle bg-surface shadow-card transition-[box-shadow,border-color] duration-120 hover:border-border hover:shadow-card-hover">
                             <Link href={`/dashboard/dashboards/${d.id}`} className="flex flex-col focus-visible:outline-offset-[-2px]">

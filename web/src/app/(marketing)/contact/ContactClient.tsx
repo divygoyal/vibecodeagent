@@ -55,7 +55,7 @@ export function ContactForm() {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4 rounded-card border border-border-subtle bg-surface p-5 shadow-card md:p-6">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                 <div>
                     <label htmlFor="contact-name" className={LABEL}>Name</label>
                     <input

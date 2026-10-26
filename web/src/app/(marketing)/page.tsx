@@ -66,7 +66,7 @@ export default function HomePage() {
 
             {dashboard ? (
                 <Section id="dashboards" tone="surface" labelledBy="dash-title">
-                    <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+                    <div className="grid items-center gap-10 grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
                         <div>
                             <SectionHeading
                                 id="dash-title"
@@ -106,7 +106,7 @@ export default function HomePage() {
             <WhyFree />
 
             <Section id="faq" tone="surface" labelledBy="faq-title">
-                <div className="grid gap-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
+                <div className="grid gap-10 grid-cols-1 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
                     <SectionHeading
                         id="faq-title"
                         eyebrow="FAQ"

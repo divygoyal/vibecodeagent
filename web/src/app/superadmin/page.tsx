@@ -1973,7 +1973,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                                     <SignalPill tone="up">Connected</SignalPill>
                                                     {provider.has_refresh_token ? <SignalPill tone="info">Refresh token</SignalPill> : null}
                                                 </div>
-                                                <dl className="mt-3 grid gap-2 text-body-sm text-fg-secondary sm:grid-cols-2">
+                                                <dl className="mt-3 grid gap-2 text-body-sm text-fg-secondary grid-cols-1 sm:grid-cols-2">
                                                     <div><dt className="inline text-fg-muted">Account: </dt><dd className="inline font-mono break-all">{provider.provider_account_id || '–'}</dd></div>
                                                     <div><dt className="inline text-fg-muted">Token type: </dt><dd className="inline">{provider.token_type || '–'}</dd></div>
                                                     <div><dt className="inline text-fg-muted">Scopes: </dt><dd className="inline break-all">{provider.scope?.join(', ') || '–'}</dd></div>
@@ -2080,7 +2080,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                                 <SignalPill tone={token.last_used_at ? 'up' : 'neutral'}>{token.last_used_at ? 'Used' : 'Never used'}</SignalPill>
                                             </div>
                                             <div className="mt-1 text-meta text-fg-muted">{token.property_name || token.property_id}</div>
-                                            <div className="mt-3 grid gap-2 text-body-sm text-fg-secondary sm:grid-cols-2">
+                                            <div className="mt-3 grid gap-2 text-body-sm text-fg-secondary grid-cols-1 sm:grid-cols-2">
                                                 <div><span className="text-fg-muted">Created: </span><LocalTime value={token.created_at} /></div>
                                                 <div><span className="text-fg-muted">Last used: </span><LocalTime value={token.last_used_at} /></div>
                                                 <div className="sm:col-span-2"><span className="text-fg-muted">Allowed origins: </span>{token.allowed_origins.length ? token.allowed_origins.join(', ') : 'Any origin'}</div>
@@ -2097,7 +2097,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                                 <SignalPill>{formatNumber(share.views)} views</SignalPill>
                                             </div>
                                             <div className="mt-1 text-meta text-fg-muted">{share.property_name || share.property_id}</div>
-                                            <div className="mt-3 grid gap-2 text-body-sm text-fg-secondary sm:grid-cols-2">
+                                            <div className="mt-3 grid gap-2 text-body-sm text-fg-secondary grid-cols-1 sm:grid-cols-2">
                                                 <div><span className="text-fg-muted">Created: </span><LocalTime value={share.created_at} /></div>
                                                 <div><span className="text-fg-muted">Last viewed: </span><LocalTime value={share.last_viewed_at} /></div>
                                                 <div className="sm:col-span-2"><span className="text-fg-muted">Widgets: </span>{Object.entries(share.config || {}).filter(([, enabled]) => enabled).map(([key]) => key).join(', ') || 'Default config'}</div>
@@ -2121,7 +2121,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                                                 </div>
                                                 <div className="mt-1 text-meta text-fg-muted">{dashboard.property_name || dashboard.property_id}</div>
                                                 {dashboard.description ? <div className="mt-2 text-body-sm text-fg-secondary">{dashboard.description}</div> : null}
-                                                <div className="mt-3 grid gap-2 text-body-sm text-fg-secondary sm:grid-cols-2">
+                                                <div className="mt-3 grid gap-2 text-body-sm text-fg-secondary grid-cols-1 sm:grid-cols-2">
                                                     <div><span className="text-fg-muted">Site: </span>{dashboard.site_url || '–'}</div>
                                                     <div><span className="text-fg-muted">Views: </span>{formatNumber(dashboard.views)}</div>
                                                     <div><span className="text-fg-muted">Created: </span><LocalTime value={dashboard.created_at} /></div>

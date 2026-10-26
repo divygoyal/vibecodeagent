@@ -184,7 +184,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                 </div>
             </Card>
 
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
                 <Card>
                     <CardHeader
                         as="h2"
@@ -284,7 +284,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                         <span className="text-body-sm text-fg-muted group-open:hidden">Show</span>
                         <span className="hidden text-body-sm text-fg-muted group-open:inline">Hide</span>
                     </summary>
-                    <ul className="mt-4 grid gap-x-6 gap-y-3 border-t border-border-subtle pt-4 sm:grid-cols-2">
+                    <ul className="mt-4 grid gap-x-6 gap-y-3 border-t border-border-subtle pt-4 grid-cols-1 sm:grid-cols-2">
                         {TOOL_SUMMARIES.map((t) => (
                             <li key={t.name} className="min-w-0">
                                 <span className="font-mono text-[12px] text-fg">{t.name}</span>

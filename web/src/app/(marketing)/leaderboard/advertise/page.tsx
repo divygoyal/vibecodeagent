@@ -90,7 +90,7 @@ export default async function AdvertisePage({ searchParams }: { searchParams: Se
                 </div>
             </header>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <div className="mt-8 grid gap-3 grid-cols-1 sm:grid-cols-3">
                 {[
                     ['1. Pick a slot', 'Header banner, newsletter mention, footer logo: whatever the publisher sells.'],
                     ['2. Send a request', 'The price is snapshotted when you ask, so it cannot change under you.'],

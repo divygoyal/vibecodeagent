@@ -84,7 +84,7 @@ export function DemoSiteDashboardView({ dashboard }: { dashboard: DemoSiteDashbo
                 </KpiStrip>
             ) : null}
 
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
                 {search ? (
                     <ChartCard title="Top search queries" subtitle="Search Console · clicks" height="compact">
                         <BarList

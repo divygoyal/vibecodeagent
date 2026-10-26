@@ -9,7 +9,7 @@ export function MarketingFooter() {
     return (
         <footer className="border-t border-border-subtle bg-surface">
             <div className="mx-auto max-w-[1200px] px-4 py-12 md:px-6 md:py-16">
-                <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(4,1fr)]">
+                <div className="grid gap-10 grid-cols-1 md:grid-cols-[1.4fr_repeat(4,1fr)]">
                     <div className="max-w-[280px]">
                         <BrandMark />
                         <p className="mt-3 text-body-sm text-fg-muted">

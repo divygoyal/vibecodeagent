@@ -27,7 +27,7 @@ export default function ToolsIndexPage() {
                 description="Check a robots.txt file, test a page for AI search, score readability, validate hreflang tags or build a comparison page. Free, in your browser."
                 align="center"
             />
-            <ul className="mx-auto mt-12 grid max-w-[880px] gap-4 sm:grid-cols-2">
+            <ul className="mx-auto mt-12 grid max-w-[880px] gap-4 grid-cols-1 sm:grid-cols-2">
                 {FREE_TOOLS.map((tool) => (
                     <li key={tool.slug}>
                         <Link

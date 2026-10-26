@@ -88,7 +88,7 @@ function PlanCard({ children, recommended, className }: { children: React.ReactN
 /** Free / Growth / Pro (DESIGN 5.17). Paid plans only add Ask messages. */
 export function PricingPlans() {
     return (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
             <PlanCard>
                 <h2 className="text-title text-fg">Free</h2>
                 <p className="mt-1 text-body text-fg-secondary">Everything, for every site you own.</p>

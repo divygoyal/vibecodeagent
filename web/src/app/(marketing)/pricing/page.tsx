@@ -134,7 +134,7 @@ export default function PricingPage() {
             </Section>
 
             <Section id="faq" labelledBy="pricing-faq-title">
-                <div className="grid gap-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
+                <div className="grid gap-10 grid-cols-1 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
                     <SectionHeading
                         id="pricing-faq-title"
                         eyebrow="FAQ"

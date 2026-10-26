@@ -103,7 +103,7 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
                         <>
                             <CopyField value={link} label="Public link" />
                             {portfolioSites ? <Banner variant="warn">This dashboard shows several sites. Viewers will see their names.</Banner> : null}
-                            <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                                 <div className="space-y-1.5">
                                     <p className="text-body-sm font-medium text-fg">Expiry</p>
                                     <Select

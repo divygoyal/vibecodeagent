@@ -112,7 +112,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
 
             <section id="how-verification-works" className="mt-16 scroll-mt-24 rounded-card border border-border-subtle bg-surface p-6 shadow-card md:p-8">
                 <h2 className="text-title text-fg">How verification works</h2>
-                <div className="mt-4 grid gap-6 md:grid-cols-3">
+                <div className="mt-4 grid gap-6 grid-cols-1 md:grid-cols-3">
                     <div>
                         <p className="text-title-sm text-fg">1. Prove you own the site</p>
                         <p className="mt-1 text-body text-fg-secondary">Only owners and full users of a domain in Google Search Console can be ranked. Read-only access, nothing is ever written to your Google data.</p>

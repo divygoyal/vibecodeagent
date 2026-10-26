@@ -112,7 +112,7 @@ function PlanContent() {
                         </div>
                         <span className="text-meta text-fg-muted">Cancel any time</span>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                         {PLANS.filter((p) => p.available).map((p) => (
                             <PlanCard key={p.key} def={p} current={plan} email={session?.user?.email ?? ''} />
                         ))}
@@ -341,7 +341,7 @@ function Faq() {
     return (
         <Card as="section" aria-labelledby="faq-title">
             <CardHeader as="h2" title={<span id="faq-title">Questions about plans</span>} />
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid gap-2 grid-cols-1 md:grid-cols-2">
                 {FAQ.map((item) => (
                     <details key={item.q} className="group rounded-control border border-border-subtle open:bg-surface-sunken">
                         <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 text-body font-medium text-fg [&::-webkit-details-marker]:hidden">
@@ -361,7 +361,7 @@ function PlanSkeleton() {
         <div aria-hidden className="mx-auto max-w-[1040px]">
             <div className="mb-6 flex flex-col gap-2"><Skeleton className="h-7 w-24" /><Skeleton className="h-4 w-80" /></div>
             <Skeleton className="mb-6 h-44 w-full" rounded="card" />
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                 {[0, 1, 2].map((i) => <Skeleton key={i} className="h-80 w-full" rounded="card" />)}
             </div>
         </div>
