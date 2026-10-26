@@ -443,7 +443,163 @@ const SITES: DemoSite[] = [
         topics: ['Intermittent fasting for beginners', 'Vitamin D deficiency symptoms'],
         queries: ['healthinsights', 'intermittent fasting beginners'],
     },
+
+    // ── Community sites (tc/leaderboard seed) ─────────────────────────────────
+    // Each belongs to its own demo Google account ('founder-<key>'), so a seeded
+    // founder sees only their own site. They exist so the public leaderboard has
+    // a populated board across categories; the main/alt accounts do not list them.
+    {
+        key: 'pixelforge',
+        name: 'PixelForge Games',
+        host: 'pixelforge.example',
+        kind: 'games',
+        shape: 'growing',
+        audience: 'global',
+        usersToday: 5200,
+        organicShare: 0.35,
+        ga: { propertyId: 'properties/412300111', account: 'accounts/198700011', displayName: 'PixelForge Games', timeZone: 'Europe/London', currencyCode: 'GBP' },
+        gsc: { siteUrl: 'sc-domain:pixelforge.example', permissionLevel: 'siteOwner' },
+        sections: [
+            ['/', 'PixelForge Games – Free browser games', 30],
+            ['/games', 'All games | PixelForge', 14],
+            ['/games/pixel-dungeon', 'Pixel Dungeon | PixelForge', 9],
+            ['/games/tiny-racers', 'Tiny Racers | PixelForge', 7],
+            ['/leaderboards', 'Leaderboards | PixelForge', 4],
+        ],
+        topicPrefix: '/games/',
+        topics: ['Pixel Dungeon', 'Tiny Racers', 'Block Builder', 'Space Hopper', 'Maze Runner 2000'],
+        queries: ['free browser games', 'pixel dungeon game', 'tiny racers', 'online puzzle games', 'games to play at work'],
+    },
+    {
+        key: 'bytebrief',
+        name: 'ByteBrief Newsletter',
+        host: 'bytebrief.example',
+        kind: 'blog',
+        shape: 'steady',
+        audience: 'us',
+        usersToday: 3100,
+        organicShare: 0.5,
+        ga: { propertyId: 'properties/412300112', account: 'accounts/198700012', displayName: 'ByteBrief', timeZone: 'America/New_York', currencyCode: 'USD' },
+        gsc: { siteUrl: 'https://bytebrief.example/', permissionLevel: 'siteOwner' },
+        sections: [
+            ['/', 'ByteBrief – The 5-minute tech newsletter', 18],
+            ['/archive', 'Archive | ByteBrief', 8],
+            ['/subscribe', 'Subscribe | ByteBrief', 6],
+            ['/sponsor', 'Sponsor ByteBrief', 1.5],
+        ],
+        topicPrefix: '/issues/',
+        topics: ['Issue 214: The quiet rise of edge databases', 'Issue 213: What AI agents still get wrong', 'Issue 212: A year of Rust in production', 'Issue 211: Why your CI is slow'],
+        queries: ['tech newsletter', 'edge databases', 'ai agents limitations', 'rust in production', 'slow ci pipeline'],
+    },
+    {
+        key: 'shipfast',
+        name: 'ShipFast Templates',
+        host: 'shipfast.example',
+        kind: 'saas',
+        shape: 'growing',
+        audience: 'global',
+        usersToday: 1300,
+        organicShare: 0.4,
+        ga: { propertyId: 'properties/412300113', account: 'accounts/198700013', displayName: 'ShipFast Templates', timeZone: 'UTC', currencyCode: 'USD' },
+        gsc: { siteUrl: 'sc-domain:shipfast.example', permissionLevel: 'siteFullUser' },
+        sections: [
+            ['/', 'ShipFast – Launch your SaaS in a weekend', 26],
+            ['/pricing', 'Pricing | ShipFast', 9],
+            ['/templates', 'Templates | ShipFast', 8],
+            ['/docs', 'Docs | ShipFast', 6],
+        ],
+        topicPrefix: '/blog/',
+        topics: ['Next.js SaaS boilerplate checklist', 'Stripe subscriptions in an afternoon', 'Auth options compared'],
+        queries: ['saas boilerplate', 'nextjs saas template', 'stripe subscription starter', 'launch saas fast'],
+    },
+    {
+        key: 'learnloop',
+        name: 'LearnLoop',
+        host: 'learnloop.example',
+        kind: 'docs',
+        shape: 'steady',
+        audience: 'in',
+        usersToday: 2200,
+        organicShare: 0.6,
+        ga: { propertyId: 'properties/412300114', account: 'accounts/198700014', displayName: 'LearnLoop', timeZone: 'Asia/Kolkata', currencyCode: 'INR' },
+        gsc: { siteUrl: 'sc-domain:learnloop.example', permissionLevel: 'siteOwner' },
+        sections: [
+            ['/', 'LearnLoop – Spaced repetition for students', 22],
+            ['/courses', 'Courses | LearnLoop', 12],
+            ['/courses/python-basics', 'Python basics | LearnLoop', 8],
+            ['/pricing', 'Pricing | LearnLoop', 3],
+        ],
+        topicPrefix: '/guides/',
+        topics: ['How spaced repetition works', 'Study plan for board exams', 'Active recall techniques', 'Best flashcard apps for students'],
+        queries: ['spaced repetition', 'study plan', 'active recall', 'flashcard app', 'python basics course'],
+    },
+    {
+        key: 'promptly',
+        name: 'Promptly',
+        host: 'promptly.example',
+        kind: 'saas',
+        shape: 'spiky',
+        audience: 'global',
+        usersToday: 900,
+        organicShare: 0.3,
+        ga: { propertyId: 'properties/412300115', account: 'accounts/198700015', displayName: 'Promptly', timeZone: 'America/Los_Angeles', currencyCode: 'USD' },
+        gsc: { siteUrl: 'sc-domain:promptly.example', permissionLevel: 'siteOwner' },
+        sections: [
+            ['/', 'Promptly – Version control for your AI prompts', 28],
+            ['/pricing', 'Pricing | Promptly', 7],
+            ['/docs', 'Docs | Promptly', 7],
+            ['/changelog', 'Changelog | Promptly', 2],
+        ],
+        topicPrefix: '/blog/',
+        topics: ['Prompt versioning best practices', 'Evaluating prompts with golden sets', 'Prompt injection basics'],
+        queries: ['prompt versioning', 'prompt management tool', 'llm prompt evaluation', 'prompt injection'],
+    },
+    {
+        key: 'greengrocer',
+        name: 'Green Grocer',
+        host: 'greengrocer.example',
+        kind: 'shop',
+        shape: 'seasonal',
+        audience: 'eu',
+        usersToday: 700,
+        organicShare: 0.45,
+        aov: 38,
+        ga: { propertyId: 'properties/412300116', account: 'accounts/198700016', displayName: 'Green Grocer Shop', timeZone: 'Europe/Berlin', currencyCode: 'EUR' },
+        gsc: { siteUrl: 'https://greengrocer.example/', permissionLevel: 'siteOwner' },
+        sections: [
+            ['/', 'Green Grocer – Organic boxes delivered weekly', 24],
+            ['/shop', 'Shop | Green Grocer', 12],
+            ['/boxes/weekly', 'Weekly veg box | Green Grocer', 8],
+            ['/cart', 'Cart | Green Grocer', 5],
+        ],
+        topicPrefix: '/journal/',
+        topics: ['Seasonal vegetables guide', 'How to store leafy greens', 'Zero-waste kitchen tips'],
+        queries: ['organic veg box', 'seasonal vegetables', 'store leafy greens', 'zero waste kitchen'],
+    },
+    {
+        // Search Console access is "restricted": demonstrates the fix-it message.
+        key: 'quietlabs',
+        name: 'Quiet Labs',
+        host: 'quietlabs.example',
+        kind: 'saas',
+        shape: 'steady',
+        audience: 'us',
+        usersToday: 600,
+        organicShare: 0.3,
+        ga: { propertyId: 'properties/412300117', account: 'accounts/198700017', displayName: 'Quiet Labs', timeZone: 'America/Chicago', currencyCode: 'USD' },
+        gsc: { siteUrl: 'sc-domain:quietlabs.example', permissionLevel: 'siteRestrictedUser' },
+        sections: [
+            ['/', 'Quiet Labs – Focus tools for deep work', 24],
+            ['/pricing', 'Pricing | Quiet Labs', 6],
+        ],
+        topicPrefix: '/blog/',
+        topics: ['Deep work routines', 'Notification hygiene'],
+        queries: ['deep work tools', 'focus timer', 'notification hygiene'],
+    },
 ];
+
+/** Demo Google accounts for the community sites above: one per site, `founder-<key>`. */
+const COMMUNITY_KEYS = ['pixelforge', 'bytebrief', 'shipfast', 'learnloop', 'promptly', 'greengrocer', 'quietlabs'];
 
 const ACCOUNTS: DemoGoogleAccount[] = [
     {
@@ -467,6 +623,16 @@ const ACCOUNTS: DemoGoogleAccount[] = [
         ],
         gscSiteKeys: ['puzzle', 'recipenest'],
     },
+    ...COMMUNITY_KEYS.map((key): DemoGoogleAccount => {
+        const site = SITES.find(s => s.key === key)!;
+        return {
+            key: `founder-${key}`,
+            email: `founder@${site.host}`,
+            name: `${site.name} founder`,
+            gaAccounts: [{ account: site.ga!.account, displayName: site.name, siteKeys: [key] }],
+            gscSiteKeys: site.gsc ? [key] : [],
+        };
+    }),
 ];
 
 export const DEMO_DEFAULT_ACCOUNT = 'main';
