@@ -222,7 +222,9 @@ export default function MarketingLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="min-h-screen overflow-x-hidden bg-black text-white">
+        // Marketing is always light for the token system (DESIGN 2.1). The
+        // current pages still use their own dark classes until they are rebuilt.
+        <div data-theme="light" className="min-h-screen overflow-x-hidden bg-black text-white">
             <Navbar />
             <main id="main-content" className="overflow-x-hidden">
                 {children}

@@ -11,7 +11,9 @@ DEV_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # slot file; the kernel drops the lock when the server dies, so a crashed
 # instance never leaves a stale slot behind.
 TC_SLOTS_DIR="$TC_DEV_HOME/slots"
-TC_MAX_SLOTS=3
+TC_MAX_SLOTS=2
+# up.sh refuses to start a dev server when MemAvailable is below this (MB).
+TC_MIN_AVAILABLE_MB=2500
 
 # Fixed demo identities (Google "sub" values). login.mjs uses the same ones.
 TC_SUPERADMIN_SUB="100000000000000000009"
@@ -174,3 +176,6 @@ slot_report() {
         fi
     done
 }
+
+# MemAvailable from /proc/meminfo, in MB.
+mem_available_mb() { awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo; }
