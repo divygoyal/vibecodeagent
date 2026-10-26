@@ -1,4 +1,6 @@
-import { MetadataRoute } from 'next';
+import type { MetadataRoute } from 'next';
+
+import { SITE_URL } from '@/lib/brand';
 
 export default function robots(): MetadataRoute.Robots {
     return {
@@ -8,23 +10,19 @@ export default function robots(): MetadataRoute.Robots {
                 allow: '/',
                 disallow: [
                     '/dashboard',
-                    '/dashboard/',
                     '/admin',
-                    '/admin/',
                     '/superadmin',
-                    '/api',
                     '/api/',
-                    '/auth',
                     '/auth/',
-                    '/share',
-                    '/view',
-                    '/embed',
-                    '/demo',
-                    '/share-popup-preview',
+                    '/oauth/',
+                    '/mcp',
+                    '/share/',
+                    '/view/',
+                    '/embed/',
                 ],
             },
         ],
-        sitemap: 'https://trafficclaw.com/sitemap.xml',
-        host: 'https://trafficclaw.com',
+        sitemap: `${SITE_URL}/sitemap.xml`,
+        host: SITE_URL,
     };
 }
