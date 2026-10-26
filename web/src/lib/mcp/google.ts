@@ -12,6 +12,7 @@ import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
 import { createDemoGoogleFetch, demoGoogleAccessToken, type FetchLike } from '@/lib/sites/fetchInventory';
 import type { McpPrincipal } from './auth';
 import { ToolError } from './errors';
+import { shared } from './shared';
 
 const GA_DATA = 'https://analyticsdata.googleapis.com/v1beta';
 const GSC = 'https://www.googleapis.com/webmasters/v3';
@@ -21,18 +22,18 @@ const CALL_TIMEOUT_MS = 15_000;
 // ───────────── cache (LRU-ish, 500 entries / ~50 MB) ─────────────
 
 interface CacheEntry { value: unknown; until: number; size: number }
-const cache = new Map<string, CacheEntry>();
-let cacheBytes = 0;
+const cache = shared('googleCache', () => new Map<string, CacheEntry>());
+const bytes = shared('googleCacheBytes', () => ({ n: 0 }));
 const CACHE_MAX_ENTRIES = 500;
 const CACHE_MAX_BYTES = 50 * 1024 * 1024;
-const inflight = new Map<string, Promise<unknown>>();
+const inflight = shared('googleInflight', () => new Map<string, Promise<unknown>>());
 
 function cacheGet(key: string): unknown | undefined {
     const e = cache.get(key);
     if (!e) return undefined;
     if (e.until <= Date.now()) {
         cache.delete(key);
-        cacheBytes -= e.size;
+        bytes.n -= e.size;
         return undefined;
     }
     cache.delete(key);
@@ -42,13 +43,13 @@ function cacheGet(key: string): unknown | undefined {
 
 function cacheSet(key: string, value: unknown, ttlMs: number, size: number) {
     const old = cache.get(key);
-    if (old) cacheBytes -= old.size;
+    if (old) bytes.n -= old.size;
     cache.set(key, { value, until: Date.now() + ttlMs, size });
-    cacheBytes += size;
-    while ((cache.size > CACHE_MAX_ENTRIES || cacheBytes > CACHE_MAX_BYTES) && cache.size) {
+    bytes.n += size;
+    while ((cache.size > CACHE_MAX_ENTRIES || bytes.n > CACHE_MAX_BYTES) && cache.size) {
         const [k, e] = cache.entries().next().value as [string, CacheEntry];
         cache.delete(k);
-        cacheBytes -= e.size;
+        bytes.n -= e.size;
     }
 }
 
@@ -70,7 +71,7 @@ class Semaphore {
     }
 }
 
-const ga4Semaphores = new Map<string, Semaphore>();
+const ga4Semaphores = shared('ga4Semaphores', () => new Map<string, Semaphore>());
 function ga4Semaphore(property: string): Semaphore {
     let s = ga4Semaphores.get(property);
     if (!s) {
@@ -81,7 +82,7 @@ function ga4Semaphore(property: string): Semaphore {
     return s;
 }
 
-const gscUserSemaphores = new Map<string, Semaphore>();
+const gscUserSemaphores = shared('gscSemaphores', () => new Map<string, Semaphore>());
 function gscSemaphore(userKey: string): Semaphore {
     let s = gscUserSemaphores.get(userKey);
     if (!s) {
@@ -93,8 +94,8 @@ function gscSemaphore(userKey: string): Semaphore {
 }
 
 /** Circuit breakers: key -> open-until, plus recent 5xx timestamps. */
-const circuits = new Map<string, number>();
-const serverErrors = new Map<string, number[]>();
+const circuits = shared('circuits', () => new Map<string, number>());
+const serverErrors = shared('serverErrors', () => new Map<string, number[]>());
 function circuitOpen(key: string): number {
     const until = circuits.get(key) ?? 0;
     return until > Date.now() ? Math.ceil((until - Date.now()) / 1000) : 0;
@@ -108,7 +109,7 @@ function record5xx(key: string) {
 }
 
 /** GA4 quota memory per property from returnPropertyQuota. */
-const ga4Quota = new Map<string, { hourly: number; daily: number; projectHourly: number; at: number }>();
+const ga4Quota = shared('ga4Quota', () => new Map<string, { hourly: number; daily: number; projectHourly: number; at: number }>());
 function quotaBlock(property: string, realtime: boolean): string | null {
     const q = ga4Quota.get(property);
     if (!q || q.at < Date.now() - 3600_000) return null;
@@ -128,7 +129,7 @@ function rememberQuota(property: string, pq: Record<string, { remaining?: number
 }
 
 /** GSC token buckets: per site+user 600/min, global 20,000/min. */
-const gscBuckets = new Map<string, { tokens: number; at: number }>();
+const gscBuckets = shared('gscBuckets', () => new Map<string, { tokens: number; at: number }>());
 function gscTake(key: string, perMinute: number): boolean {
     const now = Date.now();
     const b = gscBuckets.get(key) ?? { tokens: perMinute, at: now };
@@ -344,7 +345,7 @@ export function gaTotals(report: GaReport): number[][] {
 
 // ───────────── credentials ─────────────
 
-const credCache = new Map<string, { access: string; refresh?: string; until: number }>();
+const credCache = shared('credCache', () => new Map<string, { access: string; refresh?: string; until: number }>());
 
 export async function googleForPrincipal(p: McpPrincipal, stats: CallStats, signal?: AbortSignal): Promise<GoogleClient> {
     if (p.demo) return new GoogleClient(demoGoogleAccessToken(), createDemoGoogleFetch(), 'demo', true, stats, signal);

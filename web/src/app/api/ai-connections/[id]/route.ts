@@ -1,5 +1,5 @@
 import { adminStore, AdminStoreError } from '@/lib/mcp/adminStore';
-import { evictTokenHashes } from '@/lib/mcp/auth';
+import { evictGrant, evictTokenHashes } from '@/lib/mcp/auth';
 import { json, requireUser } from '@/lib/mcp/dashboardApi';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +37,7 @@ export async function PATCH(req: Request, { params }: Params) {
     if (!body || typeof body.exclude_queries !== 'boolean') return json({ error: 'invalid_request', message: 'exclude_queries (boolean) is required' }, 400);
     try {
         await adminStore.patchGrant(id, { user: auth.user.id, exclude_queries: body.exclude_queries });
+        evictGrant(id);
         return json({ ok: true });
     } catch (err) {
         if (err instanceof AdminStoreError && err.status === 404) return json({ error: 'not_found' }, 404);

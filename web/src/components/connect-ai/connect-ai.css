@@ -1,0 +1,122 @@
+/*
+ * Connect AI scoped tokens. Mirrors the DESIGN.md 2.2 semantic tokens (same
+ * names and values) so these screens look right before the shared
+ * styles/tokens.css lands; once it does, this block is redundant and can go.
+ */
+.tc-cai {
+  --tc-canvas: #f6f7f9;
+  --tc-surface: #ffffff;
+  --tc-surface-sunken: #f6f7f9;
+  --tc-subtle: #eff1f4;
+  --tc-subtle-strong: #e7eaee;
+  --tc-border-subtle: #e7eaee;
+  --tc-border: #dde1e7;
+  --tc-border-strong: #c6ccd5;
+  --tc-fg: #171a20;
+  --tc-fg-secondary: #4b5361;
+  --tc-fg-muted: #636b78;
+  --tc-fg-faint: #8a919c;
+  --tc-brand: #0d3a2c;
+  --tc-brand-hover: #0e4b39;
+  --tc-brand-fg: #ffffff;
+  --tc-brand-text: #157459;
+  --tc-brand-soft: #ebfbf4;
+  --tc-brand-soft-fg: #125e47;
+  --tc-focus: #1f906f;
+  --tc-up: #157f3c;
+  --tc-up-soft: #e8f6ec;
+  --tc-down: #c92a2a;
+  --tc-down-soft: #fdecec;
+  --tc-warn: #a15c00;
+  --tc-warn-soft: #fff4e0;
+  --tc-info: #2457c5;
+  --tc-info-soft: #eaf0fd;
+  --tc-m-clicks: #1f5bd6;
+  --tc-m-users: #5b4fe0;
+  --tc-shadow-xs: 0 1px 2px rgb(16 19 26 / 0.05);
+  --tc-shadow-card: 0 1px 2px rgb(16 19 26 / 0.04), 0 1px 3px rgb(16 19 26 / 0.04);
+  --tc-shadow-modal: 0 4px 12px -4px rgb(16 19 26 / 0.08), 0 24px 64px -12px rgb(16 19 26 / 0.28);
+  color-scheme: light;
+  color: var(--tc-fg);
+}
+
+[data-theme="dark"] .tc-cai:not([data-theme="light"]),
+.tc-cai[data-theme="dark"] {
+  --tc-canvas: #0b0c0f;
+  --tc-surface: #15171c;
+  --tc-surface-sunken: #0b0c0f;
+  --tc-subtle: #1f2228;
+  --tc-subtle-strong: #262a31;
+  --tc-border-subtle: #23272e;
+  --tc-border: #2c3139;
+  --tc-border-strong: #3a404a;
+  --tc-fg: #edeff2;
+  --tc-fg-secondary: #aeb4be;
+  --tc-fg-muted: #858d98;
+  --tc-fg-faint: #5f6672;
+  --tc-brand: #78d3b1;
+  --tc-brand-hover: #aeead2;
+  --tc-brand-fg: #07241a;
+  --tc-brand-text: #78d3b1;
+  --tc-brand-soft: rgb(120 211 177 / 0.12);
+  --tc-brand-soft-fg: #aeead2;
+  --tc-focus: #43b28e;
+  --tc-up: #3fbf6f;
+  --tc-up-soft: rgb(63 191 111 / 0.14);
+  --tc-down: #f87171;
+  --tc-down-soft: rgb(248 113 113 / 0.14);
+  --tc-warn: #f5b041;
+  --tc-warn-soft: rgb(245 176 65 / 0.14);
+  --tc-info: #7aa7ff;
+  --tc-info-soft: rgb(122 167 255 / 0.14);
+  --tc-m-clicks: #2a66db;
+  --tc-m-users: #645fdf;
+  --tc-shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+  --tc-shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.03);
+  --tc-shadow-modal: 0 0 0 1px rgb(255 255 255 / 0.06), 0 32px 80px -12px rgb(0 0 0 / 0.8);
+  color-scheme: dark;
+}
+
+/* Before the theme script exists, follow the OS when no theme is set. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .tc-cai:not([data-theme="light"]) {
+    --tc-canvas: #0b0c0f;
+    --tc-surface: #15171c;
+    --tc-surface-sunken: #0b0c0f;
+    --tc-subtle: #1f2228;
+    --tc-subtle-strong: #262a31;
+    --tc-border-subtle: #23272e;
+    --tc-border: #2c3139;
+    --tc-border-strong: #3a404a;
+    --tc-fg: #edeff2;
+    --tc-fg-secondary: #aeb4be;
+    --tc-fg-muted: #858d98;
+    --tc-fg-faint: #5f6672;
+    --tc-brand: #78d3b1;
+    --tc-brand-hover: #aeead2;
+    --tc-brand-fg: #07241a;
+    --tc-brand-text: #78d3b1;
+    --tc-brand-soft: rgb(120 211 177 / 0.12);
+    --tc-brand-soft-fg: #aeead2;
+    --tc-focus: #43b28e;
+    --tc-up: #3fbf6f;
+    --tc-up-soft: rgb(63 191 111 / 0.14);
+    --tc-down: #f87171;
+    --tc-down-soft: rgb(248 113 113 / 0.14);
+    --tc-warn: #f5b041;
+    --tc-warn-soft: rgb(245 176 65 / 0.14);
+    --tc-info: #7aa7ff;
+    --tc-info-soft: rgb(122 167 255 / 0.14);
+    --tc-shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.03);
+    color-scheme: dark;
+  }
+}
+
+.tc-cai :focus-visible {
+  outline: 2px solid var(--tc-focus);
+  outline-offset: 2px;
+}
+
+.tc-cai .tabular {
+  font-variant-numeric: tabular-nums;
+}

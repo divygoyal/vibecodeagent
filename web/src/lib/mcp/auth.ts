@@ -7,6 +7,7 @@ import type { AuthInfo } from '@modelcontextprotocol/server';
 import { adminStore } from './adminStore';
 import { ACCESS_TOKEN_PREFIX, API_KEY_PREFIX, protectedResourceMetadataUrl, resourceUrl, SCOPE_READ, servedHosts } from './config';
 import { sha256Hex } from '@/lib/oauth/primitives';
+import { shared } from './shared';
 
 export interface McpPrincipal {
     tokenId: number;
@@ -31,10 +32,15 @@ export type AuthResult =
 
 const POSITIVE_TTL_MS = 15_000;
 const NEGATIVE_TTL_MS = 5_000;
-const cache = new Map<string, { value: McpPrincipal | null; reason: string; until: number }>();
+const cache = shared('authCache', () => new Map<string, { value: McpPrincipal | null; reason: string; until: number }>());
 
 export function evictTokenHashes(hashes: readonly string[] | undefined): void {
     for (const h of hashes || []) cache.delete(h);
+}
+
+/** Drop cached lookups for a grant so changed settings apply on the next call. */
+export function evictGrant(grantId: number): void {
+    for (const [k, v] of cache) if (v.value?.grantId === grantId) cache.delete(k);
 }
 
 export async function authenticate(req: Request): Promise<AuthResult> {

@@ -2,6 +2,7 @@
 import { fmtPeriod, type Period } from '../dates';
 import { ToolError } from '../errors';
 import { gaRows, type GaReport, type GoogleClient, type GscRow } from '../google';
+import { shared } from '../shared';
 
 export interface GscTotals { clicks: number; impressions: number; ctr: number; position: number }
 
@@ -83,7 +84,7 @@ export function re2Escape(s: string): string {
 }
 
 /** URL Inspection budget per user: 100/day and 20/hour (MCP.md 7.10). */
-const inspections = new Map<string, number[]>();
+const inspections = shared('inspections', () => new Map<string, number[]>());
 export function takeInspectionQuota(userKey: string, n: number): { ok: boolean; retryAfterS: number } {
     const now = Date.now();
     const list = (inspections.get(userKey) ?? []).filter((t) => t > now - 86400_000);

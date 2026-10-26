@@ -6,6 +6,7 @@
 import { adminStore } from '@/lib/mcp/adminStore';
 import { classifyRedirectUri } from './primitives';
 import { safeFetchJsonDocument, SafeFetchError } from './ssrf';
+import { shared } from '@/lib/mcp/shared';
 
 export interface ClientInfo {
     client_id: string;
@@ -59,8 +60,8 @@ function devLoopbackCimd(): boolean {
 const MIN_TTL_MS = 5 * 60_000;
 const MAX_TTL_MS = 24 * 3600_000;
 const STALE_MS = 24 * 3600_000;
-const cimdCache = new Map<string, { info: ClientInfo; freshUntil: number; staleUntil: number }>();
-const cimdInflight = new Map<string, Promise<ClientInfo>>();
+const cimdCache = shared('cimdCache', () => new Map<string, { info: ClientInfo; freshUntil: number; staleUntil: number }>());
+const cimdInflight = shared('cimdInflight', () => new Map<string, Promise<ClientInfo>>());
 
 function ttlFromHeaders(headers: Record<string, string>): number {
     const cc = headers['cache-control'] || '';
@@ -147,7 +148,7 @@ async function getCimdClient(url: string): Promise<ClientInfo> {
     return p;
 }
 
-const dcrCache = new Map<string, { info: ClientInfo | null; until: number }>();
+const dcrCache = shared('dcrCache', () => new Map<string, { info: ClientInfo | null; until: number }>());
 
 async function getDcrClient(clientId: string): Promise<ClientInfo> {
     const now = Date.now();

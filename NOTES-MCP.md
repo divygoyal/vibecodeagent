@@ -23,17 +23,18 @@ Spec: /root/projects/tc-redesign-research/MCP.md + PRODUCT.md section 4. Design:
 - work/live kit merged (scripts/dev).
 
 ## Done (committed unless noted)
-- web/src/lib/sites/fetchInventory.ts: own commit 8145bd0 (for cherry-pick by portfolio).
+- web/src/lib/sites/fetchInventory.ts: own commits 8145bd0 + 9e1c0ed (globalThis cache) for cherry-pick by portfolio.
 - admin/mcp_api.py + migrations/019_add_mcp_oauth.sql + main.py wiring (include_router, ensure_mcp_schema, delete-user cascade). Not yet run.
 - web/src/lib/mcp/{config,adminStore,rateLimit,session}.ts
 - web/src/lib/oauth/{primitives,ssrf,clients,txn,metadata,authorize}.ts
 - routes: .well-known PRM (+/mcp) and AS metadata, /oauth/register, /oauth/authorize, /oauth/authorize/decision
 
+## Status (latest)
+- Backend complete: OAuth (discovery, DCR, CIMD, authorize/consent/decision, token, revoke), /mcp (both eras), 13 tools + 3 prompts, API keys, /api/ai-connections/*.
+- Consent page /oauth/consent done. web/tests/mcp/flow.test.mjs: 28/28 pass against instance mcp (3102/8102).
+- Cross-route state uses globalThis (lib/mcp/shared.ts) so revocation evicts everywhere.
+
 ## Next
-1. /oauth/token, /oauth/revoke routes; lib/mcp/auth.ts (bearer lookup cache 15s, 401/403 challenges, origin check, CORS, evictTokenHashes)
-2. app/mcp/route.ts (createMcpHandler; GET html -> 302 /ai; GET/DELETE 405)
-3. lib/sites/fetchInventory.ts, lib/mcp/{google,siteResolver,dates,format,audit,server}.ts and 13 tools + 3 prompts (MCP.md 7-8)
-4. API keys + /api/ai-connections/* session routes
-5. UI: /oauth/consent page, /dashboard/connect-ai, (marketing)/ai page
-6. tests web/tests/mcp (node:test flow script + README with Inspector commands); verify with kit; tsc + lint
-7. Report: nav item "Connect AI" -> /dashboard/connect-ai; env vars TC_MCP_ENABLED, TC_MCP_ISSUER, TC_MCP_TXN_SECRET, TC_MCP_DEMO, TC_MCP_ACCESS_TTL
+1. /dashboard/connect-ai page (components/connect-ai/ConnectAiClient.tsx), (marketing)/ai page
+2. README web/tests/mcp/README.md + Inspector runs; unit tests for primitives (tsx --test)
+3. screenshots (desktop/mobile, light/dark), lint, stop server, rm -rf web/.next, report

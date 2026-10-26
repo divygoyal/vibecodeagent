@@ -14,8 +14,9 @@ const AUTH_METHODS = ['none', 'client_secret_basic', 'client_secret_post'] as co
 export async function POST(req: Request) {
     if (!mcpEnabled()) return notFoundResponse();
     const ip = clientIp(req);
-    const perIp = hitLimit(`dcr:ip:${ip}`, 10, 3600_000);
-    const global = hitLimit('dcr:global', 200, 86400_000);
+    const perIpLimit = Number(process.env.TC_MCP_DCR_LIMIT) || 10;
+    const perIp = hitLimit(`dcr:ip:${ip}`, perIpLimit, 3600_000);
+    const global = hitLimit('dcr:global', Math.max(200, perIpLimit * 20), 86400_000);
     if (!perIp.ok || !global.ok) {
         const retry = String(Math.max(perIp.retryAfterS, global.retryAfterS));
         return oauthError('slow_down', 'Too many client registrations. Try again later.', 429, { 'retry-after': retry });

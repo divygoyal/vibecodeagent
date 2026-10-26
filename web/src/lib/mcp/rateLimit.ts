@@ -2,13 +2,14 @@
  * In-process rate limiting for the MCP endpoints (one web replica today;
  * move to Upstash if the app ever runs several). MCP.md section 8.1.
  */
+import { shared } from './shared';
 
 interface Window {
     count: number;
     resetAt: number;
 }
 
-const windows = new Map<string, Window>();
+const windows = shared('rateWindows', () => new Map<string, Window>());
 
 function sweep(now: number) {
     if (windows.size < 5000) return;
@@ -32,7 +33,7 @@ export function hitLimit(key: string, limit: number, windowMs: number, now = Dat
  * Token bucket for per-user tool cost units: capacity 100, refill 2 units/s.
  * The heaviest single call (site_health on 20 sites) costs 65, so it always fits.
  */
-const buckets = new Map<string, { tokens: number; at: number }>();
+const buckets = shared('costBuckets', () => new Map<string, { tokens: number; at: number }>());
 export const COST_BUCKET = { capacity: 100, refillPerS: 2 };
 
 export function chargeUnits(key: string, units: number, now = Date.now()): { ok: boolean; retryAfterS: number } {
@@ -48,7 +49,7 @@ export function chargeUnits(key: string, units: number, now = Date.now()): { ok:
 }
 
 /** Concurrency gate: at most `max` in flight per key, waiting up to `waitMs`. */
-const inflight = new Map<string, number>();
+const inflight = shared('inflightSlots', () => new Map<string, number>());
 export async function acquireSlot(key: string, max: number, waitMs: number): Promise<(() => void) | null> {
     const deadline = Date.now() + waitMs;
     while ((inflight.get(key) ?? 0) >= max) {
