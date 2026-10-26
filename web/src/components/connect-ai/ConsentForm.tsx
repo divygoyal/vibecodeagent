@@ -3,6 +3,7 @@
 import { signIn, signOut } from 'next-auth/react';
 import { useMemo, useState } from 'react';
 import { Badge, Banner, Button, Checkbox, GoogleMark, Pill, RadioGroup, SearchInput } from '@/components/ui';
+import { RADIX_TOUCH_FIX } from './touchFix';
 
 export interface ConsentSite {
     site_id: string;
@@ -37,7 +38,7 @@ export function ConsentForm(p: ConsentFormProps) {
     const canAllow = connected && (mode === 'all' || picked.size > 0);
 
     return (
-        <form method="post" action="/oauth/authorize/decision" className="space-y-5" onSubmit={(e) => {
+        <form method="post" action="/oauth/authorize/decision" className={`space-y-5 ${RADIX_TOUCH_FIX}`} onSubmit={(e) => {
             const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
             setSubmitting(submitter?.value ?? 'allow');
         }}>
@@ -130,7 +131,9 @@ export function ConsentForm(p: ConsentFormProps) {
 
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
                 <Button type="submit" name="action" value="deny" size="lg" loading={submitting === 'deny'} disabled={submitting !== null}>Cancel</Button>
-                <Button type="submit" name="action" value="allow" variant="primary" size="lg" className="sm:ml-auto sm:min-w-[140px]" loading={submitting === 'allow'} disabled={!canAllow || submitting !== null}>Allow</Button>
+                {p.signedIn ? (
+                    <Button type="submit" name="action" value="allow" variant="primary" size="lg" className="sm:ml-auto sm:min-w-[140px]" loading={submitting === 'allow'} disabled={!canAllow || submitting !== null}>Allow</Button>
+                ) : null}
             </div>
             {p.demoAllowed ? (
                 <div className="flex justify-center border-t border-border-subtle pt-4">

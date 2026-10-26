@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { Check, Laptop, X } from 'lucide-react';
 import { ConsentForm, type ConsentSite } from '@/components/connect-ai/ConsentForm';
+import { BrandMark, Wordmark } from '@/components/shell/BrandMark';
 import { Banner, Card, VerifiedBadge } from '@/components/ui';
 import { dashboardConnectPath, demoGrantsEnabled, issuer, mcpEnabled } from '@/lib/mcp/config';
 import { getSessionUser } from '@/lib/mcp/session';
@@ -18,8 +19,8 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div className="tc-root min-h-dvh bg-canvas px-4 py-8 text-fg sm:py-14">
             <div className="mx-auto w-full max-w-[520px]">
                 <div className="mb-5 flex items-center gap-2">
-                    <span aria-hidden className="flex size-7 items-center justify-center rounded-control bg-brand text-body-sm font-semibold text-brand-fg">T</span>
-                    <span className="text-title-sm tracking-[-0.02em] text-fg">TrafficClaw</span>
+                    <BrandMark size={28} />
+                    <Wordmark />
                 </div>
                 {children}
             </div>
