@@ -12,6 +12,8 @@
  * 3. Seeds sample records through the app's own API (annotations, goals,
  *    funnel, custom dashboard, share link, embed token, leaderboard entry)
  *    once per instance, and records their ids in <instance>/seed.json.
+ *    For the demo user it also seeds a populated public leaderboard (15 listings,
+ *    see seed-leaderboard.mjs; skip with --no-board).
  * 4. Writes a Playwright storageState to <instance>/state.json
  *    (state-demo2.json / state-admin.json for the other users).
  *
@@ -44,18 +46,19 @@ const USERS = {
 
 function usage(msg) {
     if (msg) console.error(`login.mjs: ${msg}`);
-    console.error('usage: node scripts/dev/login.mjs <webPort> [--user demo|demo2|admin] [--no-seed] [--reseed]');
+    console.error('usage: node scripts/dev/login.mjs <webPort> [--user demo|demo2|admin] [--no-seed] [--reseed] [--no-board]');
     process.exit(2);
 }
 
 function parseArgs(argv) {
-    const out = { port: null, user: 'demo', seed: true, reseed: false };
+    const out = { port: null, user: 'demo', seed: true, reseed: false, board: true };
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
         if (a === '--user') out.user = argv[++i];
         else if (a.startsWith('--user=')) out.user = a.slice(7);
         else if (a === '--no-seed') out.seed = false;
         else if (a === '--reseed') out.reseed = true;
+        else if (a === '--no-board') out.board = false;
         else if (/^\d+$/.test(a) && !out.port) out.port = Number(a);
         else usage(`unknown argument ${a}`);
     }
@@ -181,6 +184,18 @@ async function main() {
     if (args.seed && (args.reseed || !seed[args.user])) {
         seed[args.user] = await seedRecords(webUrl, cookieHeader, user, args.user, { url: adminUrl, headers: adminHeaders });
         fs.writeFileSync(seedFile, JSON.stringify(seed, null, 2));
+    }
+
+    // 4b. A populated public leaderboard (once per instance, after the demo user's own records).
+    const boardMarker = path.join(inst.dir, 'leaderboard-seeded');
+    if (args.seed && args.board && args.user === 'demo' && (args.reseed || !fs.existsSync(boardMarker))) {
+        try {
+            const { seedLeaderboard } = await import('./seed-leaderboard.mjs');
+            await seedLeaderboard(args.port, { quiet: true });
+            fs.writeFileSync(boardMarker, new Date().toISOString());
+        } catch (err) {
+            console.warn(`[login] leaderboard seed failed: ${err.message}`);
+        }
     }
 
     // 5. Playwright storageState.

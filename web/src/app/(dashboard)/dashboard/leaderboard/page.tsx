@@ -1,17 +1,15 @@
-'use client';
+import type { Metadata } from 'next';
 
-import AdSlotRequestsInbox from '../settings/AdSlotRequestsInbox';
-import LeaderboardOptIn from '../settings/LeaderboardOptIn';
+import MyLeaderboard from '@/components/leaderboard/app/MyLeaderboard';
+import { SITE_ORIGIN } from '@/lib/leaderboard/constants';
+
+export const metadata: Metadata = { title: 'Leaderboard' };
 
 /**
- * My leaderboard profile (DESIGN 5.12). For now: the existing opt-in, ad slots
- * and sponsor requests from Settings. The leaderboard stream rebuilds this page.
+ * My public profiles (DESIGN 5.12): join a site, verification and re-check, edit the profile,
+ * privacy, "open to" offers and the inbox, ad slots, badge and widget.
  */
 export default function MyLeaderboardPage() {
-    return (
-        <div className="space-y-6">
-            <LeaderboardOptIn />
-            <AdSlotRequestsInbox />
-        </div>
-    );
+    // SITE_ORIGIN is read on the server (NEXTAUTH_URL) and passed down: client bundles cannot see it.
+    return <MyLeaderboard origin={SITE_ORIGIN} />;
 }

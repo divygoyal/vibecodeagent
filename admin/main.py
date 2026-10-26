@@ -38,6 +38,9 @@ from services.github_app_tokens import (
     invalidate as github_app_invalidate_token,
 )
 from services import brevo as brevo_service
+import leaderboard_core as lb_core
+import leaderboard_v3 as lb_v3
+from models import LeaderboardProfile, LeaderboardDaily, LeaderboardRangeStat, LeaderboardInquiry
 from security.github_app_jwt import is_configured as github_app_is_configured
 from docker_manager import docker_manager
 from mcp_api import build_mcp_router, ensure_mcp_schema, delete_user_mcp_rows
@@ -312,6 +315,10 @@ async def init_db():
 
         # 019_add_mcp_oauth.sql — hosted MCP server (Connect AI). See mcp_api.py.
         await ensure_mcp_schema(conn)
+        # 021_leaderboard_v3.sql: profiles (verification + privacy), daily series,
+        # range stats, inquiries. Additive; existing rows are interpreted by
+        # leaderboard_core when they have no profile row.
+        await lb_v3.ensure_schema(conn)
 
 
 async def get_db():
@@ -3519,52 +3526,42 @@ async def get_leaderboard_entry_detail(
     id_or_slug: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Public endpoint — get a single leaderboard entry's full details.
+    """Public endpoint — a single leaderboard entry's details (pre-v3 shape).
 
-    Accepts either a numeric id (legacy `/leaderboard/4`) or the new slug
-    (`/leaderboard/antigravity-codes-a3f9b2`). Numeric IDs win on the rare
-    name-collision where someone has a slug like "5", since the `.isdigit()`
-    branch checks first.
-
-    Returns 404 for unverified entries so we don't expose pending /
-    host_mismatch listings via direct URL access. The owner can still preview
-    their entry from /dashboard/settings before it's verified.
+    Accepts either a numeric id (legacy `/leaderboard/4`) or the slug. v3 changes:
+    the owner's privacy settings are applied to every number and audience
+    section, `ga_property_id` and `contact_email` are never returned, and entries
+    that are paused or whose ownership is not proven (see leaderboard_core) are 404.
+    New code should use /api/lb/profile/{id_or_slug}.
     """
-    base_filter = (
-        (LeaderboardEntry.is_active == True)
-        & or_(
-            LeaderboardEntry.verification_status == "verified",
-            LeaderboardEntry.is_verified == True,
-        )
-    )
     if id_or_slug.isdigit():
-        stmt = select(LeaderboardEntry).where(
-            LeaderboardEntry.id == int(id_or_slug),
-            base_filter,
-        )
+        stmt = select(LeaderboardEntry).where(LeaderboardEntry.id == int(id_or_slug))
     else:
-        stmt = select(LeaderboardEntry).where(
-            LeaderboardEntry.slug == id_or_slug,
-            base_filter,
-        )
-    result = await db.execute(stmt)
-    entry = result.scalar_one_or_none()
+        stmt = select(LeaderboardEntry).where(LeaderboardEntry.slug == id_or_slug)
+    entry = (await db.execute(stmt)).scalar_one_or_none()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
-    # Fetch up to 30 days of history for the sparkline.
-    history_result = await db.execute(
-        select(LeaderboardStatsHistory)
-        .where(LeaderboardStatsHistory.entry_id == entry.id)
-        .order_by(LeaderboardStatsHistory.recorded_on.desc())
-        .limit(30)
-    )
-    history_rows = list(reversed(history_result.scalars().all()))
+    ed = lb_v3.entry_dict(entry)
+    prof_row = (await db.execute(select(LeaderboardProfile).where(LeaderboardProfile.entry_id == entry.id))).scalar_one_or_none()
+    pd_ = lb_v3.profile_dict(prof_row)
+    if not lb_core.is_public_ranked(ed, pd_):
+        raise HTTPException(status_code=404, detail="Entry not found")
+    settings = lb_core.settings_for(pd_, ed)
+    privacy = settings["privacy"]
+    level = lb_core.effective_level(ed, pd_)
 
-    # Ad slots the publisher is currently selling. Paused slots are withheld so
-    # a buyer never sees something that isn't actually on the market. Prices are
-    # verbatim publisher input — nothing here is derived from the traffic
-    # figures alongside them.
+    # Up to 30 days of history for the sparkline, only when visitors are public.
+    history_rows = []
+    if privacy["metrics"]["visitors"] == lb_core.VIS_EXACT:
+        history_result = await db.execute(
+            select(LeaderboardStatsHistory)
+            .where(LeaderboardStatsHistory.entry_id == entry.id)
+            .order_by(LeaderboardStatsHistory.recorded_on.desc())
+            .limit(30)
+        )
+        history_rows = list(reversed(history_result.scalars().all()))
+
     slots_result = await db.execute(
         select(AdSlot)
         .where(AdSlot.entry_id == entry.id, AdSlot.is_active == True)
@@ -3575,12 +3572,29 @@ async def get_leaderboard_entry_detail(
     audience_row = (
         await db.execute(select(LeaderboardAudience).where(LeaderboardAudience.entry_id == entry.id))
     ).scalar_one_or_none()
+    audience = _serialize_audience(audience_row)
+    if audience is not None:
+        # Same section toggles and count rules as /api/lb/profile.
+        shown = lb_core.public_breakdowns(audience, privacy)
+        audience = {
+            "countries": shown.get("countries"),
+            "channels": shown.get("channels"),
+            "devices": shown.get("devices"),
+            "top_pages": shown.get("pages"),
+            "cities": None,
+            "top_queries": shown.get("queries"),
+            "topics": audience.get("topics") if (privacy["sections"]["queries"] or privacy["sections"]["pages"]) else None,
+            "demographics": None,
+            "gsc_site_url": None,
+            "data_window": audience.get("data_window"),
+            "refreshed_at": audience.get("refreshed_at"),
+        }
 
     return {
         "id": entry.id,
         "slug": entry.slug,
         "ad_slots": ad_slots,
-        "audience": _serialize_audience(audience_row),
+        "audience": audience,
         "startup_name": entry.startup_name,
         "description": entry.description,
         "website_url": entry.website_url,
@@ -3588,18 +3602,13 @@ async def get_leaderboard_entry_detail(
         "category": entry.category,
         "mrr_range": entry.mrr_range,
         "looking_for": json.loads(entry.looking_for) if entry.looking_for else [],
+        "open_to": settings["open_to"],
         "twitter_handle": entry.twitter_handle,
         "founder_name": entry.founder_name,
-        "contact_email": entry.contact_email,
-        "ga_property_id": entry.ga_property_id,
-        "monthly_visitors": entry.monthly_visitors,
-        "monthly_pageviews": entry.monthly_pageviews,
-        "engagement_rate": entry.engagement_rate,
-        "bounce_rate": entry.bounce_rate,
-        "avg_session_duration": entry.avg_session_duration,
-        "visitor_trend": entry.visitor_trend,
-        "is_verified": entry.is_verified,
-        "verification_status": entry.verification_status or ("verified" if entry.is_verified else "pending"),
+        **lb_core.legacy_public_fields(ed, privacy),
+        "is_verified": lb_core.is_ranked(level),
+        "verification_level": level["level"],
+        "verification_status": "verified" if lb_core.is_ranked(level) else "pending",
         "verified_host": entry.verified_host,
         "primary_country": entry.primary_country,
         "last_refreshed": entry.last_refreshed.isoformat() if entry.last_refreshed else None,
@@ -3777,12 +3786,22 @@ async def list_sponsor_inventory(
     entry_q = (
         select(LeaderboardEntry)
         .where(LeaderboardEntry.is_active == True)
-        .where(or_(LeaderboardEntry.verification_status == "verified", LeaderboardEntry.is_verified == True))
         .where(LeaderboardEntry.monthly_visitors > 0)
     )
     if category and category != "all":
         entry_q = entry_q.where(LeaderboardEntry.category == category)
-    entries = {e.id: e for e in (await db.execute(entry_q)).scalars().all()}
+    candidates = (await db.execute(entry_q)).scalars().all()
+    # v3: only listed (not paused) entries whose ownership is proven, with the
+    # owner's privacy settings applied to every number below.
+    profiles = {p.entry_id: lb_v3.profile_dict(p) for p in (await db.execute(select(LeaderboardProfile))).scalars().all()}
+    entries = {}
+    privacy_by_entry: Dict[int, dict] = {}
+    for e in candidates:
+        ed = lb_v3.entry_dict(e)
+        pd_ = profiles.get(e.id)
+        if lb_core.is_public_ranked(ed, pd_):
+            entries[e.id] = e
+            privacy_by_entry[e.id] = lb_core.settings_for(pd_, ed)["privacy"]
     if not entries:
         return {"slots": [], "total": 0, "sites": 0}
 
@@ -3810,26 +3829,26 @@ async def list_sponsor_inventory(
             "website_url": e.website_url,
             "logo_url": e.logo_url,
             "category": e.category,
-            "monthly_visitors": e.monthly_visitors or 0,
-            "monthly_pageviews": e.monthly_pageviews or 0,
-            "engagement_rate": e.engagement_rate or 0,
-            "visitor_trend": e.visitor_trend or 0,
+            **lb_core.legacy_public_fields(lb_v3.entry_dict(e), privacy_by_entry[e.id]),
             "primary_country": e.primary_country,
-            "verification_status": e.verification_status or ("verified" if e.is_verified else "pending"),
+            "verification_status": "verified",
             "last_refreshed": e.last_refreshed.isoformat() if e.last_refreshed else None,
-            "topic_labels": _topic_labels(audience_by_entry.get(e.id)),
+            "topic_labels": lb_core.public_topics(_serialize_audience(audience_by_entry.get(e.id)), privacy_by_entry[e.id]),
+            "_sort_visitors": (e.monthly_visitors or 0) if privacy_by_entry[e.id]["metrics"]["visitors"] != lb_core.VIS_HIDDEN else 0,
         }
 
     items = [{**_serialize_ad_slot(s), "entry": entry_summary(entries[s.entry_id])} for s in slots]
-
+    # Sorting by traffic never reveals it: hidden visitors sort as zero.
     if sort == "price_asc":
-        items.sort(key=lambda i: (i["price_cents"], -i["entry"]["monthly_visitors"]))
+        items.sort(key=lambda i: (i["price_cents"], -i["entry"]["_sort_visitors"]))
     elif sort == "price_desc":
-        items.sort(key=lambda i: (-i["price_cents"], -i["entry"]["monthly_visitors"]))
+        items.sort(key=lambda i: (-i["price_cents"], -i["entry"]["_sort_visitors"]))
     elif sort == "newest":
         items.sort(key=lambda i: i["created_at"] or "", reverse=True)
     else:
-        items.sort(key=lambda i: (-i["entry"]["monthly_visitors"], i["price_cents"]))
+        items.sort(key=lambda i: (-i["entry"]["_sort_visitors"], i["price_cents"]))
+    for i in items:
+        i["entry"].pop("_sort_visitors", None)
 
     return {"slots": items, "total": len(items), "sites": len(used_entry_ids)}
 
@@ -3846,38 +3865,22 @@ async def list_leaderboard(
     page_size: int = 25,
     db: AsyncSession = Depends(get_db),
 ):
-    """Public endpoint — list active leaderboard entries with filters, search and pagination.
+    """Public endpoint — list active leaderboard entries (pre-v3 shape).
 
-    Returns `{ entries, total, page, pageSize }`. Sort modes:
-        traffic     — by monthly_visitors desc (default)
-        engagement  — by engagement_rate desc
-        movers      — by visitor_trend desc (positive growth first)
-        newest      — by created_at desc
-
-    `sponsorable=true` restricts to entries with at least one active ad slot.
-    Each entry carries `ad_slot_count`, `min_slot_price_cents` (lowest
-    publisher-set price, or null) and `topic_labels` for the card badge.
+    Returns `{ entries, total, page, pageSize }`. Sort modes: traffic (default),
+    engagement, movers, newest. v3 changes: only listed entries whose ownership is
+    proven appear, and every number follows the owner's privacy settings (hidden or
+    banded numbers are null, and hidden entries sort last, so order reveals nothing
+    the numbers do not). New code should use /api/lb/board.
     """
     page = max(page, 1)
     page_size = max(min(page_size, 100), 1)
 
-    # Public board only shows VERIFIED entries (GA4 property defaultUri matched
-    # the claimed website host, or legacy is_verified=True). Pending /
-    # host_mismatch / failed entries stay invisible to the world; the owner can
-    # still see them in their settings panel and re-verify.
     base = (
         select(LeaderboardEntry)
         .where(LeaderboardEntry.is_active == True)
-        .where(or_(
-            LeaderboardEntry.verification_status == "verified",
-            LeaderboardEntry.is_verified == True,
-        ))
-        # Drop entries that have never received GA4 stats (visitors == 0). Most
-        # of these are stale / abandoned signups; without this guard a verified
-        # entry whose cron never ran would still rank "first" with all zeros.
         .where(LeaderboardEntry.monthly_visitors > 0)
     )
-
     if category and category != "all":
         base = base.where(LeaderboardEntry.category == category)
     if mrr and mrr != "all":
@@ -3895,23 +3898,33 @@ async def list_leaderboard(
             LeaderboardEntry.id.in_(select(AdSlot.entry_id).where(AdSlot.is_active == True))
         )
 
+    profiles = {p.entry_id: lb_v3.profile_dict(p) for p in (await db.execute(select(LeaderboardProfile))).scalars().all()}
+    visible = []
+    for e in (await db.execute(base)).scalars().all():
+        ed = lb_v3.entry_dict(e)
+        pd_ = profiles.get(e.id)
+        if lb_core.is_public_ranked(ed, pd_):
+            visible.append((e, ed, lb_core.settings_for(pd_, ed)))
+
+    def key_value(item, field: str, metric: str):
+        e, ed, st = item
+        if st["privacy"]["metrics"][metric] == lb_core.VIS_HIDDEN:
+            return None
+        return ed.get(field) or 0
+
     if sort == "engagement":
-        ordered = base.order_by(LeaderboardEntry.engagement_rate.desc())
+        visible.sort(key=lambda it: lb_core.sort_key_none_last(key_value(it, "engagement_rate", "engagement")))
     elif sort == "movers":
-        ordered = base.order_by(LeaderboardEntry.visitor_trend.desc())
+        visible.sort(key=lambda it: lb_core.sort_key_none_last(key_value(it, "visitor_trend", "visitors")))
     elif sort == "newest":
-        ordered = base.order_by(LeaderboardEntry.created_at.desc())
+        visible.sort(key=lambda it: it[0].created_at or datetime.min, reverse=True)
     else:
-        ordered = base.order_by(LeaderboardEntry.monthly_visitors.desc())
+        visible.sort(key=lambda it: lb_core.sort_key_none_last(key_value(it, "monthly_visitors", "visitors")))
 
-    count_result = await db.execute(select(func.count()).select_from(base.subquery()))
-    total = count_result.scalar_one() or 0
+    total = len(visible)
+    entries = [it[0] for it in visible[(page - 1) * page_size: page * page_size]]
+    settings_by_id = {it[0].id: it[2] for it in visible}
 
-    paginated = ordered.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(paginated)
-    entries = result.scalars().all()
-
-    # Per-card sponsorship badge + topic labels, batched for the page.
     slot_count_by_entry: Dict[int, int] = {}
     min_price_by_entry: Dict[int, int] = {}
     audience_by_entry: Dict[int, LeaderboardAudience] = {}
@@ -3944,20 +3957,17 @@ async def list_leaderboard(
                 "category": e.category,
                 "mrr_range": e.mrr_range,
                 "looking_for": json.loads(e.looking_for) if e.looking_for else [],
+                "open_to": settings_by_id[e.id]["open_to"],
                 "twitter_handle": e.twitter_handle,
-                "monthly_visitors": e.monthly_visitors,
-                "monthly_pageviews": e.monthly_pageviews,
-                "engagement_rate": e.engagement_rate,
-                "bounce_rate": e.bounce_rate,
-                "visitor_trend": e.visitor_trend,
-                "is_verified": e.is_verified,
-                "verification_status": e.verification_status or ("verified" if e.is_verified else "pending"),
+                **lb_core.legacy_public_fields(lb_v3.entry_dict(e), settings_by_id[e.id]["privacy"]),
+                "is_verified": True,
+                "verification_status": "verified",
                 "primary_country": e.primary_country,
                 "last_refreshed": e.last_refreshed.isoformat() if e.last_refreshed else None,
                 "created_at": e.created_at.isoformat() if e.created_at else None,
                 "ad_slot_count": slot_count_by_entry.get(e.id, 0),
                 "min_slot_price_cents": min_price_by_entry.get(e.id),
-                "topic_labels": _topic_labels(audience_by_entry.get(e.id)),
+                "topic_labels": lb_core.public_topics(_serialize_audience(audience_by_entry.get(e.id)), settings_by_id[e.id]["privacy"]),
             }
             for e in entries
         ],
@@ -4215,6 +4225,22 @@ async def join_leaderboard_for_user(
             detail=f"Database write failed (likely missing migration): {type(exc).__name__}: {str(exc)[:200]}",
         )
 
+    if is_new:
+        # v3: a new listing starts with the conservative privacy defaults (visitors and
+        # clicks exact, everything else hidden) and is not ranked until a check passes.
+        try:
+            db.add(LeaderboardProfile(
+                entry_id=entry.id,
+                verification_level="none",
+                privacy_json=json.dumps(lb_core.DEFAULT_PRIVACY),
+                open_to_json=json.dumps(lb_core.legacy_open_to(entry.looking_for)),
+                is_paused=False,
+            ))
+            await db.commit()
+        except Exception as exc:
+            await db.rollback()
+            print(f"[join] could not create leaderboard profile row: {type(exc).__name__}: {exc}")
+
     return {
         "success": True,
         "id": entry.id,
@@ -4349,6 +4375,16 @@ async def superadmin_leaderboard_action(
         raise HTTPException(status_code=404, detail="Entry not found")
 
     action = body.action
+    if action in ("verify", "unverify"):
+        # v3: moderation writes the verification level too (manual = never auto-downgraded).
+        prof = (await db.execute(select(LeaderboardProfile).where(LeaderboardProfile.entry_id == entry.id))).scalar_one_or_none()
+        if prof is None:
+            prof = LeaderboardProfile(entry_id=entry.id, privacy_json=json.dumps(lb_core.settings_for(None, lb_v3.entry_dict(entry))["privacy"]), open_to_json=json.dumps(lb_core.legacy_open_to(entry.looking_for)))
+            db.add(prof)
+        prof.verification_level = "owner" if action == "verify" else "none"
+        prof.verification_manual = action == "verify"
+        prof.verification_checked_at = datetime.utcnow()
+        prof.verification_detail = json.dumps({"manual": True, "by": "superadmin", "action": action})
     if action == "verify":
         entry.verification_status = "verified"
         entry.is_verified = True
@@ -4366,6 +4402,8 @@ async def superadmin_leaderboard_action(
                 LeaderboardStatsHistory.entry_id == entry.id
             )
         )
+        for v3_model in (LeaderboardProfile, LeaderboardDaily, LeaderboardRangeStat, LeaderboardInquiry):
+            await db.execute(delete(v3_model).where(v3_model.entry_id == entry.id))
         await db.delete(entry)
         await db.commit()
         return {"success": True, "deleted": entry_id}
@@ -4436,8 +4474,12 @@ async def refresh_leaderboard_stats(
     )
     entries = result.scalars().all()
 
+    profiles = {p.entry_id: p for p in (await db.execute(select(LeaderboardProfile))).scalars().all()}
     refresh_list = []
     for entry in entries:
+        profile = profiles.get(entry.id)
+        if profile is not None and profile.is_paused:
+            continue  # paused listings are not refreshed; unpausing triggers a refresh
         # Get the user's Google OAuth credentials
         oauth_result = await db.execute(
             select(OAuthConnection).where(
@@ -4454,6 +4496,9 @@ async def refresh_leaderboard_stats(
                 "website_url": entry.website_url,
                 "access_token": oauth.access_token,
                 "refresh_token": oauth.refresh_token,
+                # v3 additions (older callers ignore unknown keys)
+                "gsc_site_url": profile.gsc_site_url if profile else None,
+                "verification_manual": bool(profile.verification_manual) if profile else False,
             })
 
     return {"entries": refresh_list, "total": len(refresh_list)}
@@ -4918,6 +4963,17 @@ async def update_ad_slot_request(
     await db.commit()
     await db.refresh(req)
     return {"success": True, "request": _serialize_ad_slot_request(req)}
+
+
+# ============= Leaderboard v3 router (/api/lb/*) =============
+app.include_router(lb_v3.build_router(
+    get_db=get_db,
+    verify_admin_key=verify_admin_key,
+    get_user_by_identifier=get_user_by_identifier,
+    serialize_ad_slot=_serialize_ad_slot,
+    serialize_ad_slot_request=_serialize_ad_slot_request,
+    load_owned_entry=_load_owned_entry,
+))
 
 
 # ============= Annotations =============

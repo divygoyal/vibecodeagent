@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { getValidAccessToken } from '@/lib/googleApi';
-import { verifyPropertyDomain } from '@/lib/leaderboardVerify';
+import { checkOwnership, type OwnershipCheck } from '@/lib/leaderboardVerify';
+import { refreshEntry, storeVerification } from '@/lib/leaderboard/refresh';
 import { isBlockedUrl } from '@/lib/urlValidation';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
-const GA_DATA_BASE = 'https://analyticsdata.googleapis.com/v1beta';
 
 type JoinRateEntry = { timestamps: number[] };
 const JOIN_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
@@ -69,169 +68,6 @@ const SPAM_TERMS = /(viagra|crypto-?(moon|pump)|free-?bitcoin|adult-?cam|porn-?h
 
 export const dynamic = 'force-dynamic';
 
-function cleanPropertyId(id: string): string {
-    if (!id.startsWith('properties/') && /^\d+$/.test(id)) {
-        return `properties/${id}`;
-    }
-    return id;
-}
-
-/**
- * Fetch GA4 stats and update a leaderboard entry. Used right after join so
- * the new listing has real numbers without waiting for the daily cron.
- */
-async function refreshEntryStats(
-    entryId: number,
-    gaPropertyId: string,
-    googleAccessToken: string,
-    googleRefreshToken?: string,
-) {
-    try {
-        const token = await getValidAccessToken(googleAccessToken, googleRefreshToken);
-        const pid = cleanPropertyId(gaPropertyId);
-
-        const [currentRes, prevRes] = await Promise.all([
-            fetch(`${GA_DATA_BASE}/${pid}:runReport`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    dateRanges: [{ startDate: '28daysAgo', endDate: 'today' }],
-                    metrics: [
-                        { name: 'activeUsers' },
-                        { name: 'screenPageViews' },
-                        { name: 'engagementRate' },
-                        { name: 'bounceRate' },
-                        { name: 'averageSessionDuration' },
-                    ],
-                }),
-                signal: AbortSignal.timeout(15000),
-            }),
-            fetch(`${GA_DATA_BASE}/${pid}:runReport`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    dateRanges: [{ startDate: '56daysAgo', endDate: '29daysAgo' }],
-                    metrics: [{ name: 'activeUsers' }],
-                }),
-                signal: AbortSignal.timeout(15000),
-            }),
-        ]);
-
-        if (!currentRes.ok) {
-            console.error('[Leaderboard Instant] GA4 API error:', await currentRes.text());
-            return null;
-        }
-
-        const currentData = await currentRes.json();
-        const prevData = prevRes.ok ? await prevRes.json() : null;
-        const row = currentData.rows?.[0];
-        if (!row) return null;
-
-        const mv = row.metricValues;
-        const currentUsers = parseInt(mv[0].value) || 0;
-        const prevUsers = prevData?.rows?.[0]?.metricValues?.[0]?.value
-            ? parseInt(prevData.rows[0].metricValues[0].value)
-            : 0;
-        const trend = prevUsers > 0
-            ? +((currentUsers - prevUsers) / prevUsers * 100).toFixed(1)
-            : 0;
-
-        const stats = {
-            monthly_visitors: currentUsers,
-            monthly_pageviews: parseInt(mv[1].value) || 0,
-            engagement_rate: +((parseFloat(mv[2].value) || 0) * 100).toFixed(1),
-            bounce_rate: +((parseFloat(mv[3].value) || 0) * 100).toFixed(1),
-            avg_session_duration: Math.round(parseFloat(mv[4].value) || 0),
-            visitor_trend: trend,
-        };
-
-        const updateRes = await fetch(`${ADMIN_API_URL}/api/leaderboard/${entryId}/stats`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
-            body: JSON.stringify(stats),
-        });
-
-        // Backfill the per-day history sparkline so the chart renders 30 real
-        // days the moment a user joins, instead of being a flat one-point line
-        // until the daily cron has run for a month. Best-effort — failures
-        // here don't block the join because the cron will eventually catch up.
-        backfillHistory(entryId, pid, token).catch((err) =>
-            console.error('[Leaderboard Instant] History backfill failed:', err),
-        );
-
-        return updateRes.ok ? stats : stats;
-    } catch (err) {
-        console.error('[Leaderboard Instant] Stats refresh failed:', err);
-        return null;
-    }
-}
-
-/**
- * Pull the last 30 days of per-day GA4 metrics and bulk-upsert them into
- * leaderboard_stats_history so the visitor sparkline has real points right
- * away. Idempotent: re-runs overwrite same-date rows on the admin side.
- */
-async function backfillHistory(
-    entryId: number,
-    cleanedPropertyId: string,
-    token: string,
-) {
-    const reportRes = await fetch(`${GA_DATA_BASE}/${cleanedPropertyId}:runReport`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            dateRanges: [{ startDate: '29daysAgo', endDate: 'today' }],
-            dimensions: [{ name: 'date' }],
-            metrics: [
-                { name: 'activeUsers' },
-                { name: 'screenPageViews' },
-                { name: 'engagementRate' },
-                { name: 'bounceRate' },
-                { name: 'averageSessionDuration' },
-            ],
-            orderBys: [{ dimension: { dimensionName: 'date' } }],
-            limit: 60,
-        }),
-        signal: AbortSignal.timeout(15000),
-    });
-
-    if (!reportRes.ok) {
-        console.error('[Leaderboard Backfill] GA4 daily-series error:', await reportRes.text());
-        return;
-    }
-
-    type GA4Row = { dimensionValues?: Array<{ value: string }>; metricValues?: Array<{ value: string }> };
-    const data = (await reportRes.json()) as { rows?: GA4Row[] };
-    const rows = data.rows || [];
-
-    const days = rows.map((r) => {
-        const date = r.dimensionValues?.[0]?.value || '';
-        const m = r.metricValues || [];
-        return {
-            date,
-            monthly_visitors: parseInt(m[0]?.value || '0', 10) || 0,
-            monthly_pageviews: parseInt(m[1]?.value || '0', 10) || 0,
-            engagement_rate: +(((parseFloat(m[2]?.value || '0') || 0) * 100).toFixed(1)),
-            bounce_rate: +(((parseFloat(m[3]?.value || '0') || 0) * 100).toFixed(1)),
-            avg_session_duration: Math.round(parseFloat(m[4]?.value || '0') || 0),
-        };
-    });
-
-    if (days.length === 0) return;
-
-    const backfillRes = await fetch(`${ADMIN_API_URL}/api/leaderboard/${entryId}/history/backfill`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
-        body: JSON.stringify({ days }),
-    });
-
-    if (backfillRes.ok) {
-        console.log(`[Leaderboard Backfill] ✓ Entry ${entryId}: ${days.length} days seeded`);
-    } else {
-        console.error(`[Leaderboard Backfill] ✗ Entry ${entryId}: admin returned ${backfillRes.status}`);
-    }
-}
-
 type RawEntryBody = {
     entry_id?: number;
     startup_name?: string;
@@ -258,7 +94,7 @@ async function preparePayload(
     googleAccessToken: string | undefined,
     googleRefreshToken: string | undefined,
 ): Promise<
-    | { ok: true; payload: Record<string, unknown>; verifiedHost: string | null; verificationStatus: string }
+    | { ok: true; payload: Record<string, unknown>; verifiedHost: string | null; verificationStatus: string; outcome: OwnershipCheck | null }
     | { ok: false; response: NextResponse }
 > {
     // Accept bare hostnames (`antigravity.codes`) AND fully-qualified URLs
@@ -299,26 +135,22 @@ async function preparePayload(
         return { ok: false, response: NextResponse.json({ error: 'Description rejected by content filter.' }, { status: 400 }) };
     }
 
-    let verificationStatus: 'verified' | 'host_mismatch' | 'no_web_stream' | 'no_website_url' | 'failed' | 'pending' = 'pending';
+    // v3: ownership is proven through Search Console (owner / full user), with the GA4
+    // data stream as a second signal. A failed check no longer rejects the request:
+    // the listing is saved as "Pending verification" with fix-it steps.
+    let verificationStatus: 'verified' | 'pending' = 'pending';
     let verifiedHost: string | null = null;
+    let outcome: OwnershipCheck | null = null;
     if (rawBody.ga_property_id && websiteUrl && googleAccessToken) {
-        const verify = await verifyPropertyDomain(
-            rawBody.ga_property_id,
+        outcome = await checkOwnership({
             websiteUrl,
-            googleAccessToken,
-            googleRefreshToken,
-        );
-        verificationStatus = verify.status;
-        if (verify.ok) {
-            verifiedHost = verify.matchedHost;
-        } else if (verify.status === 'host_mismatch' || verify.status === 'no_web_stream') {
-            return {
-                ok: false,
-                response: NextResponse.json(
-                    { error: verify.reason, status: verify.status, expectedHost: verify.expectedHost, actualHosts: verify.actualHosts },
-                    { status: 400 },
-                ),
-            };
+            gaPropertyId: rawBody.ga_property_id,
+            accessToken: googleAccessToken,
+            refreshToken: googleRefreshToken,
+        });
+        if (outcome.level === 'owner') {
+            verificationStatus = 'verified';
+            verifiedHost = outcome.verifiedHost;
         }
     }
 
@@ -340,7 +172,7 @@ async function preparePayload(
     };
     delete payload.entry_id;
 
-    return { ok: true, payload, verifiedHost, verificationStatus };
+    return { ok: true, payload, verifiedHost, verificationStatus, outcome };
 }
 
 /**
@@ -456,21 +288,35 @@ export async function POST(req: Request) {
         // 429s observed in production).
         recordJoinSuccess(String(userId));
 
-        // Stats refresh + history backfill are nice-to-haves — they should not
-        // block the response or risk a proxy timeout. Fire-and-forget; the
-        // daily cron will catch up if anything fails here.
-        if (data.id && rawBody.ga_property_id && googleAccessToken) {
+        // Store the verification result, then pull the numbers (7d / 28d / 3m, daily series,
+        // audience). Fire-and-forget so the response is not held up; the daily cron catches up.
+        if (data.id && rawBody.ga_property_id) {
             const entryId = data.id;
-            const propertyId = rawBody.ga_property_id;
-            void refreshEntryStats(entryId, propertyId, googleAccessToken, googleRefreshToken).catch(
-                (err) => console.error('[Leaderboard Join] Background stats refresh failed:', err),
-            );
+            const outcome = prepared.outcome;
+            void (async () => {
+                if (outcome) await storeVerification(entryId, outcome);
+                await refreshEntry({
+                    entryId,
+                    gaPropertyId: String(rawBody.ga_property_id),
+                    websiteUrl: String(prepared.payload.website_url || ''),
+                    accessToken: googleAccessToken,
+                    refreshToken: googleRefreshToken,
+                    skipVerify: true,
+                    gscSiteUrl: outcome?.gscSiteUrl ?? null,
+                });
+            })().catch((err) => console.error('[Leaderboard Join] Background refresh failed:', err));
         }
 
         return NextResponse.json({
             ...data,
             stats: null,
-            verification: { status: prepared.verificationStatus, verifiedHost: prepared.verifiedHost },
+            verification: {
+                status: prepared.verificationStatus,
+                verifiedHost: prepared.verifiedHost,
+                level: prepared.outcome?.level ?? 'none',
+                message: prepared.outcome?.message ?? null,
+                fix: prepared.outcome?.fix ?? [],
+            },
         });
     } catch (err) {
         console.error('Leaderboard join error:', err);
@@ -566,6 +412,9 @@ export async function PUT(req: Request) {
         let data;
         try { data = JSON.parse(text); } catch {
             return NextResponse.json({ error: 'Admin API returned invalid response' }, { status: 502 });
+        }
+        if (res.ok && prepared.outcome) {
+            await storeVerification(entryId, prepared.outcome);
         }
         return NextResponse.json(data, { status: res.status });
     } catch (err) {

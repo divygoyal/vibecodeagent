@@ -86,7 +86,6 @@ export const LEGACY_ROUTE_PREFIXES: string[] = [
     '/dashboard/plan',
     '/dashboard/support',
     '/dashboard/docs',
-    '/dashboard/leaderboard',
     '/dashboard/setup',
     '/dashboard/weekly',
     '/dashboard/analytics',
