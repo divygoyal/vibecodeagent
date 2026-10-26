@@ -31,7 +31,7 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
     const description = 'Real Google Analytics and Search Console numbers from sites whose owners are verified in Search Console, checked daily. Rank by visitors, search clicks and growth.';
     const filtered = Boolean(first(sp.q) || first(sp.page) || first(sp.category) || sp.tab || sp.range);
     return {
-        title,
+        title: { absolute: title },
         description,
         alternates: { canonical: `${SITE_ORIGIN}/leaderboard` },
         // Filtered and search views are for people; the plain board is for search engines.

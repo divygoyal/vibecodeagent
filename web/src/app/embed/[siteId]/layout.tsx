@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-  title: `${BRAND_NAME} live visitors`,
+  title: { absolute: `${BRAND_NAME} live visitors` },
   description: `Real-time visitors, powered by ${BRAND_NAME}`,
 };
 

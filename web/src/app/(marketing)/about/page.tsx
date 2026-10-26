@@ -9,7 +9,7 @@ const TITLE = `About ${BRAND_NAME}`;
 const DESCRIPTION = `${BRAND_NAME} puts every site you own on one screen, free: Google Analytics 4 and Search Console in one portfolio, dashboards, a verified traffic leaderboard and a ChatGPT and Claude connector.`;
 
 export const metadata: Metadata = {
-    title: TITLE,
+    title: { absolute: TITLE },
     description: DESCRIPTION,
     alternates: { canonical: '/about' },
     openGraph: { title: `${TITLE} | ${BRAND_NAME}`, description: DESCRIPTION, url: '/about' },
