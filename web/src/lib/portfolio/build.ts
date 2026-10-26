@@ -333,7 +333,9 @@ export function buildPortfolio(snap: SnapshotData, opts: BuildOptions): Portfoli
 
     const sites: PortfolioSite[] = groups.map(({ key, gsc, ga4 }) => {
         const host = gsc ? normalizeHost(gsc.asset_id) : normalizeHost(ga4?.host ?? '');
-        const baseSlug = host || `ga4-${propertyNumber(ga4?.asset_id ?? 'unknown')}`;
+        // Same keys as the app's site directory (lib/sites/siteDirectory.ts): a GA4-only site is
+        // 'ga4-<number>' even when its stream has a host, so /dashboard/s/<slug> resolves.
+        const baseSlug = gsc ? host : `ga4-${propertyNumber(ga4?.asset_id ?? 'unknown')}`;
         const n = (slugCount.get(baseSlug) ?? 0) + 1;
         slugCount.set(baseSlug, n);
         const slug = n === 1 ? baseSlug : `${baseSlug}--${n}`;

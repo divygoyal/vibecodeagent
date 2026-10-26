@@ -112,7 +112,7 @@ export interface PortfolioSite {
     label: string;
     /** Short chip that tells apart sites sharing a host: "http", "www", "/blog", "domain". */
     variant: string | null;
-    /** URL segment for /dashboard/s/[slug] (host, "--2" on collisions). */
+    /** URL segment for /dashboard/s/[slug]: the host ("--2" on collisions), or "ga4-<number>" for a GA4-only site; same keys as lib/sites/siteDirectory.ts. */
     slug: string;
     /** GA4 display name when there is one, else the host. */
     name: string;

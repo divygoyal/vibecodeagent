@@ -87,3 +87,30 @@ test('portfolio cards, MCP list_sites and the site directory agree on the demo a
     assert.equal(fromPortfolio['properties/412300101'], 'sc-domain:acmeanalytics.example');
     assert.equal(fromPortfolio['properties/412300108'], null);
 });
+
+test('portfolio card slugs are the site directory route keys (QA-02: GA4-only cards resolve)', () => {
+    const portfolio = buildDemoPortfolio({ range: '28d' });
+    const inv = demoInventory();
+    const pairs = {};
+    for (const s of portfolio.sites) if (s.ga4) pairs[s.ga4.property] = s.gsc ? s.gsc.siteUrl : null;
+    const dir = buildSiteDirectory({
+        sites: inv.sites.map((s) => ({ siteUrl: s.siteUrl })),
+        properties: inv.properties.map((p) => ({ property: p.property, displayName: p.displayName })),
+        pairs,
+    });
+    const keyOf = (gscUrl, ga4) => dir.find((e) => (gscUrl ? e.gscSiteUrl === gscUrl : e.ga4PropertyId === ga4))?.host;
+    for (const s of portfolio.sites) {
+        assert.equal(keyOf(s.gsc?.siteUrl, s.ga4?.property), s.slug, `${s.label}: card slug ${s.slug}`);
+    }
+    assert.equal(portfolio.sites.find((s) => s.ga4?.property === 'properties/412300108').slug, 'ga4-412300108');
+});
+
+test('same-host order: the paired property keeps the plain key, then domain, then https', () => {
+    const dir = buildSiteDirectory({
+        sites: [{ siteUrl: 'http://a.com/' }, { siteUrl: 'sc-domain:a.com' }, { siteUrl: 'https://www.a.com/' }],
+        properties: [{ property: 'properties/5', displayName: 'Something else' }],
+        pairs: { 'properties/5': 'https://www.a.com/' },
+    });
+    const byUrl = Object.fromEntries(dir.filter((e) => e.gscSiteUrl).map((e) => [e.gscSiteUrl, e.host]));
+    assert.deepEqual(byUrl, { 'https://www.a.com/': 'a.com', 'sc-domain:a.com': 'a.com--2', 'http://a.com/': 'a.com--3' });
+});

@@ -18,7 +18,8 @@
  *
  * Route keys ([host] in /dashboard/s/[host]):
  *  - lowercase host without www ('acme.com');
- *  - a second property on the same host gets '--2', a third '--3';
+ *  - a second property on the same host gets '--2', a third '--3' (paired
+ *    first, then domain, then https: the portfolio's card slugs use the same order);
  *  - a GA4 property with no Search Console site gets 'ga4-<number>'.
  */
 import { normalizeHost, siteKind } from './pairing';
@@ -71,34 +72,27 @@ function hostLabel(host: string): string {
     return compact(parts.length > 1 ? parts.slice(0, -1).join('.') : host);
 }
 
-function rank(siteUrl: string): number {
+/** Search Console property order inside one host (same as the portfolio's slugs, lib/portfolio/build.ts). */
+function kindRank(siteUrl: string, paired: boolean): number {
+    if (paired) return 0;
+    if (siteKind(siteUrl) === 'domain') return 1;
+    if (siteUrl.startsWith('https://')) return 2;
+    return 4;
+}
+
+/** Preferred property for the name heuristic: domain, then https, then https://www., then http. */
+function heuristicRank(siteUrl: string): number {
     if (siteKind(siteUrl) === 'domain') return 0;
     if (siteUrl.startsWith('https://')) return siteUrl.includes('://www.') ? 2 : 1;
     return 3;
 }
 
 export function buildSiteDirectory({ sites, properties, pairs }: DirectoryInput): SiteEntry[] {
-    const sorted = [...sites]
-        .filter((s) => typeof s?.siteUrl === 'string' && s.siteUrl)
-        .sort((a, b) => rank(a.siteUrl) - rank(b.siteUrl) || a.siteUrl.localeCompare(b.siteUrl));
-
-    const used = new Map<string, number>();
-    const entries: SiteEntry[] = [];
-    for (const s of sorted) {
-        const host = normalizeHost(s.siteUrl);
-        if (!host) continue;
-        const n = (used.get(host) ?? 0) + 1;
-        used.set(host, n);
-        entries.push({
-            host: n === 1 ? host : `${host}--${n}`,
-            // A second property on the same host is labelled by its own URL ("http://acme.com").
-            label: n === 1 ? host : s.siteUrl.replace(/\/$/, ''),
-            gscSiteUrl: s.siteUrl,
-            gscKind: siteKind(s.siteUrl),
-            ga4PropertyId: null,
-            ga4Name: null,
-        });
-    }
+    const seenUrls = new Set<string>();
+    const gsc = sites
+        .filter((s) => typeof s?.siteUrl === 'string' && s.siteUrl && !seenUrls.has(s.siteUrl) && seenUrls.add(s.siteUrl))
+        .map((s) => ({ siteUrl: s.siteUrl, host: normalizeHost(s.siteUrl), ga4: null as { id: string; name: string } | null }))
+        .filter((x) => x.host);
 
     const props = properties
         .map((p) => ({ id: propId(p), name: p.displayName || '' }))
@@ -112,25 +106,29 @@ export function buildSiteDirectory({ sites, properties, pairs }: DirectoryInput)
         decided.add(p.id);
         const siteUrl = pairs[p.id];
         if (!siteUrl) continue;
-        const e = entries.find((x) => x.gscSiteUrl === siteUrl && !x.ga4PropertyId);
+        const e = gsc.find((x) => x.siteUrl === siteUrl && !x.ga4);
         if (e) {
-            e.ga4PropertyId = p.id;
-            e.ga4Name = p.name;
+            e.ga4 = { id: p.id, name: p.name };
             paired.add(p.id);
         }
     }
 
     // 2. Name heuristic for properties the store has not seen yet: best (longest) host
-    //    label contained in the display name, among sites the store has not paired.
+    //    label contained in the display name, on the preferred property of each host,
+    //    never on a site the store already paired.
     const storedSites = new Set(Object.values(pairs ?? {}).filter((v): v is string => Boolean(v)));
+    const preferred = new Map<string, (typeof gsc)[number]>();
+    for (const e of [...gsc].sort((a, b) => heuristicRank(a.siteUrl) - heuristicRank(b.siteUrl) || a.siteUrl.localeCompare(b.siteUrl))) {
+        if (!preferred.has(e.host)) preferred.set(e.host, e);
+    }
     for (const p of props) {
         if (paired.has(p.id) || decided.has(p.id)) continue;
         const name = compact(p.name);
         if (!name) continue;
-        let best: SiteEntry | null = null;
+        let best: (typeof gsc)[number] | null = null;
         let bestLen = 0;
-        for (const e of entries) {
-            if (e.ga4PropertyId || e.host.includes('--') || (e.gscSiteUrl && storedSites.has(e.gscSiteUrl))) continue;
+        for (const e of preferred.values()) {
+            if (e.ga4 || storedSites.has(e.siteUrl)) continue;
             const label = hostLabel(e.host);
             if (label.length >= 3 && name.includes(label) && label.length > bestLen) {
                 best = e;
@@ -138,13 +136,32 @@ export function buildSiteDirectory({ sites, properties, pairs }: DirectoryInput)
             }
         }
         if (best) {
-            best.ga4PropertyId = p.id;
-            best.ga4Name = p.name;
+            best.ga4 = { id: p.id, name: p.name };
             paired.add(p.id);
         }
     }
 
-    // 3. GA4-only properties.
+    // 3. Route keys, exactly like the portfolio's card slugs: per host the paired
+    //    property first, then domain, then https, then the rest ('--2', '--3' …).
+    const entries: SiteEntry[] = [];
+    const used = new Map<string, number>();
+    const ordered = [...gsc].sort((a, b) => kindRank(a.siteUrl, Boolean(a.ga4)) - kindRank(b.siteUrl, Boolean(b.ga4))
+        || `gsc:${a.siteUrl}`.localeCompare(`gsc:${b.siteUrl}`));
+    for (const e of ordered) {
+        const n = (used.get(e.host) ?? 0) + 1;
+        used.set(e.host, n);
+        entries.push({
+            host: n === 1 ? e.host : `${e.host}--${n}`,
+            // A second property on the same host is labelled by its own URL ("http://acme.com").
+            label: n === 1 ? e.host : e.siteUrl.replace(/\/$/, ''),
+            gscSiteUrl: e.siteUrl,
+            gscKind: siteKind(e.siteUrl),
+            ga4PropertyId: e.ga4?.id ?? null,
+            ga4Name: e.ga4?.name ?? null,
+        });
+    }
+
+    // 4. GA4-only properties: 'ga4-<number>' (the portfolio uses the same key).
     for (const p of props) {
         if (paired.has(p.id)) continue;
         const num = p.id.replace(/^properties\//, '');
