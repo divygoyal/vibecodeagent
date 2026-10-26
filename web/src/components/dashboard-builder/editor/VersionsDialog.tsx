@@ -11,7 +11,7 @@ import { useEditorStore } from '@/stores/dashboardEditorStore';
 import { fetchJson } from '../useWidgetData';
 
 export function VersionsDialog({ open, onOpenChange, dashboardId }: { open: boolean; onOpenChange: (o: boolean) => void; dashboardId: string }) {
-    const { data, isLoading } = useSWR<{ versions: Array<{ rev: number; label: string | null; createdAt: string | null }> }>(open ? `/api/dashboards/${dashboardId}/versions` : null, (u: string) => fetchJson(u));
+    const { data, isLoading } = useSWR<{ versions: Array<{ rev: number; label: string | null; createdAt: string | null }> }>(open ? `/api/dashboards/${dashboardId}/versions` : null, (u: string) => fetchJson<{ versions: Array<{ rev: number; label: string | null; createdAt: string | null }> }>(u));
     const current = useEditorStore((s) => s.rev);
     const restore = async (rev: number) => {
         const v = await fetchJson<{ doc: DashboardDocV2 }>(`/api/dashboards/${dashboardId}/versions?rev=${rev}`);
