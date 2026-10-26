@@ -7,9 +7,19 @@ Specs: /root/projects/tc-redesign-research/{DESIGN,PRODUCT}.md. Screenshots go t
 - 176a55f tokens.css, globals.css, styles/legacy.css, theme script (lib/themeScript.ts + lib/theme.ts),
   radix-ui 1.6.7 copied in (new dirs only, hard links untouched), lib/cn, lib/format (+tests),
   lib/metrics, lib/dateRange (+tests), `npm test` (node --test tests/*.test.mjs).
-- 7ea0a0b components/ui/* and components/charts/* (barrels: '@/components/ui', '@/components/charts'),
-  /api/favicon, Toaster + TooltipProvider in app/providers.tsx. tsc + eslint clean on these files.
-  -> other agents can build on 7ea0a0b now (not visually verified yet; styleguide next).
+- 7ea0a0b components/ui/* and components/charts/* (barrels '@/components/ui', '@/components/charts'),
+  /api/favicon, Toaster + TooltipProvider in app/providers.tsx.
+- d898cb6 shell: components/shell/* (AppShell, Sidebar, SiteSwitcher, Topbar, PageHeader, DateRangeControl +
+  useDateRange, UserMenu, MobileTabBar, LegacyFrame, WorkspaceProvider + workspaceContext, useCurrentSite,
+  nav.ts), dashboard layout -> AppShell, /dashboard/s/[host]/{,traffic,search,pages,actions}, Portfolio stub,
+  ai-chat -> ask, leaderboard + connect-ai placeholders, middleware gate + tc_site redirects, GitHub repo
+  scope dropped, /dashboard/styleguide.
+- 85bddd8 + 1571ecf clutter removal + next.config redirects + Telegram copy.
+
+## Next
+- Dev server (instance foundation 3103/8103; wait for a free slot: max 2 on the box), login, fix runtime
+  issues, screenshots (styleguide + shell pages, 1280/390, light/dark) to research/shots/foundation/,
+  crawl (in parts), full lint on touched files, rm -rf web/.next, down.sh foundation.
 
 ## Decisions (keep)
 - Legacy CSS: move globals.css to styles/legacy.css, but (a) drop its `@import "tailwindcss"`,
