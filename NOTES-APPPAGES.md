@@ -45,3 +45,10 @@ Ask, Settings, Plan, Support, Docs, Setup wizard, embed/[siteId]; admin + supera
     dashboard/leaderboard/page.tsx and (marketing)/leaderboard/join/page.tsx in this branch; tc/leaderboard replaces
     both, then these three files can be deleted.
   - Removed '/dashboard/settings' from LEGACY_ROUTE_PREFIXES.
+- Plan (/dashboard/plan): plan/billing.ts holds the config (Free 5 messages, Growth $19 / 50, Pro $29 / 100, Starter kept
+  for people who have it; the live Dodo product ids are unchanged). Usage card (messages left, renewal or "active until",
+  Cancel subscription modal -> POST /api/subscription/cancel as before), three plan cards (Free, Growth, Pro; checkout link
+  pattern and ?upgraded=true handshake unchanged), "Recent questions" table from the Ask threads on the server (replaces
+  the old localStorage-only usage list, which only the removed widget wrote), FAQ. No Telegram, no site limits, no
+  "up to 3 sites". "Manage billing" is not shown: there is no Dodo customer-portal integration to link to.
+  Removed '/dashboard/plan' from LEGACY_ROUTE_PREFIXES.
