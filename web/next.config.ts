@@ -55,6 +55,36 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Removed and moved routes (redesign, DESIGN.md 4.3/4.4). Permanent, and the
+  // query string is kept. The old single-site pages (/dashboard/analytics/*,
+  // /dashboard/seo, /dashboard/audit) are NOT here: their target depends on the
+  // user's current site, so middleware.ts redirects them (307) using the tc_site
+  // cookie, with a client fallback in their layouts.
+  redirects: async () => [
+    // Telegram bot, bot blog, X / Reddit API pages, globe: removed from the app
+    ...['bot', 'setup-bot', 'blog', 'x-api', 'reddit-api', 'globe'].flatMap((p) => [
+      { source: `/dashboard/${p}`, destination: '/dashboard', permanent: true },
+      { source: `/dashboard/${p}/:path*`, destination: '/dashboard', permanent: true },
+    ]),
+    // Separate share studio: sharing lives in Dashboards now
+    { source: '/dashboard/share', destination: '/dashboard/dashboards', permanent: true },
+    { source: '/dashboard/share/:path*', destination: '/dashboard/dashboards', permanent: true },
+    // AI chat is "Ask"
+    { source: '/dashboard/ai-chat', destination: '/dashboard/ask', permanent: true },
+    { source: '/dashboard/ai-chat/:path*', destination: '/dashboard/ask/:path*', permanent: true },
+    // Product-spec names for the same pages
+    { source: '/dashboard/portfolio', destination: '/dashboard', permanent: true },
+    { source: '/dashboard/connect', destination: '/dashboard/connect-ai', permanent: true },
+    // Marketing and embeds for removed features
+    { source: '/x', destination: '/', permanent: true },
+    { source: '/reddit', destination: '/', permanent: true },
+    { source: '/globe', destination: '/', permanent: true },
+    { source: '/embed/x/:path*', destination: '/', permanent: true },
+    { source: '/embed/reddit/:path*', destination: '/', permanent: true },
+    { source: '/demo/telegram', destination: '/', permanent: true },
+    { source: '/demo/telegram-video', destination: '/', permanent: true },
+    { source: '/share-popup-preview', destination: '/', permanent: true },
+  ],
   // Security + cache headers
   headers: async () => [
     {

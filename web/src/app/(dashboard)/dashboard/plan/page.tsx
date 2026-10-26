@@ -5,7 +5,7 @@ import { getSafeRedirectUrl } from '@/lib/checkout';
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-    CheckCircle2, Coins, Bot, Zap, TrendingUp, Shield,
+    CheckCircle2, Coins, Zap, TrendingUp, Shield,
     History, AlertTriangle, X, Loader2, ArrowRight, Check,
     Sparkles, Lightbulb, GitBranch, Users, Globe, Layers,
 } from 'lucide-react';
@@ -66,7 +66,7 @@ const PLAN_CONFIG: Record<string, PlanInfo> = {
         blurb: 'Agencies, serious operators',
         bestFor: 'Multi-site · agency · power users',
         costPerMsg: '$0.29 / AI message',
-        valueLine: 'Cheapest per-message tier + Telegram bot for daily mobile alerts',
+        valueLine: 'Cheapest per-message tier for heavy AI use',
     },
 };
 
@@ -95,13 +95,11 @@ const SUBSCRIPTION_PLANS = [
         features: [
             { label: '100 AI credits / month', highlight: true, icon: Coins },
             { label: 'Everything in Growth', icon: Check },
-            { label: 'Telegram bot — alerts on the go', highlight: true, icon: Bot },
             { label: 'Unlimited connected sites', icon: Globe },
             { label: 'Priority support (24h response)', icon: Users },
             { label: 'Beta features (early access)', icon: Sparkles },
             { label: 'Cheapest per-message rate ($0.29)', icon: TrendingUp },
         ],
-        telegramBot: true,
     },
 ];
 
@@ -117,7 +115,7 @@ export default function PlanPage() {
 
 function PlanPageContent() {
     const { data: session } = useSession();
-    const { credits, plan, telegramBotEnabled, subscriptionEnd, subscriptionCancelled, refresh: refreshCredits } = useCredits();
+    const { credits, plan, subscriptionEnd, subscriptionCancelled, refresh: refreshCredits } = useCredits();
     const searchParams = useSearchParams();
     const justUpgraded = useMemo(() => searchParams.get('upgraded') === 'true', [searchParams]);
 
@@ -251,14 +249,6 @@ function PlanPageContent() {
                     </p>
                 </div>
 
-                {/* Telegram bot ribbon */}
-                {telegramBotEnabled && (
-                    <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-                        <Bot className="h-3.5 w-3.5 text-zinc-300" />
-                        <span className="text-[12px] text-zinc-300">Telegram bot access included</span>
-                        <CheckCircle2 className="ml-auto h-3 w-3 text-zinc-500" />
-                    </div>
-                )}
 
                 {/* Cancel control */}
                 {plan !== 'free' && (
@@ -479,7 +469,7 @@ const FAQ_ITEMS: Array<{ q: string; a: string }> = [
     },
     {
         q: 'Why pick Pro over Growth?',
-        a: '100 AI credits per month at the lowest current rate ($0.29 per message), plus Telegram alerts, unlimited sites, priority support, and beta-feature early access.',
+        a: '100 AI credits per month at the lowest current rate ($0.29 per message), plus priority support and beta-feature early access.',
     },
     {
         q: 'Is the data secure?',

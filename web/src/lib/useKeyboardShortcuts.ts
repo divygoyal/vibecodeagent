@@ -10,7 +10,6 @@ const chordRoutes: Record<string, string> = {
   a: '/dashboard/analytics',
   s: '/dashboard/seo',
   c: '/dashboard/ask',
-  b: '/dashboard/bot',
 };
 
 export default function useKeyboardShortcuts() {

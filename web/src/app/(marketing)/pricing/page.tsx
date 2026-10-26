@@ -5,7 +5,7 @@ import { BRAND_NAME } from '@/lib/brand';
 export const metadata: Metadata = {
     title: 'Pricing — Simple Plans Starting at $19/mo',
     description:
-        `Choose your ${BRAND_NAME} plan: Growth ($19/mo, 50 AI credits) or Pro ($29/mo, 100 credits + Telegram bot). Start free with 5 messages.`,
+        `Choose your ${BRAND_NAME} plan: Growth ($19/mo, 50 AI credits) or Pro ($29/mo, 100 credits). Start free with 5 messages.`,
     alternates: { canonical: '/pricing' },
     openGraph: {
         title: `Pricing — Simple Plans Starting at $19/mo | ${BRAND_NAME}`,
@@ -91,7 +91,7 @@ const productSchema = [
         '@context': 'https://schema.org',
         '@type': 'Product',
         name: `${BRAND_NAME} Pro`,
-        description: 'Full-power AI SEO & analytics with 100 AI credits per month. Includes Telegram bot, priority support, custom alerts, unlimited audits, and early feature access.',
+        description: 'Full-power AI SEO & analytics with 100 AI credits per month. Includes priority support, custom alerts, unlimited audits, and early feature access.',
         url: 'https://trafficclaw.com/pricing',
         brand: { '@type': 'Brand', name: `${BRAND_NAME}` },
         offers: {
