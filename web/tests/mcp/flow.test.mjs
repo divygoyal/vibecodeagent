@@ -382,8 +382,8 @@ describe('OAuth with a DCR client', () => {
         assert.equal(init.headers.get('mcp-session-id'), null);
         const list = await mcp(tokens.access_token, 'tools/list', {}, { era: 'legacy', headers: { 'mcp-protocol-version': '2025-11-25' } });
         assert.equal(list.json.result.tools.length, 13);
-        const res = await mcp(tokens.access_token, 'tools/call', { name: 'list_sites', arguments: {} }, { era: 'legacy', headers: { 'mcp-protocol-version': '2025-11-25' } });
-        assert.ok(!res.json.result.isError);
+        const res = await call(tokens.access_token, 'list_sites', {}, 'legacy');
+        assert.ok(!res.isError, res.content?.[0]?.text);
         const prompts = await mcp(tokens.access_token, 'prompts/list', {}, { era: 'legacy', headers: { 'mcp-protocol-version': '2025-11-25' } });
         assert.deepEqual(prompts.json.result.prompts.map((p) => p.name).sort(), ['find_quick_wins', 'weekly_portfolio_review', 'why_did_traffic_drop']);
     });
