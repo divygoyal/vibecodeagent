@@ -3,7 +3,7 @@ import { ArrowRight, Megaphone, SearchX } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/Badge';
-import { Button, buttonClasses } from '@/components/ui/Button';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Favicon } from '@/components/ui/Favicon';
@@ -123,8 +123,8 @@ export function BoardRows({ data, hasFilters, clearHref }: { data: BoardResponse
                     title={hasFilters ? 'No sites match' : 'Nothing here yet'}
                     description={hasFilters ? 'Try a different category or clear the search.' : 'Verified sites show up here as soon as they are listed.'}
                     actions={hasFilters
-                        ? <Link href={clearHref} className={buttonClasses({ variant: 'secondary', size: 'md' })}>Clear filters</Link>
-                        : <Link href="/leaderboard/join" className={buttonClasses({ variant: 'primary', size: 'md' })}>Add your site, free</Link>}
+                        ? <Button asChild variant="secondary" size="md"><Link href={clearHref}>Clear filters</Link></Button>
+                        : <Button asChild variant="primary" size="md"><Link href="/leaderboard/join">Add your site, free</Link></Button>}
                 />
             </Card>
         );

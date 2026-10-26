@@ -5,7 +5,7 @@ import { Megaphone, SearchX } from 'lucide-react';
 
 import { BRAND_NAME } from '@/lib/brand';
 import { Badge } from '@/components/ui/Badge';
-import { buttonClasses } from '@/components/ui/Button';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Favicon } from '@/components/ui/Favicon';
@@ -85,8 +85,8 @@ export default async function AdvertisePage({ searchParams }: { searchParams: Se
                     Every ad slot listed on the leaderboard. Owners are verified in Search Console, prices are the publisher&apos;s own, and you arrange the rest directly with them.
                 </p>
                 <div className="mt-5 flex flex-wrap items-center gap-2">
-                    <Link href="/leaderboard" className={buttonClasses({ variant: 'secondary', size: 'lg' })}>Browse the leaderboard</Link>
-                    <Link href="/dashboard/leaderboard" className={buttonClasses({ variant: 'ghost', size: 'lg' })}>Sell slots on your site</Link>
+                    <Button asChild variant="secondary" size="lg"><Link href="/leaderboard">Browse the leaderboard</Link></Button>
+                    <Button asChild variant="ghost" size="lg"><Link href="/dashboard/leaderboard">Sell slots on your site</Link></Button>
                 </div>
             </header>
 
@@ -110,7 +110,7 @@ export default async function AdvertisePage({ searchParams }: { searchParams: Se
                                     icon={filtered ? SearchX : Megaphone}
                                     title={filtered ? 'No slots match' : 'No ad slots yet'}
                                     description={filtered ? 'Try another category or billing period.' : 'Publishers add slots from their leaderboard settings.'}
-                                    actions={filtered ? <Link href="/leaderboard/advertise" className={buttonClasses({ variant: 'secondary' })}>Clear filters</Link> : undefined}
+                                    actions={filtered ? <Button asChild variant="secondary"><Link href="/leaderboard/advertise">Clear filters</Link></Button> : undefined}
                                 />
                             </Card>
                         ) : (

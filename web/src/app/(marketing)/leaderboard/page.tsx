@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { ShieldCheck } from 'lucide-react';
 
 import { BRAND_NAME } from '@/lib/brand';
-import { buttonClasses } from '@/components/ui/Button';
+import { Button } from '@/components/ui/Button';
 import { BoardControls } from '@/components/leaderboard/BoardControls';
 import { BoardRows, Pagination, SponsoredStrip } from '@/components/leaderboard/BoardRows';
 import { CategoryGrid } from '@/components/leaderboard/CategoryGrid';
@@ -87,8 +87,8 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
                     Real Google Analytics and Search Console numbers, from sites whose owners are verified. Owners choose what to show.
                 </p>
                 <div className="mt-5 flex flex-wrap items-center gap-2">
-                    <Link href="/leaderboard/join" className={buttonClasses({ variant: 'primary', size: 'lg' })}>Add your site, free</Link>
-                    <a href="#how-verification-works" className={buttonClasses({ variant: 'secondary', size: 'lg' })}>How verification works</a>
+                    <Button asChild variant="primary" size="lg"><Link href="/leaderboard/join">Add your site, free</Link></Button>
+                    <Button asChild variant="secondary" size="lg"><a href="#how-verification-works">How verification works</a></Button>
                 </div>
             </header>
 
@@ -133,7 +133,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
                     <h2 className="text-title text-fg">Get your own verified profile</h2>
                     <p className="mt-1 text-body text-fg-secondary">Free, with a live badge you can embed and a backlink to your site.</p>
                 </div>
-                <Link href="/leaderboard/join" className={buttonClasses({ variant: 'primary', size: 'lg' })}>Add your site, free</Link>
+                <Button asChild variant="primary" size="lg"><Link href="/leaderboard/join">Add your site, free</Link></Button>
             </section>
         </main>
     );

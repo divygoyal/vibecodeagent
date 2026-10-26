@@ -5,7 +5,7 @@ import { ExternalLink, ShieldCheck } from 'lucide-react';
 
 import { BRAND_NAME } from '@/lib/brand';
 import { Banner } from '@/components/ui/Banner';
-import { buttonClasses } from '@/components/ui/Button';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Favicon } from '@/components/ui/Favicon';
 import { CategoryBadge, Ga4Badge, VerificationBadge } from '@/components/leaderboard/shared';
@@ -92,9 +92,9 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
                 <div className="flex items-center gap-2">
                     {!pending ? <ShareButton url={profileUrl} title={`${p.name} on the ${BRAND_NAME} verified traffic leaderboard`} ogPath={`/leaderboard/${slug}/opengraph-image`} /> : null}
                     {p.website_url ? (
-                        <a href={p.website_url} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'secondary', size: 'md' })}>
-                            Visit site <ExternalLink aria-hidden size={14} strokeWidth={1.75} />
-                        </a>
+<Button asChild variant="secondary" size="md" trailingIcon={ExternalLink}>
+                            <a href={p.website_url} target="_blank" rel="noopener noreferrer">Visit site</a>
+                        </Button>
                     ) : null}
                 </div>
             </div>
@@ -172,7 +172,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
                     <h2 className="text-title text-fg">Get your own verified profile</h2>
                     <p className="mt-1 text-body text-fg-secondary">Free. You choose which numbers are public.</p>
                 </div>
-                <Link href="/leaderboard/join" className={buttonClasses({ variant: 'primary', size: 'lg' })}>Add your site, free</Link>
+                <Button asChild variant="primary" size="lg"><Link href="/leaderboard/join">Add your site, free</Link></Button>
             </section>
         </main>
     );
