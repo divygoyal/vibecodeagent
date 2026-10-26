@@ -130,7 +130,7 @@ export function SearchSummary({ href, className }: { href?: string; className?: 
     const q = useGsc<GscSummary>('summary');
     const [metric, setMetric] = useState<MetricKey>('clicks');
     const d = q.data;
-    const series = d?.series ?? [];
+    const series = useMemo(() => d?.series ?? [], [d]);
     const dates = useMemo(() => series.map((p) => p.date), [series]);
     const spark = (k: MetricKey) => series.map((p) => {
         const v = (p as unknown as Record<string, number>)[k] ?? 0;

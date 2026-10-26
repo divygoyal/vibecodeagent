@@ -3,7 +3,7 @@
 import { ExternalLink } from 'lucide-react';
 
 import { fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
-import { METRICS, type MetricKey } from '@/lib/metrics';
+import { METRICS } from '@/lib/metrics';
 import { BarList } from '@/components/charts/BarList';
 import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
 import { Drawer } from '@/components/ui/Drawer';

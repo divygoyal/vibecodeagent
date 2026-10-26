@@ -74,30 +74,36 @@ export function useSiteActions({ includeAudit = false, enabled = true }: { inclu
 
     const { mutate: mutateStates } = states;
     const host = site.host;
-    const setStatus = useCallback(async (action: SiteAction, status: ActionStatus, opts: { undo?: ActionStatus } = {}) => {
+    /** Save a status (optimistic). Throws when the store refuses. */
+    const write = useCallback(async (action: SiteAction, status: ActionStatus) => {
         const optimistic = (cur?: { states: ActionStateRow[] }) => {
             const rest = (cur?.states ?? []).filter((s) => s.actionId !== action.id);
             return { states: status === 'open' ? rest : [{ actionId: action.id, status, updatedAt: new Date().toISOString() }, ...rest] };
         };
+        await mutateStates(async (cur) => {
+            await fetchJson('/api/site/actions/state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ site: host, actionId: action.id, status, title: action.title }),
+            });
+            return optimistic(cur);
+        }, { optimisticData: optimistic, rollbackOnError: true, revalidate: false });
+    }, [mutateStates, host]);
+
+    /** Save a status; with `undo`, a toast offers to put the previous status back. */
+    const setStatus = useCallback(async (action: SiteAction, status: ActionStatus, opts: { undo?: ActionStatus } = {}) => {
         try {
-            await mutateStates(async (cur) => {
-                await fetchJson('/api/site/actions/state', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ site: host, actionId: action.id, status, title: action.title }),
-                });
-                return optimistic(cur);
-            }, { optimisticData: optimistic, rollbackOnError: true, revalidate: false });
+            await write(action, status);
             if (opts.undo) {
                 const undo = opts.undo;
                 toast(status === 'done' ? 'Marked done' : status === 'dismissed' ? 'Dismissed' : 'Moved back to open', {
-                    action: { label: 'Undo', onClick: () => { void setStatus(action, undo); } },
+                    action: { label: 'Undo', onClick: () => { write(action, undo).catch(() => toast.error("Couldn't undo. Try again.")); } },
                 });
             }
         } catch {
             toast.error("Couldn't save that. Try again.");
         }
-    }, [mutateStates, host]);
+    }, [write]);
 
     return {
         list,

@@ -5,7 +5,7 @@ import { Download } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { fmtDateRange, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
-import { fmtMetric, METRICS, type MetricKey } from '@/lib/metrics';
+import { fmtMetric, METRICS } from '@/lib/metrics';
 import { ChartCard } from '@/components/charts/ChartCard';
 import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
 import { Button } from '@/components/ui/Button';
