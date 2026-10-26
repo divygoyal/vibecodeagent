@@ -16,7 +16,7 @@ import ChatMessageRenderer from '@/components/ChatMessageRenderer';
 import { ReasoningTrace, narrateToolResult, narrateToolStart, type TraceLine } from '@/components/chat/ReasoningTrace';
 import { buildAnalyticsContext, buildSeoContext, buildSnapshot } from '@/lib/chatUtils';
 import {
-    useAnalyticsData, useContainerStatus, useCredits, usePropertyList, useSeoData,
+    useAnalyticsData, useConnections, useCredits, usePropertyList, useSeoData,
 } from '@/lib/useDashboardData';
 import {
     getOrCreateThreadId, persistMessage, setActiveThreadId, useChatStore, type ChatMessage,
@@ -51,7 +51,7 @@ export default function AskPage() {
         propertyInventoryLoading,
     } = useRegistration();
     const { site } = useCurrentSite();
-    const { hasGoogleConnection, refresh: refreshContainer } = useContainerStatus();
+    const { hasGoogleConnection, refresh: refreshContainer } = useConnections();
     const { credits, isLoading: creditsLoading, refresh: refreshCredits } = useCredits();
 
     // Is the model configured on this server? (null while the check runs.)

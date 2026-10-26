@@ -1347,6 +1347,25 @@ async def get_user(
     }
 
 
+@app.get("/api/users/{github_id}/connections")
+async def get_user_connections(
+    github_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin_key)
+):
+    """Connected OAuth providers only (no container lookup). Read by the web app's
+    /api/connections on every app load; GET /api/users/{id} also inspects Docker."""
+    user = await get_user_by_identifier(db, github_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "connected_providers": [
+            {"provider": connection.provider, "connected": True}
+            for connection in await get_connected_oauth_connections(db, user.id)
+        ],
+    }
+
+
 @app.get("/api/users/{github_id}/profile")
 async def get_user_profile(
     github_id: str,

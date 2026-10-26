@@ -12,7 +12,7 @@ import {
 import { isRangePreset, LEGACY_RANGES, toLegacyRange } from '@/lib/dateRange';
 import { DEMO_DOMAIN_LABEL } from '@/lib/demoWorkspace';
 import { buildSiteDirectory, siteForSelection } from '@/lib/sites/siteDirectory';
-import { useContainerStatus, usePropertyList, useSiteList } from '@/lib/useDashboardData';
+import { useConnections, usePropertyList, useSiteList } from '@/lib/useDashboardData';
 import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
 import { useChatStore } from '@/stores/chatStore';
 import { WorkspaceContext, type WorkspaceSaveInput } from './workspaceContext';
@@ -358,7 +358,7 @@ interface InventoryLayerProps {
  */
 function InventoryLayer({ children, user, pathname, isSetupRoute, router, getUserKey, selectedProperty, selectedSite, setSelectedProperty, setSelectedSite }: InventoryLayerProps) {
     const parent = useWorkspaceParent();
-    const { hasGoogleConnection } = useContainerStatus();
+    const { hasGoogleConnection } = useConnections();
     const { sites: gscSites, isLoading: siteInventoryLoading, hasLoaded: siteInventoryLoaded, error: siteErr } = useSiteList(hasGoogleConnection);
     const { properties, isLoading: propertyInventoryLoading, hasLoaded: propertyInventoryLoaded, error: propErr } = usePropertyList(hasGoogleConnection);
 

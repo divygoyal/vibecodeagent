@@ -22,7 +22,7 @@ import { signIn } from 'next-auth/react';
 import { AlertCircle, ArrowRight, MessageSquare, Sparkles } from 'lucide-react';
 
 import EmptyState, { ConnectGoogleState } from '@/components/EmptyState';
-import { useContainerStatus, useCredits } from '@/lib/useDashboardData';
+import { useConnections, useCredits } from '@/lib/useDashboardData';
 import { useRegistration } from '../layout';
 import WeekTabs from '@/components/weekly/WeekTabs';
 import WeekSummary from '@/components/weekly/WeekSummary';
@@ -42,7 +42,7 @@ const FREE_TIER_LIMIT = 8;
 const PAID_TIER_LIMIT = 26;
 
 export default function WeeklyBriefingPage() {
-    const { hasGoogleConnection, isLoading: containerLoading } = useContainerStatus();
+    const { hasGoogleConnection, isLoading: containerLoading } = useConnections();
     const { plan: userPlan } = useCredits();
     const { selectedSite, isDemoWorkspace } = useRegistration();
     const isFree = userPlan === 'free';

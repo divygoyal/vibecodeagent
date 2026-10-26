@@ -77,48 +77,30 @@ function useRegisteredSWR<T = any>(url: string | null, options = {}) {
 }
 
 // Immediate SWR — bypasses the registration gate entirely.
-// Used for endpoints that handle unregistered users gracefully (e.g. /api/container returns 404 → "not_provisioned").
+// Used for endpoints that handle unregistered users gracefully (e.g. /api/connections answers an empty list).
 function useImmediateSWR<T = any>(url: string | null, options = {}) {
     return useSWR<T, FetcherError>(url, fetcher, { ...swrOptions, ...options });
 }
 
-export function useContainerStatus() {
-    const { data, error, isLoading, mutate } = useImmediateSWR('/api/container');
+/**
+ * Which providers the user has connected (admin OAuth rows via /api/connections,
+ * plus the tokens in the current session, which covers the first seconds after
+ * sign-in before the admin row exists). No container or bot status: those
+ * features are gone.
+ */
+export function useConnections() {
+    const { data, error, isLoading, mutate } = useImmediateSWR<{ connectedProviders: { provider: string }[] }>('/api/connections');
     const { data: session } = useSession();
-    const appInstallationsQuery = useImmediateSWR<{ installations: { installation_id: number }[] }>(
-        '/api/github-app/installations',
-        { dedupingInterval: 60_000, errorRetryCount: 0 }
-    );
 
-    // Bug #5 fix: Check from admin DB providers
-    const adminHasGoogle = data?.connectedProviders?.some(
-        (c: { provider: string }) => c.provider === 'google'
-    ) || false;
-    const adminHasGithub = data?.connectedProviders?.some(
-        (c: { provider: string }) => c.provider === 'github'
-    ) || false;
-
-    // Bug #5 fix: ALSO check from the current NextAuth session (JWT has the token)
-    // This handles the case where admin DB hasn't synced yet
-    const sessionHasGoogle = !!(session?.user as SessionUser | undefined)?.googleAccessToken;
-    const sessionHasGithub = !!(session?.user as SessionUser | undefined)?.githubAccessToken;
-
-    // Phase 2: GitHub App installations are a separate connection source
-    const hasAppInstallation = (appInstallationsQuery.data?.installations?.length ?? 0) > 0;
-
-    const hasGoogleConnection = adminHasGoogle || sessionHasGoogle;
-    const hasGithubConnection = adminHasGithub || sessionHasGithub || hasAppInstallation;
+    const has = (provider: string) => data?.connectedProviders?.some((c) => c.provider === provider) || false;
+    const sessionUser = session?.user as SessionUser | undefined;
 
     return {
-        botStatus: data,
-        hasGoogleConnection,
-        hasGithubConnection,
+        hasGoogleConnection: has('google') || !!sessionUser?.googleAccessToken,
+        hasGithubConnection: has('github') || !!sessionUser?.githubAccessToken,
         isLoading,
         isError: error,
-        refresh: () => {
-            mutate();
-            appInstallationsQuery.mutate();
-        }
+        refresh: () => { void mutate(); },
     };
 }
 

@@ -8,7 +8,7 @@ import { Bell, Database, Palette, Plug, ShieldAlert, User } from 'lucide-react';
 import { PageHeader } from '@/components/shell/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
-import { useContainerStatus } from '@/lib/useDashboardData';
+import { useConnections } from '@/lib/useDashboardData';
 import { AppearanceTab } from './AppearanceTab';
 import { DangerTab } from './DangerTab';
 import { GoogleTab } from './GoogleTab';
@@ -49,7 +49,7 @@ export default function SettingsPage() {
 function Settings() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { hasGoogleConnection, refresh: refreshContainer } = useContainerStatus();
+    const { hasGoogleConnection, refresh: refreshContainer } = useConnections();
 
     const raw = searchParams.get('tab') ?? '';
     const tab: TabKey = (TAB_VALUES as readonly string[]).includes(raw) ? (raw as TabKey) : LEGACY_TABS[raw] ?? 'profile';
