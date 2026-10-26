@@ -70,7 +70,7 @@ function AnswerPreview() {
 export default function AiConnectorPage() {
     const url = resourceUrl();
     return (
-        <div className="tc-root bg-canvas pb-20 pt-24 text-fg md:pt-28">
+        <div className="tc-root bg-canvas pb-20 pt-8 text-fg md:pt-12">
             <section className="mx-auto grid max-w-[1200px] items-start gap-10 px-4 md:px-6 lg:grid-cols-[1.1fr_0.9fr]">
                 <div className="min-w-0">
                     <Badge variant="brand">MCP connector</Badge>

@@ -81,9 +81,20 @@ const nextConfig: NextConfig = {
     { source: '/globe', destination: '/', permanent: true },
     { source: '/embed/x/:path*', destination: '/', permanent: true },
     { source: '/embed/reddit/:path*', destination: '/', permanent: true },
-    { source: '/demo/telegram', destination: '/', permanent: true },
-    { source: '/demo/telegram-video', destination: '/', permanent: true },
+    { source: '/demo/telegram', destination: '/demo', permanent: true },
+    { source: '/demo/telegram-video', destination: '/demo', permanent: true },
+    { source: '/demo/telegram/:path*', destination: '/demo', permanent: true },
     { source: '/share-popup-preview', destination: '/', permanent: true },
+    // Features were folded into the home page (DESIGN 4.4)
+    { source: '/features', destination: '/#product', permanent: true },
+    { source: '/features/:path*', destination: '/#product', permanent: true },
+    // Leaderboard settings moved out of Settings into their own page
+    {
+      source: '/dashboard/settings',
+      has: [{ type: 'query', key: 'tab', value: 'leaderboard' }],
+      destination: '/dashboard/leaderboard',
+      permanent: true,
+    },
   ],
   // Security + cache headers. TC_NOINDEX=1 (private previews, read at build
   // time) adds X-Robots-Tag: noindex, nofollow to every response; robots.ts
