@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { sendSlotRequestEmails } from '@/lib/leaderboard/notify';
+import { allow, clientIp } from '@/lib/leaderboard/rateLimit';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -21,27 +22,10 @@ export const dynamic = 'force-dynamic';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Public endpoint — throttle per IP so the publisher's inbox can't be flooded.
-const RATE_WINDOW_MS = 60 * 60 * 1000;
-const RATE_MAX = 10;
-const rateStore = new Map<string, number[]>();
-
-function checkRate(key: string): boolean {
-    const now = Date.now();
-    const recent = (rateStore.get(key) || []).filter((t) => t > now - RATE_WINDOW_MS);
-    if (recent.length >= RATE_MAX) {
-        rateStore.set(key, recent);
-        return false;
-    }
-    recent.push(now);
-    rateStore.set(key, recent);
-    return true;
-}
-
-function clientIp(req: Request): string {
-    const fwd = req.headers.get('x-forwarded-for') || '';
-    return fwd.split(',')[0].trim() || req.headers.get('x-real-ip') || 'unknown';
-}
+// Public endpoint: same protections as the profile offer form
+// (/api/leaderboard/[id]/inquiry): a honeypot, per-IP and per-slot limits.
+const IP_MAX_PER_HOUR = 5;
+const SLOT_MAX_PER_DAY = 20;
 
 type AdminRequestResponse = {
     success?: boolean;
@@ -65,23 +49,32 @@ type AdminRequestResponse = {
 };
 
 export async function POST(req: Request) {
-    if (!checkRate(clientIp(req))) {
+    const perIp = allow(`slot-request:ip:${clientIp(req)}`, IP_MAX_PER_HOUR, 60 * 60 * 1000);
+    if (!perIp.ok) {
         return NextResponse.json(
             { error: 'Too many requests from this network. Try again later.' },
-            { status: 429 },
+            { status: 429, headers: { 'Retry-After': String(perIp.retryAfterSeconds) } },
         );
     }
 
-    let body: { slot_id?: number; buyer_email?: string; buyer_name?: string; message?: string };
+    let body: { slot_id?: number; buyer_email?: string; buyer_name?: string; message?: string; website?: unknown };
     try {
         body = await req.json();
     } catch {
         return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
+    // Honeypot: real people never fill the hidden "website" field. Pretend it worked.
+    if (typeof body.website === 'string' && body.website.trim() !== '') {
+        return NextResponse.json({ success: true });
+    }
+
     const slotId = Number(body.slot_id);
     if (!Number.isFinite(slotId) || slotId <= 0) {
         return NextResponse.json({ error: 'Pick a specific ad slot to request.' }, { status: 400 });
+    }
+    if (!allow(`slot-request:slot:${slotId}`, SLOT_MAX_PER_DAY, 24 * 60 * 60 * 1000).ok) {
+        return NextResponse.json({ error: 'This slot has received a lot of requests today. Try again tomorrow.' }, { status: 429 });
     }
 
     const buyerEmail = String(body.buyer_email || '').trim();
@@ -91,6 +84,9 @@ export async function POST(req: Request) {
 
     const buyerName = String(body.buyer_name || '').trim().slice(0, 120);
     const message = String(body.message || '').trim().slice(0, 2000);
+    if ((message.match(/https?:\/\//gi) || []).length >= 3) {
+        return NextResponse.json({ error: 'Too many links in the message.' }, { status: 400 });
+    }
 
     let data: AdminRequestResponse;
     let upstreamStatus = 200;
