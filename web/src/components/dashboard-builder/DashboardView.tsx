@@ -5,7 +5,8 @@
  * follows the container width (12 / 6 / 1 columns), filters collapse into a drawer on phones,
  * state lives in the URL (?page=&range=&compare=&f.<id>=) so every view is linkable.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
+import { useElementWidth } from './useElementWidth';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { cn } from '@/lib/cn';
@@ -17,20 +18,6 @@ import type { ControlState, DashboardDocV2, DashboardQueryResponse, FilterContro
 import { DashboardCanvas, bpForWidth, type Bp } from './DashboardCanvas';
 import { ControlsBar, DateControl, PageTabs, type OptionsSource } from './Controls';
 import { WidgetRenderer } from './widgets/WidgetRenderer';
-
-export function useContainerWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
-    const ref = useRef<T>(null);
-    const [w, setW] = useState(0);
-    useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-        setW(Math.floor(el.getBoundingClientRect().width));
-        const ro = new ResizeObserver(([e]) => setW(Math.floor(e.contentRect.width)));
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, []);
-    return [ref, w];
-}
 
 /** Viewer state <-> URL. Only keys the viewer may change are read. */
 export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'>, allow: { date: boolean; compare: boolean; filters: boolean }) {
@@ -115,7 +102,7 @@ export interface DashboardViewProps {
 export function DashboardView({
     doc, mode, siteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource,
 }: DashboardViewProps) {
-    const [ref, width] = useContainerWidth<HTMLDivElement>();
+    const [ref, width] = useElementWidth<HTMLDivElement>();
     const bp: Bp = bpForWidth(width || 1200);
     const pages = doc.pages.filter((p) => !p.hidden);
     const page = pages.find((p) => p.id === state.pageId) ?? pages[0];

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useElementWidth } from '../useElementWidth';
+import { useReducedMotion } from 'framer-motion';
 import { Bar, BarChart, CartesianGrid, Tooltip as RTooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts';
 
 import { BarList, ChartTooltipCard, Donut, type ChartTooltipRow } from '@/components/charts';
@@ -82,6 +83,7 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
 
 function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; height: number; currency?: string }) {
     const c = widget.config;
+    const anim = !useReducedMotion();
     const vertical = c.orientation === 'vertical';
     const dim = c.dimension;
     const data = rows.map((r) => ({ ...r, __label: dimText(dim, r[`d:${dim}`]) }));
@@ -111,10 +113,10 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency }: {
             {vertical ? <YAxis {...valAxis} width={44} /> : <XAxis {...valAxis} />}
             <RTooltip content={tooltip} cursor={{ fill: 'var(--color-subtle)' }} isAnimationActive={false} />
             {stacked
-                ? seriesKeys!.map((k, i) => <Bar key={k} dataKey={k} stackId="s" fill={breakdownColor(c.stackBy ?? '', k, i)} maxBarSize={24} stroke="var(--color-surface)" strokeWidth={1} />)
+                ? seriesKeys!.map((k, i) => <Bar key={k} dataKey={k} stackId="s" fill={breakdownColor(c.stackBy ?? '', k, i)} maxBarSize={24} stroke="var(--color-surface)" strokeWidth={1} isAnimationActive={anim} animationDuration={400} />)
                 : metrics.flatMap((id) => [
-                    ...(compare ? [<Bar key={`${id}-p`} dataKey={`m:${id}:prev`} fill={metricColor(id)} fillOpacity={0.3} maxBarSize={24} radius={vertical ? [4, 4, 0, 0] : [0, 4, 4, 0]} />] : []),
-                    <Bar key={id} dataKey={`m:${id}`} fill={metricColor(id)} maxBarSize={24} radius={vertical ? [4, 4, 0, 0] : [0, 4, 4, 0]} />,
+                    ...(compare ? [<Bar key={`${id}-p`} dataKey={`m:${id}:prev`} fill={metricColor(id)} fillOpacity={0.3} maxBarSize={24} radius={vertical ? [4, 4, 0, 0] : [0, 4, 4, 0]} isAnimationActive={anim} animationDuration={400} />] : []),
+                    <Bar key={id} dataKey={`m:${id}`} fill={metricColor(id)} maxBarSize={24} radius={vertical ? [4, 4, 0, 0] : [0, 4, 4, 0]} isAnimationActive={anim} animationDuration={400} />,
                 ])}
         </BarChart>
     );

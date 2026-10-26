@@ -27,7 +27,8 @@ import { useEditorStore, type Viewport } from '@/stores/dashboardEditorStore';
 import { DashboardCanvas, type Bp } from '../DashboardCanvas';
 import { DateControl, FilterControlView } from '../Controls';
 import { ShareDialog } from '../ShareDialog';
-import { useContainerWidth, textVars } from '../DashboardView';
+import { textVars } from '../DashboardView';
+import { useElementWidth } from '../useElementWidth';
 import { fetchJson, useInlineResult, QueryHttpError, type InlineCtx } from '../useWidgetData';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
 import { LeftPanel } from './LeftPanel';
@@ -76,7 +77,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const [nameEdit, setNameEdit] = useState(false);
     const [resolvedDates, setResolvedDates] = useState<import('@/lib/builder/types').ResolvedDates | undefined>();
     const searchRef = useRef<HTMLInputElement>(null);
-    const [canvasRef, availWidth] = useContainerWidth<HTMLDivElement>();
+    const [canvasRef, availWidth] = useElementWidth<HTMLDivElement>();
     const { data: sitesData } = useSWR<{ connected: boolean; sites: SiteOption[] }>('/api/dashboards/sites', (u: string) => fetchJson(u), { revalidateOnFocus: false });
     const sites = useMemo(() => sitesData?.sites ?? [], [sitesData]);
 
