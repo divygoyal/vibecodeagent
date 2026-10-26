@@ -16,10 +16,9 @@ import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
 import { Button } from '@/components/ui/Button';
 import { useHideChatWidget } from '@/components/ui/useHideChatWidget';
 import { BrandMark, Wordmark } from './BrandMark';
-import { LegacyFrame } from './LegacyFrame';
 import { MobileTabBar } from './MobileTabBar';
 import { PageSkeleton } from './PageSkeleton';
-import { hidesMobileTabBar, isLegacyRoute } from './nav';
+import { hidesMobileTabBar } from './nav';
 import { ShellProvider, useShell } from './ShellContext';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -89,7 +88,6 @@ function ShellBody({ children }: { children: ReactNode }) {
     const { collapsed } = useShell();
     useAppTheme();
     useGoShortcuts();
-    const legacy = isLegacyRoute(pathname);
     const noTabBar = hidesMobileTabBar(pathname);
     const isSetup = pathname.startsWith('/dashboard/setup');
 
@@ -97,7 +95,7 @@ function ShellBody({ children }: { children: ReactNode }) {
         <ErrorBoundary>
             <Suspense fallback={<PageSkeleton />}>
                 {!isSetup ? <WorkspaceIncompleteBanner className="mb-4" /> : null}
-                {legacy ? <LegacyFrame>{children}</LegacyFrame> : children}
+                {children}
             </Suspense>
         </ErrorBoundary>
     );

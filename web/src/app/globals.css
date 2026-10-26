@@ -15,13 +15,6 @@ body:has(.tc-root) {
   color: var(--tc-fg);
 }
 
-/* Unmigrated page content inside the new shell (components/shell/LegacyFrame).
-   It carries data-theme="dark" so tokens used inside it are dark as well. */
-.legacy {
-  background: var(--background);
-  color: var(--foreground);
-}
-
 /* Focus ring: 2px pine, 2px offset (DESIGN 3 shared states). */
 :focus-visible,
 a:focus-visible,

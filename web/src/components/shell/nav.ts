@@ -69,17 +69,6 @@ export function routeTitle(pathname: string): string | null {
     return null;
 }
 
-/**
- * Pages that still use the old dark styling. AppShell wraps their content in
- * <LegacyFrame> (data-theme="dark" + the old black background).
- * Empty: every app page uses the tokens now. Keep it empty.
- */
-export const LEGACY_ROUTE_PREFIXES: string[] = [];
-
-export function isLegacyRoute(pathname: string): boolean {
-    return LEGACY_ROUTE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
-
 /** Routes where the mobile tab bar is hidden (own composer, full-screen editor, focused setup). */
 export function hidesMobileTabBar(pathname: string): boolean {
     return pathname === '/dashboard/ask' || pathname.startsWith('/dashboard/ask/') || pathname === '/dashboard/ai-chat'
