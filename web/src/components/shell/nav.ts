@@ -81,7 +81,6 @@ export function routeTitle(pathname: string): string | null {
 export const LEGACY_ROUTE_PREFIXES: string[] = [
     '/dashboard/ask',
     '/dashboard/ai-chat',
-    '/dashboard/dashboards',
     '/dashboard/settings',
     '/dashboard/plan',
     '/dashboard/support',

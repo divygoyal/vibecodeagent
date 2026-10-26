@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -24,19 +24,12 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
     const metricCols = cols.filter((col) => col.kind === 'metric');
     const compare = props.compare !== 'none' && Boolean(frame?.rows.some((r) => metricCols.some((m) => `m:${m.ref}:prev` in r)));
 
-    const rows = useMemo(() => {
-        const all = (frame?.rows ?? []) as Row[];
-        if (!q.trim()) return all;
-        const s = q.trim().toLowerCase();
-        const d0 = c.dimensions[0];
-        return all.filter((r) => dimText(d0, r[`d:${d0}`]).toLowerCase().includes(s));
-    }, [frame, q, c.dimensions]);
-
-    const maxOf = useMemo(() => {
-        const m: Record<string, number> = {};
-        for (const col of metricCols) m[col.ref] = Math.max(0, ...rows.map((r) => (typeof r[`m:${col.ref}`] === 'number' ? (r[`m:${col.ref}`] as number) : 0)));
-        return m;
-    }, [rows, metricCols]);
+    const all = (frame?.rows ?? []) as Row[];
+    const needle = q.trim().toLowerCase();
+    const d0 = c.dimensions[0];
+    const rows = needle ? all.filter((r) => dimText(d0, r[`d:${d0}`]).toLowerCase().includes(needle)) : all;
+    const maxOf: Record<string, number> = {};
+    for (const col of metricCols) maxOf[col.ref] = Math.max(0, ...rows.map((r) => (typeof r[`m:${col.ref}`] === 'number' ? (r[`m:${col.ref}`] as number) : 0)));
 
     const columns: UiColumn<Row>[] = cols.map((col, i) => {
         if (col.kind === 'dimension') {

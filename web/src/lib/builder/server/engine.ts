@@ -11,7 +11,7 @@
 import { runGABatch, runGSCSearchAnalytics } from '@/lib/googleApi';
 import { GoogleBreakerOpenError, reportGoogleOutcome, withGoogleSlot } from '@/lib/googleLimiter';
 import { normalizeHost } from '@/lib/sites/pairing';
-import { dimInFamily, getDim, getMetric, metricFamily, type Family, type MetricDef } from '../catalog';
+import { dimInFamily, getDim, getMetric, type Family, type MetricDef } from '../catalog';
 import { canonicalJson, compileWidget } from '../compile';
 import { alpha2ToGsc, gscToAlpha2 } from '../countries';
 import { addDays, autoGranularity, eachDay, fromDay, monthStart, resolveCompare, resolveRange, todayIn, weekStart } from '../dates';
@@ -284,15 +284,32 @@ function gscBody(l: LogicalLeaf): Record<string, unknown> {
 
 // ── Parsing ──────────────────────────────────────────────────────────────
 
-function parseGa4(resp: Record<string, any>, l: { apiDims: string[]; compare?: Range }, metrics: string[]): LeafData {
-    const dimHeaders: string[] = (resp.dimensionHeaders ?? []).map((h: { name: string }) => h.name);
+interface Ga4Resp {
+    dimensionHeaders?: Array<{ name: string }>;
+    rows?: Array<{ dimensionValues?: Array<{ value?: string }>; metricValues?: Array<{ value?: string }> }>;
+    rowCount?: number;
+    metadata?: {
+        samplingMetadatas?: Array<{ samplesReadCount?: string; samplingSpaceSize?: string }>;
+        subjectToThresholding?: boolean;
+        dataLossFromOtherRow?: boolean;
+        currencyCode?: string;
+    };
+}
+
+interface GscResp {
+    rows?: Array<{ keys?: string[]; clicks?: number; impressions?: number; ctr?: number; position?: number }>;
+    metadata?: { first_incomplete_date?: string; firstIncompleteDate?: string };
+}
+
+function parseGa4(resp: Ga4Resp, l: { apiDims: string[]; compare?: Range }, metrics: string[]): LeafData {
+    const dimHeaders: string[] = (resp.dimensionHeaders ?? []).map((h) => h.name);
     const rangeIdx = dimHeaders.indexOf('dateRange');
     const rows: LeafData['rows'] = [];
     for (const row of resp.rows ?? []) {
-        const dv: string[] = (row.dimensionValues ?? []).map((x: { value?: string }) => x.value ?? '');
+        const dv: string[] = (row.dimensionValues ?? []).map((x) => x.value ?? '');
         const r = rangeIdx >= 0 ? (dv[rangeIdx] === 'previous' || dv[rangeIdx] === 'date_range_1' ? 1 : 0) : 0;
         const d = rangeIdx >= 0 ? dv.filter((_, i) => i !== rangeIdx) : dv;
-        const m = (row.metricValues ?? []).map((x: { value?: string }) => {
+        const m = (row.metricValues ?? []).map((x) => {
             const n = Number(x.value);
             return Number.isFinite(n) ? n : null;
         });
@@ -316,14 +333,15 @@ function parseGa4(resp: Record<string, any>, l: { apiDims: string[]; compare?: R
     };
 }
 
-function parseGsc(resp: Record<string, any>, apiDims: string[]): LeafData {
+function parseGsc(resp: GscResp, apiDims: string[]): LeafData {
     const rows: LeafData['rows'] = [];
     let lastDate: string | undefined;
     const di = apiDims.indexOf('date');
     for (const row of resp.rows ?? []) {
         const d: string[] = Array.isArray(row.keys) ? row.keys.map(String) : [];
         if (di >= 0 && d[di] && (!lastDate || d[di] > lastDate)) lastDate = d[di];
-        rows.push({ d, m: GSC_METRIC_API.map((k) => (typeof row[k] === 'number' ? row[k] : null)), r: 0 });
+        const rec = row as Record<string, unknown>;
+        rows.push({ d, m: GSC_METRIC_API.map((k) => (typeof rec[k] === 'number' ? (rec[k] as number) : null)), r: 0 });
     }
     const md = resp.metadata ?? {};
     const fid = typeof md.first_incomplete_date === 'string' ? md.first_incomplete_date : typeof md.firstIncompleteDate === 'string' ? md.firstIncompleteDate : undefined;
@@ -481,7 +499,7 @@ async function fetchGa4Batch(token: string, userId: string, property: string, le
         stats.ga4Reports += chunk.length;
         const resp = await withGoogleSlot('ga4', property, userId, chunk.length, () => runGABatch(token, property, chunk.map((l) => l.body)));
         reportGoogleOutcome('ga4', property, 200);
-        const reports: Record<string, any>[] = Array.isArray(resp?.reports) ? resp.reports : [];
+        const reports: Ga4Resp[] = Array.isArray(resp?.reports) ? (resp.reports as Ga4Resp[]) : [];
         chunk.forEach((l, i) => out.set(l.key, reports[i] ? parseGa4(reports[i], l, l.metrics) : new LeafError('UPSTREAM', ERROR_TEXT.UPSTREAM)));
     };
     for (let i = 0; i < leaves.length; i += 5) {
@@ -514,7 +532,7 @@ async function fetchGsc(token: string, userId: string, leaf: PhysicalLeaf, stats
         stats.gscCalls++;
         const resp = await withGoogleSlot('gsc', leaf.asset, userId, 1, () => runGSCSearchAnalytics(token, leaf.asset, leaf.body));
         reportGoogleOutcome('gsc', leaf.asset, 200);
-        return parseGsc(resp ?? {}, leaf.apiDims);
+        return parseGsc((resp ?? {}) as GscResp, leaf.apiDims);
     } catch (err) {
         reportGoogleOutcome('gsc', leaf.asset, statusOf(err) || 500);
         return classify(err);
