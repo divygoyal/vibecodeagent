@@ -85,17 +85,17 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
   `node scripts/dev/check-scenarios.mjs 3101 --users f403,f429,ftimeout`, `node scripts/dev/check-mobile.mjs 3101 --label final`.
 
 ## Open (severity)
-- Medium (sweep area, report only): `/api/share/<token>/overview/stats` answers 500 with an empty body when Google
+- ~~Medium~~ fixed, see "Fixed after robustness": `/api/share/<token>/overview/stats` answers 500 with an empty body when Google
   fails (429/500 cookie runs on /share/<token>); should be JSON 4xx/5xx with a message.
 - Low: with counts × 10M (`cookie:huge`) public share/view pages show 81 text-spill spots (numbers wider than their
   box, not clipped); check `mobile-scen-cookie-huge.md`.
-- Medium: a sync interrupted by a restart or deploy leaves assets `syncing`; the portfolio then reports `syncing` and
+- ~~Medium~~ fixed, see "Fixed after robustness": a sync interrupted by a restart or deploy leaves assets `syncing`; the portfolio then reports `syncing` and
   polls every 2 s for up to 15 min (SYNC_STUCK_S in build.ts/sync.ts) before a new sync runs. With one web process,
   "syncing in the store but no sync running in this process" means interrupted and could resync at once; not changed
   here because it assumes a single instance.
 - Low: the Tawk.to greeting ("Hi! How can we help?" + two buttons) opens over half of a phone screen on every app page
   and hides content (seen in every mobile screenshot). Tawk dashboard setting: turn the greeting off on mobile.
-- Low: `/api/analytics?mode=list` and `/api/seo?mode=list` answer 502 with the raw Google JSON inside `error`
+- ~~Low~~ fixed, see "Fixed after robustness": `/api/analytics?mode=list` and `/api/seo?mode=list` answer 502 with the raw Google JSON inside `error`
   (`Google API error 401: {"error":…}`), also for a revoked token where 401 + "Reconnect Google" would be right. JSON,
   not shown in the UI.
 - Low: standalone text links are 18–20px tall ("Open the full demo", "See pricing", breadcrumbs) and the marketing logo
@@ -105,3 +105,28 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
   at 390px, counts × 10M at 360px), but unusual content could. Fix as found: `grid-cols-1` / `minmax(0,…)`.
 - Info: the synthetic `nogoogle` user (GitHub session without a token) gets 503 from /api/auth/register-provider
   (`missing-session-data`, handled as degraded); a real GitHub sign-in carries a token.
+
+## Fixed after robustness
+Checked on :3101 (demo data, fault cookie / `f…` users). Tests: `web/tests/robustErrors.test.mjs`; `tsc --noEmit` and `npm test` (59) pass.
+
+1. **Stale "syncing" (was up to 15 min).** `SYNC_STUCK_S` is now 2 min (one constant in `portfolio/ranges.ts`, used by
+   build.ts and sync.ts). `sync_started_at` is a heartbeat: set when the sync marks assets, bumped after every backfill
+   chunk. `isDue()` treats `syncing` with no heartbeat for 2 min as interrupted and re-runs it at once (before, only a
+   never-synced asset restarted; one with data waited for its 6 h age). A `finally` in `runSync` puts assets still
+   `syncing` after a throw back to `error` ("Sync interrupted. Will retry."). Evidence: all 18 assets of the demo user set
+   to `syncing`, started 5 min ago, nothing running. Before: `/api/portfolio` → `syncing:true`, 11 sites `syncing`, still
+   the same 6 s later and in the DB. After: first load `syncing:true` (new sync started), 8 s later `syncing:false`, 11
+   `synced`, log `due=18 synced=18 … in 561ms`. Not changed: a sync queued behind a long run is only refreshed per chunk,
+   so with >2 min of queue another process could start a duplicate (harmless, upserts); single process today.
+2. **Share overview routes answered 500 with an empty body when Google failed.** `stats` and `journey` threw. All 11
+   Google-backed `/api/share/<token>/overview/*` routes are wrapped in `shareOverviewRoute()` (shareOverviewServer.ts):
+   JSON `{error, message}`, 503 for quota/timeout/revoked, 502 otherwise, no reconnect wording for viewers. Before (429,
+   500, revoked cookies): `stats`/`journey` 500, length 0. After: 429 → 503 `google_rate_limited`; 500 → 502
+   `google_error`; revoked → 503 `google_unavailable`. `/share/<token>` shows its normal "Could not load the chart" panel
+   with the message (client `fetchJson` now prefers `message`). `meta`, `data` and `umami/*` already answered JSON.
+3. **`/api/analytics` and `/api/seo` passed Google's raw body through** (`Google API error 401: {…}`, also for revoked
+   tokens). New `lib/googleErrors.ts` maps every Google failure in both routes (list mode, the list fallback and the
+   dashboard data): revoked / invalid grant / 401 → 401 `{error:'google_reauth', message}`; timeout → 504
+   `google_timeout`; 429 → 502 `google_rate_limited`; 403 → 502 `google_forbidden`; else 502 `google_error`.
+   Before: `frevoked` `?mode=list` 502 with raw JSON; data calls 502 raw for 403/429/500/504. After: 401 `google_reauth`
+   (list and data), `list:500|429|timeout` 502/502/504 with short messages. `useDashboardData` fetcher prefers `message`.

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { getToken } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
+import { googleErrorResponse } from '@/lib/googleErrors'
 import { isDemoRequest } from '@/lib/demoWorkspace'
 import { getDemoSeoDashboard } from '@/lib/demoWorkspaceData'
 import { getValidAccessToken, listSearchConsoleSites, fetchSeoDashboard, fetchGoogleTokensFromDb } from '@/lib/googleApi'
@@ -231,8 +232,7 @@ export async function GET(req: Request) {
             if (mode === 'list') {
                 const sites = await fetchSiteList()
                 if (!Array.isArray(sites)) {
-                    const statusCode = sites.error.includes('timed out') ? 504 : 502
-                    return NextResponse.json({ error: sites.error }, { status: statusCode })
+                    return googleErrorResponse(sites.error)
                 }
                 return NextResponse.json(sites)
             }
@@ -241,10 +241,7 @@ export async function GET(req: Request) {
             const siteListResult = await fetchSiteList()
 
             if (!Array.isArray(siteListResult)) {
-                return NextResponse.json(
-                    { error: siteListResult?.error || "Failed to load Search Console sites" },
-                    { status: 502 }
-                )
+                return googleErrorResponse(siteListResult?.error)
             }
 
             const availableSites = siteListResult
@@ -300,8 +297,7 @@ export async function GET(req: Request) {
             )
 
             if ('error' in dashboardData && typeof dashboardData.error === 'string') {
-                const statusCode = dashboardData.error.includes('timed out') ? 504 : 502
-                return NextResponse.json({ error: dashboardData.error }, { status: statusCode })
+                return googleErrorResponse(dashboardData.error)
             }
             return NextResponse.json(dashboardData)
         }

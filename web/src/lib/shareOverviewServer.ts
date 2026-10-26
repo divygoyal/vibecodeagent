@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getShareData } from '@/app/api/share/route';
 import { cachedFetch } from '@/lib/apiCache';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
+import { googleErrorResponse } from '@/lib/googleErrors';
 import { parseShareOverviewEventNames, parseShareOverviewFilters } from '@/lib/shareOverviewFilters';
 import type { ShareData } from '@/lib/shareTypes';
 
@@ -49,6 +50,22 @@ function cleanupRateLimits() {
 
 export function createShareError(message: string, status: number) {
     return NextResponse.json({ error: message }, { status });
+}
+
+/**
+ * Wrap a share overview GET handler: a Google failure (quota, 5xx, timeout, revoked token) that the
+ * handler lets escape becomes `{ error, message }` JSON with 502/503, never a 500 with an empty body.
+ * The shared page shows the message in the panel's normal error state.
+ */
+export function shareOverviewRoute<A extends unknown[]>(handler: (...args: A) => Promise<Response>) {
+    return async (...args: A): Promise<Response> => {
+        try {
+            return await handler(...args);
+        } catch (err) {
+            console.error('[share-overview] failed:', err instanceof Error ? err.message.slice(0, 300) : err);
+            return googleErrorResponse(err, { shared: true });
+        }
+    };
 }
 
 function serializeCachePart(part: unknown) {

@@ -24,6 +24,13 @@ export const HISTORY_DAYS = { ga4: 760, gsc: 486 } as const;
 /** Data older than this triggers a sync on page open. */
 export const STALE_AFTER_S = 6 * 3600;
 
+/**
+ * A "syncing" asset that has not been touched for this long was interrupted (restart, deploy, crash):
+ * the sync bumps `sync_started_at` as a heartbeat (start, every backfill chunk), so a live sync never
+ * looks this old. After it the page stops reporting "syncing" and the next page load restarts the sync.
+ */
+export const SYNC_STUCK_S = 2 * 60;
+
 export function parseRange(value: string | null | undefined): PortfolioRange {
     return (PORTFOLIO_RANGES as readonly string[]).includes(value ?? '') ? (value as PortfolioRange) : DEFAULT_RANGE;
 }

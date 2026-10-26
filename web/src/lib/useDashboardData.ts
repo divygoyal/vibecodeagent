@@ -6,6 +6,7 @@ import { DEMO_QUERY_PARAM, DEMO_QUERY_VALUE } from '@/lib/demoWorkspace';
 
 type FetcherErrorInfo = {
     error?: string;
+    message?: string;
     code?: string;
     [key: string]: unknown;
 };
@@ -24,7 +25,7 @@ const fetcher = async (url: string) => {
     const res = await fetch(url);
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as FetcherErrorInfo;
-        const error = new Error(body.error || `HTTP error! status: ${res.status}`) as FetcherError;
+        const error = new Error(body.message || body.error || `HTTP error! status: ${res.status}`) as FetcherError;
         error.info = body;
         error.status = res.status;
         throw error;

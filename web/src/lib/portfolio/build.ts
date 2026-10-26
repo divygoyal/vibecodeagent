@@ -3,7 +3,7 @@
  * client-safe: the API route, the CSV export and the public demo all call it.
  */
 import { normalizeHost, siteKind } from '@/lib/sites/pairing';
-import { addDays, daysBetween } from './ranges';
+import { addDays, daysBetween, SYNC_STUCK_S } from './ranges';
 import { NO_PAIR, type RangeTotalRow, type SnapshotData, type StoreAsset, type StoreWindow, type TotalsRow } from './snapshot';
 import type {
     AlertMetric,
@@ -36,8 +36,6 @@ export interface BuildOptions {
     demo?: boolean;
 }
 
-/** A "syncing" asset whose sync started longer ago than this is treated as interrupted. */
-const SYNC_STUCK_S = 15 * 60;
 /** Last good sync older than this shows the "Stale" pill. */
 const STALE_PILL_S = 24 * 3600;
 /** Drop alerts need a previous period of at least this much, and a drop of at least MIN_DROP_ABS (tiny sites are noise). */

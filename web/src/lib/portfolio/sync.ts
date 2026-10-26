@@ -18,7 +18,7 @@
 import { fetchInventory, type FetchLike, type Inventory } from '@/lib/sites/fetchInventory';
 import { normalizeHost, pairSites } from '@/lib/sites/pairing';
 import { AdminStoreError, adminStore, type AssetUpsert, type StatusUpdate } from './adminStore';
-import { addDays, HISTORY_DAYS, STALE_AFTER_S, syncEndDay } from './ranges';
+import { addDays, HISTORY_DAYS, STALE_AFTER_S, SYNC_STUCK_S, syncEndDay } from './ranges';
 import { ga4DailyRequest, ga4RangeUsersRequest, gscDailyRequest, parseGa4Daily, parseGa4RangeUsers, parseGscDaily } from './rows';
 import { pairingOverridesFrom, type DailyRow, type StoreAsset, type StoreWindow } from './snapshot';
 import type { AssetKind } from './types';
@@ -29,7 +29,6 @@ const GSC = 'https://www.googleapis.com/webmasters/v3';
 export const SYNC_CONCURRENCY = 4;
 const RECENT_CHUNK_DAYS = 200;
 const LOOKBACK_DAYS: Record<AssetKind, number> = { ga4: 3, gsc: 5 };
-const SYNC_STUCK_S = 15 * 60;
 const ERROR_RETRY_S = 30 * 60;
 
 export type SyncReason = 'page' | 'manual' | 'cron' | 'pairing';
@@ -73,8 +72,10 @@ export interface SyncOptions {
 }
 
 class GoogleError extends Error {
-    constructor(public status: number, message: string) {
+    status: number;
+    constructor(status: number, message: string) {
         super(message);
+        this.status = status;
     }
 }
 
@@ -212,7 +213,10 @@ export async function repairPairs(identifier: string, accessToken: string): Prom
 
 function isDue(a: StoreAsset, nowS: number, force: boolean): boolean {
     if (a.missing || a.hidden) return false;
-    if (a.status === 'syncing' && (a.sync_started_at ?? 0) > nowS - SYNC_STUCK_S) return false;
+    if (a.status === 'syncing') {
+        if ((a.sync_started_at ?? 0) > nowS - SYNC_STUCK_S) return false; // a live sync (heartbeat is recent)
+        return true; // interrupted (restart, deploy): run again now, whatever its last_synced_at says
+    }
     if (!a.backfill_done || !a.last_synced_at) {
         // Never synced yet: retry errors after 5 minutes and "no access" after 30 (it was due on every
         // poll, so a property Google refuses restarted the sync every 2 seconds while the page was open).
@@ -289,44 +293,59 @@ async function runSync(opts: SyncOptions): Promise<SyncResult> {
     })));
 
     let authFailed = false;
-    await mapLimit(due, SYNC_CONCURRENCY, async (a) => {
-        if (authFailed) {
-            await adminStore.updateStatus(identifier, [{ kind: a.asset_kind, asset_id: a.asset_id, status: 'error', last_error: 'Google access expired. Reconnect Google.' }]);
-            result.failed += 1;
-            return;
-        }
-        const { chunks, backfill } = chunksFor(a, end);
-        try {
-            for (let i = 0; i < chunks.length; i++) {
-                const [s, e] = chunks[i];
-                const rows = await fetchDaily(fetchFn, accessToken, a.asset_kind, a.asset_id, s, e);
-                await adminStore.upsertMetrics(identifier, rows);
-                const last = i === chunks.length - 1;
-                const upd: StatusUpdate = {
-                    kind: a.asset_kind, asset_id: a.asset_id, status: last ? 'synced' : 'syncing', last_error: null,
-                    data_end: end, backfill_done: backfill ? last : true,
-                };
-                // Chunks run newest first, so each backfill chunk start is the oldest day stored so far.
-                if (backfill) upd.data_start = s;
-                if (last) upd.last_synced_at = Math.floor(Date.now() / 1000);
-                await adminStore.updateStatus(identifier, [upd]);
+    // Assets marked "syncing" above that have not reached a final status. If this run dies on the way
+    // (a throw inside mapLimit), they are put back to an error below instead of staying "syncing".
+    const unfinished = new Set<StoreAsset>(due);
+    try {
+        await mapLimit(due, SYNC_CONCURRENCY, async (a) => {
+            if (authFailed) {
+                await adminStore.updateStatus(identifier, [{ kind: a.asset_kind, asset_id: a.asset_id, status: 'error', last_error: 'Google access expired. Reconnect Google.' }]);
+                unfinished.delete(a);
+                result.failed += 1;
+                return;
             }
-            result.synced += 1;
-        } catch (err) {
-            const status = err instanceof GoogleError ? err.status : 0;
-            if (status === 401) authFailed = true;
-            const message = status === 401 ? 'Google access expired. Reconnect Google.'
-                : status === 403 ? 'No access to this property'
-                : status === 429 ? 'Google quota reached; will retry later'
-                : err instanceof Error ? err.message.slice(0, 300) : 'Sync failed';
-            if (status === 403) result.noAccess += 1;
-            else result.failed += 1;
-            if (status === 401) result.googleError = { status, message };
-            await adminStore.updateStatus(identifier, [{
-                kind: a.asset_kind, asset_id: a.asset_id, status: status === 403 ? 'no_access' : 'error', last_error: message,
-            }]).catch(() => undefined);
+            const { chunks, backfill } = chunksFor(a, end);
+            try {
+                for (let i = 0; i < chunks.length; i++) {
+                    const [s, e] = chunks[i];
+                    const rows = await fetchDaily(fetchFn, accessToken, a.asset_kind, a.asset_id, s, e);
+                    await adminStore.upsertMetrics(identifier, rows);
+                    const last = i === chunks.length - 1;
+                    const upd: StatusUpdate = {
+                        kind: a.asset_kind, asset_id: a.asset_id, status: last ? 'synced' : 'syncing', last_error: null,
+                        data_end: end, backfill_done: backfill ? last : true,
+                    };
+                    // Chunks run newest first, so each backfill chunk start is the oldest day stored so far.
+                    if (backfill) upd.data_start = s;
+                    if (last) upd.last_synced_at = Math.floor(Date.now() / 1000);
+                    else upd.sync_started_at = Math.floor(Date.now() / 1000); // heartbeat: this sync is alive
+                    await adminStore.updateStatus(identifier, [upd]);
+                }
+                result.synced += 1;
+            } catch (err) {
+                const status = err instanceof GoogleError ? err.status : 0;
+                if (status === 401) authFailed = true;
+                const message = status === 401 ? 'Google access expired. Reconnect Google.'
+                    : status === 403 ? 'No access to this property'
+                    : status === 429 ? 'Google quota reached; will retry later'
+                    : err instanceof Error ? err.message.slice(0, 300) : 'Sync failed';
+                if (status === 403) result.noAccess += 1;
+                else result.failed += 1;
+                if (status === 401) result.googleError = { status, message };
+                await adminStore.updateStatus(identifier, [{
+                    kind: a.asset_kind, asset_id: a.asset_id, status: status === 403 ? 'no_access' : 'error', last_error: message,
+                }]).catch(() => undefined);
+            }
+            unfinished.delete(a);
+        });
+    } finally {
+        if (unfinished.size > 0) {
+            const nowDone = Math.floor(Date.now() / 1000);
+            await adminStore.updateStatus(identifier, [...unfinished].map((a) => ({
+                kind: a.asset_kind, asset_id: a.asset_id, status: 'error' as const, last_error: 'Sync interrupted. Will retry.', sync_started_at: nowDone,
+            }))).catch(() => undefined);
         }
-    });
+    }
 
     result.ms = Date.now() - startedAt;
     console.log(
