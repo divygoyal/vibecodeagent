@@ -17,7 +17,7 @@
  */
 import { fetchInventory, type FetchLike, type Inventory } from '@/lib/sites/fetchInventory';
 import { normalizeHost, pairSites } from '@/lib/sites/pairing';
-import { adminStore, type AssetUpsert, type StatusUpdate } from './adminStore';
+import { AdminStoreError, adminStore, type AssetUpsert, type StatusUpdate } from './adminStore';
 import { addDays, HISTORY_DAYS, STALE_AFTER_S, syncEndDay } from './ranges';
 import { ga4DailyRequest, ga4RangeUsersRequest, gscDailyRequest, parseGa4Daily, parseGa4RangeUsers, parseGscDaily } from './rows';
 import { pairingOverridesFrom, type DailyRow, type StoreAsset, type StoreWindow } from './snapshot';
@@ -64,6 +64,12 @@ export interface SyncOptions {
     force?: boolean;
     /** Refresh the inventory instead of using the 10-minute cache. */
     refreshInventory?: boolean;
+    /**
+     * Creates the admin user row when it does not exist yet (first visit right
+     * after sign-in, before /api/auth/register-provider has finished). Called
+     * once on a 404 from the store, then the sync retries. Returns success.
+     */
+    ensureUser?: () => Promise<boolean>;
 }
 
 class GoogleError extends Error {
@@ -244,7 +250,14 @@ async function runSync(opts: SyncOptions): Promise<SyncResult> {
     const result = emptyResult(opts, startedAt);
     result.calls = calls;
 
-    const current = await adminStore.getAssets(identifier);
+    let current: StoreAsset[];
+    try {
+        current = await adminStore.getAssets(identifier);
+    } catch (err) {
+        // No admin user row yet: register the user, then try once more.
+        if (!(err instanceof AdminStoreError && err.status === 404) || !opts.ensureUser || !(await opts.ensureUser())) throw err;
+        current = await adminStore.getAssets(identifier);
+    }
     const inv = await fetchInventory(accessToken, { cacheKey: identifier, fetch: fetchFn, refresh: opts.refreshInventory });
     result.properties = inv.properties.length;
     result.sites = inv.sites.length;

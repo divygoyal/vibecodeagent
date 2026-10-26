@@ -4,7 +4,7 @@
  * GET /api/portfolio and GET /api/portfolio/export.csv.
  */
 import { adminStore, AdminStoreError } from './adminStore';
-import { googleAccessFor } from './auth';
+import { googleAccessFor, sessionUserRegistrar } from './auth';
 import { buildPortfolio, rangeUsersNeeded, RECENT_DAYS } from './build';
 import { bucketDaysFor, windowRequests } from './ranges';
 import type { SnapshotData } from './snapshot';
@@ -43,7 +43,7 @@ export async function loadPortfolio(identifier: string, range: PortfolioRange, r
 
     let syncing = isSyncRunning(identifier);
     if (!syncing && needsSync(snap.assets, Math.floor(now / 1000))) {
-        void startSync({ identifier, accessToken: access.token, reason: 'page' });
+        void startSync({ identifier, accessToken: access.token, reason: 'page', ensureUser: await sessionUserRegistrar(req) });
         syncing = true;
     }
     // Exact users for the range being viewed: fetched lazily, cached 6 hours.

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { googleAccessFor, sessionIdentifier } from '@/lib/portfolio/auth';
+import { googleAccessFor, sessionIdentifier, sessionUserRegistrar } from '@/lib/portfolio/auth';
 import { isSyncRunning, startSync } from '@/lib/portfolio/sync';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
         lastForcedAt.set(identifier, Date.now());
         if (lastForcedAt.size > 5000) lastForcedAt.delete(lastForcedAt.keys().next().value as string);
     }
-    const p = startSync({ identifier, accessToken: access.token, reason: 'manual', force, refreshInventory: force });
+    const p = startSync({ identifier, accessToken: access.token, reason: 'manual', force, refreshInventory: force, ensureUser: await sessionUserRegistrar(req) });
     if (!wait) return NextResponse.json({ started: !running, syncing: true });
     const result = await p;
     return NextResponse.json({ started: !running, syncing: false, result });
