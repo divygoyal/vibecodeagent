@@ -7,7 +7,12 @@ import type { BoardResponse } from '@/lib/leaderboard/types';
 
 type Freq = MetadataRoute.Sitemap[number]['changeFrequency'];
 
+// Read TC_NOINDEX on each request, not only at build time.
+export const dynamic = 'force-dynamic';
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+    // Private previews (TC_NOINDEX=1): nothing to index.
+    if (process.env.TC_NOINDEX === '1') return [];
     const now = new Date();
     const routes: Array<{ path: string; priority: number; changeFrequency: Freq }> = [
         { path: '/', priority: 1, changeFrequency: 'weekly' },

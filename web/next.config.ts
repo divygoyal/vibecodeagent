@@ -85,8 +85,13 @@ const nextConfig: NextConfig = {
     { source: '/demo/telegram-video', destination: '/', permanent: true },
     { source: '/share-popup-preview', destination: '/', permanent: true },
   ],
-  // Security + cache headers
+  // Security + cache headers. TC_NOINDEX=1 (private previews, read at build
+  // time) adds X-Robots-Tag: noindex, nofollow to every response; robots.ts
+  // and sitemap.ts also check it at request time.
   headers: async () => [
+    ...(process.env.TC_NOINDEX === '1'
+      ? [{ source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] }]
+      : []),
     {
       // Cache static assets (videos, images, fonts) for 1 year
       source: '/:path*.(mp4|webm|jpg|jpeg|png|gif|svg|ico|woff|woff2)',
