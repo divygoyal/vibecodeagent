@@ -43,7 +43,7 @@ const PATTERNS = [
 // rainbow colors. The previous emerald/cyan/amber palette read as "cheap" —
 // Claude/ChatGPT/Grok all use a monochrome treatment for numbers in answers
 // and let the bold weight do the work.
-const NUMBER_TOKEN_CLASS = 'text-white font-semibold tabular-nums';
+const NUMBER_TOKEN_CLASS = 'text-fg font-semibold tabular-nums';
 const TONE: Record<string, string> = {
     currency: NUMBER_TOKEN_CLASS,
     percent: NUMBER_TOKEN_CLASS,

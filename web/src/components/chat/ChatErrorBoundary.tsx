@@ -34,7 +34,7 @@ export default class ChatErrorBoundary extends Component<Props, State> {
     render() {
         if (this.state.hasError) {
             return (
-                <div className="my-2 rounded-lg border border-red-500/15 bg-red-500/[0.04] px-3 py-2 text-[12px] text-red-300">
+                <div className="my-2 rounded-control border border-down/20 bg-down-soft px-3 py-2 text-body-sm text-down">
                     Couldn&apos;t render this {this.props.label || 'section'}. The rest of the message is unaffected.
                 </div>
             );

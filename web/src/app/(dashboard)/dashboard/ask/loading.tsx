@@ -1,34 +1,22 @@
+import { Skeleton } from '@/components/ui/Skeleton';
+
+/** Ask while the page loads: header, a row of prompt cards and the composer, same layout as the page. */
 export default function Loading() {
     return (
-        <div className="flex flex-col h-full animate-pulse">
-            {/* Chat header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
-                <div className="flex items-center gap-3">
-                    <div className="skeleton w-9 h-9 rounded-xl" />
-                    <div className="space-y-1.5">
-                        <div className="skeleton h-5 w-32" />
-                        <div className="skeleton h-3 w-40" />
-                    </div>
-                </div>
-                <div className="skeleton h-8 w-20 rounded-lg" />
+        <div aria-hidden className="flex min-h-[calc(100dvh-7rem)] flex-col md:min-h-[calc(100dvh-9.5rem)]">
+            <div className="mb-6 flex items-end justify-between gap-4">
+                <div className="flex flex-col gap-2"><Skeleton className="h-7 w-24" /><Skeleton className="h-4 w-64" /></div>
+                <Skeleton className="h-8 w-24" rounded="full" />
             </div>
-
-            {/* Chat area with starter prompts */}
-            <div className="flex-1 flex items-center justify-center p-6">
-                <div className="w-full max-w-lg space-y-4">
-                    <div className="skeleton h-6 w-48 mx-auto" />
-                    <div className="skeleton h-4 w-64 mx-auto" />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
-                        {[...Array(4)].map((_, i) => (
-                            <div key={i} className="skeleton h-16 rounded-2xl" />
-                        ))}
-                    </div>
+            <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center gap-4 py-8">
+                <Skeleton className="size-10" rounded="card" />
+                <Skeleton className="h-7 w-72" />
+                <div className="mt-4 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[72px] w-full" rounded="card" />)}
                 </div>
             </div>
-
-            {/* Input bar */}
-            <div className="p-4 border-t border-white/[0.06]">
-                <div className="skeleton h-12 rounded-2xl max-w-3xl mx-auto" />
+            <div className="mx-auto w-full max-w-[760px] pt-2">
+                <Skeleton className="h-[92px] w-full" rounded="card" />
             </div>
         </div>
     );
