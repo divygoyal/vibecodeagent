@@ -4,6 +4,7 @@
 #   scripts/dev/down.sh <name> [--purge]
 #
 # --purge also deletes /root/.trafficclaw-dev/<name>/ (DB, logs, login state).
+# When / has less than 8 GB free, the worktree's web/.next is deleted too.
 # Only processes recorded in that instance's pid files are touched.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -51,6 +52,16 @@ if [ -n "$slot" ]; then
         log "dev slot $slot is still held (a server process is still exiting?)"
     fi
     rm -f "$INST/web.slot"
+fi
+
+# Disk is tight: drop the dev build cache when / has less than 8 GB free.
+if [ -n "$REPO" ] && [ -d "$REPO/web/.next" ] && [ "$(disk_free_mb)" -lt "$TC_CLEAN_NEXT_BELOW_MB" ]; then
+    if [ -n "$(owned_pid "$INST/web.pid" "$REPO/web" || true)" ]; then
+        log "not deleting $REPO/web/.next: a web server still runs there"
+    else
+        rm -rf "$REPO/web/.next"
+        log "deleted $REPO/web/.next (free disk on / below $((TC_CLEAN_NEXT_BELOW_MB / 1024)) GB; now $(disk_free_mb) MB free)"
+    fi
 fi
 
 if [ "$PURGE" = "--purge" ]; then

@@ -14,6 +14,10 @@ TC_SLOTS_DIR="$TC_DEV_HOME/slots"
 TC_MAX_SLOTS=2
 # up.sh refuses to start a dev server when MemAvailable is below this (MB).
 TC_MIN_AVAILABLE_MB=2500
+# up.sh refuses to start below this much free disk on / (MB); down.sh deletes
+# the worktree's web/.next when free disk is below TC_CLEAN_NEXT_BELOW_MB.
+TC_MIN_DISK_MB=3072
+TC_CLEAN_NEXT_BELOW_MB="${TC_CLEAN_NEXT_BELOW_MB:-8192}"
 
 # Fixed demo identities (Google "sub" values). login.mjs uses the same ones.
 TC_SUPERADMIN_SUB="100000000000000000009"
@@ -179,3 +183,6 @@ slot_report() {
 
 # MemAvailable from /proc/meminfo, in MB.
 mem_available_mb() { awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo; }
+
+# Free disk on / in MB.
+disk_free_mb() { df --output=avail -BM / | tail -n 1 | tr -dc '0-9'; }

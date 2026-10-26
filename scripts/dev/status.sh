@@ -21,3 +21,14 @@ echo
 echo "Next dev slots (max $TC_MAX_SLOTS on this box):"
 mkdir -p "$TC_SLOTS_DIR"
 slot_report
+
+echo
+echo "Disk: $(disk_free_mb) MB free on /  (up.sh needs $TC_MIN_DISK_MB MB; down.sh deletes web/.next below $TC_CLEAN_NEXT_BELOW_MB MB)"
+echo "RAM:  $(mem_available_mb) MB available (up.sh needs $TC_MIN_AVAILABLE_MB MB)"
+echo "web/.next build caches:"
+{
+    for f in "$TC_DEV_HOME"/*/instance.env; do [ -f "$f" ] && sed -n 's/^REPO=//p' "$f"; done
+    for d in /root/projects/worktrees/*/; do [ -d "$d/web" ] && echo "${d%/}"; done
+} | sort -u | while read -r repo; do
+    [ -d "$repo/web/.next" ] && printf '  %-8s %s\n' "$(du -sh "$repo/web/.next" 2>/dev/null | cut -f1)" "$repo/web/.next"
+done
