@@ -717,3 +717,99 @@ class WeeklyDigest(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "year", "iso_week", "site_url", name="uq_weekly_digest_user_week_site"),
     )
+
+
+# ============= Leaderboard v3 (tc/leaderboard, migration 021) =============
+# Everything below is additive: new tables only, keyed by leaderboard_entries.id.
+# Existing entries keep working with no row in these tables (see
+# leaderboard_core.py for how a missing row is interpreted).
+
+class LeaderboardProfile(Base):
+    """Per-entry verification state + privacy settings (1:1 with leaderboard_entries).
+
+    verification_level: 'owner' (Search Console siteOwner / siteFullUser covers the
+    host), 'ga4' (GA4 web stream host matches but Search Console ownership is not
+    proven) or 'none'. Only 'owner' ranks on the main board; entries with no row yet
+    are interpreted by leaderboard_core.effective_level().
+    """
+    __tablename__ = "leaderboard_profiles"
+
+    entry_id = Column(Integer, primary_key=True)  # leaderboard_entries.id
+
+    verification_level = Column(String(10), nullable=False, default="none")
+    verification_checked_at = Column(DateTime)
+    verification_detail = Column(Text)            # JSON, owner-only (fix-it steps, hosts, errors)
+    verification_manual = Column(Boolean, nullable=False, default=False)  # superadmin override, never auto-downgraded
+    gsc_site_url = Column(String(255))
+
+    privacy_json = Column(Text)                   # see leaderboard_core.DEFAULT_PRIVACY
+    open_to_json = Column(Text)                   # ["sponsorships","acquisition","partnerships"]
+    is_paused = Column(Boolean, nullable=False, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class LeaderboardDaily(Base):
+    """One row per entry per day: GA4 users/sessions/pageviews and GSC clicks/impressions."""
+    __tablename__ = "leaderboard_daily"
+
+    entry_id = Column(Integer, primary_key=True)
+    day = Column(Date, primary_key=True)
+    users = Column(Integer)           # GA4 activeUsers that day (NULL = no GA4 data)
+    sessions = Column(Integer)
+    pageviews = Column(Integer)
+    clicks = Column(Integer)          # GSC clicks (NULL = no Search Console data)
+    impressions = Column(Integer)
+
+
+class LeaderboardRangeStat(Base):
+    """Per-range totals (7d / 28d / 3m) with the previous period, refreshed daily.
+
+    GA4 visitors are unique users over the whole window, so they cannot be summed
+    from daily rows; they are fetched per range and stored here.
+    """
+    __tablename__ = "leaderboard_range_stats"
+
+    entry_id = Column(Integer, primary_key=True)
+    range_key = Column(String(4), primary_key=True)   # '7d' | '28d' | '3m'
+    visitors = Column(Integer)
+    visitors_prev = Column(Integer)
+    pageviews = Column(Integer)
+    pageviews_prev = Column(Integer)
+    clicks = Column(Integer)
+    clicks_prev = Column(Integer)
+    impressions = Column(Integer)
+    impressions_prev = Column(Integer)
+    engagement_rate = Column(Float)       # percent 0-100
+    bounce_rate = Column(Float)
+    avg_session_duration = Column(Float)  # seconds
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class LeaderboardInquiry(Base):
+    """A visitor's offer to a listed site: sponsorship, acquisition or partnership.
+
+    Sponsorship asks for a specific ad slot go into ad_slot_requests (the existing
+    pipeline) and are mirrored here only when ad_slot_request_id is set, so the
+    owner's inbox is one list. Everything else (no slot, acquisition, partnership)
+    lives only here.
+    """
+    __tablename__ = "leaderboard_inquiries"
+
+    id = Column(Integer, primary_key=True)
+    entry_id = Column(Integer, nullable=False, index=True)
+    publisher_user_id = Column(Integer, nullable=False, index=True)
+
+    kind = Column(String(20), nullable=False)          # sponsorship | acquisition | partnership
+    name = Column(String(120))
+    email = Column(String(255), nullable=False)
+    company = Column(String(160))
+    budget = Column(String(80))
+    message = Column(Text)
+
+    status = Column(String(20), nullable=False, default="new")   # new | read | replied | archived
+    ad_slot_request_id = Column(Integer)               # set when it also went to ad_slot_requests
+
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
