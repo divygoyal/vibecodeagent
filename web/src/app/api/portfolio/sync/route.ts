@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { googleAccessFor, sessionIdentifier } from '@/lib/portfolio/auth';
-import { isSyncRunning, lastSyncResult, startSync } from '@/lib/portfolio/sync';
+import { isSyncRunning, startSync } from '@/lib/portfolio/sync';
 
 export const dynamic = 'force-dynamic';
 
 const MANUAL_COOLDOWN_MS = 60_000;
+const lastForcedAt = new Map<string, number>();
 
 /**
  * POST /api/portfolio/sync  { force?: boolean, wait?: boolean }
@@ -24,9 +25,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Google is not connected', code: 'GOOGLE_NOT_CONNECTED' }, { status: 400 });
     }
     const running = isSyncRunning(identifier);
-    const last = lastSyncResult(identifier);
-    if (!running && force && last && Date.now() - last.startedAt < MANUAL_COOLDOWN_MS) {
-        return NextResponse.json({ started: false, syncing: false, error: 'Synced a moment ago. Try again in a minute.' }, { status: 429 });
+    if (!running && force) {
+        const lastForced = lastForcedAt.get(identifier) ?? 0;
+        if (Date.now() - lastForced < MANUAL_COOLDOWN_MS) {
+            return NextResponse.json({ started: false, syncing: false, error: 'Synced a moment ago. Try again in a minute.' }, { status: 429 });
+        }
+        lastForcedAt.set(identifier, Date.now());
+        if (lastForcedAt.size > 5000) lastForcedAt.delete(lastForcedAt.keys().next().value as string);
     }
     const p = startSync({ identifier, accessToken: access.token, reason: 'manual', force, refreshInventory: force });
     if (!wait) return NextResponse.json({ started: !running, syncing: true });

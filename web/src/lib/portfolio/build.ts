@@ -38,8 +38,9 @@ export interface BuildOptions {
 const SYNC_STUCK_S = 15 * 60;
 /** Last good sync older than this shows the "Stale" pill. */
 const STALE_PILL_S = 24 * 3600;
-/** Previous-period values under this are noise: no drop alerts. */
-const MIN_PREV_FOR_DROP = 20;
+/** Drop alerts need a previous period of at least this much, and a drop of at least MIN_DROP_ABS (tiny sites are noise). */
+const MIN_PREV_FOR_DROP = 50;
+const MIN_DROP_ABS = 20;
 const DROP_WARN = -30;
 const DROP_CRITICAL = -50;
 /** Zero-traffic alerts need this daily average before the zero run. */
@@ -182,7 +183,7 @@ function siteAlerts(site: PortfolioSite, snap: SnapshotData, assets: { gsc?: Sto
             continue;
         }
         const change = pctChange(cur, prev);
-        if (change !== null && (prev ?? 0) >= MIN_PREV_FOR_DROP && change <= DROP_WARN) {
+        if (change !== null && (prev ?? 0) >= MIN_PREV_FOR_DROP && (prev ?? 0) - cur >= MIN_DROP_ABS && change <= DROP_WARN) {
             out.push({
                 id: `${site.key}:${metric}:drop`, siteKey: site.key, host: site.host, slug: site.slug, metric, type: 'drop',
                 severity: change <= DROP_CRITICAL ? 'critical' : 'warning', current: cur, previous: prev ?? null,

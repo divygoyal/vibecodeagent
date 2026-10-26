@@ -24,7 +24,7 @@ from __future__ import annotations
 import math
 import os
 import time
-from datetime import date as _date
+from datetime import date as _date, timedelta
 from typing import Callable, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -161,10 +161,13 @@ class MetricsBatch(BaseModel):
 
 
 class Window(BaseModel):
-    cur_start: str
-    cur_end: str
-    prev_start: str
-    prev_end: str
+    # Window length in days; the previous window is the same length, right before.
+    days: int = Field(..., ge=1, le=800)
+    # Last day of the current window. When omitted it is the newest stored date
+    # of that kind (Search Console lags 2-3 days), clamped to [end_min, end_max].
+    end: Optional[str] = None
+    end_min: Optional[str] = None
+    end_max: Optional[str] = None
 
 
 class SnapshotQuery(BaseModel):
@@ -358,11 +361,29 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
         recent_days = max(1, min(int(body.recent_days), 31))
         out = {"assets": await list_assets(db, user_id), "totals": [], "series": {}, "recent": {}, "bucket_days": b}
 
+        out["windows"] = {}
         for kind, w in body.windows.items():
             _check_kind(kind)
-            for d in (w.cur_start, w.cur_end, w.prev_start, w.prev_end):
-                _valid_date(d)
-            p = {"u": user_id, "k": kind, "cs": w.cur_start, "ce": w.cur_end, "ps": w.prev_start, "pe": w.prev_end}
+            end = w.end
+            if end is None:
+                newest = (await db.execute(
+                    text("SELECT MAX(date) FROM site_daily_metrics WHERE user_id = :u AND asset_kind = :k"),
+                    {"u": user_id, "k": kind},
+                )).scalar()
+                end = newest or w.end_max
+                if end and w.end_max and end > w.end_max:
+                    end = w.end_max
+                if end and w.end_min and end < w.end_min:
+                    end = w.end_min
+            if not end:
+                raise HTTPException(status_code=422, detail=f"No end date for {kind}")
+            ce = _date.fromisoformat(_valid_date(end))
+            cs = ce - timedelta(days=w.days - 1)
+            pe = cs - timedelta(days=1)
+            ps = pe - timedelta(days=w.days - 1)
+            win = {"cur_start": cs.isoformat(), "cur_end": ce.isoformat(), "prev_start": ps.isoformat(), "prev_end": pe.isoformat()}
+            out["windows"][kind] = win
+            p = {"u": user_id, "k": kind, "cs": win["cur_start"], "ce": win["cur_end"], "ps": win["prev_start"], "pe": win["prev_end"]}
 
             totals = (await db.execute(text(
                 """
@@ -384,7 +405,7 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
                 m["kind"] = kind
                 out["totals"].append(m)
 
-            span = (_date.fromisoformat(w.cur_end) - _date.fromisoformat(w.cur_start)).days + 1
+            span = w.days
             n_buckets = max(1, math.ceil(span / b))
             series_rows = (await db.execute(text(
                 """
