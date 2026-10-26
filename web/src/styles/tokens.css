@@ -315,6 +315,8 @@
   --animate-pop-in: tc-pop-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-sheet-up: tc-sheet-up 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-drawer-in: tc-drawer-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-drawer-in-left: tc-drawer-in-left 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-progress: tc-progress 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   --animate-live-dot: tc-live-dot 2s ease-in-out infinite;
 }
 
@@ -324,6 +326,8 @@
 @keyframes tc-pop-in { from { opacity: 0; transform: scale(0.97) translateY(2px); } to { opacity: 1; transform: none; } }
 @keyframes tc-sheet-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes tc-drawer-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes tc-drawer-in-left { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+@keyframes tc-progress { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 @keyframes tc-live-dot {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--tc-up) 35%, transparent); }
   50%      { box-shadow: 0 0 0 4px color-mix(in oklab, var(--tc-up) 0%, transparent); }
