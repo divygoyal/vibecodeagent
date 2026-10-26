@@ -12,6 +12,7 @@ const SITE_COOKIE = 'tc_site';
  */
 function movedSitePath(pathname: string, host: string): { path: string; tab?: string } | null {
     const base = `/dashboard/s/${encodeURIComponent(host)}`;
+    if (pathname === '/dashboard/site' || pathname === '/dashboard/s') return { path: base };
     if (pathname === '/dashboard/seo' || pathname.startsWith('/dashboard/seo/')) return { path: `${base}/search` };
     if (pathname === '/dashboard/audit' || pathname.startsWith('/dashboard/audit/')) return { path: `${base}/actions/audit` };
     if (pathname === '/dashboard/analytics' || pathname.startsWith('/dashboard/analytics/')) {
@@ -72,6 +73,10 @@ export async function middleware(request: NextRequest) {
                     if (moved.tab) url.searchParams.set('tab', moved.tab);
                     return NextResponse.redirect(url, 307);
                 }
+            }
+            // No saved site: the site overview's old name and the bare /dashboard/s go to the portfolio.
+            if (pathname === '/dashboard/site' || pathname === '/dashboard/s') {
+                return NextResponse.redirect(new URL('/dashboard', request.url), 307);
             }
         }
     }
