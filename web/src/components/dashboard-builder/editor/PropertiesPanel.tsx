@@ -28,6 +28,15 @@ function cfg<W extends WidgetDef>(w: W, patch: Partial<W['config']>): W {
     return { ...w, config: { ...w.config, ...patch } } as W;
 }
 
+
+/** Menu presets, plus the saved one when it is not in the menu (older dashboards default to "Last 30 days"). */
+function presetOptions(current: string | null) {
+    const ids = current && !MENU_PRESETS.includes(current as (typeof MENU_PRESETS)[number]) && PRESETS.some((p) => p.id === current)
+        ? [current as (typeof MENU_PRESETS)[number], ...MENU_PRESETS]
+        : MENU_PRESETS;
+    return ids.map((id) => ({ value: id, label: PRESETS.find((p) => p.id === id)!.label }));
+}
+
 export function PropertiesPanel({ doc, sites, defaultLabel }: { doc: DashboardDocV2; sites: SiteOption[]; defaultLabel: string }) {
     const selectedId = useEditorStore((s) => s.selectedId);
     const controlId = useEditorStore((s) => s.selectedControlId);
@@ -330,7 +339,7 @@ function DashboardSettings({ doc, sites }: { doc: DashboardDocV2; sites: SiteOpt
                 {dc && dc.type === 'date' ? (
                     <>
                         <Field label="Default date range">
-                            <Choice ariaLabel="Default date range" value={dc.default.kind === 'preset' ? dc.default.id : '28d'} onChange={(v) => setDate({ default: { kind: 'preset', id: v } })} options={MENU_PRESETS.map((id) => ({ value: id, label: PRESETS.find((p) => p.id === id)!.label }))} />
+                            <Choice ariaLabel="Default date range" value={dc.default.kind === 'preset' ? dc.default.id : '28d'} onChange={(v) => setDate({ default: { kind: 'preset', id: v } })} options={presetOptions(dc.default.kind === 'preset' ? dc.default.id : null)} />
                         </Field>
                         <Field label="Compare to">
                             <Choice ariaLabel="Default comparison" value={dc.defaultCompare.mode === 'custom' ? 'none' : dc.defaultCompare.mode} onChange={(v) => setDate({ defaultCompare: { mode: v } })} options={[{ value: 'previous_period', label: 'Previous period' }, { value: 'previous_year', label: 'Same period last year' }, { value: 'none', label: 'No comparison' }]} />

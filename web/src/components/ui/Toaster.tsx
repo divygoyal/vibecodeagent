@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertTriangle, CheckCircle2, Info, Loader2, XCircle } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { Toaster as Sonner } from 'sonner';
 
 import { useIsMobile } from '@/lib/useIsMobile';
@@ -9,14 +10,16 @@ export { toast } from 'sonner';
 
 /**
  * App toasts (DESIGN 3.16): bottom-right on desktop, top-center on mobile,
- * max 3, 4s (errors and toasts with actions: pass duration 8000).
+ * max 3, 4s (errors and toasts with actions: pass duration 8000). In the
+ * dashboard editor they sit bottom-center, clear of the palette and the properties panel.
  * Mounted once in app/providers.tsx. Styling lives in globals.css (.tc-toast).
  */
 export function Toaster() {
     const isMobile = useIsMobile();
+    const inEditor = /^\/dashboard\/dashboards\/[^/]+\/edit$/.test(usePathname() ?? '');
     return (
         <Sonner
-            position={isMobile ? 'top-center' : 'bottom-right'}
+            position={isMobile ? 'top-center' : inEditor ? 'bottom-center' : 'bottom-right'}
             visibleToasts={3}
             gap={8}
             duration={4000}

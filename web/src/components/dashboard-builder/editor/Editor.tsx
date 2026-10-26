@@ -150,7 +150,9 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
         const st = useEditorStore.getState();
         if (!st.doc || !st.pageId) return;
         const w = defaultWidget(type, { families: families.ga4 || families.gsc ? families : { ga4: true, gsc: true } }, newWidgetId());
-        const pos = at && VIEWPORT_BP[st.viewport] === 'lg' ? at : undefined;
+        // Drop position only: the size is always the widget's default (the drop preview can
+        // report a squeezed width, which added scorecards one column wide).
+        const pos = at && VIEWPORT_BP[st.viewport] === 'lg' ? { x: at.x, y: at.y } : undefined;
         st.apply((d) => addWidget(d, st.pageId!, w, pos), { announce: `Added ${widgetMeta(type).label}` });
         st.select(w.id);
         toast(`Added ${widgetTitle(w)}`, { action: { label: 'Undo', onClick: () => useEditorStore.getState().undo() } });

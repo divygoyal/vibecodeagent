@@ -19,6 +19,7 @@ import { BLANK_TEMPLATE, TEMPLATES, buildFromTemplate, type TemplateCategory, ty
 import type { DashboardRecord } from '@/lib/builder/types';
 import PREVIEWS from '@/lib/builder/templatePreviews.json';
 import type { SiteOption } from '@/components/dashboard-builder/editor/Fields';
+import { useCurrentSite } from '@/components/shell/useCurrentSite';
 
 const CATEGORIES: Array<'All' | TemplateCategory | 'My templates'> = ['All', 'Overview', 'Search', 'Traffic', 'Content', 'Portfolio', 'Reporting', 'My templates'];
 
@@ -80,7 +81,10 @@ function Gallery() {
     const thumbs = useMemo(() => Object.fromEntries([BLANK_TEMPLATE, ...TEMPLATES].map((t) => [t.id, thumbFor(t.id)])), []);
     const shown = cat === 'All' ? TEMPLATES : cat === 'My templates' ? [] : TEMPLATES.filter((t) => t.category === cat);
     const portfolio = Boolean(picked?.tpl?.portfolio);
-    const site = sites.find((s) => s.siteId === siteId) ?? sites.find((s) => s.ga4 && s.gsc) ?? sites[0];
+    // Default: the site the user is on (switcher / last site page), then a fully paired site.
+    const current = useCurrentSite().site;
+    const currentOption = current ? sites.find((s) => (current.gscSiteUrl && s.gsc === current.gscSiteUrl) || (current.ga4PropertyId && s.ga4 === current.ga4PropertyId)) : undefined;
+    const site = sites.find((s) => s.siteId === siteId) ?? currentOption ?? sites.find((s) => s.ga4 && s.gsc) ?? sites[0];
     const missing = picked?.tpl && site ? picked.tpl.needs.filter((n) => (n === 'ga4' ? !site.ga4 : !site.gsc)) : [];
 
     const create = async () => {
