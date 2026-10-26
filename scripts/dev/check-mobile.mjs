@@ -458,28 +458,28 @@ async function visit(context, route, theme) {
     res.finalPath = page.url().replace(base, '');
     await withTimeout(page.addStyleTag({ content: 'nextjs-portal{display:none!important} [data-mc-hit]{outline:3px solid #ff1744!important;outline-offset:-1px!important} [data-mc-small]{outline:2px dashed #ff9100!important}' }), 5000);
     for (const width of opts.widths) {
-        await page.setViewportSize({ width, height: MOBILE.viewport.height });
+        await withTimeout(page.setViewportSize({ width, height: MOBILE.viewport.height }), 15_000);
         await page.waitForTimeout(450);
-        await page.evaluate(() => window.scrollTo(0, 0));
+        await withTimeout(page.evaluate(() => window.scrollTo(0, 0)), 10_000);
         let w;
         try {
-            w = await page.evaluate(pageAudit);
+            w = await deadline(page.evaluate(pageAudit), 60_000, 'audit');
         } catch (err) {
             res.widths[width] = { auditError: err.message.split('\n')[0] };
             continue;
         }
         try {
-            await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+            await deadline(page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)), 10_000, 'scroll');
             await page.waitForTimeout(250);
-            w.tabbarEnd = await page.evaluate(tabbarEndAudit);
-            await page.evaluate(() => window.scrollTo(0, 0));
+            w.tabbarEnd = await deadline(page.evaluate(tabbarEndAudit), 20_000, 'tab bar audit');
+            await deadline(page.evaluate(() => window.scrollTo(0, 0)), 10_000, 'scroll');
         } catch { w.tabbarEnd = []; }
         res.widths[width] = w;
         if (opts.shots && issueCount(w) > 0) {
             const hits = [...w.offscreen, ...w.clipped, ...w.textClipped, ...w.tabbar, ...w.badText].map((x) => x.id);
             const file = path.join(shotDir, `${routeSlug(route.pattern.replace('#', '_'))}-${theme}-${width}.jpg`);
             try {
-                await page.evaluate((ids) => {
+                await deadline(page.evaluate((ids) => {
                     for (const el of document.querySelectorAll('[data-mc-hit]')) el.removeAttribute('data-mc-hit');
                     let first = null;
                     for (const id of ids) {
@@ -487,7 +487,7 @@ async function visit(context, route, theme) {
                         if (el) { el.setAttribute('data-mc-hit', ''); first = first || el; }
                     }
                     if (first) first.scrollIntoView({ block: 'center', inline: 'nearest' });
-                }, hits);
+                }, hits), 10_000, 'highlight');
                 await page.waitForTimeout(150);
                 fs.mkdirSync(shotDir, { recursive: true });
                 await page.screenshot({ path: file, type: 'jpeg', quality: 70, timeout: 30_000 });
@@ -503,8 +503,14 @@ async function visit(context, route, theme) {
     res.pageErrors = watch.pageErrors;
     res.consoleErrors = watch.consoleErrors.filter((x) => firstParty(x) && !/^Failed to load resource/.test(x));
     res.failedRequests = watch.failedRequests.filter(firstParty);
-    await page.close();
+    await withTimeout(page.close(), 15_000);
     return res;
+}
+
+/** Rejects when `promise` takes longer than `ms` (a page busy in a loop must not hang the whole run). */
+function deadline(promise, ms, what) {
+    let t;
+    return Promise.race([promise, new Promise((_, reject) => { t = setTimeout(() => reject(new Error(`${what} took over ${ms} ms`)), ms); })]).finally(() => clearTimeout(t));
 }
 
 // ---------------------------------------------------------------- report
