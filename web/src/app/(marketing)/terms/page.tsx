@@ -1,94 +1,91 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+
+import { ContentPage, CrossLinks, Prose } from '@/components/marketing/site/ContentPage';
 import { BRAND_NAME } from '@/lib/brand';
 
+const TITLE = 'Terms of Service';
+const DESCRIPTION = `The terms that govern your use of ${BRAND_NAME}: accounts, acceptable use, public leaderboard content, connected AI apps and paid plans.`;
+
 export const metadata: Metadata = {
-    title: `Terms of Service | ${BRAND_NAME}`,
-    description:
-        `Terms of Service for ${BRAND_NAME} — AI-powered analytics and SEO platform. Read about acceptable use, user accounts, and service terms.`,
+    title: TITLE,
+    description: DESCRIPTION,
     alternates: { canonical: '/terms' },
-    openGraph: {
-        title: `Terms of Service | ${BRAND_NAME}`,
-        description: `Terms governing use of the ${BRAND_NAME} platform and services.`,
-        url: '/terms',
-    },
+    openGraph: { title: `${TITLE} | ${BRAND_NAME}`, description: DESCRIPTION, url: '/terms' },
+    twitter: { card: 'summary', title: `${TITLE} | ${BRAND_NAME}`, description: DESCRIPTION },
 };
 
 export default function TermsPage() {
     return (
-        <div className="min-h-screen bg-black text-white pt-24 pb-12 px-6">
-            <div className="max-w-3xl mx-auto">
-                {/* Breadcrumb */}
-                <nav aria-label="Breadcrumb" className="mb-8">
-                    <ol className="flex items-center gap-2 text-sm text-zinc-400">
-                        <li><Link href="/" className="hover:text-white transition-colors">Home</Link></li>
-                        <li aria-hidden="true">/</li>
-                        <li className="text-white font-medium">Terms of Service</li>
-                    </ol>
-                </nav>
-
-                <h1 className="text-4xl font-bold mb-4">Terms of Service</h1>
-                <p className="text-zinc-500 mb-8">
-                    Last updated: <time dateTime="2026-02-18">February 18, 2026</time>
+        <ContentPage
+            crumb="Terms"
+            title={TITLE}
+            meta={<>Last updated: <time dateTime="2026-10-26">October 26, 2026</time></>}
+            footer={<CrossLinks links={[{ label: 'Privacy Policy', href: '/privacy' }, { label: 'Contact', href: '/contact' }]} />}
+        >
+            <Prose>
+                <h2>1. Acceptance of terms</h2>
+                <p>
+                    By accessing or using {BRAND_NAME}, you agree to be bound by these Terms of Service. If you disagree with any part of
+                    the terms, you may not access the service.
                 </p>
 
-                <div className="space-y-8 text-zinc-300 leading-relaxed">
-                    <section>
-                        <h2 className="text-2xl font-semibold text-white mb-4">1. Acceptance of Terms</h2>
-                        <p>
-                            By accessing or using {BRAND_NAME}, you agree to be bound by these Terms of Service. If you disagree with any part of the terms, you may not access the service.
-                        </p>
-                    </section>
+                <h2>2. Description of service</h2>
+                <p>
+                    {BRAND_NAME} shows data from your Google Analytics and Search Console accounts in a portfolio of your sites and in
+                    dashboards, lets you publish selected numbers on a public leaderboard, provides a built-in AI chat (Ask), and lets you
+                    connect AI apps such as ChatGPT or Claude through a Model Context Protocol (MCP) server. We may modify or discontinue
+                    any part of the service at any time.
+                </p>
 
-                    <section>
-                        <h2 className="text-2xl font-semibold text-white mb-4">2. Description of Service</h2>
-                        <p>
-                            {BRAND_NAME} provides AI-powered analytics and SEO insights via a web dashboard and Telegram bot interface. We reserve the right to modify or discontinue the service at any time.
-                        </p>
-                    </section>
+                <h2>3. User accounts</h2>
+                <p>
+                    You are responsible for maintaining the security of your account and of any API keys or tokens associated with it,
+                    including access you grant to AI apps. You engage with the service at your own risk.
+                </p>
 
-                    <section>
-                        <h2 className="text-2xl font-semibold text-white mb-4">3. User Accounts</h2>
-                        <p>
-                            You are responsible for maintaining the security of your account and any API keys or tokens associated with it. You engage with the service at your own risk.
-                        </p>
-                    </section>
+                <h2>4. Acceptable use</h2>
+                <p>
+                    You agree not to misuse the service or help anyone else do so. This includes not probing, scanning, or testing the
+                    vulnerability of any system or network, and not using the service or its API to get around rate limits or access data
+                    you are not authorised to see.
+                </p>
 
-                    <section>
-                        <h2 className="text-2xl font-semibold text-white mb-4">4. Acceptable Use</h2>
-                        <p>
-                            You agree not to misuse the service or help anyone else do so. This includes not probing, scanning, or testing the vulnerability of any system or network.
-                        </p>
-                    </section>
+                <h2>5. Public leaderboard</h2>
+                <ul>
+                    <li>Only list sites you own or are authorised to represent.</li>
+                    <li>You are responsible for the names, descriptions, links and other content you publish, and for the numbers you choose to make public.</li>
+                    <li>Rankings and verification depend on data from Google and on our verification checks. We may change how ranking and verification work.</li>
+                    <li>We may hide or remove listings that are misleading, infringe others&apos; rights or break these terms.</li>
+                    <li>Sponsored placements are labelled as sponsored and are not part of the ranking.</li>
+                </ul>
 
-                    <section>
-                        <h2 className="text-2xl font-semibold text-white mb-4">5. Disclaimer</h2>
-                        <p>
-                            The service is provided &quot;as is&quot; without warranties of any kind. We generally do not guarantee that the service will meet your specific requirements or be uninterrupted.
-                        </p>
-                    </section>
+                <h2>6. Connected AI apps</h2>
+                <p>
+                    When you connect a third-party AI app, that app&apos;s own terms and privacy policy govern how it uses the data you
+                    allow it to read. AI-generated answers, including those from the Ask chat, can be wrong; check important numbers in
+                    your dashboard or in Google&apos;s tools before acting on them.
+                </p>
 
-                    <section>
-                        <h2 className="text-2xl font-semibold text-white mb-4">6. Contact</h2>
-                        <p>
-                            Questions about the Terms of Service should be sent to us at{' '}
-                            <a href="mailto:support@trafficclaw.com" className="text-emerald-400 hover:text-emerald-300 transition-colors">
-                                support@trafficclaw.com
-                            </a>.
-                        </p>
-                    </section>
-                </div>
+                <h2>7. Paid plans</h2>
+                <p>
+                    Paid plans add Ask messages each month, are billed monthly through our payment provider, and can be cancelled at any
+                    time from the Plan page. A cancelled plan stays active until the end of the period you paid for. Unused Ask messages
+                    do not roll over. Current prices are on the <Link href="/pricing">pricing page</Link>.
+                </p>
 
-                {/* Cross-links */}
-                <div className="mt-12 pt-8 border-t border-white/[0.06] flex items-center gap-6 text-sm">
-                    <Link href="/privacy" className="text-zinc-400 hover:text-white transition-colors">
-                        Privacy Policy &rarr;
-                    </Link>
-                    <Link href="/about" className="text-zinc-400 hover:text-white transition-colors">
-                        About Us &rarr;
-                    </Link>
-                </div>
-            </div>
-        </div>
+                <h2>8. Disclaimer</h2>
+                <p>
+                    The service is provided &quot;as is&quot; without warranties of any kind. We do not guarantee that the service will meet
+                    your specific requirements or be uninterrupted, or that data shown by the service is complete or accurate.
+                </p>
+
+                <h2>9. Contact</h2>
+                <p>
+                    Questions about these Terms of Service should be sent to{' '}
+                    <a href="mailto:support@trafficclaw.com">support@trafficclaw.com</a>.
+                </p>
+            </Prose>
+        </ContentPage>
     );
 }

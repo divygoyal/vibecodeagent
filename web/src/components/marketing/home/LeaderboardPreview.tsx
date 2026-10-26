@@ -1,0 +1,166 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { ArrowRight, ShieldCheck } from 'lucide-react';
+
+import { Badge, Button } from '@/components/ui';
+import { Sparkline } from '@/components/charts';
+import { fmtCompact } from '@/lib/format';
+import { cn } from '@/lib/cn';
+import { Section, SectionHeading } from '../site/Section';
+import { SiteIcon } from '../site/SiteIcon';
+
+/** One row, normalised from either the v3 board (`rows`) or the legacy list (`entries`). */
+interface PreviewRow {
+    key: string;
+    rank: number;
+    href: string;
+    name: string;
+    host: string | null;
+    category: string | null;
+    visitors: string | null;
+    deltaPct: number | null;
+    spark: number[] | null;
+    verified: boolean;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function hostOf(url: unknown): string | null {
+    if (typeof url !== 'string' || !url) return null;
+    try {
+        return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, '');
+    } catch {
+        return null;
+    }
+}
+
+function normalise(data: any): PreviewRow[] {
+    if (Array.isArray(data?.rows)) {
+        return data.rows.slice(0, 5).map((r: any, i: number) => {
+            const v = r.visitors;
+            return {
+                key: String(r.id),
+                rank: typeof r.rank === 'number' ? r.rank : i + 1,
+                href: `/leaderboard/${encodeURIComponent(r.slug ?? r.id)}`,
+                name: String(r.name ?? ''),
+                host: hostOf(r.website_url),
+                category: r.category ?? null,
+                visitors: v ? (v.mode === 'exact' ? fmtCompact(v.value) : String(v.label ?? '')) : null,
+                deltaPct: v && typeof v.delta_pct === 'number' ? v.delta_pct : null,
+                spark: Array.isArray(r.spark?.values) ? r.spark.values.map((x: unknown) => (typeof x === 'number' ? x : 0)) : null,
+                verified: Boolean(r.verification?.ranked ?? r.verification?.level === 'owner'),
+            };
+        });
+    }
+    if (Array.isArray(data?.entries)) {
+        return data.entries.slice(0, 5).map((e: any, i: number) => ({
+            key: String(e.id),
+            rank: i + 1,
+            href: `/leaderboard/${encodeURIComponent(e.slug ?? e.id)}`,
+            name: String(e.startup_name ?? ''),
+            host: hostOf(e.website_url),
+            category: e.category ?? null,
+            visitors: typeof e.monthly_visitors === 'number' ? fmtCompact(e.monthly_visitors) : null,
+            deltaPct: typeof e.visitor_trend === 'number' ? e.visitor_trend : null,
+            spark: null,
+            verified: Boolean(e.is_verified),
+        }));
+    }
+    return [];
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+function Delta({ pct }: { pct: number | null }) {
+    if (pct === null || !Number.isFinite(pct)) return null;
+    const up = pct >= 0;
+    return (
+        <span className={cn('inline-flex items-center gap-0.5 text-meta font-medium tabular-nums', up ? 'text-up' : 'text-down')}>
+            <svg aria-hidden width="8" height="7" viewBox="0 0 8 7" className="fill-current">{up ? <path d="M4 0 8 7H0z" /> : <path d="M4 7 0 0h8z" />}</svg>
+            {Math.abs(pct).toFixed(Math.abs(pct) >= 10 ? 0 : 1)}%
+            <span className="sr-only">{up ? 'up' : 'down'} versus the previous period</span>
+        </span>
+    );
+}
+
+/**
+ * Live leaderboard teaser for the home page. Reads the public leaderboard API;
+ * renders nothing at all (no section) until real rows arrive, and nothing when
+ * the board is empty or unavailable. Never shows placeholder rows.
+ */
+export function LeaderboardPreview() {
+    const [rows, setRows] = useState<PreviewRow[] | null>(null);
+
+    useEffect(() => {
+        const ctrl = new AbortController();
+        fetch('/api/leaderboard?tab=top&range=28d&sort=traffic&page_size=5', { signal: ctrl.signal, headers: { Accept: 'application/json' } })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => setRows(data ? normalise(data).filter((r) => r.name) : []))
+            .catch(() => { /* aborted or offline: stay hidden */ });
+        return () => ctrl.abort();
+    }, []);
+
+    if (!rows || rows.length === 0) return null;
+
+    return (
+        <Section id="leaderboard" labelledBy="lb-title">
+            <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+                <div>
+                    <SectionHeading
+                        id="lb-title"
+                        eyebrow="Leaderboard"
+                        title="Show off verified traffic"
+                        description="Add a site to the public leaderboard. The numbers come straight from Google, you choose what is public, and only owners verified in Search Console can rank."
+                    />
+                    <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                        <Button asChild variant="primary" size="lg">
+                            <Link href="/leaderboard/join">Add your site, free</Link>
+                        </Button>
+                        <Button asChild variant="secondary" size="lg" trailingIcon={ArrowRight}>
+                            <Link href="/leaderboard">See the full leaderboard</Link>
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="rounded-card border border-border-subtle bg-surface shadow-card">
+                    <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
+                        <p className="text-title-sm text-fg">Top sites right now</p>
+                        <span className="inline-flex items-center gap-1.5 text-meta text-fg-muted">
+                            <span aria-hidden className="size-1.5 animate-live-dot rounded-full bg-up" />
+                            Live from the leaderboard
+                        </span>
+                    </div>
+                    <ol>
+                        {rows.map((row) => (
+                            <li key={row.key} className="border-b border-border-subtle last:border-b-0">
+                                <Link href={row.href} className="flex items-center gap-3 px-4 py-3 transition-colors duration-120 hover:bg-subtle/60">
+                                    <span className="w-6 shrink-0 text-center text-body-sm font-medium tabular-nums text-fg-muted">{row.rank}</span>
+                                    <SiteIcon host={row.host ?? row.name} size={32} />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="flex items-center gap-1.5">
+                                            <span className="truncate text-body font-semibold text-fg">{row.name}</span>
+                                            {row.verified ? <ShieldCheck aria-label="Verified" size={14} strokeWidth={1.75} className="shrink-0 text-brand-text" /> : null}
+                                        </span>
+                                        <span className="flex items-center gap-2 text-body-sm text-fg-muted">
+                                            {row.host ? <span className="truncate">{row.host}</span> : null}
+                                            {row.category ? <Badge variant="neutral" className="hidden sm:inline-flex">{row.category}</Badge> : null}
+                                        </span>
+                                    </span>
+                                    {row.spark && row.spark.length > 1 ? (
+                                        <span className="hidden w-24 shrink-0 sm:block">
+                                            <Sparkline height={28} series={[{ metric: 'users', values: row.spark, label: 'Visitors' }]} interactive={false} />
+                                        </span>
+                                    ) : null}
+                                    <span className="w-20 shrink-0 text-right">
+                                        {row.visitors ? <span className="block text-stat-sm tabular-nums text-fg">{row.visitors}</span> : null}
+                                        <Delta pct={row.deltaPct} />
+                                    </span>
+                                </Link>
+                            </li>
+                        ))}
+                    </ol>
+                </div>
+            </div>
+        </Section>
+    );
+}

@@ -142,20 +142,20 @@ export default function ComparisonBuilderPage() {
     const isValid = title.trim() && products.every((p) => p.name.trim()) && features.every((f) => f.name.trim());
 
     return (
-        <div className="min-h-screen pt-24 pb-20 px-6">
+        <div className="px-4 pt-10 pb-16 md:px-6">
             <div className="max-w-4xl mx-auto">
-                <Link href="/tools" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors mb-8">
+                <Link href="/tools" className="inline-flex items-center gap-1.5 text-sm text-fg-secondary hover:text-fg transition-colors mb-8">
                     <ArrowLeft className="w-4 h-4" /> All Tools
                 </Link>
 
                 <motion.div initial="hidden" animate="visible" variants={fadeUp}>
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2.5 rounded-xl bg-pink-500/10 text-pink-400">
+                        <div className="p-2.5 rounded-control bg-brand-soft text-brand-soft-fg">
                             <GitCompareArrows className="w-5 h-5" />
                         </div>
-                        <h1 className="text-2xl sm:text-3xl font-bold">Comparison Builder</h1>
+                        <h1 className="text-heading sm:text-heading-lg text-fg">Comparison Builder</h1>
                     </div>
-                    <p className="text-sm sm:text-base text-zinc-400 mb-8">
+                    <p className="text-sm sm:text-base text-fg-secondary mb-8">
                         Generate professional comparison pages with structured data schema markup.
                     </p>
                 </motion.div>
@@ -163,24 +163,24 @@ export default function ComparisonBuilderPage() {
                 {/* Builder Form */}
                 <motion.div initial="hidden" animate="visible" variants={fadeUp} className="space-y-6">
                     {/* Title */}
-                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">Comparison Title</label>
+                    <div className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6">
+                        <label className="block text-sm font-medium text-fg mb-2">Comparison Title</label>
                         <input
                             type="text"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             placeholder="e.g., Best Project Management Tools 2026"
-                            className="w-full px-4 py-3 min-h-[44px] rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                            className="w-full px-4 py-3 min-h-[44px] rounded-lg bg-surface border border-border shadow-xs text-fg placeholder-fg-faint focus:outline-none focus:border-focus transition-colors"
                         />
                     </div>
 
                     {/* Products */}
-                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
+                    <div className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold">Products / Items</h2>
                             <button
                                 onClick={addProduct}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] text-sm text-zinc-300 hover:text-white hover:bg-white/[0.1] transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-subtle text-sm text-fg hover:text-fg hover:bg-subtle-strong transition-colors cursor-pointer"
                             >
                                 <Plus className="w-3.5 h-3.5" /> Add
                             </button>
@@ -194,20 +194,20 @@ export default function ComparisonBuilderPage() {
                                             value={p.name}
                                             onChange={(e) => updateProduct(i, 'name', e.target.value)}
                                             placeholder={`Product ${i + 1} name`}
-                                            className="px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                                            className="px-3 py-2 rounded-lg bg-surface border border-border shadow-xs text-fg text-sm placeholder-fg-faint focus:outline-none focus:border-focus transition-colors"
                                         />
                                         <input
                                             type="text"
                                             value={p.description}
                                             onChange={(e) => updateProduct(i, 'description', e.target.value)}
                                             placeholder="Short description"
-                                            className="px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                                            className="px-3 py-2 rounded-lg bg-surface border border-border shadow-xs text-fg text-sm placeholder-fg-faint focus:outline-none focus:border-focus transition-colors"
                                         />
                                     </div>
                                     {products.length > 2 && (
                                         <button
                                             onClick={() => removeProduct(i)}
-                                            className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                            className="p-2 rounded-lg text-fg-muted hover:text-down hover:bg-down-soft transition-colors cursor-pointer"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
@@ -218,12 +218,12 @@ export default function ComparisonBuilderPage() {
                     </div>
 
                     {/* Features */}
-                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
+                    <div className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold">Comparison Features</h2>
                             <button
                                 onClick={addFeature}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] text-sm text-zinc-300 hover:text-white hover:bg-white/[0.1] transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-subtle text-sm text-fg hover:text-fg hover:bg-subtle-strong transition-colors cursor-pointer"
                             >
                                 <Plus className="w-3.5 h-3.5" /> Add Row
                             </button>
@@ -231,7 +231,7 @@ export default function ComparisonBuilderPage() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="text-left text-zinc-500 border-b border-white/[0.06]">
+                                    <tr className="text-left text-fg-muted border-b border-border-subtle">
                                         <th className="py-2 pr-3 font-medium">Feature</th>
                                         {products.map((p, i) => (
                                             <th key={i} className="py-2 px-2 font-medium">{p.name || `Product ${i + 1}`}</th>
@@ -241,14 +241,14 @@ export default function ComparisonBuilderPage() {
                                 </thead>
                                 <tbody>
                                     {features.map((f, fi) => (
-                                        <tr key={fi} className="border-b border-white/[0.04]">
+                                        <tr key={fi} className="border-b border-border-subtle">
                                             <td className="py-2 pr-3">
                                                 <input
                                                     type="text"
                                                     value={f.name}
                                                     onChange={(e) => updateFeatureName(fi, e.target.value)}
                                                     placeholder="Feature name"
-                                                    className="w-full px-2 py-1.5 rounded bg-white/[0.04] border border-white/[0.08] text-white text-xs placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50"
+                                                    className="w-full px-2 py-1.5 rounded bg-surface border border-border shadow-xs text-fg text-xs placeholder-fg-faint focus:outline-none focus:border-focus"
                                                 />
                                             </td>
                                             {products.map((_, pi) => (
@@ -258,7 +258,7 @@ export default function ComparisonBuilderPage() {
                                                         value={f.values[pi] || ''}
                                                         onChange={(e) => updateFeatureValue(fi, pi, e.target.value)}
                                                         placeholder="Value"
-                                                        className="w-full px-2 py-1.5 rounded bg-white/[0.04] border border-white/[0.08] text-white text-xs placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50"
+                                                        className="w-full px-2 py-1.5 rounded bg-surface border border-border shadow-xs text-fg text-xs placeholder-fg-faint focus:outline-none focus:border-focus"
                                                     />
                                                 </td>
                                             ))}
@@ -266,7 +266,7 @@ export default function ComparisonBuilderPage() {
                                                 {features.length > 1 && (
                                                     <button
                                                         onClick={() => removeFeature(fi)}
-                                                        className="p-1 rounded text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
+                                                        className="p-1 rounded text-fg-muted hover:text-down transition-colors cursor-pointer"
                                                     >
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
@@ -283,7 +283,7 @@ export default function ComparisonBuilderPage() {
                     <button
                         onClick={handleGenerate}
                         disabled={!isValid}
-                        className="w-full py-3 min-h-[44px] rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        className="w-full py-3 min-h-[44px] rounded-control bg-brand text-brand-fg font-semibold text-sm hover:bg-brand-hover transition-opacity disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                         Generate Comparison
                     </button>
@@ -298,24 +298,24 @@ export default function ComparisonBuilderPage() {
                         className="mt-8 space-y-6"
                     >
                         {/* Preview Table */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
+                        <motion.div variants={fadeUp} className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6">
                             <h2 className="text-lg font-semibold mb-4">Preview</h2>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm border-collapse">
                                     <thead>
-                                        <tr className="bg-white/[0.04]">
-                                            <th className="py-3 px-4 text-left font-semibold text-zinc-300 border border-white/[0.06]">Feature</th>
+                                        <tr className="bg-surface-sunken">
+                                            <th className="py-3 px-4 text-left font-semibold text-fg border border-border-subtle">Feature</th>
                                             {products.map((p, i) => (
-                                                <th key={i} className="py-3 px-4 text-left font-semibold text-emerald-400 border border-white/[0.06]">{p.name}</th>
+                                                <th key={i} className="py-3 px-4 text-left font-semibold text-up border border-border-subtle">{p.name}</th>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {features.map((f, fi) => (
-                                            <tr key={fi} className={fi % 2 === 0 ? '' : 'bg-white/[0.02]'}>
-                                                <td className="py-2.5 px-4 font-medium text-zinc-300 border border-white/[0.06]">{f.name}</td>
+                                            <tr key={fi} className={fi % 2 === 0 ? '' : 'bg-surface-sunken'}>
+                                                <td className="py-2.5 px-4 font-medium text-fg border border-border-subtle">{f.name}</td>
                                                 {f.values.map((v, vi) => (
-                                                    <td key={vi} className="py-2.5 px-4 text-zinc-400 border border-white/[0.06]">{v}</td>
+                                                    <td key={vi} className="py-2.5 px-4 text-fg-secondary border border-border-subtle">{v}</td>
                                                 ))}
                                             </tr>
                                         ))}
@@ -325,7 +325,7 @@ export default function ComparisonBuilderPage() {
                         </motion.div>
 
                         {/* Schema Markup */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
+                        <motion.div variants={fadeUp} className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6">
                             <div className="flex items-center justify-between mb-3">
                                 <button
                                     onClick={() => setShowSchema(!showSchema)}
@@ -336,21 +336,21 @@ export default function ComparisonBuilderPage() {
                                 </button>
                                 <button
                                     onClick={() => copyToClipboard(schemaMarkup, 'schema')}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] text-sm text-zinc-300 hover:text-white hover:bg-white/[0.1] transition-colors cursor-pointer"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-subtle text-sm text-fg hover:text-fg hover:bg-subtle-strong transition-colors cursor-pointer"
                                 >
                                     {copiedSection === 'schema' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                                     {copiedSection === 'schema' ? 'Copied' : 'Copy'}
                                 </button>
                             </div>
                             {showSchema && (
-                                <pre className="text-xs font-mono text-zinc-400 bg-black/40 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap">
+                                <pre className="text-xs font-mono text-fg-secondary bg-surface-sunken rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap">
                                     {schemaMarkup}
                                 </pre>
                             )}
                         </motion.div>
 
                         {/* HTML Output */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
+                        <motion.div variants={fadeUp} className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6">
                             <div className="flex items-center justify-between mb-3">
                                 <button
                                     onClick={() => setShowHTML(!showHTML)}
@@ -361,14 +361,14 @@ export default function ComparisonBuilderPage() {
                                 </button>
                                 <button
                                     onClick={() => copyToClipboard(htmlOutput, 'html')}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] text-sm text-zinc-300 hover:text-white hover:bg-white/[0.1] transition-colors cursor-pointer"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-subtle text-sm text-fg hover:text-fg hover:bg-subtle-strong transition-colors cursor-pointer"
                                 >
                                     {copiedSection === 'html' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                                     {copiedSection === 'html' ? 'Copied' : 'Copy'}
                                 </button>
                             </div>
                             {showHTML && (
-                                <pre className="text-xs font-mono text-zinc-400 bg-black/40 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap">
+                                <pre className="text-xs font-mono text-fg-secondary bg-surface-sunken rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap">
                                     {htmlOutput}
                                 </pre>
                             )}

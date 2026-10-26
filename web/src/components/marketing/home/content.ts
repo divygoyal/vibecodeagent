@@ -1,189 +1,64 @@
 import { BRAND_NAME } from '@/lib/brand';
-const ANALYTICS_EMBED_URL =
-    'https://trafficclaw.com/share/aaa1e9e2505785a849dcc68eeea06aa3?embed=true';
+import { FREE_START_CREDITS, PAID_PLANS } from '@/lib/plans';
+import type { FaqItem } from '../site/Faq';
 
-export const MARKETING_SIGN_IN_URL = '/api/auth/signin/google?callbackUrl=%2Fdashboard';
+const growth = PAID_PLANS.find((p) => p.key === 'growth')!;
+const pro = PAID_PLANS.find((p) => p.key === 'pro')!;
 
-export const HOMEPAGE_CONTENT = {
-    hero: {
-        eyebrow: 'AI for Google Analytics + Search Console',
-        titleLead: 'Talk to your',
-        titleAccent: 'Google Analytics.',
-        subtitle:
-            'Your AI co-pilot for Google Analytics and Search Console. Ask in plain English. Get answers, insights, and SEO wins in seconds.',
-        primaryCta: 'Start with Google',
-        secondaryCta: 'Open live dashboard',
-        trustLine: 'Read-only Google OAuth · 5 free AI messages · No card required',
+export const HOME_FAQ: FaqItem[] = [
+    {
+        q: `Is ${BRAND_NAME} really free?`,
+        a: `Yes. The portfolio, dashboards, the public leaderboard and the ChatGPT and Claude connector are free, with no site limit. Paid plans only add more Ask messages in ${BRAND_NAME}'s built-in AI chat.`,
     },
-    analyticsEmbedUrl: ANALYTICS_EMBED_URL,
-    reasonsIntro: {
-        eyebrow: '5+1 reasons',
-        title: `Why ${BRAND_NAME} is the best Google Analytics alternative?`,
-        description: 'Here are 5+1 simple reasons that sum it up.',
-        supportingCopy:
-            `${BRAND_NAME} turns analytics into something you can talk to, share, embed, and actually enjoy showing people.`,
-        checkpoints: [
-            '01 AI traffic chat',
-            '02 Realtime globe',
-            '03 Shareable dashboard',
-            '04 X mention embeds',
-            '05 Reddit mention embeds',
-            '+1 Switching proof',
-        ],
+    {
+        q: `What can ${BRAND_NAME} see in my Google account?`,
+        a: `Only what you allow when you sign in: read-only access to Google Analytics and Search Console. ${BRAND_NAME} cannot change anything in Analytics or Search Console, and it never sees Gmail, Drive or any other Google data.`,
     },
-    aiChat: {
-        number: '01',
-        eyebrow: 'AI traffic chat',
-        title: 'Just ask. Your traffic data will answer.',
-        description:
-            "Stop hunting through reports and dashboards. Ask plain-English questions and instantly know what's happening with your traffic — and what to do about it.",
-        videoSrc: '/home/ai-chat-final.mp4',
-        posterSrc: '/home/ai-chat-demo-poster.jpg',
-        frameLabel: 'trafficclaw.com/dashboard/ask',
-        frameMeta: 'Reason 1',
-        highlights: [
-            {
-                title: 'Ask anything',
-                text: 'Traffic, pages, sources, sessions — in plain English.',
-            },
-            {
-                title: 'Instant answers',
-                text: 'No dashboards, exports, or SQL needed.',
-            },
-            {
-                title: 'Clear next steps',
-                text: 'Know what happened and what to fix.',
-            },
-        ],
+    {
+        q: 'How many sites can I add?',
+        a: 'Every Google Analytics 4 property and Search Console site your Google account can see shows up in your portfolio. There is no site limit on any plan.',
     },
-    globe: {
-        number: '02',
-        eyebrow: 'Realtime globe',
-        title: 'Live interactive globe',
-        description:
-            'A rotating 3D globe that maps every active visitor in real time. Embed it on your landing page, share it with clients, or run it live on a big screen during your launch.',
-        videoSrc: '/home/globe-demo.mp4',
-        videoClassName: 'scale-[1.25]',
-        frameLabel: 'trafficclaw.com/globe/live',
-        frameMeta: 'Reason 2',
-        demoHref:
-            'https://trafficclaw.com/embed/513732772?token=a220a20c719ad0fb1c5f58e735eb7e48624aa8362005096514c4881155473a45',
-        ctaLabel: 'View live demo',
-        highlights: [
-            {
-                title: 'Cinematic quality',
-                text: 'Looks premium, works out of the box.',
-            },
-            {
-                title: 'Embeddable anywhere',
-                text: 'Landing pages, decks, client portals.',
-            },
-            {
-                title: 'Live, not static',
-                text: 'Visitors appear the moment they land.',
-            },
-        ],
+    {
+        q: 'Do I need to install a tracking script?',
+        a: `No. ${BRAND_NAME} reads the Google Analytics 4 and Search Console data you already collect. Nothing changes on your site.`,
     },
-    compactReasons: [
-        {
-            number: '03',
-            kind: 'seo',
-            eyebrow: 'Autonomous AI Agent',
-            title: 'Meet your dedicated SEO Bot.',
-            description:
-                'Imagine having an SEO expert constantly analyzing your site. Our AI bot runs auto keyword research, builds smart internal links, and detects content decay before traffic drops.',
-            previewLabel: 'SEO Bot Active',
-            previewValue: 'ANALYZING SITE HEALTH...',
-            chips: ['Keyword discovery', 'Link building', 'Decay alerts'],
-            href: '/features#seo-bot',
-            ctaLabel: 'Activate SEO Bot',
-            features: [
-                {
-                    label: 'AI Blog Writer',
-                    description: 'Generate SEO-optimized blog posts with headings, meta tags, and schema markup.',
-                    actionText: 'Click to use',
-                    actionColor: 'text-[#8EE68E]',
-                    iconColor: 'text-[#8EE68E]',
-                    iconBg: 'bg-[#8EE68E]/10 border-[#8EE68E]/20',
-                    iconType: 'pen'
-                },
-                {
-                    label: 'Auto Keyword Research',
-                    description: 'AI finds untapped keyword opportunities by analyzing competitors and search trends.',
-                    actionText: 'Click to use',
-                    actionColor: 'text-[#FFD700]',
-                    iconColor: 'text-[#FFD700]',
-                    iconBg: 'bg-[#FFD700]/10 border-[#FFD700]/20',
-                    iconType: 'brain'
-                },
-                {
-                    label: 'AI Smart Linking',
-                    description: 'Discover and suggest internal links between your pages to build topical authority.',
-                    actionText: 'Click to use',
-                    actionColor: 'text-[#14C4E1]',
-                    iconColor: 'text-[#14C4E1]',
-                    iconBg: 'bg-[#14C4E1]/10 border-[#14C4E1]/20',
-                    iconType: 'link'
-                },
-                {
-                    label: 'Content Decay Detector',
-                    description: 'Monitors your top-performing pages and alerts when traffic declines to refresh content.',
-                    actionText: '2 pages decaying',
-                    actionColor: 'text-[#FF6B6B]',
-                    iconColor: 'text-[#FF6B6B]',
-                    iconBg: 'bg-[#FF6B6B]/10 border-[#FF6B6B]/20',
-                    iconType: 'activity'
-                },
-                {
-                    label: 'Cannibalization Scanner',
-                    description: 'Detects when multiple pages compete for the same keywords, splitting ranking power.',
-                    actionText: 'Get Analysis',
-                    actionColor: 'text-[#8EE68E]',
-                    iconColor: 'text-[#FFBD2E]',
-                    iconBg: 'bg-[#FFBD2E]/10 border-[#FFBD2E]/20',
-                    iconType: 'layers'
-                },
-                {
-                    label: 'Core Web Vitals',
-                    description: 'Check LCP, FID, CLS for any page to ensure search engines love your technical performance.',
-                    actionText: 'Open Audit Tool',
-                    actionColor: 'text-[#14C4E1]',
-                    iconColor: 'text-[#14C4E1]',
-                    iconBg: 'bg-[#14C4E1]/10 border-[#14C4E1]/20',
-                    iconType: 'cpu'
-                }
-            ]
-        },
-    ],
-    proof: {
-        number: '+1',
-        eyebrow: 'Switching proof',
-        title: 'One extra reason: the product makes growth easier to see.',
-        description:
-            'Real products saw traffic move after switching, and more importantly, they could explain those changes without spending the day inside GA.',
+    {
+        q: 'How does the ChatGPT and Claude connector work?',
+        a: `${BRAND_NAME} runs a hosted MCP server. Add its URL in ChatGPT, Claude or another MCP client, sign in, approve read-only access for all of your sites or only some, then ask questions. You can revoke access at any time.`,
     },
-    proofCards: [
-        {
-            site: 'antigravity.codes',
-            metric: '+110.8% sessions',
-            imageSrc: '/home/proof-antigravity.png',
-            caption:
-                `Sessions climbed to 54k while active users crossed 39k. ${BRAND_NAME} makes those growth moves legible the moment they happen.`,
-        },
-        {
-            site: 'nailart.app',
-            metric: '+124.2% active users',
-            imageSrc: '/home/proof-nailart.png',
-            caption:
-                'Active users hit 17k while views moved to 56k. This is the kind of lift that deserves a clearer analytics layer.',
-        },
-    ],
-    cta: {
-        title: 'Ditch the tabs. Talk to your traffic instead.',
-        description:
-            'Start with one shareable dashboard, one AI chat that understands your traffic, and one product surface that makes your growth feel alive.',
+    {
+        q: 'What shows on the public leaderboard?',
+        a: 'Only sites you add yourself, and only the numbers you choose to make public. To rank, you have to be a verified owner of the site in Search Console.',
     },
-} as const;
+    {
+        q: 'Can I delete my data?',
+        a: `Yes. Revoke ${BRAND_NAME}'s access in your Google Account settings or email privacy@trafficclaw.com, and we delete your Google data within 30 days.`,
+    },
+];
 
-export type HomepageCompactReason = (typeof HOMEPAGE_CONTENT.compactReasons)[number];
-export type HomepageProofCard = (typeof HOMEPAGE_CONTENT.proofCards)[number];
+export const PRICING_FAQ: FaqItem[] = [
+    {
+        q: 'Why is it free?',
+        a: `Most of what ${BRAND_NAME} does is read numbers from your own Google account and show them well, which costs us little to run. The expensive part is AI. When you ask ChatGPT or Claude through the connector, the AI runs on your plan with them. Only ${BRAND_NAME}'s built-in Ask chat costs us AI fees, so extra Ask messages are the one paid thing. Later we plan to earn from clearly labelled sponsor slots on the leaderboard.`,
+    },
+    {
+        q: 'What is an Ask message?',
+        a: `One question to ${BRAND_NAME}'s built-in AI chat, which answers from your Analytics and Search Console data. Free accounts start with ${FREE_START_CREDITS} Ask messages. ${growth.name} adds ${growth.credits} a month and ${pro.name} adds ${pro.credits} a month.`,
+    },
+    {
+        q: 'What happens when I run out of Ask messages?',
+        a: 'Everything else keeps working: portfolio, dashboards, leaderboard and the ChatGPT and Claude connector. Paid allowances reset at the start of each billing cycle and do not roll over.',
+    },
+    {
+        q: 'Do I need a paid plan to use ChatGPT or Claude with my data?',
+        a: `No. The connector is free on every plan. The AI runs on your own ChatGPT or Claude account, so it does not use ${BRAND_NAME} Ask messages.`,
+    },
+    {
+        q: 'Can I cancel any time?',
+        a: 'Yes. Cancel from the Plan page in your dashboard. Your plan stays active until the end of the period you paid for, then your account goes back to Free.',
+    },
+    {
+        q: 'How do payments work?',
+        a: 'Payments are handled by Dodo Payments, which accepts major credit and debit cards and some digital wallets. We never see your full card details.',
+    },
+];
