@@ -106,7 +106,7 @@ export function ChartCard({
                     ) : undefined
                 }
             />
-            <div className="max-md:[&>*]:max-h-[220px]" style={{ minHeight: state === 'ready' || state === 'refetching' ? undefined : Math.min(h, 220) }}>
+            <div style={{ minHeight: state === 'ready' || state === 'refetching' ? undefined : Math.min(h, 220) }}>
                 {state === 'loading' ? (
                     <ChartSkeleton height={h} />
                 ) : state === 'error' ? (
