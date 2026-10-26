@@ -20,7 +20,7 @@
  *   node scripts/dev/check-mobile.mjs <webPort | baseUrl> [--label name] [--out dir]
  *        [--widths 360,390,414] [--themes light,dark] [--user demo|demo2|admin] [--state file]
  *        [--host h1,h2] [--only /a,/b] [--skip /a,/b] [--part k/n] [--wait ms] [--no-shots]
- *        [--fail-on error,overflow,offscreen] [--settle ms] [--cookie name=value]
+ *        [--fail-on error,overflow,offscreen] [--settle ms] [--cookie name=value] [--paths /a,/b?x=1]
  *
  * One page load per route and theme; the viewport is resized to each width.
  * Output: <out>/mobile-<label>.json, <out>/mobile-<label>.md and offender
@@ -46,7 +46,7 @@ function usage(msg) {
 const argv = process.argv.slice(2);
 const opts = {
     target: null, label: null, out: '/root/projects/tc-redesign-research/robust', widths: [390, 360, 414], themes: ['light', 'dark'],
-    user: 'demo', state: null, hosts: ['acmeanalytics.example'], only: null, skip: [], part: null, wait: 800, shots: true,
+    user: 'demo', state: null, hosts: ['acmeanalytics.example'], only: null, paths: null, skip: [], part: null, wait: 800, shots: true,
     failOn: ['error', 'overflow', 'offscreen'], settleMs: 25_000, cookies: [],
 };
 for (let i = 0; i < argv.length; i++) {
@@ -60,6 +60,7 @@ for (let i = 0; i < argv.length; i++) {
     else if (a === '--state') opts.state = argv[++i];
     else if (a === '--host') opts.hosts = list();
     else if (a === '--only') opts.only = list();
+    else if (a === '--paths') opts.paths = list();
     else if (a === '--skip') opts.skip = list();
     else if (a === '--part') {
         const m = /^(\d+)\/(\d+)$/.exec(argv[++i] || '');
@@ -108,7 +109,8 @@ for (const pattern of discoverRoutes(path.join(repo, 'web', 'src', 'app'))) {
         routes.push({ pattern, path: fillRoute(pattern, seed, { user: opts.user }) });
     }
 }
-if (opts.only) routes = routes.filter((r) => opts.only.some((o) => r.pattern === o || r.path === o || r.pattern.split('#')[0] === o || (o !== '/' && r.pattern.startsWith(o.endsWith('/') ? o : `${o}/`))));
+if (opts.paths) routes = opts.paths.map((p) => ({ pattern: p, path: p })); // explicit URLs instead of the route list
+else if (opts.only) routes = routes.filter((r) => opts.only.some((o) => r.pattern === o || r.path === o || r.pattern.split('#')[0] === o || (o !== '/' && r.pattern.startsWith(o.endsWith('/') ? o : `${o}/`))));
 if (opts.skip.length) routes = routes.filter((r) => !opts.skip.includes(r.pattern) && !opts.skip.includes(r.path));
 routes = routes.filter((r) => !r.path.includes('missing-seed'));
 if (opts.part) {
@@ -579,6 +581,17 @@ function writeReports() {
     return { ordered, totals };
 }
 
+async function serverUp() {
+    for (let i = 0; i < 60; i++) {
+        try {
+            const res = await fetch(`${base}/api/auth/providers`, { signal: AbortSignal.timeout(10_000) });
+            if (res.ok) return true;
+        } catch { /* still restarting */ }
+        await new Promise((ok) => setTimeout(ok, 3000));
+    }
+    return false;
+}
+
 // ---------------------------------------------------------------- run
 console.error(`[mobile] ${routes.length} routes × ${opts.widths.join('/')} px on ${base} as ${opts.user}${stateFile ? '' : ' (logged out)'}`);
 const browser = await launchBrowser();
@@ -596,7 +609,11 @@ try {
                 break;
             }
             const t0 = Date.now();
-            const r = await visit(contexts[theme], route, theme);
+            let r = await visit(contexts[theme], route, theme);
+            // The dev server restarts itself near its memory limit: wait for it and visit once more.
+            if (r.navError && /ERR_(EMPTY_RESPONSE|CONNECTION_REFUSED|CONNECTION_RESET)|Timeout \d+ms exceeded/.test(r.navError) && await serverUp()) {
+                r = await visit(contexts[theme], route, theme);
+            }
             const c = categories(r);
             console.error(`[mobile] ${String(r.status).padEnd(3)} ${theme.padEnd(5)} ${route.path}${r.finalPath && r.finalPath !== route.path ? ` → ${r.finalPath}` : ''}  ${Date.now() - t0}ms  ${Object.entries(c).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(' ')}`);
             results = results.filter((x) => !(x.route === r.route && x.theme === r.theme));
