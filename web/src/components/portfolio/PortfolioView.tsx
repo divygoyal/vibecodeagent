@@ -79,28 +79,30 @@ function saveLayout(v: PortfolioLayout) {
 }
 
 function Subtitle({ data, range }: { data: PortfolioResponse | undefined; range: PortfolioRange }) {
-    const parts: React.ReactNode[] = [];
+    // [content, shown on phones]
+    const parts: [React.ReactNode, boolean][] = [];
     if (data && data.sites.length) {
         const { total, synced } = data.totals.sites;
         if (data.syncing && synced < total) {
-            parts.push(
+            parts.push([
                 <span key="sync" className="inline-flex items-center gap-1.5">
                     <Loader2 aria-hidden size={12} className="animate-spin" />
                     Syncing · {fmtFull(synced)} of {fmtFull(total)} sites ready
                 </span>,
-            );
+                true,
+            ]);
         } else {
-            parts.push(`${fmtFull(synced)} of ${fmtFull(total)} sites synced`);
+            parts.push([`${fmtFull(synced)} of ${fmtFull(total)} sites synced`, true]);
         }
-        if (data.lastSyncedAt && !data.demo) parts.push(`updated ${timeAgo(data.lastSyncedAt)}`);
+        if (data.lastSyncedAt && !data.demo) parts.push([`updated ${timeAgo(data.lastSyncedAt)}`, false]);
     } else if (data?.syncing) {
-        parts.push(<span key="find" className="inline-flex items-center gap-1.5"><Loader2 aria-hidden size={12} className="animate-spin" />Finding your sites</span>);
+        parts.push([<span key="find" className="inline-flex items-center gap-1.5"><Loader2 aria-hidden size={12} className="animate-spin" />Finding your sites</span>, true]);
     }
-    parts.push(`${RANGE_LABEL[range]} vs previous`);
+    parts.push([`${RANGE_LABEL[range]} vs previous`, true]);
     return (
         <span className="inline-flex flex-wrap items-center gap-x-1.5">
-            {parts.map((p, i) => (
-                <span key={i} className="inline-flex items-center gap-1.5">
+            {parts.map(([p, phone], i) => (
+                <span key={i} className={cn('inline-flex items-center gap-1.5', !phone && 'max-md:hidden')}>
                     {i > 0 ? <span aria-hidden className="text-fg-faint">·</span> : null}
                     {p}
                 </span>
@@ -203,7 +205,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                             onValueChange={setQuery}
                             placeholder="Search sites"
                             aria-label="Search sites"
-                            className="w-44 shrink-0 md:w-36 lg:w-44"
+                            className="hidden shrink-0 md:block md:w-36 lg:w-44"
                         />
                         <Select
                             value={sort}
@@ -211,7 +213,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                             options={SORT_OPTIONS}
                             ariaLabel="Sort sites"
                             align="end"
-                            className="w-[164px] min-w-0 shrink-0"
+                            className="w-[148px] min-w-0 shrink-0 md:w-[164px]"
                         />
                         <SegmentedControl options={RANGE_OPTIONS} value={range} onChange={onRangeChange} ariaLabel="Date range" />
                     </>
@@ -255,6 +257,15 @@ export function PortfolioView(props: PortfolioViewProps) {
                     )}
 
                     <section aria-label="Sites" className="flex flex-col gap-4">
+                        {/* Phones: the header row has no room for search, so it sits above the list. */}
+                        <SearchInput
+                            value={query}
+                            onValueChange={setQuery}
+                            placeholder="Search sites"
+                            aria-label="Search sites"
+                            slashShortcut={false}
+                            className="md:hidden"
+                        />
                         <div className="flex flex-wrap items-center gap-2">
                             <div className="-mx-4 flex min-w-0 max-w-[calc(100%+2rem)] overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:max-w-full md:px-0">
                                 <SegmentedControl<FilterKey>

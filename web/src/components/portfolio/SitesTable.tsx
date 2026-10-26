@@ -6,7 +6,7 @@ import { Download, Star } from 'lucide-react';
 import { Badge, Button, EmptyState, Favicon, MetricDelta, Table, type TableColumn } from '@/components/ui';
 import { Sparkline } from '@/components/charts';
 import { fmtFull, fmtPosition } from '@/lib/format';
-import { headlineChange } from '@/lib/portfolio/view';
+import type { MetricKey } from '@/lib/metrics';
 import type { PortfolioSite } from '@/lib/portfolio/types';
 import { SiteStatusPill } from './SiteStatusPill';
 import type { CardView } from './SiteCard';
@@ -22,7 +22,16 @@ export interface SitesTableProps {
     dimmed?: boolean;
 }
 
-const num = (v: number | null | undefined) => (v === null || v === undefined ? '–' : fmtFull(v));
+/** Exact value with its delta underneath (keeps the table to 8 columns). */
+function ValueDelta({ metric, value, prev, has }: { metric: MetricKey; value: number | null | undefined; prev: number | null | undefined; has: boolean }) {
+    if (!has) return <span className="text-fg-faint">–</span>;
+    return (
+        <span className="inline-flex flex-col items-end leading-tight">
+            <span>{metric === 'position' ? fmtPosition(value) : fmtFull(value)}</span>
+            {prev === null || prev === undefined ? null : <MetricDelta metric={metric} current={value} previous={prev} />}
+        </span>
+    );
+}
 
 /** List view: sortable columns, sparkline cells, CSV export (DESIGN 5.1 / 3.13). */
 export function SitesTable({ sites, dates, view, syncing, onOpen, exportHref, empty, dimmed }: SitesTableProps) {
@@ -34,12 +43,11 @@ export function SitesTable({ sites, dates, view, syncing, onOpen, exportHref, em
             sortable: true,
             firstSortDir: 'asc',
             sortValue: (s) => s.label,
-            width: '26%',
             cell: (s) => (
                 <span className="flex min-w-0 items-center gap-2">
                     <Favicon host={s.host || s.label} size={16} />
-                    <span className="min-w-0 truncate font-medium" title={s.label}>{s.label}</span>
-                    <Badge className="hidden sm:inline-flex">{s.gsc ? (s.gsc.propertyType === 'domain' ? 'Domain' : 'Prefix') : 'GA4'}</Badge>
+                    <span className="min-w-0 max-w-[140px] truncate font-medium sm:max-w-[240px]" title={s.label}>{s.label}</span>
+                    <Badge className="max-sm:hidden!">{s.gsc ? (s.gsc.propertyType === 'domain' ? 'Domain' : 'Prefix') : 'GA4'}</Badge>
                     {s.starred ? <Star aria-label="Starred" size={14} strokeWidth={1.75} className="shrink-0 fill-star text-star" /> : null}
                     {s.alerts.length ? <span aria-label={s.alerts.map((a) => a.message).join(', ')} title={s.alerts.map((a) => a.message).join(', ')} className={`size-2 shrink-0 rounded-full ${s.alerts[0].severity === 'critical' ? 'bg-down' : 'bg-warn'}`} /> : null}
                 </span>
@@ -47,39 +55,23 @@ export function SitesTable({ sites, dates, view, syncing, onOpen, exportHref, em
         },
         {
             key: 'clicks', header: 'Clicks', align: 'right', sortable: true, sortValue: (s) => s.search?.cur.clicks,
-            cell: (s) => num(s.search?.cur.clicks),
-        },
-        {
-            key: 'clicksD', header: 'Δ', align: 'right', sortable: true, sortValue: (s) => headlineChange(s),
-            cell: (s) => (s.search?.prev ? <MetricDelta metric="clicks" current={s.search.cur.clicks} previous={s.search.prev.clicks} /> : null),
+            cell: (s) => <ValueDelta metric="clicks" value={s.search?.cur.clicks} prev={s.search?.prev?.clicks} has={Boolean(s.search)} />,
         },
         {
             key: 'impressions', header: 'Impressions', align: 'right', sortable: true, sortValue: (s) => s.search?.cur.impressions,
-            cell: (s) => num(s.search?.cur.impressions),
-        },
-        {
-            key: 'imprD', header: 'Δ', align: 'right',
-            cell: (s) => (s.search?.prev ? <MetricDelta metric="impressions" current={s.search.cur.impressions} previous={s.search.prev.impressions} /> : null),
+            cell: (s) => <ValueDelta metric="impressions" value={s.search?.cur.impressions} prev={s.search?.prev?.impressions} has={Boolean(s.search)} />,
         },
         {
             key: 'position', header: 'Position', align: 'right', sortable: true, firstSortDir: 'asc', sortValue: (s) => s.search?.cur.position ?? null,
-            cell: (s) => (s.search ? fmtPosition(s.search.cur.position) : '–'),
-        },
-        {
-            key: 'posD', header: 'Δ', align: 'right',
-            cell: (s) => (s.search?.prev ? <MetricDelta metric="position" current={s.search.cur.position} previous={s.search.prev.position} /> : null),
+            cell: (s) => <ValueDelta metric="position" value={s.search?.cur.position} prev={s.search?.prev ? s.search.prev.position : undefined} has={Boolean(s.search)} />,
         },
         {
             key: 'users', header: 'Users', align: 'right', sortable: true, sortValue: (s) => s.traffic?.cur.users,
-            cell: (s) => num(s.traffic?.cur.users),
-        },
-        {
-            key: 'usersD', header: 'Δ', align: 'right',
-            cell: (s) => (s.traffic?.prev ? <MetricDelta metric="users" current={s.traffic.cur.users} previous={s.traffic.prev.users} /> : null),
+            cell: (s) => <ValueDelta metric="users" value={s.traffic?.cur.users} prev={s.traffic?.prev?.users} has={Boolean(s.traffic)} />,
         },
         {
             key: 'sessions', header: 'Sessions', align: 'right', sortable: true, sortValue: (s) => s.traffic?.cur.sessions,
-            cell: (s) => num(s.traffic?.cur.sessions),
+            cell: (s) => <ValueDelta metric="sessions" value={s.traffic?.cur.sessions} prev={s.traffic?.prev?.sessions} has={Boolean(s.traffic)} />,
         },
         {
             key: 'trend', header: 'Trend', width: 112,
@@ -107,6 +99,7 @@ export function SitesTable({ sites, dates, view, syncing, onOpen, exportHref, em
             columns={columns}
             rows={sites}
             rowKey={(s) => s.key}
+            density="comfortable"
             onRowClick={onOpen}
             empty={empty ?? <EmptyState variant="inline" title="No sites" />}
             pagination={{ pageSize, pageSizes: [25, 50, 100], onPageSizeChange: setPageSize }}

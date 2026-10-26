@@ -44,9 +44,11 @@ export function AlertsPanel({ alerts, hrefFor, onOpen, className }: {
                                 className={cn('size-2 shrink-0 rounded-full', a.severity === 'critical' ? 'bg-down' : 'bg-warn')}
                             />
                             <Favicon host={a.host} size={16} />
-                            <span className="min-w-0 shrink truncate text-body font-medium text-fg">{a.host}</span>
-                            <span className={cn('min-w-0 flex-1 truncate text-body-sm', a.severity === 'critical' ? 'text-down' : 'text-warn')}>
-                                {a.message}
+                            <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
+                                <span className="min-w-0 truncate text-body font-medium text-fg sm:max-w-[45%] sm:shrink-0">{a.host}</span>
+                                <span className={cn('min-w-0 truncate text-body-sm', a.severity === 'critical' ? 'text-down' : 'text-warn')}>
+                                    {a.message}
+                                </span>
                             </span>
                             {a.type === 'drop' && a.previous !== null ? (
                                 <span className="hidden text-meta text-fg-muted tabular-nums md:inline">
