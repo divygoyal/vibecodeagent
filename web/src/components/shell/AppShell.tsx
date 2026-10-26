@@ -133,15 +133,20 @@ function ShellBody({ children }: { children: ReactNode }) {
                     s0.parentNode.insertBefore(s1,s0);
                   })();`}
             </Script>
+            {/* The aside is a full-height column (its surface and border run the
+                whole page, also in full-page screenshots); the sidebar inside it
+                sticks to the viewport and scrolls on its own. */}
             <aside
                 className={cn(
-                    'sticky top-0 z-40 hidden h-dvh shrink-0 border-r border-border-subtle bg-surface md:block',
+                    'relative z-40 hidden shrink-0 self-stretch border-r border-border-subtle bg-surface md:block',
                     'md:w-16',
                     collapsed ? 'lg:w-16' : 'lg:w-[248px]',
                 )}
             >
-                <div className="h-full lg:hidden"><Sidebar collapsed localSwitcher /></div>
-                <div className="hidden h-full lg:block"><Sidebar collapsed={collapsed} /></div>
+                <div className="sticky top-0 h-dvh overflow-y-auto overscroll-contain">
+                    <div className="h-full lg:hidden"><Sidebar collapsed localSwitcher /></div>
+                    <div className="hidden h-full lg:block"><Sidebar collapsed={collapsed} /></div>
+                </div>
             </aside>
             <div className="flex min-w-0 flex-1 flex-col">
                 <Topbar />
