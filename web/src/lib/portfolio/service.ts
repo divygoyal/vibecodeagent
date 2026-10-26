@@ -8,7 +8,7 @@ import { googleAccessFor, sessionUserRegistrar } from './auth';
 import { buildPortfolio, rangeUsersNeeded, RECENT_DAYS } from './build';
 import { bucketDaysFor, windowRequests } from './ranges';
 import type { SnapshotData } from './snapshot';
-import { isRangeUsersRunning, isSyncRunning, lastSyncResult, needsSync, startRangeUsers, startSync } from './sync';
+import { isRangeUsersRunning, isSyncRunning, lastSyncResult, needsSync, rangeUsersFailedRecently, startRangeUsers, startSync } from './sync';
 import type { PortfolioRange, PortfolioResponse } from './types';
 
 /**
@@ -64,7 +64,8 @@ export async function loadPortfolio(identifier: string, range: PortfolioRange, r
     // Waits for the daily sync so a first visit does not double the Google load.
     let usersPending = isRangeUsersRunning(identifier, range);
     const ga4Window = snap.windows.ga4;
-    if (!usersPending && !syncing && ga4Window) {
+    // After a failed run (quota, outage) wait 5 minutes: the cards show summed users meanwhile.
+    if (!usersPending && !syncing && ga4Window && !rangeUsersFailedRecently(identifier, range, now)) {
         const need = rangeUsersNeeded(snap, Math.floor(now / 1000));
         if (need.length > 0) {
             void startRangeUsers({ identifier, accessToken: access.token, rangeKey: range, window: ga4Window, properties: need.map((a) => a.asset_id) });

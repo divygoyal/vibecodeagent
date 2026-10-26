@@ -214,7 +214,10 @@ function isDue(a: StoreAsset, nowS: number, force: boolean): boolean {
     if (a.missing || a.hidden) return false;
     if (a.status === 'syncing' && (a.sync_started_at ?? 0) > nowS - SYNC_STUCK_S) return false;
     if (!a.backfill_done || !a.last_synced_at) {
+        // Never synced yet: retry errors after 5 minutes and "no access" after 30 (it was due on every
+        // poll, so a property Google refuses restarted the sync every 2 seconds while the page was open).
         if (a.status === 'error' && !force) return nowS - (a.sync_started_at ?? 0) > ERROR_RETRY_S / 6;
+        if (a.status === 'no_access' && !force) return nowS - (a.sync_started_at ?? 0) > ERROR_RETRY_S;
         return true;
     }
     if ((a.status === 'error' || a.status === 'no_access') && !force) return nowS - (a.sync_started_at ?? 0) > ERROR_RETRY_S;
@@ -342,6 +345,15 @@ export function isRangeUsersRunning(identifier: string, rangeKey: string): boole
     return rangeJobs.has(`${identifier}|${rangeKey}`);
 }
 
+/** Last range-users run per user|range that had Google failures (epoch ms), to back off instead of retrying on every poll. */
+const rangeFailedAt = new Map<string, number>();
+const RANGE_USERS_RETRY_MS = 5 * 60_000;
+
+export function rangeUsersFailedRecently(identifier: string, rangeKey: string, now: number = Date.now()): boolean {
+    const t = rangeFailedAt.get(`${identifier}|${rangeKey}`);
+    return t !== undefined && now - t < RANGE_USERS_RETRY_MS;
+}
+
 /**
  * Fetch exact (de-duplicated) users for one range and its previous period:
  * ONE GA4 runReport per property (two date ranges, no date dimension), 4
@@ -387,6 +399,13 @@ async function runRangeUsers(opts: { identifier: string; accessToken: string; ra
             if (err instanceof GoogleError && err.status === 401) throw err;
         }
     });
+    const key = `${opts.identifier}|${opts.rangeKey}`;
+    if (failed > 0) {
+        rangeFailedAt.set(key, Date.now());
+        if (rangeFailedAt.size > 5000) rangeFailedAt.delete(rangeFailedAt.keys().next().value as string);
+    } else {
+        rangeFailedAt.delete(key);
+    }
     console.log(
         `[portfolio-users] user=${opts.identifier} range=${opts.rangeKey} properties=${opts.properties.length}` +
         ` stored=${stored} failed=${failed} google_calls ga4=${calls.ga4} in ${Date.now() - started}ms`,
