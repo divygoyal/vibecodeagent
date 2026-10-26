@@ -263,19 +263,24 @@ function pageAudit() {
         }
     }
 
-    // Tap targets. A positioned ::before/::after (e.g. `pointer-coarse:after:-inset-3`) widens the hit area.
+    // Tap targets. An absolutely positioned ::before/::after widens the hit area: `pointer-coarse:after:-inset-3`
+    // on a positioned control, or a stretched link (`after:absolute after:inset-0`, the pseudo covers the nearest
+    // positioned ancestor, e.g. the whole card). Its box is resolved against that containing block.
     const hitRect = (el) => {
         const r = el.getBoundingClientRect();
         let { left, top, right, bottom } = r;
-        if (getComputedStyle(el).position !== 'static') {
+        let cb = el;
+        while (cb && getComputedStyle(cb).position === 'static') cb = cb.parentElement;
+        if (cb && cb !== document.body && cb !== document.documentElement) {
+            const cr = cb.getBoundingClientRect();
             for (const pseudo of ['::before', '::after']) {
                 const ps = getComputedStyle(el, pseudo);
                 if (ps.content === 'none' || ps.position !== 'absolute' || ps.display === 'none' || ps.pointerEvents === 'none') continue;
                 const [t, b, l, rr] = [ps.top, ps.bottom, ps.left, ps.right].map(parseFloat);
-                if (!Number.isNaN(t)) top = Math.min(top, r.top + t);
-                if (!Number.isNaN(b)) bottom = Math.max(bottom, r.bottom - b);
-                if (!Number.isNaN(l)) left = Math.min(left, r.left + l);
-                if (!Number.isNaN(rr)) right = Math.max(right, r.right - rr);
+                if (!Number.isNaN(t)) top = Math.min(top, cr.top + t);
+                if (!Number.isNaN(b)) bottom = Math.max(bottom, cr.bottom - b);
+                if (!Number.isNaN(l)) left = Math.min(left, cr.left + l);
+                if (!Number.isNaN(rr)) right = Math.max(right, cr.right - rr);
             }
         }
         return { width: right - left, height: bottom - top };

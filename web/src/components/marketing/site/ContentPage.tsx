@@ -28,7 +28,7 @@ export function ContentPage({
             <div className="mx-auto max-w-[720px] px-4 pt-10 pb-16 md:px-6 md:pt-16 md:pb-24">
                 <nav aria-label="Breadcrumb" className="mb-8">
                     <ol className="flex items-center gap-2 text-body-sm text-fg-muted">
-                        <li><Link href="/" className="hover:text-fg">Home</Link></li>
+                        <li><Link href="/" className="tap-area inline-block hover:text-fg">Home</Link></li>
                         <li aria-hidden>/</li>
                         <li aria-current="page" className="text-fg-secondary">{crumb}</li>
                     </ol>
@@ -68,7 +68,7 @@ export function CrossLinks({ links }: { links: Array<{ label: string; href: stri
     return (
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-body-sm">
             {links.map((l) => (
-                <Link key={l.href} href={l.href} className="text-fg-secondary underline-offset-4 hover:text-fg hover:underline">
+                <Link key={l.href} href={l.href} className="tap-area inline-block text-fg-secondary underline-offset-4 hover:text-fg hover:underline">
                     {l.label} →
                 </Link>
             ))}

@@ -71,7 +71,7 @@ export default function AiConnectorPage() {
     const url = resourceUrl();
     return (
         <div className="tc-root bg-canvas pb-20 pt-8 text-fg md:pt-12">
-            <section className="mx-auto grid max-w-[1200px] items-start gap-10 px-4 md:px-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <section className="mx-auto grid max-w-[1200px] items-start gap-10 px-4 md:px-6 grid-cols-1 lg:grid-cols-[1.1fr_0.9fr]">
                 <div className="min-w-0">
                     <Badge variant="brand">MCP connector</Badge>
                     <h1 className="mt-4 text-display-sm text-fg md:text-display">Use your Google Analytics and Search Console in ChatGPT and Claude</h1>
@@ -97,7 +97,7 @@ export default function AiConnectorPage() {
 
             <section className="mx-auto mt-20 max-w-[1200px] px-4 md:px-6" aria-labelledby="how">
                 <h2 id="how" className="text-display-sm text-fg">How it works</h2>
-                <ol className="mt-6 grid gap-4 md:grid-cols-3">
+                <ol className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-3">
                     {[
                         ['Copy the server URL', 'One URL for every app. It works for all your sites.'],
                         ['Add it to your AI app', 'Paste it as a custom connector or MCP server.'],
@@ -112,7 +112,7 @@ export default function AiConnectorPage() {
                         </li>
                     ))}
                 </ol>
-                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                <div className="mt-6 grid gap-6 grid-cols-1 lg:grid-cols-2">
                     <Card padding="lg" className="min-w-0">
                         <h3 className="text-title text-fg">Set it up</h3>
                         <p className="mt-1 mb-4 text-body text-fg-muted">Server URL: <span className="font-mono text-fg">{url}</span></p>
@@ -145,7 +145,7 @@ export default function AiConnectorPage() {
 
             <section className="mx-auto mt-20 max-w-[1200px] px-4 md:px-6" aria-labelledby="privacy">
                 <h2 id="privacy" className="text-display-sm text-fg">Your data, your call</h2>
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <div className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-3">
                     {[
                         { Icon: Eye, title: 'Read-only', body: 'No tool can change anything in Analytics, Search Console or TrafficClaw.' },
                         { Icon: ListChecks, title: 'You choose the sites', body: 'Share all sites or a few, and hide search queries per app if you prefer.' },
@@ -166,7 +166,7 @@ export default function AiConnectorPage() {
                 <div className="mt-6 divide-y divide-border-subtle border-y border-border-subtle">
                     {FAQ.map((f) => (
                         <details key={f.q} className="group py-4">
-                            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-body-lg font-medium text-fg [&::-webkit-details-marker]:hidden">
+                            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 pointer-coarse:min-h-11 text-body-lg font-medium text-fg [&::-webkit-details-marker]:hidden">
                                 {f.q}
                                 <span aria-hidden className="text-fg-muted transition-transform group-open:rotate-45">+</span>
                             </summary>

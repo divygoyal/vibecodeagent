@@ -68,7 +68,7 @@ export function Pillars() {
                 title="Four things you get, all free"
                 description="TrafficClaw reads your Google Analytics 4 and Search Console data with read-only access and puts it to work in four ways."
             />
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-10 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 {PILLARS.map((p) => (
                     <Link
                         key={p.title}
@@ -110,7 +110,7 @@ export function HowItWorks() {
     return (
         <Section id="how-it-works" tone="surface" labelledBy="how-title">
             <SectionHeading id="how-title" eyebrow="How it works" title="Up and running in three steps" align="center" />
-            <ol className="mt-12 grid gap-4 md:grid-cols-3">
+            <ol className="mt-12 grid gap-4 grid-cols-1 md:grid-cols-3">
                 {STEPS.map((s, i) => (
                     <li key={s.title} className="rounded-card border border-border-subtle bg-canvas p-6">
                         <span className="inline-flex size-8 items-center justify-center rounded-full bg-brand text-body-sm font-semibold text-brand-fg">{i + 1}</span>
@@ -141,21 +141,21 @@ export function WhyFree() {
     ];
     return (
         <Section id="why-free" labelledBy="why-free-title">
-            <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+            <div className="grid gap-10 grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
                 <SectionHeading
                     id="why-free-title"
                     eyebrow="Why free?"
                     title="Free, because most of it is cheap to run"
                     description="We would rather tell you how the money works than hide it in the small print."
                 />
-                <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 lg:grid-cols-1">
                     {points.map((p) => (
                         <div key={p.title} className="rounded-card border border-border-subtle bg-surface p-5 shadow-card">
                             <h3 className="text-title-sm text-fg">{p.title}</h3>
                             <p className="mt-1.5 text-body text-fg-secondary">{p.text}</p>
                         </div>
                     ))}
-                    <Link href="/pricing" className="inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary hover:text-fg sm:col-span-3 lg:col-span-1">
+                    <Link href="/pricing" className="tap-area inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary hover:text-fg sm:col-span-3 lg:col-span-1">
                         See pricing <ArrowRight aria-hidden size={14} strokeWidth={1.75} />
                     </Link>
                 </div>

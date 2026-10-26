@@ -319,7 +319,7 @@ export function IndexingTab() {
                     toolbar={<div><p className="text-title-sm text-fg">Sitemaps</p><p className="text-meta text-fg-muted">Submitted in Search Console</p></div>}
                     empty={<EmptyState variant="inline" title="No sitemaps submitted" description="Submit your sitemap in Search Console so Google finds new pages faster." />}
                     columns={[
-                        { key: 'path', header: 'Sitemap', width: '44%', cell: (r) => <a href={r.path} target="_blank" rel="noreferrer" className="hover:underline" title={r.path}>{r.path.replace(/^https?:\/\//, '')}</a> },
+                        { key: 'path', header: 'Sitemap', width: '44%', cell: (r) => <a href={r.path} target="_blank" rel="noreferrer" className="tap-inline hover:underline" title={r.path}>{r.path.replace(/^https?:\/\//, '')}</a> },
                         { key: 'submitted', header: 'URLs', align: 'right', cell: (r) => fmtFull(r.submitted) },
                         { key: 'read', header: 'Last read', align: 'right', className: 'max-md:hidden', headerClassName: 'max-md:hidden', cell: (r) => (r.lastDownloaded ? fmtDayYear(r.lastDownloaded.slice(0, 10)) : '–') },
                         { key: 'status', header: 'Status', align: 'right', cell: (r) => (r.errors ? <span className="text-down">{fmtFull(r.errors)} errors</span> : r.warnings ? <span className="text-warn">{fmtFull(r.warnings)} warnings</span> : r.isPending ? 'Pending' : <span className="text-up">OK</span>) },

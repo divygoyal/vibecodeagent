@@ -106,7 +106,7 @@ export function Composer({ value, onChange, onSend, textareaRef, sendDisabled, i
                         </>
                     )}
                 </p>
-                <Link href="/dashboard/connect-ai" className="inline-flex items-center gap-1 hover:text-fg">
+                <Link href="/dashboard/connect-ai" className="tap-area inline-flex items-center gap-1 hover:text-fg">
                     Unlimited with ChatGPT or Claude <span aria-hidden>→</span>
                 </Link>
             </div>

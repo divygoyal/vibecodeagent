@@ -80,7 +80,7 @@ export function AuditPage() {
                 <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); void run(); }}>
                     <label htmlFor="audit-url" className="sr-only">Page to audit</label>
                     <input id="audit-url" value={input} onChange={(e) => setInput(e.target.value)} placeholder="https://your-site.com" inputMode="url"
-                        className="h-9 min-w-0 flex-1 rounded-control border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint focus-visible:outline-2 focus-visible:outline-focus" />
+                        className="h-9 min-w-0 rounded-control sm:flex-1 border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint focus-visible:outline-2 focus-visible:outline-focus" />
                     <Button type="submit" variant="primary" icon={Play} loading={running} disabled={!input.trim()}>{r ? 'Run a fresh audit' : 'Audit page'}</Button>
                 </form>
                 <p className="mt-2 text-meta text-fg-muted">Checks titles, meta tags, headings, links, images, structured data and response time. Results are kept for 6 hours.</p>

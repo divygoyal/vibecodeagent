@@ -104,7 +104,7 @@ function Loaded({ rec, onRecord, openShare, router }: { rec: DashboardRecord; on
 
     const header = (
         <div className="flex flex-col gap-3">
-            <Link href="/dashboard/dashboards" className="inline-flex w-fit items-center gap-1 text-body-sm text-fg-muted hover:text-fg"><ArrowLeft aria-hidden size={14} />Dashboards</Link>
+            <Link href="/dashboard/dashboards" className="tap-area inline-flex w-fit items-center gap-1 text-body-sm text-fg-muted hover:text-fg"><ArrowLeft aria-hidden size={14} />Dashboards</Link>
             <DashboardBrandHeader doc={doc} />
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">

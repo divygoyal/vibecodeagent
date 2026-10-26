@@ -63,7 +63,8 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
             aria-label={ariaLabel}
             className={cn(
                 'flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-                underline ? 'gap-5 border-b border-border-subtle' : 'gap-1',
+                // pills: room inside the scroll box for the 44px touch hit area (overflow clips it otherwise)
+                underline ? 'gap-5 border-b border-border-subtle' : 'gap-1 pointer-coarse:-my-1.5 pointer-coarse:py-1.5',
                 className,
             )}
         >
@@ -72,6 +73,9 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
                 const Icon = t.icon;
                 const cls = cn(
                     'relative flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors duration-120 ease-standard',
+                    // Touch: 44px hit area (narrow labels like "Top" are 23px wide), no layout change.
+                    'pointer-coarse:after:absolute pointer-coarse:after:-inset-x-2.5',
+                    underline ? 'pointer-coarse:after:inset-y-0' : 'pointer-coarse:after:-inset-y-1.5',
                     underline
                         ? cn('h-10 text-body font-medium', active ? 'text-fg' : 'text-fg-muted hover:text-fg')
                         : cn('h-7 rounded-md px-2.5 text-body-sm font-medium pointer-coarse:h-8', active ? 'bg-subtle text-fg' : 'text-fg-muted hover:text-fg'),

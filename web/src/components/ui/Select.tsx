@@ -43,7 +43,7 @@ export function Select<T extends string = string>({
             <S.Trigger
                 aria-label={ariaLabel ?? label}
                 className={cn(
-                    'tc-control inline-flex min-w-40 items-center gap-1.5 rounded-control border border-border bg-surface px-3 text-left text-fg',
+                    'tc-control tap-area inline-flex min-w-40 items-center gap-1.5 rounded-control border border-border bg-surface px-3 text-left text-fg',
                     'transition-colors duration-120 hover:border-border-strong data-[state=open]:border-border-strong',
                     'focus-visible:outline-2 disabled:opacity-50 data-[placeholder]:text-fg-faint',
                     size === 'md' ? 'h-9 text-body' : 'h-8 text-body-sm',
@@ -78,7 +78,7 @@ export function Select<T extends string = string>({
                                 textValue={o.textValue}
                                 disabled={o.disabled}
                                 className={cn(
-                                    'relative flex h-8 cursor-default select-none items-center gap-2 rounded-md pl-2 pr-8 outline-none',
+                                    'relative flex h-8 pointer-coarse:h-11 cursor-default select-none items-center gap-2 rounded-md pl-2 pr-8 outline-none',
                                     'data-[highlighted]:bg-subtle data-[disabled]:text-fg-faint',
                                     size === 'sm' && 'text-body-sm',
                                 )}

@@ -15,7 +15,7 @@ const VARIANT: Record<ButtonVariant, string> = {
     ghost: 'text-fg-secondary hover:bg-subtle hover:text-fg',
     subtle: 'bg-subtle text-fg hover:bg-subtle-strong',
     danger: 'bg-down text-white hover:brightness-[0.92]',
-    link: 'relative text-fg-secondary underline-offset-4 hover:text-fg hover:underline px-0! h-auto! shadow-none pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-2',
+    link: 'relative text-fg-secondary underline-offset-4 hover:text-fg hover:underline px-0! h-auto! shadow-none pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-3',
     google: 'bg-white border border-[#dadce0] text-[#1f1f1f] shadow-xs hover:bg-[#f8f9fa]',
 };
 
@@ -49,6 +49,7 @@ export function buttonClasses({ variant = 'secondary', size = 'md', iconOnly = f
         'inline-flex shrink-0 select-none items-center justify-center whitespace-nowrap',
         'transition-[background-color,border-color,color,box-shadow,filter] duration-120 ease-standard',
         'active:translate-y-[0.5px] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
+        variant !== 'link' && 'tap-area', // touch: 44px hit area (link has its own)
         VARIANT[variant],
         iconOnly ? cn(ICON_ONLY[size], variant === 'link' ? '' : 'p-0') : SIZE[size],
         className,

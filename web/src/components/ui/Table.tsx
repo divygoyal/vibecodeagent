@@ -168,7 +168,7 @@ export function Table<T>({
                                         <button
                                             type="button"
                                             onClick={() => toggleSort(c)}
-                                            className={cn('relative inline-flex items-center gap-1 rounded hover:text-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-2.5', active && 'text-fg', c.align === 'right' && 'flex-row-reverse')}
+                                            className={cn('relative inline-flex items-center gap-1 rounded hover:text-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-x-2.5 pointer-coarse:after:-inset-y-2.5', active && 'text-fg', c.align === 'right' && 'flex-row-reverse')}
                                         >
                                             {c.header}
                                             <SortIcon aria-hidden size={12} className={active ? 'text-fg' : 'text-fg-faint'} />

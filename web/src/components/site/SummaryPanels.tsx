@@ -28,7 +28,7 @@ function SectionTitle({ title, source, href, linkLabel }: { title: string; sourc
                 <p className="text-meta text-fg-muted">{source}</p>
             </div>
             {href ? (
-                <Link href={href} className="inline-flex shrink-0 items-center gap-1 text-body-sm font-medium text-brand-text hover:underline">
+                <Link href={href} className="tap-area inline-flex shrink-0 items-center gap-1 text-body-sm font-medium text-brand-text hover:underline">
                     {linkLabel ?? 'Open'} <ArrowRight aria-hidden size={14} />
                 </Link>
             ) : null}

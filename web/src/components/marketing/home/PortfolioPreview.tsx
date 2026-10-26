@@ -69,7 +69,7 @@ export function PortfolioPreview({ portfolio, cards = 6 }: { portfolio: DemoPort
             </div>
 
             <div className="mt-4 flex justify-center">
-                <Link href="/demo" className="inline-flex items-center gap-1.5 text-body-sm font-medium text-fg-secondary hover:text-fg">
+                <Link href="/demo" className="tap-area inline-flex items-center gap-1.5 text-body-sm font-medium text-fg-secondary hover:text-fg">
                     Open the full demo ({totals.sites.total} sample sites)
                     <ArrowRight aria-hidden size={14} strokeWidth={1.75} />
                 </Link>

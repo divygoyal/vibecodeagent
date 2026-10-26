@@ -110,7 +110,7 @@ function Gallery() {
     return (
         <div className="flex flex-col gap-6">
             <div>
-                <Link href="/dashboard/dashboards" className="inline-flex items-center gap-1 text-body-sm text-fg-muted hover:text-fg"><ArrowLeft aria-hidden size={14} />Dashboards</Link>
+                <Link href="/dashboard/dashboards" className="tap-area inline-flex items-center gap-1 text-body-sm text-fg-muted hover:text-fg"><ArrowLeft aria-hidden size={14} />Dashboards</Link>
                 <h1 className="mt-2 text-heading text-fg">New dashboard</h1>
                 <p className="mt-1 text-body text-fg-muted">Pick a starting point. You can change every widget, and each widget can read any of your sites.</p>
             </div>
@@ -119,7 +119,7 @@ function Gallery() {
                     <button key={c} type="button" role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={cn('h-8 rounded-full px-3 text-body-sm font-medium transition-colors', cat === c ? 'bg-brand text-brand-fg' : 'bg-subtle text-fg-secondary hover:text-fg')}>{c}</button>
                 ))}
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                 {cat === 'All' ? <TemplateCard id="blank" title="Blank" description="Start from an empty page." needs={[]} thumb={[]} onPick={() => setPicked({ tpl: BLANK_TEMPLATE })} /> : null}
                 {shown.map((t) => (
                     <TemplateCard key={t.id} id={t.id} title={t.name} description={t.description} chip={t.portfolio ? 'All sites' : undefined} needs={t.portfolio ? [] : t.needs.map((n) => NEED_LABEL[n])} thumb={thumbs[t.id]} onPick={() => setPicked({ tpl: t })} />

@@ -79,7 +79,7 @@ export function StatusPill({ status, label, progress, tooltip, onClick, classNam
         <button
             type="button"
             onClick={onClick}
-            className={cn('inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-meta font-medium transition-[filter] duration-120 hover:brightness-95', TONE[s.tone], className)}
+            className={cn('tap-area inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-meta font-medium transition-[filter] duration-120 hover:brightness-95', TONE[s.tone], className)}
         >
             {dot ? <span aria-hidden className="size-1.5 rounded-full bg-current" /> : null}
             {icon}

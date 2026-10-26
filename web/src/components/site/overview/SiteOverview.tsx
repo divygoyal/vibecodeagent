@@ -101,7 +101,7 @@ function TopPagesCard({ className }: { className?: string }) {
                     columns={[
                         {
                             key: 'page', header: 'Page', width: '46%',
-                            cell: (r) => <Link href={`${siteHref(site.host, 'pages')}?page=${encodeURIComponent(r.key)}`} className="hover:underline" title={r.label}>{r.label}</Link>,
+                            cell: (r) => <Link href={`${siteHref(site.host, 'pages')}?page=${encodeURIComponent(r.key)}`} className="tap-inline hover:underline" title={r.label}>{r.label}</Link>,
                             heat: site.hasGa4 ? { metric: 'pageviews', value: (r) => r.views } : { metric: 'clicks', value: (r) => r.clicks },
                         },
                         ...(site.hasGa4 ? [
@@ -284,7 +284,7 @@ function AlertsCard() {
                                 </div>
                                 <Link
                                     href={askHref(`About ${site.siteHost ?? site.label}: "${a.title}". ${a.description ?? ''} What caused it and what should I do?`, { ga4: site.ga4, gsc: site.gsc }, 'site:alert')}
-                                    className="shrink-0 text-meta font-medium text-brand-text hover:underline"
+                                    className="tap-area shrink-0 text-meta font-medium text-brand-text hover:underline"
                                 >
                                     Ask AI
                                 </Link>

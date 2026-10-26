@@ -38,7 +38,7 @@ export function PageHeader({ title, subtitle, icon, badges, actions, secondaryAc
                 <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2.5">
                         {backHref ? (
-                            <Link href={backHref} aria-label="Back" className="-ml-1 flex size-8 shrink-0 items-center justify-center rounded-control text-fg-muted hover:bg-subtle hover:text-fg">
+                            <Link href={backHref} aria-label="Back" className="tap-area -ml-1 flex size-8 shrink-0 items-center justify-center rounded-control text-fg-muted hover:bg-subtle hover:text-fg">
                                 <ArrowLeft aria-hidden size={16} />
                             </Link>
                         ) : null}
