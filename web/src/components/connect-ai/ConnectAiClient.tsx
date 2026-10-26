@@ -170,7 +170,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
 
             <Card>
                 <CardHeader as="h2" title="Set up your app" />
-                <SetupTabs url={url} />
+                <SetupTabs url={url} urlShown />
                 <div className="mt-5 border-t border-border-subtle pt-4">
                     <h3 className="mb-2 text-caption uppercase tracking-[0.04em] text-fg-muted">Try asking</h3>
                     <ul className="space-y-1.5">
