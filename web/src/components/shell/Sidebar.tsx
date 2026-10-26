@@ -123,7 +123,7 @@ export function Sidebar({ collapsed = false, inDrawer = false, onNavigate, local
     const onSitePage = pathname.startsWith('/dashboard/s/');
 
     return (
-        <nav aria-label="Main" className="flex h-full flex-col">
+        <nav aria-label="Main" className="flex min-h-full flex-col">
             <div className={cn('group/logo flex h-14 shrink-0 items-center', collapsed ? 'justify-center px-0' : 'gap-2 px-4')}>
                 <Link href="/dashboard" onClick={onNavigate} className="flex min-w-0 items-center gap-2 rounded-md" aria-label="Portfolio">
                     <BrandMark size={24} />
@@ -154,7 +154,7 @@ export function Sidebar({ collapsed = false, inDrawer = false, onNavigate, local
                 <SiteSwitcher collapsed={collapsed} onNavigate={onNavigate} {...(local ? { open: localOpen, onOpenChange: setLocalOpen } : {})} />
             </div>
 
-            <div className="mt-3 min-h-0 flex-1 overflow-y-auto pb-3">
+            <div className="mt-3 flex-1 pb-3">
                 <NavLink {...PORTFOLIO_ITEM} active={isActive(pathname, PORTFOLIO_ITEM)} collapsed={collapsed} onClick={onNavigate} />
 
                 <GroupLabel collapsed={collapsed}>Site</GroupLabel>

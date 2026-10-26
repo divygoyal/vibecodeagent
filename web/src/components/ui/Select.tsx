@@ -61,7 +61,7 @@ export function Select<T extends string = string>({
                     align={align}
                     collisionPadding={8}
                     className={cn(
-                        'z-50 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden',
+                        'tc-ui z-50 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden',
                         'rounded-popover border border-border-subtle bg-surface-raised p-1 text-body text-fg shadow-popover animate-pop-in',
                         contentClassName,
                     )}

@@ -1138,7 +1138,11 @@ select:focus-visible {
 
 /* ========== Mobile-optimized touch targets ========== */
 @media (max-width: 640px) {
-  button, a[role="button"], [role="switch"] {
+  /* Old pages only: never on the design system (.tc-root = AppShell and new
+     pages, .tc-ui = our portalled panels, .tc-toast = toasts); inside the
+     shell, only unmigrated content in <LegacyFrame> (.legacy). */
+  :is(button, a[role="button"], [role="switch"]):not(.tc-root *, .tc-ui *, .tc-toast *),
+  .legacy :is(button, a[role="button"], [role="switch"]) {
     min-height: 44px;
     min-width: 44px;
   }

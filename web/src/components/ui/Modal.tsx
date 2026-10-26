@@ -44,7 +44,7 @@ export function Modal({ open, onOpenChange, title, description, children, footer
                 <Dialog.Content
                     aria-describedby={description ? undefined : undefined}
                     className={cn(
-                        'fixed z-70 flex flex-col bg-surface-raised text-body text-fg shadow-modal outline-none',
+                        'tc-ui fixed z-70 flex flex-col bg-surface-raised text-body text-fg shadow-modal outline-none',
                         // mobile: bottom sheet
                         'inset-x-0 bottom-0 max-h-[90dvh] rounded-t-2xl animate-sheet-up pb-[env(safe-area-inset-bottom)]',
                         // desktop: centred

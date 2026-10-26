@@ -82,7 +82,8 @@ export function buildSiteDirectory({ sites, properties, savedPair }: DirectoryIn
         used.set(host, n);
         entries.push({
             host: n === 1 ? host : `${host}--${n}`,
-            label: host,
+            // A second property on the same host is labelled by its own URL ("http://acme.com").
+            label: n === 1 ? host : s.siteUrl.replace(/\/$/, ''),
             gscSiteUrl: s.siteUrl,
             gscKind: siteKind(s.siteUrl),
             ga4PropertyId: null,

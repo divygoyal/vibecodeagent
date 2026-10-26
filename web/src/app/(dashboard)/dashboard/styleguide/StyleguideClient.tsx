@@ -480,7 +480,7 @@ export function StyleguideClient() {
                 </Row>
                 <Row>
                     {([24, 28, 32, 40] as const).map((s) => <Avatar key={s} size={s} name="Demo Owner" />)}
-                    <Avatar size={32} name="Second User" src="/does-not-exist.png" />
+                    <Avatar size={32} name="Second User" />
                 </Row>
             </Section>
 

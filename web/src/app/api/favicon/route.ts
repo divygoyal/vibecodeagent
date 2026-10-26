@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 /**
  * Favicon proxy for <Favicon> (DESIGN 2.8): wraps Google's s2 favicon service
- * and caches for 7 days. Returns 404 when there is no real icon so the client
- * falls back to its letter tile.
+ * and caches for 7 days. Answers 204 (empty) when there is no real icon so the
+ * client falls back to its letter tile.
  *
  *   GET /api/favicon?host=acme.com&size=32|64
  */
@@ -12,8 +12,9 @@ const HOST_RE = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,
 const RESERVED_TLDS = ['.example', '.test', '.invalid', '.localhost', '.local'];
 const WEEK = 60 * 60 * 24 * 7;
 
+/** "No icon": 204 makes the <img> fail (letter tile) without a console 404. */
 function notFound(maxAge = 60 * 60 * 24) {
-    return new NextResponse(null, { status: 404, headers: { 'Cache-Control': `public, max-age=${maxAge}` } });
+    return new NextResponse(null, { status: 204, headers: { 'Cache-Control': `public, max-age=${maxAge}` } });
 }
 
 export async function GET(req: NextRequest) {

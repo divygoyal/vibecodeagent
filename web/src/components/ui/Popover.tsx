@@ -31,7 +31,7 @@ export function PopoverContent({ children, className, side = 'bottom', align = '
                 sideOffset={sideOffset}
                 collisionPadding={8}
                 className={cn(
-                    'z-50 rounded-popover border border-border-subtle bg-surface-raised text-body text-fg shadow-popover',
+                    'tc-ui z-50 rounded-popover border border-border-subtle bg-surface-raised text-body text-fg shadow-popover',
                     'animate-pop-in outline-none',
                     className,
                 )}
