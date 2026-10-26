@@ -104,7 +104,6 @@ function ShellBody({ children }: { children: ReactNode }) {
     if (isSetup) {
         return (
             <div className="tc-root min-h-dvh bg-canvas text-fg">
-                <a href="#main-content" className="skip-to-content">Skip to content</a>
                 <header className="flex h-14 items-center justify-between px-4 md:px-6">
                     <Link href="/dashboard" className="flex items-center gap-2"><BrandMark size={24} /><Wordmark /></Link>
                     <Button asChild variant="ghost" size="sm"><Link href="/dashboard">Exit setup</Link></Button>
@@ -116,7 +115,6 @@ function ShellBody({ children }: { children: ReactNode }) {
 
     return (
         <div className="tc-root flex min-h-dvh bg-canvas text-fg">
-            <a href="#main-content" className="skip-to-content">Skip to content</a>
             {/* Tawk.to live chat: dashboard only (moved from the old layout). */}
             <Script id="tawk-init" strategy="afterInteractive">
                 {`var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
@@ -140,9 +138,9 @@ function ShellBody({ children }: { children: ReactNode }) {
                     collapsed ? 'lg:w-16' : 'lg:w-[248px]',
                 )}
             >
-                <div className="sticky top-0 h-dvh overflow-y-auto overscroll-contain">
-                    <div className="min-h-full lg:hidden"><Sidebar collapsed localSwitcher /></div>
-                    <div className="hidden min-h-full lg:block"><Sidebar collapsed={collapsed} /></div>
+                <div className="sticky top-0 h-dvh overflow-hidden">
+                    <div className="h-full lg:hidden"><Sidebar collapsed localSwitcher /></div>
+                    <div className="hidden h-full lg:block"><Sidebar collapsed={collapsed} /></div>
                 </div>
             </aside>
             <div className="flex min-w-0 flex-1 flex-col">
