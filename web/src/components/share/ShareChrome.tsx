@@ -108,9 +108,9 @@ export function ShareHeader({
 }
 
 /** "Built with TrafficClaw" line under a share page. */
-export function ShareFooter({ className }: { className?: string }) {
+export function ShareFooter({ compact = false, className }: { compact?: boolean; className?: string }) {
     return (
-        <footer className={cn('py-8 text-center', className)}>
+        <footer className={cn('text-center', compact ? 'py-4' : 'py-8', className)}>
             <a href={HOME_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-meta text-fg-muted transition-colors hover:text-fg">
                 <BrandMark size={14} />
                 Built with {BRAND_NAME}
