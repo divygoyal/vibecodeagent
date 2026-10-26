@@ -1,6 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
+import { isEmailAllowed, parseAllowedEmails, PREVIEW_PRIVATE_PATH } from "@/lib/accessAllowlist";
 
 // Generic profile type
 interface UserProfile {
@@ -83,10 +84,22 @@ export const authOptions: NextAuthOptions = {
     ],
 
     callbacks: {
-        async signIn({ account }) {
+        async signIn({ account, user, profile }) {
             // Minimal logging — don't log PII
             if (account?.provider) {
                 console.log(`[Auth] Sign-in via ${account.provider}`);
+            }
+            // Private previews: only listed emails (TC_ALLOWED_EMAILS). Unset = everyone.
+            const allowed = parseAllowedEmails(process.env.TC_ALLOWED_EMAILS);
+            if (allowed) {
+                const p = profile as { email?: string; email_verified?: boolean } | undefined;
+                const email = p?.email ?? user?.email ?? null;
+                const verified = account?.provider === 'google' ? p?.email_verified !== false : undefined;
+                if (!isEmailAllowed(email, allowed, { verified })) {
+                    console.log(`[Auth] Sign-in refused by TC_ALLOWED_EMAILS (${account?.provider ?? 'unknown'})`);
+                    const base = (process.env.NEXTAUTH_URL ?? '').replace(/\/+$/, '');
+                    return `${base}${PREVIEW_PRIVATE_PATH}`;
+                }
             }
             return true;
         },
