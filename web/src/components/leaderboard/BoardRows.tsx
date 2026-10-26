@@ -23,7 +23,7 @@ function metricFor(row: BoardRow, focus: 'visitors' | 'clicks') {
     return focus === 'clicks' ? row.clicks : row.visitors;
 }
 
-function Row({ row, focus, range, showNew }: { row: BoardRow; focus: 'visitors' | 'clicks'; range: BoardResponse['range']; showNew: boolean }) {
+export function BoardRowItem({ row, focus, range, showNew }: { row: BoardRow; focus: 'visitors' | 'clicks'; range: BoardResponse['range']; showNew: boolean }) {
     const m = metricFor(row, focus);
     const host = hostOf(row.website_url);
     const label = focus === 'clicks' ? 'search clicks' : 'visitors';
@@ -130,10 +130,9 @@ export function BoardRows({ data, hasFilters, clearHref }: { data: BoardResponse
         );
     }
     const showSponsoredInline = data.tab === 'top' && data.page === 1 && data.sponsored.length > 0;
-    const monthAgo = Date.now() - 30 * 86_400_000;
     const items: React.ReactNode[] = [];
     data.rows.forEach((row, i) => {
-        items.push(<Row key={row.id} row={row} focus={data.focus} range={data.range} showNew={data.tab !== 'new' && !!row.created_at && Date.parse(row.created_at) > monthAgo} />);
+        items.push(<BoardRowItem key={row.id} row={row} focus={data.focus} range={data.range} showNew={data.tab !== 'new' && row.is_new} />);
         if (showSponsoredInline && i === 4) items.push(<SponsoredRow key={`sp-a`} card={data.sponsored[0]} />);
         if (showSponsoredInline && i === 14 && data.sponsored[1]) items.push(<SponsoredRow key={`sp-b`} card={data.sponsored[1]} />);
     });

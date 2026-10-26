@@ -61,6 +61,8 @@ export interface BoardRow {
     min_slot_price_cents: number | null;
     topic_labels: string[];
     created_at: string | null;
+    /** Joined within the last 30 days. */
+    is_new: boolean;
     last_refreshed: string | null;
     spark: SparkData | null;
 }

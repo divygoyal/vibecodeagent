@@ -312,6 +312,7 @@ def _row_base(c: Candidate, rank: Optional[int]) -> Dict[str, Any]:
         "min_slot_price_cents": c["min_price"],
         "topic_labels": core.public_topics(_serialize_audience_row(c["audience"]), c["settings"]["privacy"]),
         "created_at": iso(created) if isinstance(created, datetime) else created,
+        "is_new": bool(isinstance(created, datetime) and (datetime.utcnow() - created).days <= 30),
         "last_refreshed": iso(e.get("last_refreshed")),
     }
 
