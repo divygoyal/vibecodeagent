@@ -38,6 +38,13 @@ opengraph images, `app/sitemap.ts`, `app/robots.ts`, `app/llms.txt`. Marketing b
 ## Done
 - 0e9f08a shell, home, demo, pricing, content pages, tools restyle, removals, OG, sitemap, robots, llms.txt.
 - 7b42653 merge tc/foundation (kept marketing versions of layout/home/pricing/sitemap/robots).
+- 03fe2aa, 2b9867f small fixes (header nav from xl, variable names, aria labels). tsc clean, eslint clean on owned files.
+
+## Verification status
+- Not yet run: dev server (both slots busy at 14:5x UTC; `TC_SLOT_WAIT_MIN=60 scripts/dev/up.sh marketing 3107 8107` queued).
+- Ready to run once up: scratchpad scripts mshots.mjs (1280 + 390 full-page shots + console/network report) and
+  mflows.mjs (contact POST, pricing signed-out -> Google sign-in, signed-in -> Dodo checkout popup), then crawl.mjs
+  `--only` the marketing routes. Shots go to /root/projects/tc-redesign-research/shots/marketing/.
 
 ## Left / for the report
 - next.config redirects wanted: `/features` -> `/#product` (308); `/demo/telegram*` -> `/demo` (foundation sends them to `/`).
