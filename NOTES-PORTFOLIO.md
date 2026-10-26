@@ -36,6 +36,13 @@ Shots: /root/projects/tc-redesign-research/shots/portfolio/.
   responses captured from the real flow (mocked in the browser for a stable shot).
 - Console: only third-party (tawk CORS, gtag) and /api/favicon 404s for .example hosts (foundation proxy).
 
+## PAUSED (coordinator, usage 93%)
+- Follow-ups (exact users per range, favicon letter-mark) are committed (246a663) and pass tsc, lint and npm test.
+- Left: one verification round on the dev kit (both slots were busy): up.sh portfolio 3104 8104, login,
+  open /dashboard, check the [portfolio-users] log line (expect 8 GA4 calls per range), and check that the
+  favicons are 200 SVG and the console is clean. Retake the shots: desktop/mobile, light/dark, grid + table.
+  Then down.sh and rm -rf web/.next.
+
 ## Open / for others
 - Foundation: globals.css revert rule (commit "keep legacy 44px...") is
   theirs to keep or move. lib/format flat position delta now "–" (test added).
