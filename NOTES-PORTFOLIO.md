@@ -37,11 +37,13 @@ Shots: /root/projects/tc-redesign-research/shots/portfolio/.
 - Console: only third-party (tawk CORS, gtag) and /api/favicon 404s for .example hosts (foundation proxy).
 
 ## Open / for others
-- Foundation: /api/favicon answers 404 for hosts without an icon -> console errors; a 204 or a
-  placeholder would keep consoles clean. globals.css revert rule (commit "keep legacy 44px...") is
+- Foundation: globals.css revert rule (commit "keep legacy 44px...") is
   theirs to keep or move. lib/format flat position delta now "–" (test added).
-- Users = sum of daily active users (one runReport by date); exact uniques would need an extra
-  report per range.
+- Users are exact per range (follow-up 246a663): portfolio_range_totals, one runReport per GA4
+  property for the viewed range (cur + prev, no date dimension), lazily after the daily sync, 6 h cache.
+  Across sites the tile says "Users (sum of sites)" + tooltip in the chart header.
+- /api/favicon returns a letter-mark SVG (categorical colour) instead of 404. Note DESIGN 2.8 says
+  fallbacks should not be colourful; the coordinator asked for colour.
 - mcp_site_links (tc/mcp) and portfolio_assets.pairing_override both store pairing overrides:
   reconcile into one when merging.
 - /demo page (marketing) can render <PortfolioView data={buildDemoPortfolio({range})} readOnly
