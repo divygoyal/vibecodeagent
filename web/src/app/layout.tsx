@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
 import { BRAND_NAME, SITE_URL } from '@/lib/brand';
+import { THEME_INIT_SCRIPT } from '@/lib/themeScript';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -80,8 +81,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html lang="en" data-theme="light" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
+        {/* Theme before first paint (lib/themeScript.ts): the app follows the
+            stored Light/Dark/System choice, everything else is light. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <meta name="ory-verify" content="orynth-754970ea155245b89f4e47db77c81f43" />
         {/*
           Chrome / Edge / Safari auto-translate wrap text nodes in a <font> tag,
@@ -112,10 +116,10 @@ export default function RootLayout({
               operatingSystem: 'Web',
               url: `${SITE_URL}`,
               description: 'AI-powered SEO & analytics platform. Monitor Google Analytics & Search Console, get AI insights, traffic alerts, and automated fixes.',
-              featureList: 'Real-time Analytics Dashboard, SEO Intelligence, AI Chat Assistant, Site Audit, Telegram Bot, Smart Alerts, AI SEO Tools',
+              featureList: 'Portfolio of every site, Dashboard builder, Verified traffic leaderboard, ChatGPT and Claude connector (MCP), AI chat assistant, Site audit, Smart alerts',
               offers: [
-                { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '50 AI credits/month', url: `${SITE_URL}/pricing` },,
-                { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '100 AI credits/month + Telegram bot', url: `${SITE_URL}/pricing` },,
+                { '@type': 'Offer', name: 'Growth', price: '19', priceCurrency: 'USD', description: '50 AI credits/month', url: `${SITE_URL}/pricing` },
+                { '@type': 'Offer', name: 'Pro', price: '29', priceCurrency: 'USD', description: '100 AI credits/month', url: `${SITE_URL}/pricing` },
               ],
             }),
           }}
@@ -179,7 +183,7 @@ export default function RootLayout({
       </head>
       <body
         suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <a href="#main-content" className="skip-to-content">Skip to content</a>
         <Providers>{children}</Providers>
