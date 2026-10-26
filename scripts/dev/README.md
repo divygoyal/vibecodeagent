@@ -4,6 +4,9 @@ Run TrafficClaw (Next.js web + FastAPI admin) on this box with **realistic demo
 Google data**, log in without OAuth, take screenshots and crawl every page.
 Nothing here talks to production, Google, email, Telegram or payments.
 
+> **RAM rule: bring a server up, take shots, bring it down; never leave it idle.**
+> (Production runs on this box. Max 2 dev servers at once; `up.sh` refuses below 2.5 GB free RAM.)
+
 ```
 scripts/dev/up.sh <name> <webPort> <adminPort> [--fresh]   start (idempotent)
 node scripts/dev/login.mjs <webPort> [--user demo|demo2|admin]
@@ -26,11 +29,20 @@ Never `npm install` inside a hard-linked `node_modules` (it would modify the
 shared files). If you need different packages: `rm -rf web/node_modules && npm ci`.
 Never `next build` (disk is tight).
 
-## 2. Pick ports
+## 2. Pick ports (and get a dev slot)
 
-Each agent takes one slot: web **3101–3109**, admin **8101–8109** (same last
-digit), and uses its own name. `scripts/dev/status.sh` shows what is taken.
-The kit itself uses `kit 3101 8101`.
+Each agent takes one port pair: web **3101–3109**, admin **8101–8109** (same
+last digit), and uses its own name. The kit itself uses `kit 3101 8101`.
+
+**At most 2 `next dev` servers may run on this box at once, across all
+worktrees.** `up.sh` takes one of two slot locks
+(`/root/.trafficclaw-dev/slots/slot{1,2}.lock`); the running web server
+holds it and the kernel releases it when the server stops or dies, so there
+are no stale slots. If both are busy, `up.sh` waits up to
+`TC_SLOT_WAIT_MIN` minutes (default 10) and then exits with
+`no free dev slot` — nothing is started in that case. It also refuses to
+start when `MemAvailable` is below 2500 MB. `down.sh` frees the
+slot; `scripts/dev/status.sh` shows ports, pids and who holds each slot.
 
 ## 3. Start, log in, look
 
@@ -144,8 +156,8 @@ like the real API. Edit sites, shapes and topics in `web/src/lib/demo/catalog.ts
 - `next dev` gets `NODE_OPTIONS=--max-old-space-size=1536` and a Turbopack cache
   target of 1 GB (`TC_TURBOPACK_MEMORY_LIMIT_MB`, read by `web/next.config.ts`,
   unset in production). Expect 1–2.5 GB RSS per instance once many routes are
-  compiled (a full crawl compiles all of them). **The box also runs production:
-  keep at most 2–3 instances up at once and run `down.sh` as soon as you finish.**
+  compiled (a full crawl compiles all of them, ~3 GB). **The box also runs
+  production: run `down.sh` as soon as you have your screenshots.**
 
 Harmless warnings in `web.log`: "Next.js inferred your workspace root …
 /root/package-lock.json" and "middleware file convention is deprecated".
