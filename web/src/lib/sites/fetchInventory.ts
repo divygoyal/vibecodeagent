@@ -65,9 +65,17 @@ const STREAMS_TTL_MS = 24 * 3600_000;
 const STREAM_CONCURRENCY = 5;
 const MAX_ACCOUNT_PAGES = 10;
 
-const inventoryCache = new Map<string, { value: Inventory; until: number }>();
-const inventoryInflight = new Map<string, Promise<Inventory>>();
-const streamCache = new Map<string, { uris: string[]; until: number }>();
+// On globalThis so every route bundle in the process shares one cache.
+const store = ((globalThis as unknown as { __tcInventory?: unknown }).__tcInventory ??= {
+    inventoryCache: new Map<string, { value: Inventory; until: number }>(),
+    inventoryInflight: new Map<string, Promise<Inventory>>(),
+    streamCache: new Map<string, { uris: string[]; until: number }>(),
+}) as {
+    inventoryCache: Map<string, { value: Inventory; until: number }>;
+    inventoryInflight: Map<string, Promise<Inventory>>;
+    streamCache: Map<string, { uris: string[]; until: number }>;
+};
+const { inventoryCache, inventoryInflight, streamCache } = store;
 
 /** A fetch that answers Google APIs from the demo generator and refuses everything else. */
 export function createDemoGoogleFetch(): FetchLike {
