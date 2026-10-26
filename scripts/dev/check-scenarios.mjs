@@ -20,6 +20,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fillRoute, findInstance } from './routes.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ALL_USERS = ['empty', 'one', 'ga4only', 'gsconly', 'many', 'nogoogle', 'nocredits', 'f403', 'f429', 'f500', 'ftimeout', 'fempty', 'frevoked', 'fhuge'];
@@ -59,10 +60,14 @@ for (const user of opts.users) {
             continue;
         }
     }
-    const routes = opts.only || (cookie ? PUBLIC_ROUTES : APP_ROUTES).join(',');
+    // Exact pages (an --only prefix like /dashboard would pull in every legacy redirect too).
+    const inst = findInstance(opts.port);
+    const seed = inst && fs.existsSync(path.join(inst.dir, 'seed.json')) ? JSON.parse(fs.readFileSync(path.join(inst.dir, 'seed.json'), 'utf8')) : {};
+    const paths = opts.only ? opts.only.split(',') : (cookie ? PUBLIC_ROUTES : APP_ROUTES).map((r) => fillRoute(r, seed, { user: 'demo', host: HOST[user] || HOST.default }));
+    const routes = paths.join(',');
     const args = [
         path.join(here, 'check-mobile.mjs'), String(opts.port), '--label', label, '--out', opts.out, '--widths', '390', '--themes', 'light',
-        '--only', routes, '--host', HOST[user] || HOST.default, '--settle', String(opts.settle), '--no-shots', '--fail-on', 'error,badText,api',
+        '--paths', routes, '--settle', String(opts.settle), '--no-shots', '--fail-on', 'error,badText,api',
         ...(cookie ? ['--state', 'none', '--cookie', `tc_demo_faults=${cookie}`] : ['--user', user]),
     ];
     console.error(`[scenarios] ${user}: ${routes.split(',').length} routes`);
@@ -89,7 +94,7 @@ for (const file of fs.readdirSync(opts.out).filter((f) => /^mobile-scen-.+\.json
         if (w.badText?.length) flags.push('N');
         if (w.loadingCount) flags.push('L');
         if (r.api?.length) flags.push('A');
-        const key = r.route.replace(/#.*/, '');
+        const key = r.route.replace(/#.*/, '').replace(/\/dashboard\/s\/[^/]+/, '/dashboard/s/[host]').replace(/\/dashboards\/[0-9a-f-]{36}/, '/dashboards/[id]');
         allPaths.add(key);
         byUser[s.user][key] = { flags, r, w };
     }

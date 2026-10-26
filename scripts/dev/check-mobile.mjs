@@ -20,7 +20,7 @@
  *   node scripts/dev/check-mobile.mjs <webPort | baseUrl> [--label name] [--out dir]
  *        [--widths 360,390,414] [--themes light,dark] [--user demo|demo2|admin] [--state file]
  *        [--host h1,h2] [--only /a,/b] [--skip /a,/b] [--part k/n] [--wait ms] [--no-shots]
- *        [--fail-on error,overflow,offscreen] [--settle ms] [--cookie name=value] [--paths /a,/b?x=1]
+ *        [--fail-on error,overflow,offscreen] [--settle ms] [--spinner-wait ms] [--cookie name=value] [--paths /a,/b?x=1]
  *
  * One page load per route and theme; the viewport is resized to each width.
  * Output: <out>/mobile-<label>.json, <out>/mobile-<label>.md and offender
@@ -47,7 +47,7 @@ const argv = process.argv.slice(2);
 const opts = {
     target: null, label: null, out: '/root/projects/tc-redesign-research/robust', widths: [390, 360, 414], themes: ['light', 'dark'],
     user: 'demo', state: null, hosts: ['acmeanalytics.example'], only: null, paths: null, skip: [], part: null, wait: 800, shots: true,
-    failOn: ['error', 'overflow', 'offscreen'], settleMs: 25_000, cookies: [],
+    failOn: ['error', 'overflow', 'offscreen'], settleMs: 25_000, spinnerWait: 20_000, cookies: [],
 };
 for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -70,6 +70,7 @@ for (let i = 0; i < argv.length; i++) {
     else if (a === '--no-shots') opts.shots = false;
     else if (a === '--fail-on') opts.failOn = list();
     else if (a === '--settle') opts.settleMs = Number(argv[++i]);
+    else if (a === '--spinner-wait') opts.spinnerWait = Number(argv[++i]);
     else if (a === '--cookie') {
         const [name, ...rest] = argv[++i].split('=');
         opts.cookies.push({ name, value: rest.join('=') });
@@ -443,6 +444,15 @@ async function visit(context, route, theme) {
         res.navError = err.message.split('\n')[0];
     }
     await settle(page, watch, { quietMs: 1200, maxMs: opts.settleMs });
+    // Pages that poll (portfolio sync, realtime) keep skeletons up between requests: give
+    // them up to --spinner-wait ms to finish, so what is left is a spinner that never ends.
+    const spinStart = Date.now();
+    while (Date.now() - spinStart < opts.spinnerWait) {
+        const busy = await withTimeout(page.evaluate(() => [...document.querySelectorAll('[aria-busy="true"], .animate-spin, .skeleton, .tc-skeleton, [data-skeleton]')]
+            .some((el) => el.checkVisibility?.({ checkOpacity: true, checkVisibilityCSS: true }) && el.getBoundingClientRect().width > 0)), 5000, false);
+        if (!busy) break;
+        await page.waitForTimeout(1000);
+    }
     if (opts.wait) await page.waitForTimeout(opts.wait);
     res.finalPath = page.url().replace(base, '');
     await withTimeout(page.addStyleTag({ content: 'nextjs-portal{display:none!important} [data-mc-hit]{outline:3px solid #ff1744!important;outline-offset:-1px!important} [data-mc-small]{outline:2px dashed #ff9100!important}' }), 5000);
