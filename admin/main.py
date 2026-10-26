@@ -324,6 +324,8 @@ async def lifespan(app: FastAPI):
     import os
     os.makedirs("data", exist_ok=True)
     await init_db()
+    # 020_add_portfolio.sql: portfolio snapshot store. See portfolio_api.py.
+    await ensure_portfolio_schema(engine)
 
     # Auto-encrypt any pre-existing plaintext OAuth tokens.
     # Idempotent — skips rows that are already Fernet ciphertext.
@@ -648,6 +650,11 @@ def sanitize_identifier(identifier: str) -> str:
 def get_user_runtime_identifier(user: User) -> str:
     """Best-effort stable identifier for Docker/plugin calls."""
     return user.github_id or user.email or str(user.id)
+
+
+# Portfolio snapshot store (app home): /api/portfolio/*. See portfolio_api.py.
+from portfolio_api import build_portfolio_router, ensure_portfolio_schema, delete_user_portfolio_rows  # noqa: E402
+app.include_router(build_portfolio_router(get_db, verify_admin_key, get_user_by_identifier))
 
 
 def has_non_empty_token(value: Optional[str]) -> bool:
@@ -2706,7 +2713,8 @@ async def delete_user(
         OAuthConnection.__table__.delete().where(OAuthConnection.user_id == user.id)
     )
 
-    # 3. Delete user record
+    # 3. Delete user record (and the portfolio snapshot rows)
+    await delete_user_portfolio_rows(db, user.id)
     await db.delete(user)
     await db.commit()
 
