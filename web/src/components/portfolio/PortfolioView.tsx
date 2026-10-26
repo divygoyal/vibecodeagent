@@ -191,7 +191,7 @@ export function PortfolioView(props: PortfolioViewProps) {
     }
 
     return (
-        <div className="tc-root mx-auto w-full max-w-[1440px] px-4 py-6 md:px-6">
+        <div className="tc-root mx-auto w-full max-w-[1440px] px-4 py-6 font-sans md:px-6">
             {/* Header */}
             <header className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
                 <div className="min-w-0">
@@ -205,7 +205,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                             onValueChange={setQuery}
                             placeholder="Search sites"
                             aria-label="Search sites"
-                            className="min-w-0 flex-1 md:w-56 md:flex-none"
+                            className="min-w-0 flex-1 md:w-48 md:flex-none"
                         />
                         <Select
                             value={sort}

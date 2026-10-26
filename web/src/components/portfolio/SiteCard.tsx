@@ -35,22 +35,24 @@ export interface SiteCardProps {
 /** Previous totals under this are noise: the delta is shown without colour (DESIGN 6.7). */
 const TINY = 20;
 
-function Metric({ metric, value, previous, labelFirst, dot = true, label }: {
+function Metric({ metric, value, previous, labelFirst, dot = true, label, small }: {
     metric: MetricKey;
     value: number | null | undefined;
     previous: number | null | undefined;
     labelFirst?: boolean;
     dot?: boolean;
     label?: string;
+    /** Secondary row (GA4 under Search Console): body-size numbers. */
+    small?: boolean;
 }) {
     const m = METRICS[metric];
     const short = label ?? m.short;
     const tiny = typeof previous === 'number' && previous > 0 && previous < TINY && m.format === 'count';
     return (
         <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
-            {dot ? <span aria-hidden className="size-2 shrink-0 self-center rounded-full" style={{ background: m.color }} /> : null}
+            {dot ? <span aria-hidden className={cn('shrink-0 self-center rounded-full', small ? 'size-1.5' : 'size-2')} style={{ background: m.color }} /> : null}
             {labelFirst ? <span className="text-body-sm text-fg-muted">{short}</span> : null}
-            <span className="text-stat-sm text-fg tabular-nums">{fmtMetric(metric, value, { compact: true })}</span>
+            <span className={cn('text-fg tabular-nums', small ? 'text-body font-semibold' : 'text-stat-sm')}>{fmtMetric(metric, value, { compact: true })}</span>
             {labelFirst ? null : <span className="text-body-sm text-fg-muted">{short}</span>}
             {previous === null || previous === undefined ? null : (
                 <MetricDelta metric={metric} current={value} previous={previous} className={tiny ? 'text-fg-muted!' : undefined} />
@@ -70,23 +72,23 @@ function EngagementMetric({ value, previous }: { value: number | null; previous:
     );
 }
 
-function SearchMetrics({ site }: { site: PortfolioSite }) {
+function SearchMetrics({ site, small }: { site: PortfolioSite; small?: boolean }) {
     const s = site.search!;
     return (
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <Metric metric="clicks" value={s.cur.clicks} previous={s.prev?.clicks} />
-            <Metric metric="impressions" value={s.cur.impressions} previous={s.prev?.impressions} />
-            <Metric metric="position" value={s.cur.position} previous={s.prev ? s.prev.position : undefined} labelFirst dot={false} />
+        <div className={cn('flex flex-wrap items-baseline gap-y-1', small ? 'gap-x-3' : 'gap-x-4')}>
+            <Metric metric="clicks" value={s.cur.clicks} previous={s.prev?.clicks} small={small} />
+            <Metric metric="impressions" value={s.cur.impressions} previous={s.prev?.impressions} small={small} />
+            <Metric metric="position" value={s.cur.position} previous={s.prev ? s.prev.position : undefined} labelFirst dot={false} small={small} />
         </div>
     );
 }
 
-function TrafficMetrics({ site, withEngagement }: { site: PortfolioSite; withEngagement?: boolean }) {
+function TrafficMetrics({ site, withEngagement, small }: { site: PortfolioSite; withEngagement?: boolean; small?: boolean }) {
     const t = site.traffic!;
     return (
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <Metric metric="users" value={t.cur.users} previous={t.prev?.users} />
-            <Metric metric="sessions" value={t.cur.sessions} previous={t.prev?.sessions} />
+        <div className={cn('flex flex-wrap items-baseline gap-y-1', small ? 'gap-x-3' : 'gap-x-4')}>
+            <Metric metric="users" value={t.cur.users} previous={t.prev?.users} small={small} />
+            <Metric metric="sessions" value={t.cur.sessions} previous={t.prev?.sessions} small={small} />
             {withEngagement ? <EngagementMetric value={t.cur.engagementRate} previous={t.prev ? t.prev.engagementRate : undefined} /> : null}
         </div>
     );
@@ -153,16 +155,16 @@ export const SiteCard = memo(function SiteCard({
     } else if (!hasSearch && !hasTraffic) {
         metrics = <p className="text-body-sm text-fg-muted">{site.status === 'no_access' ? 'No access to this property' : 'No data yet'}</p>;
     } else {
-        const blocks = [
-            hasSearch ? <SearchMetrics key="s" site={site} /> : null,
-            hasTraffic ? <TrafficMetrics key="t" site={site} withEngagement={!hasSearch} /> : null,
-        ];
-        metrics = <div className={cn('flex flex-col gap-1', greyed && 'opacity-50')}>{trafficFirst ? blocks.reverse() : blocks}</div>;
+        // The view's source leads at full size; the paired source follows as a smaller row.
+        const blocks = trafficFirst
+            ? [<TrafficMetrics key="t" site={site} withEngagement={!hasSearch} />, hasSearch ? <SearchMetrics key="s" site={site} small /> : null]
+            : [<SearchMetrics key="s" site={site} />, hasTraffic ? <TrafficMetrics key="t" site={site} small /> : null];
+        metrics = <div className={cn('flex flex-col gap-1.5', greyed && 'opacity-50')}>{blocks}</div>;
     }
 
     return (
         <article
-            className={cn(cardBaseClass, !readOnly && cardInteractiveClass, 'relative flex min-w-0 flex-col gap-3 p-4')}
+            className={cn(cardBaseClass, !readOnly && cardInteractiveClass, '@container relative flex min-w-0 flex-col gap-3 p-4')}
             data-site={site.slug}
         >
             {readOnly ? null : (
@@ -184,15 +186,6 @@ export const SiteCard = memo(function SiteCard({
                     <Badge>GA4</Badge>
                 )}
                 <span className="flex-1" />
-                {chip ? (
-                    <Tooltip content={site.alerts.map((a) => a.message).join(' · ')}>
-                        <span className="relative z-[1] inline-flex" tabIndex={0}>
-                            <Pill tone={critical ? 'down' : 'warn'} icon={<AlertTriangle aria-hidden size={12} strokeWidth={2} />} className="h-5 px-2">
-                                {chip}
-                            </Pill>
-                        </span>
-                    </Tooltip>
-                ) : null}
                 {readOnly ? (
                     site.starred ? <Star aria-label="Starred" size={16} strokeWidth={1.75} className="shrink-0 fill-star text-star" /> : null
                 ) : (
@@ -228,7 +221,15 @@ export const SiteCard = memo(function SiteCard({
 
             <div className="mt-auto flex min-w-0 items-center gap-2">
                 <SiteStatusPill site={site} syncing={syncing} />
-                {window && !loadingData ? (
+                {chip ? (
+                    <Tooltip content={site.alerts.map((a) => a.message).join(' · ')}>
+                        <span className="relative z-[1] inline-flex min-w-0" tabIndex={0}>
+                            <Pill tone={critical ? 'down' : 'warn'} icon={<AlertTriangle aria-hidden size={12} strokeWidth={2} />} className="min-w-0">
+                                <span className="truncate">{chip}</span>
+                            </Pill>
+                        </span>
+                    </Tooltip>
+                ) : window && !loadingData ? (
                     <span className="truncate text-meta text-fg-muted tabular-nums">
                         {greyed && site.lastSyncedAt ? `Last data ${fmtDay(new Date(site.lastSyncedAt * 1000))}` : fmtDateRange(window.curStart, window.curEnd)}
                     </span>
@@ -236,7 +237,7 @@ export const SiteCard = memo(function SiteCard({
                 <span className="flex-1" />
                 {site.ga4 && site.gsc ? (
                     <Tooltip content={`GA4 property ${site.ga4.propertyId} linked${site.pairing === 'manual' ? ' (set by you)' : ''}`}>
-                        <span tabIndex={0} className="relative z-[1] hidden rounded text-fg-faint sm:inline-flex">
+                        <span tabIndex={0} className="relative z-[1] hidden rounded text-fg-faint @[21rem]:inline-flex">
                             <Link2 aria-label="GA4 linked" size={14} strokeWidth={1.75} />
                         </span>
                     </Tooltip>
