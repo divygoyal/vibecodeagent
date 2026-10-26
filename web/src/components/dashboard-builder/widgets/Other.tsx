@@ -194,7 +194,7 @@ export function PortfolioGridView(props: WidgetViewProps<PortfolioGridWidget>) {
                                 <>
                                     <div className="flex min-w-0 items-center gap-2">
                                         <Favicon host={site.replace(/--\d+$/, '')} size={16} />
-                                        <span className="truncate text-title-sm text-fg">{site}</span>
+                                        <span className="truncate text-title-sm text-fg">{sites.labels?.[site] ?? site}</span>
                                         {alert ? <span className="ml-auto shrink-0 rounded-badge bg-down-soft px-1.5 text-caption text-down">Drop</span> : null}
                                     </div>
                                     <div className={cn('mt-2 grid gap-x-3 gap-y-1', c.show === 'compact' ? 'grid-cols-4' : 'grid-cols-2')}>

@@ -49,9 +49,12 @@ export function buildDirectory(inv: Inventory): SiteDirectory {
         const n = (used.get(id) ?? 0) + 1;
         used.set(id, n);
         if (n > 1) id = `${id}--${n}`;
+        // Two Search Console properties for one host (http vs https, www): number them. The
+        // label never contains the property URL (labels reach public viewers).
+        const base = p.gsc ? normalizeHost(p.gsc.siteUrl) : p.ga4?.displayName ?? id;
         sites.push({
             siteId: id,
-            label: p.gsc ? normalizeHost(p.gsc.siteUrl) : p.ga4?.displayName ?? id,
+            label: n > 1 ? `${base} (${n})` : base,
             ga4: p.ga4?.property,
             gsc: p.gsc?.siteUrl,
             ga4Name: p.ga4?.displayName,

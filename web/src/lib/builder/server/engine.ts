@@ -925,7 +925,9 @@ function assemble(
             }
         }
 
-        parts[q.part] = shapeFrame(q, e, cur, prev, bySite, plan, flags);
+        const frame = shapeFrame(q, e, cur, prev, bySite, plan, flags);
+        if (bySite) frame.labels = Object.fromEntries(e.targets.map((t) => [t.site.siteId, t.site.label]));
+        parts[q.part] = frame;
     }
 
     if (rollFlags.usersSummed) flags.usersSummed = true;

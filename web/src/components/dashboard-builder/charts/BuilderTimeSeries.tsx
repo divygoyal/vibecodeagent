@@ -42,7 +42,7 @@ export interface BuilderTimeSeriesProps {
     rows: Array<Record<string, CellValue>>;
     series: TsSeries[];
     /** Breakdown frame: series keys 'b:<value>' (one metric). */
-    breakdown?: { metric: string; dimension: string; keys: string[]; stacked: boolean };
+    breakdown?: { metric: string; dimension: string; keys: string[]; stacked: boolean; labels?: Record<string, string> };
     compare: boolean;
     granularity: 'day' | 'week' | 'month';
     /** Rows from this index are partial (Search Console lag): dotted. */
@@ -73,9 +73,10 @@ export function breakdownColor(dimension: string, key: string, index: number): s
     return CATEGORICAL[index] ?? CATEGORICAL_OTHER;
 }
 
-export function breakdownLabel(dimension: string, key: string): string {
+export function breakdownLabel(dimension: string, key: string, labels?: Record<string, string>): string {
     const v = key.replace(/^b:/, '');
     if (v === '__other') return 'Other';
+    if (labels?.[v]) return labels[v];
     if (dimension === 'country') return countryName(v);
     return v || '(not set)';
 }
@@ -142,7 +143,7 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
         if (breakdown) {
             breakdown.keys.forEach((k, i) => {
                 const v = row[k];
-                out.push({ key: k, label: breakdownLabel(breakdown.dimension, k), color: breakdownColor(breakdown.dimension, k, i), value: fmtMetricValue(breakdown.metric, typeof v === 'number' ? v : null, { currency }) });
+                out.push({ key: k, label: breakdownLabel(breakdown.dimension, k, breakdown.labels), color: breakdownColor(breakdown.dimension, k, i), value: fmtMetricValue(breakdown.metric, typeof v === 'number' ? v : null, { currency }) });
             });
         } else {
             for (const s of series) {
@@ -168,10 +169,10 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
     return (
         <figure className={cn('relative m-0', className)} style={{ height }} aria-label={breakdown ? `${metricLabel(breakdown.metric)} by ${breakdown.dimension}` : series.map((s) => s.label ?? metricLabel(s.metric)).join(', ')}>
             {showLegend && (breakdown || series.length > 1) ? (
-                <div className="mb-1 flex flex-wrap gap-x-3 gap-y-1 text-meta text-fg-secondary">
+                <div className="mb-1 flex h-5 flex-wrap gap-x-3 gap-y-1 overflow-hidden text-meta text-fg-secondary">
                     {breakdown
                         ? breakdown.keys.map((k, i) => (
-                            <span key={k} className="inline-flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-3 rounded" style={{ background: breakdownColor(breakdown.dimension, k, i) }} />{breakdownLabel(breakdown.dimension, k)}</span>
+                            <span key={k} className="inline-flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-3 rounded" style={{ background: breakdownColor(breakdown.dimension, k, i) }} />{breakdownLabel(breakdown.dimension, k, breakdown.labels)}</span>
                         ))
                         : series.map((s) => (
                             <span key={s.metric} className="inline-flex items-center gap-1.5"><span aria-hidden className="h-0.5 w-3 rounded" style={{ background: metricColor(s.metric) }} />{s.label ?? metricLabel(s.metric)}</span>
@@ -209,9 +210,9 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     ? breakdown.keys.map((k, i) => {
                         const color = breakdownColor(breakdown.dimension, k, i);
                         return breakdown.stacked ? (
-                            <Area key={k} yAxisId="b" dataKey={k} stackId="b" type="monotone" stroke={color} strokeWidth={1.5} fill={color} fillOpacity={0.18} isAnimationActive={anim} animationDuration={400} name={breakdownLabel(breakdown.dimension, k)} activeDot={false} />
+                            <Area key={k} yAxisId="b" dataKey={k} stackId="b" type="monotone" stroke={color} strokeWidth={1.5} fill={color} fillOpacity={0.18} isAnimationActive={anim} animationDuration={400} name={breakdownLabel(breakdown.dimension, k, breakdown.labels)} activeDot={false} />
                         ) : (
-                            <Line key={k} yAxisId="b" dataKey={k} type="monotone" stroke={color} strokeWidth={2} dot={false} isAnimationActive={anim} animationDuration={400} name={breakdownLabel(breakdown.dimension, k)} />
+                            <Line key={k} yAxisId="b" dataKey={k} type="monotone" stroke={color} strokeWidth={2} dot={false} isAnimationActive={anim} animationDuration={400} name={breakdownLabel(breakdown.dimension, k, breakdown.labels)} />
                         );
                     })
                     : null}

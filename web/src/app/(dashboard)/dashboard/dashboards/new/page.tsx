@@ -117,7 +117,7 @@ function Gallery() {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {cat === 'All' ? <TemplateCard id="blank" title="Blank" description="Start from an empty page." needs={[]} thumb={[]} onPick={() => setPicked({ tpl: BLANK_TEMPLATE })} /> : null}
                 {shown.map((t) => (
-                    <TemplateCard key={t.id} id={t.id} title={t.name} description={t.description} chip={t.portfolio ? 'All sites' : t.needs.length === 2 ? 'Both' : undefined} needs={t.portfolio ? [] : t.needs.map((n) => NEED_LABEL[n])} thumb={thumbs[t.id]} onPick={() => setPicked({ tpl: t })} />
+                    <TemplateCard key={t.id} id={t.id} title={t.name} description={t.description} chip={t.portfolio ? 'All sites' : undefined} needs={t.portfolio ? [] : t.needs.map((n) => NEED_LABEL[n])} thumb={thumbs[t.id]} onPick={() => setPicked({ tpl: t })} />
                 ))}
                 {(cat === 'My templates' || cat === 'All') ? mine.map((m) => (
                     <TemplateCard key={m.id} id={m.id} title={m.name} description={m.description || 'Your template'} chip="My template" needs={[]} thumb={m.preview} onPick={() => setPicked({ mine: m })} />

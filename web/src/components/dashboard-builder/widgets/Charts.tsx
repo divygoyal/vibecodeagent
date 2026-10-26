@@ -18,9 +18,10 @@ import { okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { dsFormat, dsKey } from './metricUi';
 
 /** Display text for a dimension value. */
-export function dimText(dim: string, v: CellValue): string {
+export function dimText(dim: string, v: CellValue, labels?: Record<string, string>): string {
     if (v === null || v === undefined || v === '') return '(not set)';
     const s = String(v);
+    if (labels?.[s]) return labels[s];
     if (dim === 'country') return s === '(other)' ? 'Other' : countryName(s);
     if (dim === 'device') return s.charAt(0).toUpperCase() + s.slice(1);
     if (s === '(other)') return 'Other';
@@ -57,7 +58,7 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
         const i = rows.findIndex((r) => typeof r['d:date'] === 'string' && toDay(r['d:date'] as string) >= toDay(pf));
         return i > 0 ? i : undefined;
     }, [ok, rows, c.markPreliminary, granularity]);
-    const breakdown = c.breakdown && frame?.seriesKeys ? { metric: c.series[0].metric.id, dimension: c.breakdown.dimension, keys: frame.seriesKeys, stacked: c.stacked !== false } : undefined;
+    const breakdown = c.breakdown && frame?.seriesKeys ? { metric: c.series[0].metric.id, dimension: c.breakdown.dimension, keys: frame.seriesKeys, stacked: c.stacked !== false, labels: frame.labels } : undefined;
     const compare = props.compare !== 'none' && c.compare === 'inherit' && !breakdown && rows.some((r) => `m:${c.series[0]?.metric.id}:prev` in r);
     const h = plotHeight(props.height, widget.showTitle !== false);
     return (
@@ -81,12 +82,12 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
 
 // ── Bar ──────────────────────────────────────────────────────────────────
 
-function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; height: number; currency?: string }) {
+function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, labels }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; height: number; currency?: string; labels?: Record<string, string> }) {
     const c = widget.config;
     const anim = !useReducedMotion();
     const vertical = c.orientation === 'vertical';
     const dim = c.dimension;
-    const data = rows.map((r) => ({ ...r, __label: dimText(dim, r[`d:${dim}`]) }));
+    const data = rows.map((r) => ({ ...r, __label: dimText(dim, r[`d:${dim}`], labels) }));
     const metrics = c.metrics.map((m) => m.id);
     const stacked = Boolean(seriesKeys?.length);
     const fmtV = (id: string) => (v: number) => (getMetric(id)?.format === 'integer' ? fmtAxis(v) : fmtMetricValue(id, v, { compact: true, currency }));
@@ -94,7 +95,7 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency }: {
         if (!p.active || !p.payload?.length) return null;
         const row = p.payload[0]?.payload as Record<string, CellValue>;
         const out: ChartTooltipRow[] = stacked
-            ? seriesKeys!.map((k, i) => ({ key: k, label: breakdownLabel(c.stackBy ?? '', k), color: breakdownColor(c.stackBy ?? '', k, i), value: fmtMetricValue(metrics[0], typeof row[k] === 'number' ? (row[k] as number) : null, { currency }) }))
+            ? seriesKeys!.map((k, i) => ({ key: k, label: breakdownLabel(c.stackBy ?? '', k, labels), color: breakdownColor(c.stackBy ?? '', k, i), value: fmtMetricValue(metrics[0], typeof row[k] === 'number' ? (row[k] as number) : null, { currency }) }))
             : metrics.flatMap((id) => {
                 const v = row[`m:${id}`];
                 const pv = row[`m:${id}:prev`];
@@ -141,8 +142,8 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
                     <BarList
                         items={rows.map((r, i) => ({
                             key: `${String(r[`d:${c.dimension}`])}-${i}`,
-                            label: dimText(c.dimension, r[`d:${c.dimension}`]),
-                            text: dimText(c.dimension, r[`d:${c.dimension}`]),
+                            label: dimText(c.dimension, r[`d:${c.dimension}`], frame.labels),
+                            text: dimText(c.dimension, r[`d:${c.dimension}`], frame.labels),
                             value: typeof r[`m:${metric}`] === 'number' ? (r[`m:${metric}`] as number) : 0,
                         }))}
                         metric={dsKey(metric)}
@@ -155,7 +156,7 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
                     />
                 </div>
             ) : (
-                <BarChartPlot widget={widget} rows={rows} seriesKeys={frame.seriesKeys} compare={compare} height={h} currency={ok?.flags.currency} />
+                <BarChartPlot widget={widget} rows={rows} seriesKeys={frame.seriesKeys} compare={compare} height={h} currency={ok?.flags.currency} labels={frame.labels} />
             )}
         </WidgetFrame>
     );
@@ -183,7 +184,7 @@ export function PieView(props: WidgetViewProps<PieWidget>) {
                     <Donut
                         items={rows.map((r, i) => {
                             const raw = String(r[`d:${c.dimension}`] ?? '');
-                            return { key: `${raw}-${i}`, label: dimText(c.dimension, raw), value: typeof r[`m:${id}`] === 'number' ? (r[`m:${id}`] as number) : 0, color: categoryColor(c.dimension, raw, i) };
+                            return { key: `${raw}-${i}`, label: dimText(c.dimension, raw, frame.labels), value: typeof r[`m:${id}`] === 'number' ? (r[`m:${id}`] as number) : 0, color: categoryColor(c.dimension, raw, i) };
                         })}
                         centerLabel={c.centerLabel === 'none' ? undefined : metricLabel(id)}
                         format={dsFormat(id)}

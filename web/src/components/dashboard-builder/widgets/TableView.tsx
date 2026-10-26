@@ -27,7 +27,7 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
     const all = (frame?.rows ?? []) as Row[];
     const needle = q.trim().toLowerCase();
     const d0 = c.dimensions[0];
-    const rows = needle ? all.filter((r) => dimText(d0, r[`d:${d0}`]).toLowerCase().includes(needle)) : all;
+    const rows = needle ? all.filter((r) => dimText(d0, r[`d:${d0}`], frame?.labels).toLowerCase().includes(needle)) : all;
     const maxOf: Record<string, number> = {};
     for (const col of metricCols) maxOf[col.ref] = Math.max(0, ...rows.map((r) => (typeof r[`m:${col.ref}`] === 'number' ? (r[`m:${col.ref}`] as number) : 0)));
 
@@ -39,10 +39,10 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                 header: col.label ?? dimLabel(dim),
                 sortable: true,
                 firstSortDir: 'asc',
-                sortValue: (r) => dimText(dim, r[`d:${dim}`]),
+                sortValue: (r) => dimText(dim, r[`d:${dim}`], frame?.labels),
                 className: cn('max-w-[340px]', i === 0 && 'min-w-[160px]'),
                 cell: (r) => {
-                    const text = dimText(dim, r[`d:${dim}`]);
+                    const text = dimText(dim, r[`d:${dim}`], frame?.labels);
                     const raw = String(r[`d:${dim}`] ?? '');
                     const href = col.link && /^https?:\/\//.test(raw) ? raw : null;
                     return (

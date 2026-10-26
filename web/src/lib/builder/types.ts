@@ -427,6 +427,8 @@ export interface DataFrame {
     truncated?: boolean;
     /** Wide frames (breakdowns, stacks): the series keys in order, e.g. 'b:Organic Search'. */
     seriesKeys?: string[];
+    /** Display names for 'site' values (and site series keys): siteId -> name. */
+    labels?: Record<string, string>;
 }
 
 export interface ResultFlags {
