@@ -1,0 +1,373 @@
+/* =====================================================================
+   TrafficClaw tokens v1 (web/src/styles/tokens.css)
+   ===================================================================== */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------- 1. Raw palette (never use directly in components) ---------- */
+:root {
+  /* Cool gray, light UI */
+  --tc-gray-0:   #ffffff;
+  --tc-gray-25:  #fbfbfc;
+  --tc-gray-50:  #f6f7f9;
+  --tc-gray-100: #eff1f4;
+  --tc-gray-150: #e7eaee;
+  --tc-gray-200: #dde1e7;
+  --tc-gray-300: #c6ccd5;
+  --tc-gray-400: #8a919c;
+  --tc-gray-500: #636b78;
+  --tc-gray-600: #4b5361;
+  --tc-gray-700: #363c47;
+  --tc-gray-800: #22262d;
+  --tc-gray-900: #171a20;
+  --tc-gray-950: #0e1014;
+
+  /* Night gray, dark UI */
+  --tc-night-0:   #0b0c0f;  /* canvas */
+  --tc-night-50:  #15171c;  /* surface (cards) */
+  --tc-night-100: #1b1e23;  /* raised (menus, popovers) */
+  --tc-night-150: #1f2228;  /* subtle fill, skeleton */
+  --tc-night-200: #23272e;  /* border subtle, chart grid */
+  --tc-night-250: #262a31;  /* hover fill */
+  --tc-night-300: #2c3139;  /* border */
+  --tc-night-400: #3a404a;  /* border strong */
+  --tc-night-500: #5f6672;  /* faint text (disabled only) */
+  --tc-night-600: #858d98;  /* muted text */
+  --tc-night-700: #aeb4be;  /* secondary text */
+  --tc-night-900: #edeff2;  /* primary text */
+
+  /* Brand: Pine (OKLCH hue 168) */
+  --tc-pine-50:  #ebfbf4;
+  --tc-pine-100: #d4f6e8;
+  --tc-pine-200: #aeead2;
+  --tc-pine-300: #78d3b1;
+  --tc-pine-400: #43b28e;
+  --tc-pine-500: #1f906f;
+  --tc-pine-600: #157459;
+  --tc-pine-700: #125e47;
+  --tc-pine-800: #0e4b39;
+  --tc-pine-900: #0d3a2c;
+  --tc-pine-950: #07241a;
+
+  /* Layout constants (same in both themes) */
+  --tc-sidebar-w: 248px;
+  --tc-sidebar-w-collapsed: 64px;
+  --tc-topbar-h: 56px;
+  --tc-page-px: 24px;          /* 16px below md, see base layer */
+  --tc-content-max: 1440px;    /* app pages; marketing uses 1200px */
+  --tc-grid-gap: 16px;
+
+  /* Motion durations (use with Tailwind duration-* numbers of the same value) */
+  --tc-dur-instant: 80ms;
+  --tc-dur-fast: 120ms;
+  --tc-dur-base: 180ms;
+  --tc-dur-slow: 260ms;
+  --tc-dur-chart: 400ms;
+}
+
+/* ---------- 2. Semantic tokens: LIGHT (default) ---------- */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --tc-canvas:         var(--tc-gray-50);   /* page background */
+  --tc-surface:        var(--tc-gray-0);    /* cards, tables, sidebar */
+  --tc-surface-raised: var(--tc-gray-0);    /* menus, popovers, modals */
+  --tc-surface-sunken: var(--tc-gray-50);   /* wells, code blocks, table header */
+  --tc-subtle:         var(--tc-gray-100);  /* hover fill, segmented track, skeleton */
+  --tc-subtle-strong:  var(--tc-gray-150);  /* pressed fill */
+  --tc-inverse:        var(--tc-gray-900);  /* tooltip background */
+  --tc-overlay:        rgb(14 16 20 / 0.45);
+
+  /* Borders */
+  --tc-border-subtle: var(--tc-gray-150);
+  --tc-border:        var(--tc-gray-200);
+  --tc-border-strong: var(--tc-gray-300);
+
+  /* Text */
+  --tc-fg:           var(--tc-gray-900);   /* 17.4:1 on white */
+  --tc-fg-secondary: var(--tc-gray-600);   /* 7.8:1 */
+  --tc-fg-muted:     var(--tc-gray-500);   /* 5.4:1 on white, 5.0:1 on canvas */
+  --tc-fg-faint:     var(--tc-gray-400);   /* 3.2:1, placeholders and disabled only */
+  --tc-fg-inverse:   #ffffff;
+
+  /* Brand */
+  --tc-brand:         var(--tc-pine-900);  /* primary button, selected segment, switch on */
+  --tc-brand-hover:   var(--tc-pine-800);
+  --tc-brand-fg:      #ffffff;             /* text on brand, 12.7:1 */
+  --tc-brand-text:    var(--tc-pine-600);  /* prose links, brand text, 5.7:1 */
+  --tc-brand-soft:    var(--tc-pine-50);   /* active nav item, selected row */
+  --tc-brand-soft-fg: var(--tc-pine-700);  /* text/icon on brand-soft, 7.2:1 */
+  --tc-focus:         var(--tc-pine-500);  /* focus ring, 4.0:1 */
+
+  /* Semantic */
+  --tc-up:        #157f3c;  --tc-up-soft:   #e8f6ec;   /* text 5.1:1, on soft 4.6:1 */
+  --tc-down:      #c92a2a;  --tc-down-soft: #fdecec;   /* 5.5:1, on soft 4.8:1 */
+  --tc-warn:      #a15c00;  --tc-warn-soft: #fff4e0;   /* 5.2:1, on soft 4.8:1 */
+  --tc-info:      #2457c5;  --tc-info-soft: #eaf0fd;   /* 6.5:1, on soft 5.7:1 */
+  --tc-star:      #e5a50a;                              /* favourite star fill (icon only) */
+
+  /* Metric map (validated, see 2.3). Marks only, never text. */
+  --tc-m-clicks:      #1f5bd6;
+  --tc-m-impressions: #b77be6;
+  --tc-m-ctr:         #0e9c8b;
+  --tc-m-position:    #e8710a;
+  --tc-m-users:       #5b4fe0;
+  --tc-m-sessions:    #0b8fb8;
+  --tc-m-pageviews:   #db3f8a;
+  --tc-m-conversions: #c2410c;
+  --tc-m-ai:          #c98500;
+
+  /* Categorical 8 (dimension breakdowns), fixed order, never cycled */
+  --tc-cat-1: #2a78d6;  --tc-cat-2: #eb6834;  --tc-cat-3: #1baf7a;  --tc-cat-4: #eda100;
+  --tc-cat-5: #e87ba4;  --tc-cat-6: #008300;  --tc-cat-7: #6250d6;  --tc-cat-8: #e34948;
+  --tc-cat-other: var(--tc-gray-400);
+
+  /* Chart chrome */
+  --tc-chart-grid:   var(--tc-gray-100);
+  --tc-chart-axis:   var(--tc-gray-200);
+  --tc-chart-tick:   var(--tc-gray-500);
+  --tc-chart-cursor: var(--tc-gray-300);
+  --tc-chart-fill-top: 16%;   /* area gradient start opacity */
+  --tc-heatbar:        12%;   /* table heat-bar opacity */
+
+  /* Elevation */
+  --tc-shadow-xs:         0 1px 2px rgb(16 19 26 / 0.05);
+  --tc-shadow-card:       0 1px 2px rgb(16 19 26 / 0.04), 0 1px 3px rgb(16 19 26 / 0.04);
+  --tc-shadow-card-hover: 0 2px 4px rgb(16 19 26 / 0.04), 0 8px 20px -6px rgb(16 19 26 / 0.10);
+  --tc-shadow-popover:    0 4px 8px -2px rgb(16 19 26 / 0.06), 0 12px 32px -8px rgb(16 19 26 / 0.16);
+  --tc-shadow-modal:      0 4px 12px -4px rgb(16 19 26 / 0.08), 0 24px 64px -12px rgb(16 19 26 / 0.28);
+}
+
+/* ---------- 3. Semantic tokens: DARK ---------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --tc-canvas:         var(--tc-night-0);
+  --tc-surface:        var(--tc-night-50);
+  --tc-surface-raised: var(--tc-night-100);
+  --tc-surface-sunken: var(--tc-night-0);
+  --tc-subtle:         var(--tc-night-150);
+  --tc-subtle-strong:  var(--tc-night-250);
+  --tc-inverse:        var(--tc-night-900);
+  --tc-overlay:        rgb(0 0 0 / 0.6);
+
+  --tc-border-subtle: var(--tc-night-200);
+  --tc-border:        var(--tc-night-300);
+  --tc-border-strong: var(--tc-night-400);
+
+  --tc-fg:           var(--tc-night-900);  /* 15.7:1 on surface */
+  --tc-fg-secondary: var(--tc-night-700);  /* 8.7:1 */
+  --tc-fg-muted:     var(--tc-night-600);  /* 5.3:1 */
+  --tc-fg-faint:     var(--tc-night-500);  /* 3.1:1, disabled only */
+  --tc-fg-inverse:   var(--tc-gray-900);
+
+  --tc-brand:         var(--tc-pine-300);
+  --tc-brand-hover:   var(--tc-pine-200);
+  --tc-brand-fg:      var(--tc-pine-950);  /* 9.2:1 on brand */
+  --tc-brand-text:    var(--tc-pine-300);  /* 10:1 */
+  --tc-brand-soft:    rgb(120 211 177 / 0.12);
+  --tc-brand-soft-fg: var(--tc-pine-200);
+  --tc-focus:         var(--tc-pine-400);  /* 6.8:1 */
+
+  --tc-up:   #3fbf6f;  --tc-up-soft:   rgb(63 191 111 / 0.14);
+  --tc-down: #f87171;  --tc-down-soft: rgb(248 113 113 / 0.14);
+  --tc-warn: #f5b041;  --tc-warn-soft: rgb(245 176 65 / 0.14);
+  --tc-info: #7aa7ff;  --tc-info-soft: rgb(122 167 255 / 0.14);
+  --tc-star: #f2b824;
+
+  --tc-m-clicks:      #2a66db;
+  --tc-m-impressions: #ae79d3;
+  --tc-m-ctr:         #159e8d;
+  --tc-m-position:    #e26e0d;
+  --tc-m-users:       #645fdf;
+  --tc-m-sessions:    #149ac4;
+  --tc-m-pageviews:   #d14186;
+  --tc-m-conversions: #e25500;
+  --tc-m-ai:          #b98c07;
+
+  --tc-cat-1: #3987e5;  --tc-cat-2: #d95926;  --tc-cat-3: #199e70;  --tc-cat-4: #c98500;
+  --tc-cat-5: #d55181;  --tc-cat-6: #008300;  --tc-cat-7: #9085e9;  --tc-cat-8: #e66767;
+  --tc-cat-other: var(--tc-night-500);
+
+  --tc-chart-grid:   var(--tc-night-200);
+  --tc-chart-axis:   var(--tc-night-300);
+  --tc-chart-tick:   var(--tc-night-600);
+  --tc-chart-cursor: var(--tc-night-400);
+  --tc-chart-fill-top: 22%;
+  --tc-heatbar:        18%;
+
+  --tc-shadow-xs:         0 1px 2px rgb(0 0 0 / 0.4);
+  --tc-shadow-card:       inset 0 1px 0 rgb(255 255 255 / 0.03);
+  --tc-shadow-card-hover: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 8px 24px -8px rgb(0 0 0 / 0.6);
+  --tc-shadow-popover:    0 0 0 1px rgb(255 255 255 / 0.06), 0 16px 40px -8px rgb(0 0 0 / 0.7);
+  --tc-shadow-modal:      0 0 0 1px rgb(255 255 255 / 0.06), 0 32px 80px -12px rgb(0 0 0 / 0.8);
+}
+
+/* ---------- 4. Tailwind theme: utilities that follow the theme ---------- */
+@theme inline {
+  --color-canvas: var(--tc-canvas);
+  --color-surface: var(--tc-surface);
+  --color-surface-raised: var(--tc-surface-raised);
+  --color-surface-sunken: var(--tc-surface-sunken);
+  --color-subtle: var(--tc-subtle);
+  --color-subtle-strong: var(--tc-subtle-strong);
+  --color-inverse: var(--tc-inverse);
+  --color-overlay: var(--tc-overlay);
+
+  --color-border-subtle: var(--tc-border-subtle);
+  --color-border: var(--tc-border);
+  --color-border-strong: var(--tc-border-strong);
+
+  --color-fg: var(--tc-fg);
+  --color-fg-secondary: var(--tc-fg-secondary);
+  --color-fg-muted: var(--tc-fg-muted);
+  --color-fg-faint: var(--tc-fg-faint);
+  --color-fg-inverse: var(--tc-fg-inverse);
+
+  --color-brand: var(--tc-brand);
+  --color-brand-hover: var(--tc-brand-hover);
+  --color-brand-fg: var(--tc-brand-fg);
+  --color-brand-text: var(--tc-brand-text);
+  --color-brand-soft: var(--tc-brand-soft);
+  --color-brand-soft-fg: var(--tc-brand-soft-fg);
+  --color-focus: var(--tc-focus);
+
+  --color-up: var(--tc-up);       --color-up-soft: var(--tc-up-soft);
+  --color-down: var(--tc-down);   --color-down-soft: var(--tc-down-soft);
+  --color-warn: var(--tc-warn);   --color-warn-soft: var(--tc-warn-soft);
+  --color-info: var(--tc-info);   --color-info-soft: var(--tc-info-soft);
+  --color-star: var(--tc-star);
+
+  --color-m-clicks: var(--tc-m-clicks);
+  --color-m-impressions: var(--tc-m-impressions);
+  --color-m-ctr: var(--tc-m-ctr);
+  --color-m-position: var(--tc-m-position);
+  --color-m-users: var(--tc-m-users);
+  --color-m-sessions: var(--tc-m-sessions);
+  --color-m-pageviews: var(--tc-m-pageviews);
+  --color-m-conversions: var(--tc-m-conversions);
+  --color-m-ai: var(--tc-m-ai);
+
+  --color-cat-1: var(--tc-cat-1);  --color-cat-2: var(--tc-cat-2);
+  --color-cat-3: var(--tc-cat-3);  --color-cat-4: var(--tc-cat-4);
+  --color-cat-5: var(--tc-cat-5);  --color-cat-6: var(--tc-cat-6);
+  --color-cat-7: var(--tc-cat-7);  --color-cat-8: var(--tc-cat-8);
+  --color-cat-other: var(--tc-cat-other);
+
+  --color-chart-grid: var(--tc-chart-grid);
+  --color-chart-axis: var(--tc-chart-axis);
+  --color-chart-tick: var(--tc-chart-tick);
+  --color-chart-cursor: var(--tc-chart-cursor);
+
+  --shadow-xs: var(--tc-shadow-xs);
+  --shadow-card: var(--tc-shadow-card);
+  --shadow-card-hover: var(--tc-shadow-card-hover);
+  --shadow-popover: var(--tc-shadow-popover);
+  --shadow-modal: var(--tc-shadow-modal);
+}
+
+/* ---------- 5. Tailwind theme: static scales ---------- */
+@theme {
+  /* Fonts come from next/font (Geist, Geist_Mono) in app/layout.tsx */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Type scale: size / line-height / tracking / weight */
+  --text-caption: 0.6875rem;   --text-caption--line-height: 1rem;      --text-caption--letter-spacing: 0.02em;   --text-caption--font-weight: 500;   /* 11/16 */
+  --text-meta: 0.75rem;        --text-meta--line-height: 1rem;                                                                                      /* 12/16 */
+  --text-body-sm: 0.8125rem;   --text-body-sm--line-height: 1.125rem;                                                                               /* 13/18 */
+  --text-body: 0.875rem;       --text-body--line-height: 1.25rem;                                                                                   /* 14/20 app default */
+  --text-body-lg: 1rem;        --text-body-lg--line-height: 1.5rem;                                                                                 /* 16/24 marketing default */
+  --text-lead: 1.125rem;       --text-lead--line-height: 1.75rem;                                                                                   /* 18/28 marketing subtitle */
+  --text-title-sm: 0.9375rem;  --text-title-sm--line-height: 1.375rem;  --text-title-sm--font-weight: 600;  --text-title-sm--letter-spacing: -0.005em; /* 15/22 card title */
+  --text-title: 1.125rem;      --text-title--line-height: 1.625rem;     --text-title--font-weight: 600;     --text-title--letter-spacing: -0.01em;     /* 18/26 section */
+  --text-heading: 1.5rem;      --text-heading--line-height: 2rem;       --text-heading--font-weight: 600;   --text-heading--letter-spacing: -0.02em;   /* 24/32 page title */
+  --text-heading-lg: 1.875rem; --text-heading-lg--line-height: 2.25rem; --text-heading-lg--font-weight: 600; --text-heading-lg--letter-spacing: -0.025em; /* 30/36 */
+  --text-display-sm: 2.25rem;  --text-display-sm--line-height: 2.5rem;  --text-display-sm--font-weight: 600; --text-display-sm--letter-spacing: -0.03em;  /* 36/40 */
+  --text-display: 3rem;        --text-display--line-height: 3.25rem;    --text-display--font-weight: 600;   --text-display--letter-spacing: -0.035em;  /* 48/52 */
+  --text-display-lg: 3.75rem;  --text-display-lg--line-height: 4rem;    --text-display-lg--font-weight: 600; --text-display-lg--letter-spacing: -0.04em; /* 60/64 */
+  --text-stat-sm: 1.0625rem;   --text-stat-sm--line-height: 1.5rem;     --text-stat-sm--font-weight: 600;   --text-stat-sm--letter-spacing: -0.01em;   /* 17/24 card numbers */
+  --text-stat: 1.5rem;         --text-stat--line-height: 1.875rem;      --text-stat--font-weight: 600;      --text-stat--letter-spacing: -0.02em;      /* 24/30 KPI tile */
+  --text-stat-lg: 2rem;        --text-stat-lg--line-height: 2.375rem;   --text-stat-lg--font-weight: 600;   --text-stat-lg--letter-spacing: -0.025em;  /* 32/38 hero KPI */
+  --text-stat-xl: 3rem;        --text-stat-xl--line-height: 3.25rem;    --text-stat-xl--font-weight: 600;   --text-stat-xl--letter-spacing: -0.035em;  /* 48/52 realtime, profile hero */
+
+  /* Semantic radii (use these, not rounded-lg/xl, in new code) */
+  --radius-badge: 6px;     /* badges, kbd, small chips */
+  --radius-control: 10px;  /* buttons, inputs, selects, menu items use rounded-md (6px) */
+  --radius-popover: 12px;  /* menus, popovers, tooltips-card, toasts */
+  --radius-card: 16px;     /* cards, chart cards, portfolio cards */
+  --radius-modal: 16px;    /* modals, drawers (inner corners) */
+  --radius-panel: 24px;    /* marketing feature panels, browser frames */
+
+  /* Easing */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);    /* hover, colour, small moves */
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);    /* things appearing: menus, modals, drawers */
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);        /* things leaving */
+
+  /* Extra breakpoint for 4-column portfolio */
+  --breakpoint-3xl: 105rem; /* 1680px */
+
+  /* Animations */
+  --animate-shimmer: tc-shimmer 1.4s linear infinite;
+  --animate-fade-in: tc-fade-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pop-in: tc-pop-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-sheet-up: tc-sheet-up 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-drawer-in: tc-drawer-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-live-dot: tc-live-dot 2s ease-in-out infinite;
+}
+
+/* Keyframes live outside @theme so they are always emitted (the skeleton utility uses one directly) */
+@keyframes tc-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes tc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tc-pop-in { from { opacity: 0; transform: scale(0.97) translateY(2px); } to { opacity: 1; transform: none; } }
+@keyframes tc-sheet-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes tc-drawer-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes tc-live-dot {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--tc-up) 35%, transparent); }
+  50%      { box-shadow: 0 0 0 4px color-mix(in oklab, var(--tc-up) 0%, transparent); }
+}
+
+/* ---------- 6. Base layer ---------- */
+@layer base {
+  html {
+    background: var(--tc-canvas);
+    color: var(--tc-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body { background: var(--tc-canvas); }
+  /* App base size lives on .tc-root (AppShell, styleguide) so legacy and marketing pages keep 16px. */
+  .tc-root { font-size: 0.875rem; line-height: 1.25rem; color: var(--tc-fg); }
+  *, ::before, ::after { border-color: var(--tc-border-subtle); }
+  :focus-visible { outline: 2px solid var(--tc-focus); outline-offset: 2px; border-radius: 4px; }
+  ::selection { background: color-mix(in oklab, var(--tc-focus) 22%, transparent); }
+  table, .tabular { font-variant-numeric: tabular-nums; }
+  code, kbd, pre, samp { font-family: var(--font-mono); }
+  @media (max-width: 767px) { :root { --tc-page-px: 16px; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important; scroll-behavior: auto !important; }
+  }
+}
+
+/* ---------- 7. Small helpers ---------- */
+@utility skeleton {
+  background: linear-gradient(90deg, var(--tc-subtle) 25%, var(--tc-subtle-strong) 50%, var(--tc-subtle) 75%);
+  background-size: 200% 100%;
+  animation: tc-shimmer 1.4s linear infinite;
+  border-radius: 6px;
+}
+@utility heatbar-clicks { background: color-mix(in oklab, var(--tc-m-clicks) var(--tc-heatbar), transparent); }
+@utility heatbar-impressions { background: color-mix(in oklab, var(--tc-m-impressions) var(--tc-heatbar), transparent); }
+@utility heatbar-ctr { background: color-mix(in oklab, var(--tc-m-ctr) var(--tc-heatbar), transparent); }
+@utility heatbar-position { background: color-mix(in oklab, var(--tc-m-position) var(--tc-heatbar), transparent); }
+@utility heatbar-users { background: color-mix(in oklab, var(--tc-m-users) var(--tc-heatbar), transparent); }
+@utility heatbar-sessions { background: color-mix(in oklab, var(--tc-m-sessions) var(--tc-heatbar), transparent); }
+@utility heatbar-pageviews { background: color-mix(in oklab, var(--tc-m-pageviews) var(--tc-heatbar), transparent); }
+@utility heatbar-conversions { background: color-mix(in oklab, var(--tc-m-conversions) var(--tc-heatbar), transparent); }
+@utility heatbar-ai { background: color-mix(in oklab, var(--tc-m-ai) var(--tc-heatbar), transparent); }
+@utility heatbar-neutral { background: color-mix(in oklab, var(--tc-fg-muted) var(--tc-heatbar), transparent); }
