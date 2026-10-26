@@ -68,6 +68,18 @@ The worktree is shared with a robustness agent: commit with `git commit -- <path
 - Owner/ops (from MCP notes): Google consent wording, Cloudflare WAF skip for /mcp, /oauth, /.well-known; MCP directory
   submissions.
 
+## Final checks (2026-10-26, HEAD after 4438622)
+- `npx tsc --noEmit`: exit 0, no errors.
+- `npm run lint`: `✖ 5809 problems (546 errors, 5263 warnings)` repo-wide, all in old code. Files changed since
+  work/live (501): no new errors. The only files with errors are googleApi.ts (64), api/ai-chat/route.ts (51),
+  useDashboardData.ts (2) and api/auth/callback/github-app/route.ts (1), with the same counts as on work/live.
+- `npm test`: `# tests 48 # pass 48 # fail 0`.
+- Admin: `python -m unittest admin.tests.test_leaderboard_core admin.tests.test_leaderboard_v3_api
+  admin.tests.test_plugin_security` -> `Ran 41 tests ... OK`.
+- MCP unit `tests/mcp/unit.test.ts` 22/22; MCP flow on 3101 28/28; builder `tests/builder/query.test.ts` 11/11,
+  `tests/builder/public-api.mjs 3101 integrate` 9/9; leaderboard privacy audit OK (21,356 assertions);
+  migration upgrade check 37/37.
+
 ## Admin restart needed on 8101
 The auto-mode classifier blocked restarting the shared integrate admin; the running admin on 8101 still has the
 pre-integration Python (no /connections endpoint, old site_links code, schema hook). Web code tolerates it.
