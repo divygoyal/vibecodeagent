@@ -88,10 +88,27 @@ The worktree is shared with a robustness agent: commit with `git commit -- <path
   `tests/builder/public-api.mjs 3101 integrate` 9/9; leaderboard privacy audit OK (21,356 assertions);
   migration upgrade check 37/37.
 
-## Admin restart needed on 8101
-The auto-mode classifier blocked restarting the shared integrate admin; the running admin on 8101 still has the
-pre-integration Python (no /connections endpoint, old site_links code, schema hook). Web code tolerates it.
-Admin changes are verified by the migration-upgrade script on its own throwaway admin instead (below).
+## QA pass (research/QA-REPORT.md has a Status column per item)
+- d3ea4b5 QA-08 setup pairing: the site directory pairs from the portfolio store (GET /api/portfolio/pairs);
+  the saved workspace selection no longer forces a pair. tests/sitePairing.test.mjs: portfolio cards, MCP
+  list_sites and the directory agree on the demo account; card slugs = directory route keys.
+- 9151df7 QA-02 GA4-only cards link to /dashboard/s/ga4-<id>; same-host order matches the portfolio.
+- e69ab8a QA-03 view grid = editor grid (12 cols from 900px, v1 md/sm derived), v1 scorecards get sparklines.
+- b29ef82 QA-04 board rows use container queries (preview column stacks).
+- QA-05 Done/Undo verified after the admin restart.
+- P2s: f266a22 + 2988e7a titles, fa09a46 live count, d2db97f "Site · host", 8a9b4e2 editor, bf164b8 focus return +
+  embed gating/preview, dd81510 star label/badges/Export CSV, 6cb49b9 pinned sidebar account block + one skip
+  link, a9ccd61 /dashboard/site, d6c85af Actions "Show more", 1775eef collapsed preview on phones, 5f4ec28 nav +
+  nowrap ranges, de8cbf2 Connect AI URL once, 77ebc56 superadmin wording.
+- Still open: QA-01 (dev-only 500 on `/?callbackUrl=` + "dashboard"/"leaderboard": Next dev; production preview
+  200), QA-18 (dev-only, unreproducible hydration warning), QA-22 (product call), QA-17 (robustness agent).
+- Also: 4438622 /admin shows "Admins only" to non-admins; e9b7746 Select/menus in sheets (z-75) + Tawk hidden
+  under sheets; 245b9bd light welcome + Google banner; 154a91d first sync registers the user; a265184 no
+  container polling (/api/connections).
+
+## Dev servers
+The coordinator restarted the integrate admin and web (current code) after the merges; web/.next was cleared
+after a Turbopack panic. Admin changes are also covered by the migration-upgrade script (own throwaway admins).
 
 ## Crawl
 (see "Crawl results" below)
