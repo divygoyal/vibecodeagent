@@ -52,3 +52,9 @@ Ask, Settings, Plan, Support, Docs, Setup wizard, embed/[siteId]; admin + supera
   the old localStorage-only usage list, which only the removed widget wrote), FAQ. No Telegram, no site limits, no
   "up to 3 sites". "Manage billing" is not shown: there is no Dodo customer-portal integration to link to.
   Removed '/dashboard/plan' from LEGACY_ROUTE_PREFIXES.
+- Support (/dashboard/support): same thread logic (SWR, optimistic send, mark read, length limits), new layout: header,
+  conversation card (log region, neutral bubbles, composer with counter), side cards (Docs, Email us, how support works,
+  private). The old "Priority support" and gradient/ping decorations are gone.
+- Docs (/dashboard/docs): rewritten as one page with an "on this page" list: Getting started, Portfolio, Site pages,
+  Dashboards, Leaderboard, Connect AI, Ask, Help. No Telegram. Example questions link to /dashboard/ask?q=...&prefill=1.
+  Removed '/dashboard/support' and '/dashboard/docs' from LEGACY_ROUTE_PREFIXES.
