@@ -41,6 +41,7 @@ opengraph images, `app/sitemap.ts`, `app/robots.ts`, `app/llms.txt`. Marketing b
 - 03fe2aa, 2b9867f small fixes (header nav from xl, variable names, aria labels). tsc clean, eslint clean on owned files.
 
 ## Verification status
+- PAUSED 2026-10-26 (coordinator, usage 93%): queued up.sh stopped, no marketing server running. Resume after 18:50 UTC with the steps below.
 - Not yet run: dev server (both slots busy at 14:5x UTC; `TC_SLOT_WAIT_MIN=60 scripts/dev/up.sh marketing 3107 8107` queued).
 - Ready to run once up: /root/projects/tc-redesign-research/shots/marketing/scripts/mshots.mjs (1280 + 390 full-page shots + console/network report) and
   mflows.mjs (contact POST, pricing signed-out -> Google sign-in, signed-in -> Dodo checkout popup), then crawl.mjs
