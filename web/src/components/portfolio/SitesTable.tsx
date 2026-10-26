@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Download, Star } from 'lucide-react';
 
-import { Badge, Button, EmptyState, Favicon, MetricDelta, Table, type TableColumn } from '@/components/ui';
+import { Badge, Button, EmptyState, Favicon, MetricDelta, Skeleton, Table, type TableColumn } from '@/components/ui';
 import { Sparkline } from '@/components/charts';
 import { fmtFull, fmtPosition } from '@/lib/format';
 import type { MetricKey } from '@/lib/metrics';
@@ -16,6 +16,7 @@ export interface SitesTableProps {
     dates: { search: string[]; traffic: string[] };
     view: CardView;
     syncing: boolean;
+    usersPending?: boolean;
     onOpen?: (site: PortfolioSite) => void;
     exportHref?: string;
     empty?: React.ReactNode;
@@ -23,8 +24,9 @@ export interface SitesTableProps {
 }
 
 /** Exact value with its delta underneath (keeps the table to 8 columns). */
-function ValueDelta({ metric, value, prev, has }: { metric: MetricKey; value: number | null | undefined; prev: number | null | undefined; has: boolean }) {
+function ValueDelta({ metric, value, prev, has, loading }: { metric: MetricKey; value: number | null | undefined; prev: number | null | undefined; has: boolean; loading?: boolean }) {
     if (!has) return <span className="text-fg-faint">–</span>;
+    if (loading) return <Skeleton className="ml-auto h-3.5 w-14" delay={0} />;
     return (
         <span className="inline-flex flex-col items-end leading-tight">
             <span>{metric === 'position' ? fmtPosition(value) : fmtFull(value)}</span>
@@ -34,7 +36,7 @@ function ValueDelta({ metric, value, prev, has }: { metric: MetricKey; value: nu
 }
 
 /** List view: sortable columns, sparkline cells, CSV export (DESIGN 5.1 / 3.13). */
-export function SitesTable({ sites, dates, view, syncing, onOpen, exportHref, empty, dimmed }: SitesTableProps) {
+export function SitesTable({ sites, dates, view, syncing, usersPending, onOpen, exportHref, empty, dimmed }: SitesTableProps) {
     const [pageSize, setPageSize] = useState(50);
     const columns: TableColumn<PortfolioSite>[] = [
         {
@@ -68,7 +70,7 @@ export function SitesTable({ sites, dates, view, syncing, onOpen, exportHref, em
         },
         {
             key: 'users', header: 'Users', align: 'right', sortable: true, sortValue: (s) => s.traffic?.cur.users,
-            cell: (s) => <ValueDelta metric="users" value={s.traffic?.cur.users} prev={s.traffic?.prev?.users} has={Boolean(s.traffic)} />,
+            cell: (s) => <ValueDelta metric="users" value={s.traffic?.cur.users} prev={s.traffic?.prev?.users} has={Boolean(s.traffic)} loading={usersPending && !s.traffic?.cur.usersExact} />,
         },
         {
             key: 'sessions', header: 'Sessions', align: 'right', sortable: true, sortValue: (s) => s.traffic?.cur.sessions,

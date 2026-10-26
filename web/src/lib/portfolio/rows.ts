@@ -72,3 +72,38 @@ export function parseGscDaily(siteUrl: string, res: GscResponse): DailyRow[] {
     }
     return out;
 }
+
+/** Exact (de-duplicated) users for a window and its previous period: one report, no date dimension. */
+export function ga4RangeUsersRequest(cur: { start: string; end: string }, prev: { start: string; end: string }) {
+    return {
+        dateRanges: [
+            { startDate: cur.start, endDate: cur.end, name: 'cur' },
+            { startDate: prev.start, endDate: prev.end, name: 'prev' },
+        ],
+        metrics: [{ name: 'activeUsers' }, { name: 'totalUsers' }],
+    };
+}
+
+export interface RangeUsers {
+    activeCur: number;
+    activePrev: number;
+    totalCur: number;
+    totalPrev: number;
+}
+
+/** Rows carry the dateRange name as their only dimension; a range with no users has no row. */
+export function parseGa4RangeUsers(report: Ga4Report): RangeUsers {
+    const out: RangeUsers = { activeCur: 0, activePrev: 0, totalCur: 0, totalPrev: 0 };
+    for (const r of report.rows ?? []) {
+        const name = r.dimensionValues?.[r.dimensionValues.length - 1]?.value;
+        const m = r.metricValues ?? [];
+        if (name === 'cur') {
+            out.activeCur = Math.round(num(m[0]?.value));
+            out.totalCur = Math.round(num(m[1]?.value));
+        } else if (name === 'prev') {
+            out.activePrev = Math.round(num(m[0]?.value));
+            out.totalPrev = Math.round(num(m[1]?.value));
+        }
+    }
+    return out;
+}

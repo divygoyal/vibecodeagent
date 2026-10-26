@@ -17,8 +17,8 @@ import { demoListSites, demoSearchAnalytics } from '@/lib/demo/gsc';
 import { normalizeHost, pairSites, type Ga4PropertyInput, type GscSiteInput } from '@/lib/sites/pairing';
 import { buildPortfolio, RECENT_DAYS } from './build';
 import { addDays, bucketDaysFor, RANGE_DAYS, syncEndDay, todayIso, windowRequests } from './ranges';
-import { ga4DailyRequest, gscDailyRequest, parseGa4Daily, parseGscDaily } from './rows';
-import { aggregateSnapshot, type DailyRow, type StoreAsset } from './snapshot';
+import { ga4DailyRequest, ga4RangeUsersRequest, gscDailyRequest, parseGa4Daily, parseGa4RangeUsers, parseGscDaily } from './rows';
+import { aggregateSnapshot, type DailyRow, type RangeTotalRow, type StoreAsset } from './snapshot';
 import type { PortfolioRange, PortfolioResponse } from './types';
 
 export interface DemoPortfolioOptions {
@@ -121,5 +121,18 @@ function computeDemoPortfolio(range: PortfolioRange, now: number, opts: DemoPort
         bucket_days: bucketDaysFor(range),
         recent_days: RECENT_DAYS,
     });
+    // Exact users per property, the same single report the app makes per range.
+    const w = snap.windows.ga4;
+    if (w) {
+        snap.range_totals = assets.filter((a) => a.asset_kind === 'ga4').map((a): RangeTotalRow => {
+            const u = parseGa4RangeUsers(demoRunReport(a.asset_id, ga4RangeUsersRequest(
+                { start: w.cur_start, end: w.cur_end }, { start: w.prev_start, end: w.prev_end },
+            ), { now }));
+            return {
+                asset_kind: 'ga4', asset_id: a.asset_id, range_key: range, ...w, fetched_at: syncedAt,
+                active_users_cur: u.activeCur, active_users_prev: u.activePrev, total_users_cur: u.totalCur, total_users_prev: u.totalPrev,
+            };
+        });
+    }
     return buildPortfolio(snap, { range, now, demo: true });
 }

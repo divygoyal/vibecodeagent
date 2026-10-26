@@ -19,8 +19,13 @@ export interface SearchTotals {
 }
 
 export interface TrafficTotals {
-    /** Sum of daily active users (GA4 activeUsers per day). */
+    /**
+     * GA4 active users over the window, de-duplicated (one report per range)
+     * when usersExact; otherwise the sum of daily active users until the exact
+     * figure arrives. Across sites it is a sum (visitors may overlap).
+     */
     users: number;
+    usersExact: boolean;
     sessions: number;
     pageviews: number;
     keyEvents: number;
@@ -142,6 +147,8 @@ export interface PortfolioResponse {
     generatedAt: number;
     /** True while a sync runs for this user; the UI polls until it is false. */
     syncing: boolean;
+    /** Exact users for this range are being fetched; poll until false. */
+    usersPending: boolean;
     /** Newest successful sync of any asset (epoch seconds). */
     lastSyncedAt: number | null;
     /** Google connection problem (expired token, API disabled). */

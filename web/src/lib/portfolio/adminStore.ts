@@ -2,7 +2,7 @@
  * Server-only client for the admin portfolio store (admin/portfolio_api.py).
  * `identifier` is the session user id string; the admin resolves it.
  */
-import type { DailyRow, SnapshotData, SnapshotRequest, StoreAsset } from './snapshot';
+import type { DailyRow, RangeTotalRow, SnapshotData, SnapshotRequest, StoreAsset } from './snapshot';
 import type { AssetKind, AssetStatus } from './types';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
@@ -82,6 +82,11 @@ export const adminStore = {
 
     async snapshot(identifier: string, req: SnapshotRequest): Promise<SnapshotData> {
         return call<SnapshotData>('POST', `${u(identifier)}/snapshot`, req, 20_000);
+    },
+
+    async upsertRangeTotals(identifier: string, rows: (Omit<RangeTotalRow, 'asset_kind' | 'fetched_at'> & { kind: 'ga4' })[]): Promise<void> {
+        if (rows.length === 0) return;
+        await call('POST', `${u(identifier)}/range-totals`, { rows }, 30_000);
     },
 
     async staleUsers(olderThanS: number, limit: number): Promise<{ identifier: string; user_id: number; oldest_synced_at: number | null }[]> {

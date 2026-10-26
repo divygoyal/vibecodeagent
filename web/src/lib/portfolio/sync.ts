@@ -19,8 +19,8 @@ import { fetchInventory, type FetchLike, type Inventory } from '@/lib/sites/fetc
 import { normalizeHost, pairSites, type PairingOverrides } from '@/lib/sites/pairing';
 import { adminStore, type AssetUpsert, type StatusUpdate } from './adminStore';
 import { addDays, HISTORY_DAYS, STALE_AFTER_S, syncEndDay } from './ranges';
-import { ga4DailyRequest, gscDailyRequest, parseGa4Daily, parseGscDaily } from './rows';
-import { NO_PAIR, type DailyRow, type StoreAsset } from './snapshot';
+import { ga4DailyRequest, ga4RangeUsersRequest, gscDailyRequest, parseGa4Daily, parseGa4RangeUsers, parseGscDaily } from './rows';
+import { NO_PAIR, type DailyRow, type StoreAsset, type StoreWindow } from './snapshot';
 import type { AssetKind } from './types';
 
 const GA_DATA = 'https://analyticsdata.googleapis.com/v1beta';
@@ -328,4 +328,63 @@ async function runSync(opts: SyncOptions): Promise<SyncResult> {
         ` google_calls inventory=${calls.inventory} ga4=${calls.ga4} gsc=${calls.gsc} in ${result.ms}ms`,
     );
     return result;
+}
+
+// ─── Exact users per range (lazy, for the range being viewed) ──────────────
+
+const rangeJobs = new Map<string, Promise<void>>();
+
+export function isRangeUsersRunning(identifier: string, rangeKey: string): boolean {
+    return rangeJobs.has(`${identifier}|${rangeKey}`);
+}
+
+/**
+ * Fetch exact (de-duplicated) users for one range and its previous period:
+ * ONE GA4 runReport per property (two date ranges, no date dimension), 4
+ * properties at a time, stored per (property, range key). Joins a running job.
+ */
+export function startRangeUsers(opts: {
+    identifier: string;
+    accessToken: string;
+    rangeKey: string;
+    window: StoreWindow;
+    properties: string[];
+}): Promise<void> {
+    const key = `${opts.identifier}|${opts.rangeKey}`;
+    const existing = rangeJobs.get(key);
+    if (existing) return existing;
+    const p = runRangeUsers(opts)
+        .catch((err) => console.error(`[portfolio-users] user=${opts.identifier} failed:`, err instanceof Error ? err.message : err))
+        .finally(() => rangeJobs.delete(key));
+    rangeJobs.set(key, p);
+    return p;
+}
+
+async function runRangeUsers(opts: { identifier: string; accessToken: string; rangeKey: string; window: StoreWindow; properties: string[] }): Promise<void> {
+    const started = Date.now();
+    const calls: SyncCalls = { inventory: 0, ga4: 0, gsc: 0 };
+    const fetchFn = countingFetch(calls, `user=${opts.identifier} users=${opts.rangeKey}`);
+    const w = opts.window;
+    let failed = 0;
+    let stored = 0;
+    await mapLimit(opts.properties, SYNC_CONCURRENCY, async (property) => {
+        try {
+            const report = await googlePost(fetchFn, `${GA_DATA}/${property}:runReport`, opts.accessToken,
+                ga4RangeUsersRequest({ start: w.cur_start, end: w.cur_end }, { start: w.prev_start, end: w.prev_end }));
+            const u = parseGa4RangeUsers(report as never);
+            // Store each property as it lands so cards fill in while the rest load.
+            await adminStore.upsertRangeTotals(opts.identifier, [{
+                kind: 'ga4', asset_id: property, range_key: opts.rangeKey, ...w,
+                active_users_cur: u.activeCur, active_users_prev: u.activePrev, total_users_cur: u.totalCur, total_users_prev: u.totalPrev,
+            }]);
+            stored += 1;
+        } catch (err) {
+            failed += 1;
+            if (err instanceof GoogleError && err.status === 401) throw err;
+        }
+    });
+    console.log(
+        `[portfolio-users] user=${opts.identifier} range=${opts.rangeKey} properties=${opts.properties.length}` +
+        ` stored=${stored} failed=${failed} google_calls ga4=${calls.ga4} in ${Date.now() - started}ms`,
+    );
 }

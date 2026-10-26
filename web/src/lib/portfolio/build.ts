@@ -4,7 +4,7 @@
  */
 import { normalizeHost, siteKind } from '@/lib/sites/pairing';
 import { addDays, daysBetween } from './ranges';
-import { NO_PAIR, type SnapshotData, type StoreAsset, type StoreWindow, type TotalsRow } from './snapshot';
+import { NO_PAIR, type RangeTotalRow, type SnapshotData, type StoreAsset, type StoreWindow, type TotalsRow } from './snapshot';
 import type {
     AlertMetric,
     AssetKind,
@@ -31,6 +31,8 @@ export interface BuildOptions {
     googleError?: { status: number; message: string } | null;
     /** The inventory finished and found no properties or sites. */
     noSites?: boolean;
+    /** Exact users for this range are being fetched. */
+    usersPending?: boolean;
     demo?: boolean;
 }
 
@@ -47,7 +49,9 @@ const DROP_CRITICAL = -50;
 const MIN_DAILY_FOR_ZERO = 2;
 
 const EMPTY_SEARCH: SearchTotals = { clicks: 0, impressions: 0, ctr: null, position: null };
-const EMPTY_TRAFFIC: TrafficTotals = { users: 0, sessions: 0, pageviews: 0, keyEvents: 0, engagementRate: null };
+const EMPTY_TRAFFIC: TrafficTotals = { users: 0, usersExact: false, sessions: 0, pageviews: 0, keyEvents: 0, engagementRate: null };
+/** Exact range users older than this are refetched (same staleness as the daily sync). */
+const RANGE_USERS_STALE_S = 6 * 3600;
 
 function toSearch(t: TotalsRow | undefined): SearchTotals {
     if (!t) return { ...EMPTY_SEARCH };
@@ -61,11 +65,13 @@ function toSearch(t: TotalsRow | undefined): SearchTotals {
     };
 }
 
-function toTraffic(t: TotalsRow | undefined): TrafficTotals {
-    if (!t) return { ...EMPTY_TRAFFIC };
+function toTraffic(t: TotalsRow | undefined, exactUsers?: number | null): TrafficTotals {
+    const exact = exactUsers !== undefined && exactUsers !== null;
+    if (!t) return { ...EMPTY_TRAFFIC, users: exact ? exactUsers : 0, usersExact: exact };
     const sessions = Math.round(t.sessions ?? 0);
     return {
-        users: Math.round(t.users ?? 0),
+        users: exact ? exactUsers : Math.round(t.users ?? 0),
+        usersExact: exact,
         sessions,
         pageviews: Math.round(t.pageviews ?? 0),
         keyEvents: Math.round((t.key_events ?? 0) * 100) / 100,
@@ -197,6 +203,32 @@ function siteAlerts(site: PortfolioSite, snap: SnapshotData, assets: { gsc?: Sto
     return out;
 }
 
+/** Exact-users rows that belong to the current GA4 window, by property. */
+function rangeUsersByAsset(snap: SnapshotData): Map<string, RangeTotalRow> {
+    const w = snap.windows.ga4;
+    const out = new Map<string, RangeTotalRow>();
+    if (!w) return out;
+    for (const r of snap.range_totals ?? []) {
+        if (r.asset_kind === 'ga4' && r.cur_start === w.cur_start && r.cur_end === w.cur_end) out.set(r.asset_id, r);
+    }
+    return out;
+}
+
+/**
+ * GA4 properties whose exact users for this range are missing, for another
+ * window, or older than 6 hours. Hidden, missing and inaccessible ones are skipped.
+ */
+export function rangeUsersNeeded(snap: SnapshotData, nowS: number): StoreAsset[] {
+    const w = snap.windows.ga4;
+    if (!w) return [];
+    const rows = new Map((snap.range_totals ?? []).filter((r) => r.asset_kind === 'ga4').map((r) => [r.asset_id, r]));
+    return snap.assets.filter((a) => {
+        if (a.asset_kind !== 'ga4' || a.hidden || a.missing || a.status === 'no_access' || !hasData(a)) return false;
+        const r = rows.get(a.asset_id);
+        return !r || r.cur_start !== w.cur_start || r.cur_end !== w.cur_end || r.fetched_at < nowS - RANGE_USERS_STALE_S;
+    });
+}
+
 function coveredFrom(asset: StoreAsset, w: StoreWindow | undefined): boolean {
     return Boolean(w && asset.data_start && asset.data_start <= w.prev_start);
 }
@@ -220,14 +252,16 @@ function sumTraffic(list: Compared<TrafficTotals>[]): Compared<TrafficTotals> | 
     if (list.length === 0) return null;
     const add = (items: TrafficTotals[]): TrafficTotals => {
         let users = 0, sessions = 0, pageviews = 0, keyEvents = 0, erW = 0, erS = 0;
+        let usersExact = true;
         for (const t of items) {
+            usersExact &&= t.usersExact;
             users += t.users;
             sessions += t.sessions;
             pageviews += t.pageviews;
             keyEvents += t.keyEvents;
             if (t.engagementRate !== null) { erW += t.engagementRate * t.sessions; erS += t.sessions; }
         }
-        return { users, sessions, pageviews, keyEvents, engagementRate: erS > 0 ? erW / erS : null };
+        return { users, usersExact, sessions, pageviews, keyEvents, engagementRate: erS > 0 ? erW / erS : null };
     };
     const prevs = list.map((c) => c.prev).filter((p): p is TrafficTotals => p !== null);
     return { cur: add(list.map((c) => c.cur)), prev: prevs.length ? add(prevs) : null };
@@ -284,6 +318,7 @@ export function buildPortfolio(snap: SnapshotData, opts: BuildOptions): Portfoli
 
     const gscW = snap.windows.gsc;
     const ga4W = snap.windows.ga4;
+    const exactUsers = rangeUsersByAsset(snap);
     const slugCount = new Map<string, number>();
     // The "main" property of a host keeps the plain slug: paired first, then
     // domain properties, then https prefixes; "--2" goes to the rest.
@@ -331,9 +366,10 @@ export function buildPortfolio(snap: SnapshotData, opts: BuildOptions): Portfoli
             cur: toSearch(totals.get(`gsc|${gsc.asset_id}|cur`)),
             prev: coveredFrom(gsc, gscW) ? toSearch(totals.get(`gsc|${gsc.asset_id}|prev`)) : null,
         } : null;
+        const exact = ga4 ? exactUsers.get(ga4.asset_id) : undefined;
         const traffic: Compared<TrafficTotals> | null = ga4 && hasData(ga4) ? {
-            cur: toTraffic(totals.get(`ga4|${ga4.asset_id}|cur`)),
-            prev: coveredFrom(ga4, ga4W) ? toTraffic(totals.get(`ga4|${ga4.asset_id}|prev`)) : null,
+            cur: toTraffic(totals.get(`ga4|${ga4.asset_id}|cur`), exact?.active_users_cur ?? (exact ? 0 : undefined)),
+            prev: coveredFrom(ga4, ga4W) ? toTraffic(totals.get(`ga4|${ga4.asset_id}|prev`), exact?.active_users_prev ?? (exact ? 0 : undefined)) : null,
         } : null;
 
         const series: SiteSeries = {};
@@ -424,6 +460,7 @@ export function buildPortfolio(snap: SnapshotData, opts: BuildOptions): Portfoli
         state,
         generatedAt: now,
         syncing: Boolean(opts.syncing) || sites.some((s) => s.status === 'syncing'),
+        usersPending: Boolean(opts.usersPending),
         lastSyncedAt,
         googleError: opts.googleError ?? null,
         windows: { search: toWindow(gscW), traffic: toWindow(ga4W) },

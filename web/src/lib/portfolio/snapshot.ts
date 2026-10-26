@@ -71,6 +71,22 @@ export interface TotalsRow {
     position_weighted: number | null;
 }
 
+/** Exact GA4 users of one range key (portfolio_range_totals). */
+export interface RangeTotalRow {
+    asset_kind: AssetKind;
+    asset_id: string;
+    range_key: string;
+    cur_start: string;
+    cur_end: string;
+    prev_start: string;
+    prev_end: string;
+    active_users_cur: number | null;
+    active_users_prev: number | null;
+    total_users_cur: number | null;
+    total_users_prev: number | null;
+    fetched_at: number;
+}
+
 export interface SnapshotData {
     assets: StoreAsset[];
     windows: Partial<Record<AssetKind, StoreWindow>>;
@@ -89,12 +105,15 @@ export interface SnapshotData {
     /** Newest `recent_days` daily values (users for GA4, clicks for GSC), oldest first; missing days absent. */
     recent: Partial<Record<AssetKind, Record<string, [string, number][]>>>;
     bucket_days: number;
+    /** Present when the request named a range_key. */
+    range_totals?: RangeTotalRow[];
 }
 
 export interface SnapshotRequest {
     windows: Partial<Record<AssetKind, WindowRequest>>;
     bucket_days: number;
     recent_days: number;
+    range_key?: string;
 }
 
 function resolveWindow(req: WindowRequest, newest: string | null): StoreWindow | null {

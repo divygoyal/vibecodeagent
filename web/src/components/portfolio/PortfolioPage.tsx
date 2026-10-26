@@ -74,7 +74,7 @@ export function PortfolioPage() {
         keepPreviousData: true,
         revalidateOnFocus: true,
         // Poll while a sync runs so cards fill in progressively.
-        refreshInterval: (d) => (d?.syncing ? 2000 : 0),
+        refreshInterval: (d) => (d?.syncing || d?.usersPending ? 2000 : 0),
         shouldRetryOnError: (err) => !(err instanceof HttpError && err.status === 401),
     });
 

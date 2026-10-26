@@ -23,6 +23,8 @@ export interface SiteCardProps {
     view: CardView;
     /** Global sync running (pending sites show "Syncing"). */
     syncing: boolean;
+    /** Exact users for this range are loading. */
+    usersPending?: boolean;
     href: string;
     onOpen?: (site: PortfolioSite) => void;
     onToggleStar?: (site: PortfolioSite) => void;
@@ -35,7 +37,7 @@ export interface SiteCardProps {
 /** Previous totals under this are noise: the delta is shown without colour (DESIGN 6.7). */
 const TINY = 20;
 
-function Metric({ metric, value, previous, labelFirst, dot = true, label, small }: {
+function Metric({ metric, value, previous, labelFirst, dot = true, label, small, loading }: {
     metric: MetricKey;
     value: number | null | undefined;
     previous: number | null | undefined;
@@ -44,6 +46,8 @@ function Metric({ metric, value, previous, labelFirst, dot = true, label, small 
     label?: string;
     /** Secondary row (GA4 under Search Console): body-size numbers. */
     small?: boolean;
+    /** Number still loading (exact users being fetched): a bar in its place. */
+    loading?: boolean;
 }) {
     const m = METRICS[metric];
     const short = label ?? m.short;
@@ -52,9 +56,13 @@ function Metric({ metric, value, previous, labelFirst, dot = true, label, small 
         <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
             {dot ? <span aria-hidden className={cn('shrink-0 self-center rounded-full', small ? 'size-1.5' : 'size-2')} style={{ background: m.color }} /> : null}
             {labelFirst ? <span className="text-body-sm text-fg-muted">{short}</span> : null}
-            <span className={cn('text-fg tabular-nums', small ? 'text-body font-semibold' : 'text-stat-sm')}>{fmtMetric(metric, value, { compact: true })}</span>
+            {loading ? (
+                <Skeleton className={cn('self-center', small ? 'h-3.5 w-10' : 'h-4 w-12')} delay={0} />
+            ) : (
+                <span className={cn('text-fg tabular-nums', small ? 'text-body font-semibold' : 'text-stat-sm')}>{fmtMetric(metric, value, { compact: true })}</span>
+            )}
             {labelFirst ? null : <span className="text-body-sm text-fg-muted">{short}</span>}
-            {previous === null || previous === undefined ? null : (
+            {loading || previous === null || previous === undefined ? null : (
                 <MetricDelta metric={metric} current={value} previous={previous} className={tiny ? 'text-fg-muted!' : undefined} />
             )}
         </span>
@@ -83,11 +91,11 @@ function SearchMetrics({ site, small }: { site: PortfolioSite; small?: boolean }
     );
 }
 
-function TrafficMetrics({ site, withEngagement, small }: { site: PortfolioSite; withEngagement?: boolean; small?: boolean }) {
+function TrafficMetrics({ site, withEngagement, small, usersPending }: { site: PortfolioSite; withEngagement?: boolean; small?: boolean; usersPending?: boolean }) {
     const t = site.traffic!;
     return (
         <div className={cn('flex flex-wrap items-baseline gap-y-1', small ? 'gap-x-3' : 'gap-x-4')}>
-            <Metric metric="users" value={t.cur.users} previous={t.prev?.users} small={small} />
+            <Metric metric="users" value={t.cur.users} previous={t.prev?.users} small={small} loading={usersPending && !t.cur.usersExact} />
             <Metric metric="sessions" value={t.cur.sessions} previous={t.prev?.sessions} small={small} />
             {withEngagement ? <EngagementMetric value={t.cur.engagementRate} previous={t.prev ? t.prev.engagementRate : undefined} /> : null}
         </div>
@@ -130,7 +138,7 @@ function ariaSummary(site: PortfolioSite): string {
  * card links to the site overview; star, menu and "Details" sit above the link.
  */
 export const SiteCard = memo(function SiteCard({
-    site, windows, dates, view, syncing, href, onOpen, onToggleStar, menu, compact, readOnly,
+    site, windows, dates, view, syncing, usersPending, href, onOpen, onToggleStar, menu, compact, readOnly,
 }: SiteCardProps) {
     const hasSearch = Boolean(site.search);
     const hasTraffic = Boolean(site.traffic);
@@ -166,8 +174,8 @@ export const SiteCard = memo(function SiteCard({
     } else {
         // The view's source leads at full size; the paired source follows as a smaller row.
         const blocks = trafficFirst
-            ? [<TrafficMetrics key="t" site={site} withEngagement={!hasSearch} />, hasSearch ? <SearchMetrics key="s" site={site} small /> : null]
-            : [<SearchMetrics key="s" site={site} />, hasTraffic ? <TrafficMetrics key="t" site={site} small /> : null];
+            ? [<TrafficMetrics key="t" site={site} withEngagement={!hasSearch} usersPending={usersPending} />, hasSearch ? <SearchMetrics key="s" site={site} small /> : null]
+            : [<SearchMetrics key="s" site={site} />, hasTraffic ? <TrafficMetrics key="t" site={site} small usersPending={usersPending} /> : null];
         metrics = <div className={cn('flex flex-col gap-1.5', greyed && 'opacity-50')}>{blocks}</div>;
     }
 

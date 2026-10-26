@@ -323,6 +323,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                                 dates={data.dates}
                                 view={view}
                                 syncing={data.syncing}
+                                usersPending={data.usersPending}
                                 onOpen={readOnly ? undefined : (s) => { onOpenSite?.(s); }}
                                 exportHref={exportHref}
                                 dimmed={refetching}
@@ -341,6 +342,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                                             dates={data.dates}
                                             view={view}
                                             syncing={data.syncing}
+                                            usersPending={data.usersPending}
                                             href={hrefFor(s)}
                                             onOpen={onOpenSite}
                                             onToggleStar={onToggleStar}
