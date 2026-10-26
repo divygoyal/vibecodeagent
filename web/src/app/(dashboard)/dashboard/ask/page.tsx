@@ -322,7 +322,7 @@ function ConnectorCard({ name, connected, onClose, onDisconnected, placement = '
     const handleGoogleConnect = () => {
         if (connecting) return;
         setConnecting(true);
-        const callbackUrl = `/dashboard/ai-chat?connected=google`;
+        const callbackUrl = `/dashboard/ask?connected=google`;
         void signIn('google', { callbackUrl }, { prompt: 'select_account consent' });
     };
 
@@ -585,7 +585,7 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: (provider?: 
                     const params = new URLSearchParams(searchParams.toString());
                     params.delete('connected');
                     const qs = params.toString();
-                    router.replace(`/dashboard/ai-chat${qs ? `?${qs}` : ''}`);
+                    router.replace(`/dashboard/ask${qs ? `?${qs}` : ''}`);
                 }
             }
         })();
@@ -615,7 +615,7 @@ function ProviderConnectionCallback({ onConnected }: { onConnected: (provider?: 
         params.delete('action');
         params.delete('why');
         const qs = params.toString();
-        router.replace(`/dashboard/ai-chat${qs ? `?${qs}` : ''}`);
+        router.replace(`/dashboard/ask${qs ? `?${qs}` : ''}`);
     }, [searchParams, router, onConnected]);
 
     return null;
@@ -687,7 +687,7 @@ function AutoPromptFromQuery({ onPrompt }: { onPrompt: (q: string, opts?: { from
         params.delete('site');
         params.delete('__from');
         const qs = params.toString();
-        router.replace(`/dashboard/ai-chat${qs ? `?${qs}` : ''}`);
+        router.replace(`/dashboard/ask${qs ? `?${qs}` : ''}`);
 
         const labelFromSite = (s: string) =>
             s.replace(/^sc-domain:/, '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
@@ -1780,7 +1780,7 @@ export default function AIChat() {
                                     if (target === 'google') {
                                         void signIn(
                                             'google',
-                                            { callbackUrl: '/dashboard/ai-chat?connected=google' },
+                                            { callbackUrl: '/dashboard/ask?connected=google' },
                                             { prompt: 'select_account consent' },
                                         );
                                     }

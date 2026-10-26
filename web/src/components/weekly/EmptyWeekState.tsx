@@ -84,7 +84,7 @@ export default function EmptyWeekState({ digest }: EmptyWeekStateProps) {
                                         </div>
                                     </div>
                                     <Link
-                                        href={`/dashboard/ai-chat?q=${encodeURIComponent(`How do I move "${q.query}" from position ${q.position?.toFixed(1)} into the top 10?`)}`}
+                                        href={`/dashboard/ask?q=${encodeURIComponent(`How do I move "${q.query}" from position ${q.position?.toFixed(1)} into the top 10?`)}`}
                                         className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#14C4E1]/22 bg-[#14C4E1]/12 text-xs font-medium text-[#7AD9DA] hover:bg-[#14C4E1]/20 transition-colors"
                                     >
                                         Ask AI

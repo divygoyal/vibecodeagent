@@ -11,7 +11,7 @@
  * Step 2 ("Got Search Console for this site?") — soft-suggested GSC site
  * (token-overlap with the picked GA4) at the top, plus a searchable list of
  * the rest. User either picks one ("Use this site") or clicks "Skip — I
- * don't have one." Either action saves and routes to /dashboard/ai-chat.
+ * don't have one." Either action saves and routes to /dashboard/ask.
  *   In the inverted branch, Step 2 asks about GA4 instead.
  *
  * Workspace name (label) is auto-derived: GA4 displayName wins, else GSC
@@ -139,10 +139,10 @@ function MiniStarField() {
 // Only paths starting with "/dashboard/" are accepted, so a malicious caller
 // can't send users to an arbitrary external site after setup completes.
 function safeReturnTo(raw: string | null): string {
-    if (!raw) return '/dashboard/ai-chat';
-    if (!raw.startsWith('/dashboard/')) return '/dashboard/ai-chat';
+    if (!raw) return '/dashboard/ask';
+    if (!raw.startsWith('/dashboard/')) return '/dashboard/ask';
     // Reject protocol-relative paths and embedded URLs.
-    if (raw.startsWith('//') || raw.includes('\\') || /:\/\//.test(raw)) return '/dashboard/ai-chat';
+    if (raw.startsWith('//') || raw.includes('\\') || /:\/\//.test(raw)) return '/dashboard/ask';
     return raw;
 }
 
@@ -150,12 +150,12 @@ export default function SetupPage() {
     const router = useRouter();
     // Where to send the user once setup is complete. Middleware appends
     // ?returnTo=<original-url> when it bounces a setup-incomplete user away
-    // from a deep link (e.g. /dashboard/ai-chat?q=…&property=…&site=… from a
+    // from a deep link (e.g. /dashboard/ask?q=…&property=…&site=… from a
     // report-email CTA). Resolved on click, not in state — keeps the page
     // statically pre-renderable (no useSearchParams) and avoids the
     // cascading-render hit of useState+useEffect.
     const resolveReturnTo = useCallback(() => {
-        if (typeof window === 'undefined') return '/dashboard/ai-chat';
+        if (typeof window === 'undefined') return '/dashboard/ask';
         const params = new URLSearchParams(window.location.search);
         return safeReturnTo(params.get('returnTo'));
     }, []);
@@ -192,7 +192,7 @@ export default function SetupPage() {
     const [saveError, setSaveError] = useState<string | null>(null);
     // Wizard step. 'pick-website' = Step 1, 'pair-gsc' = Step 2,
     // 'done' = Step 3 (confirmation). The Done screen waits for a click
-    // before routing to /dashboard/ai-chat. Always starts at Step 1 so the
+    // before routing to /dashboard/ask. Always starts at Step 1 so the
     // sidebar workspace pill consistently lands users on the website
     // picker — they can always change either side from the start.
     const [step, setStep] = useState<'pick-website' | 'pair-gsc' | 'done'>('pick-website');
@@ -206,7 +206,7 @@ export default function SetupPage() {
     // Loading state for the Done-screen "Go to workspace" button. The button
     // re-runs markSetupCompleted before navigating (in case finishSetup's
     // 12s timeout cut off updateSession() and left the JWT claim stale —
-    // without the refreshed claim, middleware.ts bounces /dashboard/ai-chat
+    // without the refreshed claim, middleware.ts bounces /dashboard/ask
     // straight back to /dashboard/setup and the click looks dead.
     const [navigating, setNavigating] = useState(false);
 
@@ -403,13 +403,13 @@ export default function SetupPage() {
         // updateSession() to refresh the JWT claim that middleware reads.
         // Do NOT wrap this in withTimeout — if the timer fires before
         // updateSession() finishes, the JWT cookie is never re-issued and
-        // middleware bounces /dashboard/ai-chat straight back to /setup,
+        // middleware bounces /dashboard/ask straight back to /setup,
         // which is what was leaving demo users stuck on the setup page.
         await markSetupCompleted();
         // Hard navigation so the just-refreshed JWT cookie ships with the
         // request (router.push can race the cookie write). Honour ?returnTo
         // when it was passed in (e.g. from a report-email deep link bounced
-        // through setup); otherwise default to /dashboard/ai-chat.
+        // through setup); otherwise default to /dashboard/ask.
         window.location.href = resolveReturnTo();
     };
 
@@ -764,7 +764,7 @@ export default function SetupPage() {
                             // the request. router.push can race the cookie
                             // write and hit middleware with the stale value.
                             // Honours ?returnTo when middleware bounced a deep
-                            // link (e.g. /dashboard/ai-chat?q=…) through here.
+                            // link (e.g. /dashboard/ask?q=…) through here.
                             window.location.href = resolveReturnTo();
                         }}
                         disabled={navigating}

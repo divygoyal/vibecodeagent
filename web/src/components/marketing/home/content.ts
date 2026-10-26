@@ -39,7 +39,7 @@ export const HOMEPAGE_CONTENT = {
             "Stop hunting through reports and dashboards. Ask plain-English questions and instantly know what's happening with your traffic — and what to do about it.",
         videoSrc: '/home/ai-chat-final.mp4',
         posterSrc: '/home/ai-chat-demo-poster.jpg',
-        frameLabel: 'trafficclaw.com/dashboard/ai-chat',
+        frameLabel: 'trafficclaw.com/dashboard/ask',
         frameMeta: 'Reason 1',
         highlights: [
             {

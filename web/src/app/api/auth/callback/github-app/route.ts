@@ -42,14 +42,14 @@ export async function GET(req: NextRequest) {
     const setupAction = url.searchParams.get('setup_action') || 'install';
 
     if (!installationIdParam) {
-        return NextResponse.redirect(new URL('/dashboard/ai-chat?installed=error', base));
+        return NextResponse.redirect(new URL('/dashboard/ask?installed=error', base));
     }
 
     const stateCookie = req.cookies.get('gh_app_install_state')?.value;
     // The Setup URL flow does NOT carry our CSRF state — only the OAuth-during-install
     // flow does. So we only enforce the state check when GitHub actually sent one back.
     if (stateParam && (!stateCookie || stateParam !== stateCookie)) {
-        return NextResponse.redirect(new URL('/dashboard/ai-chat?installed=invalid_state', base));
+        return NextResponse.redirect(new URL('/dashboard/ask?installed=invalid_state', base));
     }
 
     const session = await getServerSession(authOptions);
@@ -57,14 +57,14 @@ export async function GET(req: NextRequest) {
         return NextResponse.redirect(new URL('/', base));
     }
     if (!ADMIN_API_KEY) {
-        return NextResponse.redirect(new URL('/dashboard/ai-chat?installed=admin_misconfigured', base));
+        return NextResponse.redirect(new URL('/dashboard/ask?installed=admin_misconfigured', base));
     }
 
     // @ts-expect-error — id added in NextAuth callbacks
     const userId = String(session.user.id);
     const installationId = parseInt(installationIdParam, 10);
     if (Number.isNaN(installationId)) {
-        return NextResponse.redirect(new URL('/dashboard/ai-chat?installed=error', base));
+        return NextResponse.redirect(new URL('/dashboard/ask?installed=error', base));
     }
 
     let adminFailReason = '';
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
         );
         if (res.ok) {
             const out = NextResponse.redirect(
-                new URL(`/dashboard/ai-chat?installed=ok&action=${encodeURIComponent(setupAction)}`, base)
+                new URL(`/dashboard/ask?installed=ok&action=${encodeURIComponent(setupAction)}`, base)
             );
             out.cookies.delete('gh_app_install_state');
             return out;
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
         adminFailReason = e?.message || 'fetch_failed';
     }
     const out = NextResponse.redirect(
-        new URL(`/dashboard/ai-chat?installed=admin_failed&why=${encodeURIComponent(adminFailReason.slice(0, 120))}`, base)
+        new URL(`/dashboard/ask?installed=admin_failed&why=${encodeURIComponent(adminFailReason.slice(0, 120))}`, base)
     );
     out.cookies.delete('gh_app_install_state');
     return out;

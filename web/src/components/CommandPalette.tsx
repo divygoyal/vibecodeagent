@@ -34,7 +34,7 @@ export default function CommandPalette() {
 
   const commands = useMemo<CommandItem[]>(() => [
     { id: 'overview', label: 'Overview', description: 'Dashboard overview', icon: LayoutDashboard, action: () => navigate('/dashboard'), section: 'Navigation', keywords: ['home', 'dashboard'] },
-    { id: 'ai-chat', label: 'AI Chat', description: 'Talk to AI analyst', icon: MessageSquare, action: () => navigate('/dashboard/ai-chat'), section: 'Navigation', keywords: ['chat', 'ai', 'ask'] },
+    { id: 'ai-chat', label: 'AI Chat', description: 'Talk to AI analyst', icon: MessageSquare, action: () => navigate('/dashboard/ask'), section: 'Navigation', keywords: ['chat', 'ai', 'ask'] },
     { id: 'analytics', label: 'Analytics', description: 'Traffic & sources', icon: BarChart3, action: () => navigate('/dashboard/analytics'), section: 'Navigation', keywords: ['traffic', 'visitors', 'ga4'] },
     { id: 'seo', label: 'SEO', description: 'Keywords & rankings', icon: Search, action: () => navigate('/dashboard/seo'), section: 'Navigation', keywords: ['search', 'keywords', 'gsc', 'rankings'] },
     { id: 'audit', label: 'Site Audit', description: '50+ SEO checks', icon: ScanSearch, action: () => navigate('/dashboard/audit'), section: 'Navigation', keywords: ['audit', 'check', 'health'] },
