@@ -28,6 +28,21 @@ Shots: /root/projects/tc-redesign-research/shots/portfolio/.
   16 GA4 + 20 GSC; forced resync 10 + 8 + 10; cron 0 + 8 + 10); progressive fill polled; 500-site admin
   snapshot 0.3-1.2 s, builder 67 ms, response ~1 MB.
 
-## Next
-- Re-take shots after the WITHOUT ROWID restart (dev DB tables were dropped; resync happens on open).
-- Remove web/.next, down.sh portfolio when finished.
+## Verified (final)
+- tsc clean, eslint clean on touched files, `npm test` 24/24, admin standalone tests + 500-site scale test.
+- Real path (admin SQL + sync) and buildDemoPortfolio() give identical totals for 7d/28d/3m/12m.
+- 23 shots in /root/projects/tc-redesign-research/shots/portfolio (desktop 1280 / mobile 390, light/dark:
+  grid, table, empty, first-sync, mid-sync, no-sites, 7d alerts). Empty/first-sync/mid-sync use API
+  responses captured from the real flow (mocked in the browser for a stable shot).
+- Console: only third-party (tawk CORS, gtag) and /api/favicon 404s for .example hosts (foundation proxy).
+
+## Open / for others
+- Foundation: /api/favicon answers 404 for hosts without an icon -> console errors; a 204 or a
+  placeholder would keep consoles clean. globals.css revert rule (commit "keep legacy 44px...") is
+  theirs to keep or move. lib/format flat position delta now "–" (test added).
+- Users = sum of daily active users (one runReport by date); exact uniques would need an extra
+  report per range.
+- mcp_site_links (tc/mcp) and portfolio_assets.pairing_override both store pairing overrides:
+  reconcile into one when merging.
+- /demo page (marketing) can render <PortfolioView data={buildDemoPortfolio({range})} readOnly
+  className="tc-root ..." /> with its own range state.
