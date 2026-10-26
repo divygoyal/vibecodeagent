@@ -47,6 +47,11 @@ opengraph images, `app/sitemap.ts`, `app/robots.ts`, `app/llms.txt`. Marketing b
   `--only` the marketing routes. Shots go to /root/projects/tc-redesign-research/shots/marketing/.
 
 ## Left / for the report
+- /ai (tc/mcp, `app/(marketing)/ai/page.tsx`) is already linked: header nav "ChatGPT & Claude", footer (Resources),
+  sitemap, llms.txt, home MCP section and pricing callout. The new `(marketing)/layout.tsx` (sticky light header +
+  footer) wraps every route in the group, /ai, /leaderboard/** and /sponsor included; none of them render their own
+  navbar. After the merge, /ai can drop its `pt-24 md:pt-28` (that offset was for the old fixed, transparent navbar);
+  the leaderboard/sponsor pages keep their own dark backgrounds until their owners restyle them.
 - next.config redirects wanted: `/features` -> `/#product` (308); `/demo/telegram*` -> `/demo` (foundation sends them to `/`).
 - Root `app/layout.tsx` (not mine) still has the old default title/description, dark `theme-color`, and a JSON-LD
   description "AI-powered SEO & analytics platform"; worth updating to the new positioning.
