@@ -243,6 +243,33 @@ class LeaderboardV3ApiTests(unittest.TestCase):
         self.assertIsNone(row["monthly_visitors"])
         self.assertNotIn("33333", json.dumps(row))
 
+    def test_11_entries_from_before_v3_keep_working(self):
+        """No profile row (how every existing listing looks after the migration): still listed with what it showed."""
+        import sqlite3
+        eid = self.join("Old Timer", "oldtimer.test", status="verified")
+        self.metrics(eid, users=8000, clicks=900)
+        db = sqlite3.connect(os.environ["DATABASE_URL"].split("///", 1)[1])
+        db.execute("DELETE FROM leaderboard_profiles WHERE entry_id = ?", (eid,))
+        db.commit()
+        db.close()
+        row = next(r for r in self.board(tab="top")["rows"] if r["name"] == "Old Timer")
+        self.assertEqual(row["visitors"]["value"], 8000)
+        self.assertEqual(row["verification"]["label"], "GA4 connected")  # grace until the first v3 check
+        mine = next(e for e in self.c.get(f"/api/lb/mine/{self.users['owner']}", headers=KEY).json()["entries"] if e["id"] == eid)
+        self.assertTrue(mine["legacy_privacy"])
+        self.assertTrue(mine["verification"]["grace"])
+        prof = self.c.get(f"/api/lb/profile/{eid}", headers=KEY).json()
+        self.assertEqual(prof["kpis"]["pageviews"]["mode"], "exact")  # today's visibility is preserved
+        # the first check (cron) decides: GA4 only -> off the board; owner -> stays
+        self.verify(eid, "ga4")
+        self.assertNotIn("Old Timer", [r["name"] for r in self.board(tab="top")["rows"]])
+        self.verify(eid, "owner")
+        self.assertIn("Old Timer", [r["name"] for r in self.board(tab="top")["rows"]])
+        # editing one setting freezes today's visibility for the rest instead of flipping them to the new defaults
+        self.settings(eid, open_to=["partnerships"])
+        mine = next(e for e in self.c.get(f"/api/lb/mine/{self.users['owner']}", headers=KEY).json()["entries"] if e["id"] == eid)
+        self.assertEqual(mine["privacy"]["metrics"]["pageviews"], "exact")
+
 
 if __name__ == "__main__":
     unittest.main()
