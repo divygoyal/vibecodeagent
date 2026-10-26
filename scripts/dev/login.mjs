@@ -123,6 +123,14 @@ async function main() {
     if (!r.ok) throw new Error(`admin POST /api/users failed: ${r.status} ${JSON.stringify(r.data)}`);
     r = await http('PATCH', `${adminUrl}/api/users/${user.sub}`, { headers: adminHeaders, body: { plan: user.plan } });
     if (!r.ok) console.warn(`[login] could not set plan: ${r.status} ${JSON.stringify(r.data).slice(0, 200)}`);
+    if (user.plan === 'pro') {
+        // A full monthly allowance so credit banners do not dominate screenshots.
+        const credits = await http('GET', `${adminUrl}/api/users/${user.sub}/credits`, { headers: adminHeaders });
+        const current = Number(credits.data?.credits ?? 0);
+        if (credits.ok && current < 250) {
+            await http('POST', `${adminUrl}/api/users/${user.sub}/credits/add`, { headers: adminHeaders, body: { amount: 300 - current, reason: 'dev-kit' } });
+        }
+    }
     r = await http('PATCH', `${adminUrl}/api/users/${user.sub}/workspace`, {
         headers: adminHeaders,
         body: { selected_property_id: user.property, selected_site_url: user.site, selected_range: '30d', workspace_label: user.label, mark_setup_completed: true, mark_welcome_seen: true },
@@ -239,7 +247,12 @@ async function seedRecords(webUrl, cookie, user, userKey) {
             widgets: parts.map(p => p.widget),
             gridLayouts: { lg, md: lg.map(l => ({ ...l, w: Math.min(l.w, 6), x: 0 })), sm: lg.map(l => ({ ...l, w: 12, x: 0 })) },
         });
-        if (dash?.dashboard?.id !== undefined) out.dashboardId = dash.dashboard.id;
+        if (dash?.dashboard?.id !== undefined) {
+            out.dashboardId = dash.dashboard.id;
+            const pub = await call('dashboard share', 'POST', `/api/dashboards/${dash.dashboard.id}/share`, {});
+            const pubToken = pub?.shareToken || pub?.share_token || pub?.token;
+            if (pubToken) out.dashboardPublicToken = pubToken;
+        }
 
         const share = await call('share', 'POST', '/api/share', { propertyId, siteUrl: user.site, config: {} });
         const shareToken = share?.token || share?.share?.token;
