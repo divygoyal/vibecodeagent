@@ -54,6 +54,13 @@ export function PublicDashboard({ token, forceEmbed }: { token: string; forceEmb
     const { data, error, mutate } = useSWR<{ dashboard: PublicDashboard }>([docKey, unlockKey], () => fetchJson(docKey, { headers: unlockKey ? { Authorization: `Bearer ${unlockKey}` } : undefined }), { revalidateOnFocus: false });
     const pub = data?.dashboard;
     const theme = useThemeMode(sp.get('theme'), pub?.doc?.theme.mode);
+    // Tokens like --color-chart-grid resolve where they are declared (:root), so the page theme
+    // has to live on <html>, not only on a wrapper.
+    useEffect(() => {
+        const el = document.documentElement;
+        el.setAttribute('data-theme', theme);
+        el.style.colorScheme = theme;
+    }, [theme]);
 
     const frame = (children: React.ReactNode) => (
         <div data-theme={theme} className="tc-root min-h-dvh bg-canvas text-fg">

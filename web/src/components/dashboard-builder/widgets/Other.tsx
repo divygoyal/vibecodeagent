@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useElementWidth } from '../useElementWidth';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
@@ -19,19 +20,6 @@ import { dsFormat, dsKey, metricBetter } from './metricUi';
 
 const ChoroplethMap = dynamic(() => import('../charts/ChoroplethMap'), { ssr: false, loading: () => <div className="skeleton h-full w-full" /> });
 
-function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
-    const ref = useRef<T>(null);
-    const [w, setW] = useState(0);
-    useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-        const ro = new ResizeObserver(([e]) => setW(Math.floor(e.contentRect.width)));
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, []);
-    return [ref, w];
-}
-
 // ── Geo ──────────────────────────────────────────────────────────────────
 
 export function GeoView(props: WidgetViewProps<GeoWidget>) {
@@ -40,7 +28,7 @@ export function GeoView(props: WidgetViewProps<GeoWidget>) {
     const frame = ok?.parts.rows;
     const c = widget.config;
     const id = c.metric.id;
-    const [ref, width] = useWidth<HTMLDivElement>();
+    const [ref, width] = useElementWidth<HTMLDivElement>();
     const values = useMemo(() => {
         const m = new Map<string, number>();
         for (const r of frame?.rows ?? []) {

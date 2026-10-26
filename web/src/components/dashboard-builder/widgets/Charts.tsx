@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useElementWidth } from '../useElementWidth';
 import { Bar, BarChart, CartesianGrid, Tooltip as RTooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts';
 
 import { BarList, ChartTooltipCard, Donut, type ChartTooltipRow } from '@/components/charts';
@@ -162,19 +163,21 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
 
 export function PieView(props: WidgetViewProps<PieWidget>) {
     const { widget, result } = props;
+    const [box, width] = useElementWidth<HTMLDivElement>();
     const ok = okResult(result);
     const frame = ok?.parts.rows;
     const c = widget.config;
     const id = c.metric.id;
     const rows = frame?.rows ?? [];
     const h = plotHeight(props.height, widget.showTitle !== false);
-    const narrow = props.bp === 'sm';
+    const bottom = props.bp === 'sm' || c.legend === 'bottom' || (width > 0 && width < 380);
+    const size = bottom ? Math.max(96, Math.min(160, h - 120, width - 16)) : Math.max(96, Math.min(180, h - 8, width - 230));
     return (
         <WidgetFrame props={props}>
             {!frame ? null : !rows.length ? (
                 <EmptyState variant="inline" title={`No ${metricLabel(id).toLowerCase()} in this period`} />
             ) : (
-                <div className="flex h-full items-center">
+                <div ref={box} className="flex h-full items-center overflow-hidden">
                     <Donut
                         items={rows.map((r, i) => {
                             const raw = String(r[`d:${c.dimension}`] ?? '');
@@ -182,8 +185,8 @@ export function PieView(props: WidgetViewProps<PieWidget>) {
                         })}
                         centerLabel={c.centerLabel === 'none' ? undefined : metricLabel(id)}
                         format={dsFormat(id)}
-                        size={Math.max(96, Math.min(180, h - 8))}
-                        legend={narrow || c.legend === 'bottom' ? 'bottom' : 'right'}
+                        size={size}
+                        legend={bottom ? 'bottom' : 'right'}
                         className="w-full"
                     />
                 </div>

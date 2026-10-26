@@ -12,7 +12,8 @@ const name = process.argv[3] || 'builder';
 const base = `http://localhost:${port}`;
 const dir = `/root/.trafficclaw-dev/${name}`;
 const state = JSON.parse(readFileSync(`${dir}/state.json`, 'utf8'));
-const seed = JSON.parse(readFileSync(`${dir}/seed.json`, 'utf8'));
+const seedAll = JSON.parse(readFileSync(`${dir}/seed.json`, 'utf8'));
+const seed = seedAll.demo ?? seedAll;
 const cookie = state.cookies.filter((c) => c.domain.includes('localhost')).map((c) => `${c.name}=${c.value}`).join('; ');
 
 async function call(method, path, { body, auth = true, headers = {} } = {}) {
