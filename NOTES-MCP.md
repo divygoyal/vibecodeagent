@@ -30,11 +30,15 @@ Spec: /root/projects/tc-redesign-research/MCP.md + PRODUCT.md section 4. Design:
 - routes: .well-known PRM (+/mcp) and AS metadata, /oauth/register, /oauth/authorize, /oauth/authorize/decision
 
 ## Status (latest)
-- Backend complete: OAuth (discovery, DCR, CIMD, authorize/consent/decision, token, revoke), /mcp (both eras), 13 tools + 3 prompts, API keys, /api/ai-connections/*.
-- Consent page /oauth/consent done. web/tests/mcp/flow.test.mjs: 28/28 pass against instance mcp (3102/8102).
-- Cross-route state uses globalThis (lib/mcp/shared.ts) so revocation evicts everywhere.
+- ALL BUILT. Backend: OAuth (discovery, DCR, CIMD, authorize/consent/decision, token, revoke), /mcp (both eras), 13 tools + 3 prompts,
+  API keys, /api/ai-connections/*. UI on foundation kit (merged tc/foundation incl. shell): /oauth/consent,
+  /dashboard/connect-ai (nav item already in components/shell/nav.ts), (marketing)/ai.
+- Tests: web/tests/mcp/unit.test.ts 22/22 (tsx), web/tests/mcp/flow.test.mjs 28/28 against instance mcp; Inspector CLI OK
+  (modern + legacy + auto, --strict clean). README: web/tests/mcp/README.md.
+- Screenshots: /root/projects/tc-redesign-research/shots/mcp/ (connect-ai desktop/mobile light/dark, consent verified/signed-out, ai).
+- node_modules = hard links of tc-foundation + own copies of zod 4.6.7 and @modelcontextprotocol/{server,core}.
 
-## Next
-1. /dashboard/connect-ai page (components/connect-ai/ConnectAiClient.tsx), (marketing)/ai page
-2. README web/tests/mcp/README.md + Inspector runs; unit tests for primitives (tsx --test)
-3. screenshots (desktop/mobile, light/dark), lint, stop server, rm -rf web/.next, report
+## Remaining
+- Final cleanup: scripts/dev/down.sh mcp; rm -rf web/.next; delete scratch Inspector install; report.
+- Known cross-lane issue: styles/legacy.css forces 44px on button/[role=switch] below 640px (deforms Radix controls);
+  worked around locally (components/connect-ai/touchFix.ts). Foundation should scope the rule.
