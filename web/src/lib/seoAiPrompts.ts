@@ -17,7 +17,7 @@
  * to keep both surfaces in sync.
  */
 
-const CHAT_PATH = '/dashboard/ai-chat';
+const CHAT_PATH = '/dashboard/ask';
 
 /** Used as the `__from` URL param so the AI knows which SEO surface the
  *  user came from. The chat's system prompt routes the relevant tool first

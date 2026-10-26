@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
-import { useRegistration } from '@/app/(dashboard)/dashboard/layout';
+import { useRegistration } from '@/components/shell/workspaceContext';
 import type { AnalyticsIntelligenceData } from '@/lib/analyticsIntelligenceServer';
 import { DEMO_QUERY_PARAM, DEMO_QUERY_VALUE } from '@/lib/demoWorkspace';
 
