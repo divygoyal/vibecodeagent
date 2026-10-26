@@ -164,6 +164,8 @@ export function PortfolioView(props: PortfolioViewProps) {
 
     const state = data?.state;
     const firstLoad = loading && !data;
+    // Nothing stored yet and the last sync failed at Google (quota, no access, outage): say so instead of loading forever.
+    const firstSyncFailed = state === 'first_sync' && !data?.syncing && Boolean(data?.googleError);
     const comparisonLabel = `previous ${RANGE_LABEL[range].replace('last ', '')}`;
     const showControls = !firstLoad && state !== 'no_google' && state !== 'no_sites';
 
@@ -188,7 +190,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                 We fetch 16 months of history once. Numbers fill in as data arrives; you can leave this page.
             </Banner>
         );
-    } else if (data?.state === 'first_sync') {
+    } else if (data?.state === 'first_sync' && !firstSyncFailed) {
         banner = (
             <Banner variant="info" title="Finding your sites">
                 We&apos;re listing your Search Console and Analytics properties. Cards appear in a few seconds and fill in as data arrives.
@@ -242,6 +244,14 @@ export function PortfolioView(props: PortfolioViewProps) {
                 <ConnectGoogle onConnect={() => onConnectGoogle?.()} reconnect={Boolean(data?.googleError && data.googleError.status === 401 && data.googleError.message !== 'Google is not connected')} />
             ) : state === 'no_sites' ? (
                 <NoSitesFound onCheckAgain={() => onSyncNow?.()} checking={syncBusy || data?.syncing} />
+            ) : firstSyncFailed ? (
+                <EmptyState
+                    variant="page"
+                    icon={AlertTriangle}
+                    title="Couldn't reach Google"
+                    description={`Google didn't answer when we listed your sites (${data?.googleError?.message ?? 'unknown error'}). Your data is safe; try again in a minute.`}
+                    actions={onSyncNow ? <Button variant="primary" icon={RefreshCw} loading={syncBusy} onClick={() => onSyncNow()}>Try again</Button> : null}
+                />
             ) : state === 'first_sync' || !data ? (
                 <LoadingSkeleton compact={isMobile} withStrip={false} count={6} />
             ) : (
