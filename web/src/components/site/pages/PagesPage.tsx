@@ -86,14 +86,14 @@ export function PagesPage() {
             heat: site.hasGa4 ? { metric: 'pageviews', value: (r) => r.views } : { metric: 'clicks', value: (r) => r.clicks },
         },
         ...(site.hasGa4 ? [
-            { key: 'views', header: 'Views', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.views, cell: (r: Row) => fmtFull(r.views) },
-            { key: 'users', header: 'Users', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.users, cell: (r: Row) => fmtFull(r.users) },
-            { key: 'eng', header: 'Eng. time', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.engagement, cell: (r: Row) => (r.engagement === null ? '–' : fmtDuration(r.engagement)), className: 'max-md:hidden', headerClassName: 'max-md:hidden' },
+            { key: 'views', header: 'Views', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.views ?? -1, cell: (r: Row) => fmtFull(r.views) },
+            { key: 'users', header: 'Users', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.users ?? -1, cell: (r: Row) => fmtFull(r.users) },
+            { key: 'eng', header: 'Eng. time', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.engagement ?? -1, cell: (r: Row) => (r.engagement === null ? '–' : fmtDuration(r.engagement)), className: 'max-md:hidden', headerClassName: 'max-md:hidden' },
         ] : []),
         ...(site.hasGsc ? [
-            { key: 'clicks', header: 'Clicks', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.clicks, cell: (r: Row) => fmtFull(r.clicks) },
-            { key: 'impr', header: 'Impr.', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.impressions, cell: (r: Row) => fmtFull(r.impressions), className: 'max-md:hidden', headerClassName: 'max-md:hidden' },
-            { key: 'pos', header: 'Pos', align: 'right' as const, sortable: true, firstSortDir: 'asc' as const, sortValue: (r: Row) => (r.impressions ? r.position : null), cell: (r: Row) => (r.impressions ? fmtPosition(r.position) : '–') },
+            { key: 'clicks', header: 'Clicks', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.clicks ?? -1, cell: (r: Row) => fmtFull(r.clicks) },
+            { key: 'impr', header: 'Impr.', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.impressions ?? -1, cell: (r: Row) => fmtFull(r.impressions), className: 'max-md:hidden', headerClassName: 'max-md:hidden' },
+            { key: 'pos', header: 'Pos', align: 'right' as const, sortable: true, firstSortDir: 'asc' as const, sortValue: (r: Row) => (r.impressions ? r.position : 9999), cell: (r: Row) => (r.impressions ? fmtPosition(r.position) : '–') },
         ] : []),
         ...(compareOn ? [{
             key: 'delta', header: site.hasGa4 ? 'Δ views' : 'Δ clicks', align: 'right' as const, sortable: true,

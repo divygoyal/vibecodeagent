@@ -40,7 +40,7 @@ export function OpportunitiesTab() {
                 <Card padding="sm">
                     <p className="text-body-sm font-medium text-fg">Striking distance</p>
                     <p className="mt-0.5 text-meta text-fg-muted">Queries at position 8–20 with more impressions than your median query{q.data ? ` (${fmtFull(Math.round(q.data.medianImpressions))})` : ''}. A small push puts them on page one.</p>
-                    {q.data ? <p className="mt-2 text-stat-sm text-fg">{fmtFull(q.data.striking.length)} <span className="text-body-sm font-normal text-fg-muted">queries · +{fmtFull(q.data.striking.reduce((a, r) => a + r.potentialClicks, 0))} clicks at position 3</span></p> : <Skeleton className="mt-2 h-6 w-40" />}
+                    {q.data ? <p className="mt-2 text-stat-sm text-fg">{fmtFull(q.data.striking.length)} <span className="text-body-sm font-normal text-fg-muted">queries · +{fmtFull(q.data.striking.reduce((a, r) => a + r.potentialClicks, 0))} clicks at position 5</span></p> : <Skeleton className="mt-2 h-6 w-40" />}
                 </Card>
                 <Card padding="sm">
                     <p className="text-body-sm font-medium text-fg">Low CTR</p>
@@ -74,7 +74,7 @@ export function OpportunitiesTab() {
                     { key: 'pos', header: 'Position', format: 'position', better: 'down', value: (r) => r.position },
                     { key: 'impr', header: 'Impr.', value: (r) => r.impressions, hideOnMobile: true },
                     { key: 'ctr', header: 'CTR', format: 'percent', value: (r) => r.ctr, hideOnMobile: true },
-                    { key: 'exp', header: kind === 'striking' ? 'CTR at #3' : 'Usual CTR', format: 'percent', value: (r) => r.expectedCtr, hideOnMobile: true },
+                    { key: 'exp', header: kind === 'striking' ? 'CTR at #5' : 'Usual CTR', format: 'percent', value: (r) => r.expectedCtr, hideOnMobile: true },
                     { key: 'gain', header: 'Potential clicks', value: (r) => r.potentialClicks },
                 ]}
             />

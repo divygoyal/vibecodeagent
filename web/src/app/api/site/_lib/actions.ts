@@ -5,7 +5,7 @@
  */
 import { fmtFull } from '@/lib/format';
 import {
-    displayPage, expectedCtr, isDecaying, isLowCtr, isStriking, lowCtrPotential, median, pageRef, strikingPotential,
+    displayPage, expectedCtr, isDecaying, isLowCtr, isStriking, lowCtrPotential, median, pageRef, STRIKING_TARGET, strikingPotential,
 } from '@/components/site/lib/rules';
 import { actionId, impactFor, pct, per28, plural } from '@/components/site/lib/actionText';
 import type { ActionsResponse, SiteAction } from '@/components/site/lib/types';
@@ -133,14 +133,14 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
                 area: 'Search',
                 impact: impactFor(gain, scale),
                 title: `Push "${x.key}" onto the first page`,
-                summary: `Ranks ${pos(x.position)} with ${fmtFull(x.impressions)} impressions and ${fmtFull(x.clicks)} clicks${page ? ` (${show(page)})` : ''}. A top-3 result usually gets about ${ctrText(expectedCtr(3))} of clicks.`,
+                summary: `Ranks ${pos(x.position)} with ${fmtFull(x.impressions)} impressions and ${fmtFull(x.clicks)} clicks${page ? ` (${show(page)})` : ''}. A result at position ${STRIKING_TARGET} usually gets about ${ctrText(expectedCtr(STRIKING_TARGET))} of clicks.`,
                 evidence: [
                     { label: 'Position', value: pos(x.position) },
                     { label: 'Impressions', value: fmtFull(x.impressions) },
                     { label: 'CTR', value: ctrText(x.ctr) },
                     ...(page ? [{ label: 'Page', value: show(page) }] : []),
                 ],
-                expectedImpact: `+${fmtFull(gain)} clicks a month at position 3`,
+                expectedImpact: `+${fmtFull(gain)} clicks a month at position ${STRIKING_TARGET}`,
                 score: gain,
                 fix: [
                     `Make sure the page answers "${x.key}" directly near the top, with the query in the title and H1.`,
@@ -149,7 +149,7 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
                 ],
                 page,
                 query: x.key,
-                askPrompt: `"${x.key}" ranks ${pos(x.position)} on ${host} with ${fmtFull(x.impressions)} impressions${page ? ` (page ${show(page)})` : ''}. How do I get it into the top 3?`,
+                askPrompt: `"${x.key}" ranks ${pos(x.position)} on ${host} with ${fmtFull(x.impressions)} impressions${page ? ` (page ${show(page)})` : ''}. How do I get it onto the first page and higher?`,
             });
         }
     }
@@ -372,12 +372,19 @@ export async function buildActions(inp: ActionsInput): Promise<ActionsResponse> 
         inp.property ? trafficActions(inp, partial) : Promise.resolve([]),
     ]);
     const seen = new Set<string>();
-    const actions = [...search, ...traffic]
-        .filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true)))
-        .sort((a, b) => {
-            const rank = { high: 3, medium: 2, low: 1 };
-            return rank[b.impact] - rank[a.impact] || b.score - a.score;
-        })
+    const unique = [...search, ...traffic].filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true)));
+    // Mix types: the n-th task of the same type ranks as if 20% smaller per step,
+    // so one signal (e.g. ten striking-distance queries) doesn't fill the top.
+    const nth = new Map<string, number>();
+    const ranked = [...unique].sort((a, b) => b.score - a.score).map((a) => {
+        const n = nth.get(a.type) ?? 0;
+        nth.set(a.type, n + 1);
+        return { a, adj: a.score * 0.8 ** n };
+    });
+    const rank = { high: 3, medium: 2, low: 1 };
+    const actions = ranked
+        .sort((x, y) => rank[y.a.impact] - rank[x.a.impact] || y.adj - x.adj)
+        .map((x) => x.a)
         .slice(0, 60);
     const w = inp.siteUrl ? withPrevious(inp.search) : withPrevious(inp.traffic);
     return {

@@ -142,7 +142,7 @@ export interface OpportunityRow extends GscMetrics {
     /** Page with the most impressions for this query. */
     page: string | null;
     expectedCtr: number;
-    /** Extra clicks per period if it reached position 3 (striking) or the usual CTR (low CTR). */
+    /** Extra clicks per period if it reached position 5 (striking) or the usual CTR (low CTR). */
     potentialClicks: number;
 }
 

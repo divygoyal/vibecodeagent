@@ -101,9 +101,12 @@ export function isLowCtr(r: GscMetrics, minImpressions = 100): boolean {
     return r.ctr < expectedCtr(r.position) * 0.7;
 }
 
-/** Extra clicks if a query reached position 3 at the usual CTR. */
+/** Position used for striking-distance estimates: solidly on page one, not a top-3 promise. */
+export const STRIKING_TARGET = 5;
+
+/** Extra clicks if a query reached position 5 at the usual CTR. */
 export function strikingPotential(r: GscMetrics): number {
-    return Math.max(0, Math.round(r.impressions * expectedCtr(3) - r.clicks));
+    return Math.max(0, Math.round(r.impressions * expectedCtr(STRIKING_TARGET) - r.clicks));
 }
 
 /** Extra clicks if CTR rose to the usual CTR for its current position. */

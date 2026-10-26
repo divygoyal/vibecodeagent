@@ -89,7 +89,7 @@ export function JourneysTab() {
                 Google Analytics doesn&apos;t share full click paths through its API, so this tab shows how visits start and how deep they go. For step-by-step flows, build a funnel.
             </Banner>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <MetricTile metric="pageviews" label="Pages per session" value={t && t.sessions ? Math.round((t.pageviews / t.sessions) * 100) / 100 : null} previous={prev === undefined ? undefined : prev && prev.sessions ? Math.round((prev.pageviews / prev.sessions) * 100) / 100 : null} loading={loading} comparisonLabel={compareText} />
+                <MetricTile metric="pageviews" label="Pages per session" format="position" better="up" value={t && t.sessions ? Math.round((t.pageviews / t.sessions) * 100) / 100 : null} previous={prev === undefined ? undefined : prev && prev.sessions ? Math.round((prev.pageviews / prev.sessions) * 100) / 100 : null} loading={loading} comparisonLabel={compareText} />
                 <MetricTile metric="sessions" label="Avg. session duration" format="duration" value={t?.avgDuration} previous={prev === undefined ? undefined : prev?.avgDuration ?? null} loading={loading} comparisonLabel={compareText} />
                 <MetricTile metric="sessions" label="Engaged sessions" value={t?.engagedSessions} previous={prev === undefined ? undefined : prev?.engagedSessions ?? null} loading={loading} comparisonLabel={compareText} />
                 <MetricTile metric="sessions" label="Bounce rate" format="percent" better="down" value={t ? 1 - t.engagementRate : null} previous={prev === undefined ? undefined : prev ? 1 - prev.engagementRate : null} loading={loading} comparisonLabel={compareText} />

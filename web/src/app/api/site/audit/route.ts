@@ -28,7 +28,14 @@ function demoReport(url: string): AuditReport | null {
     if (process.env.TC_DEMO_DATA !== '1' || process.env.NODE_ENV === 'production') return null;
     const host = new URL(url).hostname;
     if (!host.endsWith('.example')) return null;
-    return { ...getDemoAuditReport(url), fetchedAt: new Date().toISOString() };
+    const base = getDemoAuditReport(url);
+    const label = host.replace(/^www\./, '');
+    return {
+        ...base,
+        fetchedAt: new Date().toISOString(),
+        // The shared demo report carries another site's title; use this site's host instead.
+        meta: { ...base.meta, title: `${label} – home`, description: `Demo audit of ${label} (dev kit data).`, canonical: url },
+    };
 }
 
 async function audit(userId: string, url: string): Promise<{ report: AuditReport } | { error: string }> {

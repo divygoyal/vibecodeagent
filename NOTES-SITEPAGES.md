@@ -31,21 +31,17 @@ Specs: /root/projects/tc-redesign-research/{DESIGN,PRODUCT}.md (4.2–4.3, 5.4�
   landing/exit data; drop the fake Sankey.
 - Retention: old route returned MOCK cohorts on any error; new report is cached and honest (empty/error).
 
-## Built (WIP commits, tsc clean as of the Pages commit; Actions/Audit just written, NOT yet typechecked)
-- components/site: useSiteData (useSite/useSiteRange/useGa4/useGsc/useJson, CSV), useTabParam (nuqs), SiteHeader,
-  MetricTile, SiteStates (SourceMissing, LoadError, askHref/AskButton -> /dashboard/ask?q=&property=&site=&__from=),
-  BreakdownTable, SummaryPanels, ActionCard, useSiteActions (+ audit issues as tasks), lib/{types,rules,actionText,geo,pages}.
-- Pages: overview/SiteOverview, traffic/* (9 tabs, Goals+Funnels restyled on the old definition APIs),
-  search/* (5 tabs + query/page drawer), pages/PagesPage (+ drawer, GA4 report=page), actions/ActionsPage, actions/AuditPage.
-- Routes wired: s/[host]/{page,traffic,search,pages,actions,actions/audit}.tsx.
-- Site pages never use isDemoWorkspace / DEMO_SITE_URL (coordinator: antigravity fallback race). Old page files still do.
-
-## Next (resume here)
-1. `npx tsc --noEmit`; fix Actions/Audit errors.
-2. Old routes: analytics/**, seo/**, audit/** page files -> redirect-only (no demo fallback); audit/layout client
-   fallback -> /actions/audit; delete s/[host]/LegacySitePage.tsx if unused; drop '/dashboard/analytics','/seo','/audit'
-   from LEGACY_ROUTE_PREFIXES? (shell file: NOT mine -> report it).
-3. Redirects to report: middleware /dashboard/audit -> /dashboard/s/<host>/actions/audit; analytics/performance -> actions/audit.
-4. Dev kit (instance sitepages 3108/8108) when a slot is free: login, shots (paired acmeanalytics.example,
-   GSC-only recipenest.example, GA4-only ga4-412300108) 1280/390 light/dark -> shots/sitepages; crawl; lint touched files;
-   rm -rf web/.next; down.sh sitepages.
+## Status (final)
+- tsc clean, eslint clean on every touched file. Old analytics/seo/audit page files are empty stubs; their layouts
+  redirect to /dashboard/s/<host>/… for the user's own saved site (Portfolio when none). No demo-workspace fallback.
+- Shell edits (separate commits): LEGACY_ROUTE_PREFIXES drops analytics/seo/audit; middleware /dashboard/audit ->
+  /dashboard/s/<host>/actions/audit.
+- Partial visual check before the server was stopped (light 1280): overview, all 9 Traffic tabs, all 5 Search tabs + drawer,
+  Pages + drawer + decaying, Actions, Audit for acmeanalytics.example; 0 console errors (only Tawk CORS). Shots in
+  research/shots/sitepages. Not done: GSC-only / GA4-only, mobile 390, dark, crawl (coordinator takes them on integration).
+- Fixed after the shots: striking estimate at position 5 (was 3), mixed action types in the ranking, demo audit meta no
+  longer shows the old demo site's name, audit counts from the issue list, Pages null values sort last, per-session tiles 2 dp.
+- Dropped: Traffic "Sessions" (merged into Sources/Journeys), "Performance" (Core Web Vitals moved to Audit > Speed),
+  Journeys' invented Sankey paths, the paid TieredActionPlanView on Audit (replaced by "Ask AI for a fix plan").
+- Open: no per-row trend sparklines in Pages (would need page x date reports); delete_user does not yet call
+  delete_user_site_action_rows; old components (components/seo, analytics/subpages, audit) are now unused, delete in cleanup.

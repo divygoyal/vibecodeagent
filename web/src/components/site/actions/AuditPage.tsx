@@ -110,7 +110,7 @@ export function AuditPage() {
                                     return (
                                         <div key={s} className="rounded-card border border-border-subtle p-3">
                                             <p className="flex items-center gap-1.5 text-meta text-fg-muted"><Icon aria-hidden size={14} className={SEV[s].tone} />{SEV[s].label}</p>
-                                            <p className="mt-1 text-stat text-fg">{fmtFull(r.summary[s])}</p>
+                                            <p className="mt-1 text-stat text-fg">{fmtFull(s === 'passed' ? Math.max(r.summary.passed, r.issues.filter((i) => i.severity === 'passed').length) : r.issues.filter((i) => i.severity === s).length)}</p>
                                         </div>
                                     );
                                 })}

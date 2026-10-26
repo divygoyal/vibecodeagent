@@ -4,7 +4,7 @@
  * (opportunities, cannibalization, decay) reuse them.
  */
 import {
-    expectedCtr, isLowCtr, isStriking, lowCtrPotential, median, strikingPotential, sumGsc,
+    expectedCtr, isLowCtr, isStriking, lowCtrPotential, median, STRIKING_TARGET, strikingPotential, sumGsc,
 } from '@/components/site/lib/rules';
 import type {
     CannibalizedQuery, DecayRow, GscDetailResponse, GscDimensionReport, GscMetrics, GscRow, GscRowsResponse,
@@ -167,7 +167,7 @@ export async function gscOpportunities(userId: string, token: string, site: stri
         impressions: x.impressions,
         ctr: x.ctr,
         position: x.position,
-        expectedCtr: expectedCtr(kind === 'striking' ? 3 : x.position),
+        expectedCtr: expectedCtr(kind === 'striking' ? STRIKING_TARGET : x.position),
         potentialClicks: kind === 'striking' ? strikingPotential(x) : lowCtrPotential(x),
     });
     const striking = queries.rows.filter((x) => isStriking(x, med)).map((x) => row(x, 'striking', 'query'));

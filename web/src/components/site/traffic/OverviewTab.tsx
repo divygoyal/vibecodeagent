@@ -80,7 +80,7 @@ export function TrafficOverviewTab() {
                 <MetricTile metric="sessions" label="Engagement rate" format="percent" value={t?.engagementRate} previous={prev === undefined ? undefined : prev?.engagementRate ?? null} loading={loading} comparisonLabel={compareText} />
                 <MetricTile metric="sessions" label="Avg. session duration" format="duration" value={t?.avgDuration} previous={prev === undefined ? undefined : prev?.avgDuration ?? null} loading={loading} comparisonLabel={compareText} />
                 <MetricTile metric="users" label="New users" value={t?.newUsers} previous={prev === undefined ? undefined : prev?.newUsers ?? null} loading={loading} comparisonLabel={compareText} />
-                <MetricTile metric="pageviews" label="Views per session" value={t && t.sessions ? Math.round((t.pageviews / t.sessions) * 100) / 100 : null}
+                <MetricTile metric="pageviews" label="Views per session" format="position" better="up" value={t && t.sessions ? Math.round((t.pageviews / t.sessions) * 100) / 100 : null}
                     previous={prev === undefined ? undefined : prev && prev.sessions ? Math.round((prev.pageviews / prev.sessions) * 100) / 100 : null} loading={loading} comparisonLabel={compareText} />
             </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
