@@ -1,15 +1,43 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Fragment, type ReactNode } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
     Users, Bot, Coins, Server, Trash2, RefreshCw, Play, Square, RotateCw,
-    Search, X, Shield, ChevronDown, LogOut, Eye, EyeOff, Plus, Minus,
-    Terminal, Clock, AlertTriangle, MessageSquare, Mail, ExternalLink, Check,
-    Globe, LayoutDashboard, Link2, BarChart3, Activity, FileText, Loader2,
-    Trophy, ShieldCheck, ShieldOff, LifeBuoy, Send
+    ChevronDown, LogOut, Eye, EyeOff, Plus, Minus,
+    Terminal, Clock, AlertTriangle, MessageSquare, Mail, Check,
+    Globe, LayoutDashboard, Link2, BarChart3, Activity, FileText,
+    Trophy, ShieldCheck, ShieldOff, LifeBuoy, Send, ThumbsUp, ThumbsDown, PanelRight,
+    ExternalLink, type LucideIcon,
 } from 'lucide-react'
 import { BRAND_NAME } from '@/lib/brand';
+import { fmtFull } from '@/lib/format'
+import { AdminFrame, AdminGate } from '@/components/admin/AdminFrame'
+import { AdminStat, UsageBar } from '@/components/admin/AdminStat'
+import { TableCard, Th, Td, Tr } from '@/components/admin/AdminTable'
+import { Field, TextInput, Textarea } from '@/components/admin/FormControls'
+import { LocalTime, TimeAgo, TimeAgoOrDate } from '@/components/admin/TimeAgo'
+import { ContainerPill, PlanBadge } from '@/components/admin/tones'
+import { BarList } from '@/components/charts/BarList'
+import { BrandMark } from '@/components/shell/BrandMark'
+import { Avatar } from '@/components/ui/Avatar'
+import { Badge, type BadgeVariant } from '@/components/ui/Badge'
+import { Banner } from '@/components/ui/Banner'
+import { Button } from '@/components/ui/Button'
+import { Card, CardHeader } from '@/components/ui/Card'
+import { Drawer } from '@/components/ui/Drawer'
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { ConfirmModal } from '@/components/ui/Modal'
+import { Pill, type PillTone } from '@/components/ui/Pill'
+import { SearchInput } from '@/components/ui/SearchInput'
+import { Select } from '@/components/ui/Select'
+import { Skeleton, SkeletonText } from '@/components/ui/Skeleton'
+import { Table, type TableColumn } from '@/components/ui/Table'
+import { Tabs, type TabItem } from '@/components/ui/Tabs'
+import { toast } from '@/components/ui/Toaster'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -404,26 +432,8 @@ async function apiPost(action: string, data: Record<string, unknown> = {}) {
     return res.json()
 }
 
-function timeAgo(ts: string): string {
-    const diff = Date.now() - new Date(ts).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return 'just now'
-    if (mins < 60) return `${mins}m ago`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs}h ago`
-    const days = Math.floor(hrs / 24)
-    return `${days}d ago`
-}
-
-function formatDateTime(ts?: string | null): string {
-    if (!ts) return '—'
-    const date = new Date(ts)
-    if (Number.isNaN(date.getTime())) return ts
-    return date.toLocaleString()
-}
-
 function formatNumber(value?: number | null): string {
-    return new Intl.NumberFormat().format(value ?? 0)
+    return fmtFull(value ?? 0)
 }
 
 function formatPercent(value?: number | null): string {
@@ -514,50 +524,55 @@ export default function SuperAdminPage() {
 
     if (!authenticated) {
         return (
-            <div className="min-h-screen bg-black flex items-center justify-center p-4">
-                <div className="w-full max-w-sm">
-                    <div className="bg-zinc-900/50 border border-white/[0.04] rounded-2xl p-8">
-                        <div className="flex items-center justify-center gap-3 mb-8">
-                            <Shield className="w-8 h-8 text-emerald-400" />
-                            <div>
-                                <h1 className="text-xl font-bold text-white">{BRAND_NAME}</h1>
-                                <p className="text-xs text-zinc-500">Super Admin Access</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
-                                    placeholder="Enter password"
-                                    className="w-full bg-black/50 border border-white/[0.08] rounded-lg px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 pr-10"
-                                />
-                                <button
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-                                >
-                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
-                            </div>
-
-                            {authError && (
-                                <p className="text-red-400 text-sm text-center">{authError}</p>
-                            )}
-
-                            <button
-                                onClick={handleAuth}
-                                disabled={authLoading || !password}
-                                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors"
-                            >
-                                {authLoading ? 'Verifying...' : 'Unlock'}
-                            </button>
+            <AdminGate>
+                <Card padding="lg">
+                    <div className="mb-6 flex items-center gap-3">
+                        <BrandMark size={32} />
+                        <div>
+                            <h1 className="text-title text-fg">{BRAND_NAME}</h1>
+                            <p className="text-body-sm text-fg-muted">Superadmin access</p>
                         </div>
                     </div>
-                </div>
-            </div>
+
+                    <form
+                        className="space-y-4"
+                        onSubmit={(e) => {
+                            e.preventDefault()
+                            handleAuth()
+                        }}
+                    >
+                        <Field label="Password">
+                            {(id) => (
+                                <div className="relative">
+                                    <TextInput
+                                        id={id}
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        autoComplete="current-password"
+                                        placeholder="Enter password"
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                        className="absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-fg-muted transition-colors duration-120 hover:bg-subtle hover:text-fg"
+                                    >
+                                        {showPassword ? <EyeOff aria-hidden size={16} strokeWidth={1.75} /> : <Eye aria-hidden size={16} strokeWidth={1.75} />}
+                                    </button>
+                                </div>
+                            )}
+                        </Field>
+
+                        {authError && <Banner variant="danger">{authError}</Banner>}
+
+                        <Button type="submit" variant="primary" size="lg" className="w-full" loading={authLoading} disabled={!password}>
+                            {authLoading ? 'Verifying' : 'Unlock'}
+                        </Button>
+                    </form>
+                </Card>
+            </AdminGate>
         )
     }
 
@@ -637,173 +652,120 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
 
     const unreadSupportCount = supportThreads.reduce((sum, t) => sum + (t.unread_user_count || 0), 0)
 
-    const tabs = [
-        { key: 'users' as const, label: 'Users', icon: Users, badge: 0 },
-        { key: 'support' as const, label: 'Support', icon: LifeBuoy, badge: unreadSupportCount },
-        { key: 'queries' as const, label: 'Queries', icon: MessageSquare, badge: newQueryCount },
-        { key: 'leaderboard' as const, label: 'Leaderboard', icon: Trophy, badge: pendingLeaderboardCount },
-        { key: 'events' as const, label: 'Events', icon: Clock, badge: 0 },
-        { key: 'system' as const, label: 'System', icon: Server, badge: 0 },
+    const initialLoading = loading && !status
+
+    const tabs: Array<{ value: typeof tab; label: string; icon: LucideIcon; badge: number }> = [
+        { value: 'users', label: 'Users', icon: Users, badge: 0 },
+        { value: 'support', label: 'Support', icon: LifeBuoy, badge: unreadSupportCount },
+        { value: 'queries', label: 'Queries', icon: MessageSquare, badge: newQueryCount },
+        { value: 'leaderboard', label: 'Leaderboard', icon: Trophy, badge: pendingLeaderboardCount },
+        { value: 'events', label: 'Events', icon: Clock, badge: 0 },
+        { value: 'system', label: 'System', icon: Server, badge: 0 },
     ]
+    const tabItems: TabItem<typeof tab>[] = tabs.map((t) => ({
+        value: t.value,
+        icon: t.icon,
+        label: (
+            <span className="inline-flex items-center gap-1.5">
+                {t.label}
+                {t.badge > 0 ? <Badge variant="brand" aria-label={`${t.badge} need attention`}>{t.badge}</Badge> : null}
+            </span>
+        ),
+    }))
 
     return (
-        <div className="min-h-screen bg-black text-white">
-            {/* Header */}
-            <header className="border-b border-white/[0.04] px-6 py-4">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Shield className="w-6 h-6 text-emerald-400" />
-                        <h1 className="text-lg font-bold">System Control</h1>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => { setLoading(true); fetchData() }}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/50 border border-white/[0.04] text-zinc-400 hover:text-white transition-colors text-sm"
-                        >
-                            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                            Refresh
-                        </button>
-                        <button
-                            onClick={onSignOut}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/50 border border-white/[0.04] text-zinc-400 hover:text-red-400 transition-colors text-sm"
-                        >
-                            <LogOut className="w-3.5 h-3.5" />
-                            Sign Out
-                        </button>
-                    </div>
-                </div>
-            </header>
+        <AdminFrame
+            title="System control"
+            badge={<Badge variant="neutral" className="max-sm:hidden">Superadmin</Badge>}
+            actions={
+                <>
+                    <Button variant="secondary" size="sm" icon={RefreshCw} loading={loading} onClick={() => { setLoading(true); fetchData() }}>
+                        <span className="max-sm:sr-only">Refresh</span>
+                    </Button>
+                    <Button variant="ghost" size="sm" icon={LogOut} onClick={() => onSignOut()}>
+                        <span className="max-sm:sr-only">Sign out</span>
+                    </Button>
+                </>
+            }
+        >
+            {error && <Banner variant="danger" className="mb-4">{error}</Banner>}
 
-            <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-                {error && (
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex items-center gap-2 text-red-400 text-sm">
-                        <AlertTriangle className="w-4 h-4 shrink-0" />
-                        {error}
-                    </div>
+            {/* Stats Row */}
+            <section aria-label="System overview" className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+                <AdminStat icon={Users} label="Total users" value={status?.total_users ?? '–'} loading={initialLoading} />
+                <AdminStat icon={Bot} label="Running containers" value={status?.running_containers ?? '–'} loading={initialLoading} />
+                <AdminStat
+                    icon={Coins}
+                    label="Plan breakdown"
+                    className="col-span-2 lg:col-span-1"
+                    loading={initialLoading}
+                    value={
+                        status ? (
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body">
+                                <span className="inline-flex items-center gap-1.5"><PlanBadge plan="free" /><span className="font-medium tabular-nums">{status.plans?.free ?? 0}</span></span>
+                                <span className="inline-flex items-center gap-1.5"><PlanBadge plan="starter" /><span className="font-medium tabular-nums">{status.plans?.starter ?? 0}</span></span>
+                                <span className="inline-flex items-center gap-1.5"><PlanBadge plan="pro" /><span className="font-medium tabular-nums">{status.plans?.pro ?? 0}</span></span>
+                            </div>
+                        ) : '–'
+                    }
+                />
+                <AdminStat
+                    icon={MessageSquare}
+                    label="New queries"
+                    value={queries.filter(q => q.status === 'new').length}
+                    sub={`${queries.length} total`}
+                    loading={initialLoading}
+                />
+                <AdminStat
+                    icon={Server}
+                    label="Capacity"
+                    value={status ? `${capacity}%` : '–'}
+                    sub={status ? `${status.total_users} / ${status.max_users || 50}` : undefined}
+                    loading={initialLoading}
+                >
+                    {status ? <UsageBar percent={capacity} label="Capacity used" /> : null}
+                </AdminStat>
+            </section>
+
+            {/* Tabs */}
+            <Tabs
+                className="mt-6"
+                ariaLabel="Superadmin sections"
+                panelIdPrefix="sa-panel"
+                value={tab}
+                onValueChange={setTab}
+                items={tabItems}
+            />
+
+            {/* Tab Content */}
+            <div className="mt-4" role="tabpanel" id={`sa-panel-${tab}`}>
+                {tab === 'users' && (
+                    <UsersTab
+                        users={filteredUsers}
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
+                        onRefresh={fetchData}
+                        loading={initialLoading}
+                    />
                 )}
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                    <StatCard
-                        icon={Users}
-                        label="Total Users"
-                        value={status?.total_users ?? '-'}
-                        color="emerald"
-                    />
-                    <StatCard
-                        icon={Bot}
-                        label="Running Containers"
-                        value={status?.running_containers ?? '-'}
-                        color="cyan"
-                    />
-                    <StatCard
-                        icon={Coins}
-                        label="Plan Breakdown"
-                        value={status ? `${status.plans?.free ?? 0}F / ${status.plans?.starter ?? 0}S / ${status.plans?.pro ?? 0}P` : '-'}
-                        color="amber"
-                    />
-                    <StatCard
-                        icon={MessageSquare}
-                        label="New Queries"
-                        value={queries.filter(q => q.status === 'new').length}
-                        sub={`${queries.length} total`}
-                        color="amber"
-                    />
-                    <StatCard
-                        icon={Server}
-                        label="Capacity"
-                        value={status ? `${capacity}%` : '-'}
-                        sub={status ? `${status.total_users} / ${status.max_users || 50}` : undefined}
-                        color="purple"
-                    />
-                </div>
-
-                {/* Tabs */}
-                <div className="flex gap-1 bg-zinc-900/50 border border-white/[0.04] rounded-lg p-1 w-fit">
-                    {tabs.map(t => (
-                        <button
-                            key={t.key}
-                            onClick={() => setTab(t.key)}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                tab === t.key
-                                    ? 'bg-emerald-600/20 text-emerald-400'
-                                    : 'text-zinc-500 hover:text-zinc-300'
-                            }`}
-                        >
-                            <t.icon className="w-4 h-4" />
-                            {t.label}
-                            {t.badge > 0 && (
-                                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-500 text-black text-[10px] font-bold leading-none">
-                                    {t.badge}
-                                </span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Tab Content */}
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={tab}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.2 }}
-                    >
-                        {tab === 'users' && (
-                            <UsersTab
-                                users={filteredUsers}
-                                searchQuery={searchQuery}
-                                onSearchChange={setSearchQuery}
-                                onRefresh={fetchData}
-                            />
-                        )}
-                        {tab === 'queries' && <QueriesTab queries={queries} onRefresh={fetchData} />}
-                        {tab === 'support' && <SupportTab threads={supportThreads} onRefresh={fetchData} />}
-                        {tab === 'leaderboard' && <LeaderboardTab entries={leaderboardEntries} onRefresh={fetchData} />}
-                        {tab === 'events' && <EventsTab events={events} />}
-                        {tab === 'system' && <SystemTab status={status} capacity={capacity} />}
-                    </motion.div>
-                </AnimatePresence>
-            </main>
-        </div>
-    )
-}
-
-// ─── Stat Card ───────────────────────────────────────────────────────────────
-
-function StatCard({ icon: Icon, label, value, sub, color }: {
-    icon: React.ComponentType<{ className?: string }>
-    label: string
-    value: string | number
-    sub?: string
-    color: string
-}) {
-    const colorMap: Record<string, string> = {
-        emerald: 'text-emerald-400',
-        cyan: 'text-cyan-400',
-        amber: 'text-amber-400',
-        purple: 'text-purple-400',
-    }
-    return (
-        <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-3">
-                <Icon className={`w-4 h-4 ${colorMap[color] || 'text-zinc-400'}`} />
-                <span className="text-xs text-zinc-500 uppercase tracking-wider">{label}</span>
+                {tab === 'queries' && <QueriesTab queries={queries} onRefresh={fetchData} loading={initialLoading} />}
+                {tab === 'support' && <SupportTab threads={supportThreads} onRefresh={fetchData} loading={initialLoading} />}
+                {tab === 'leaderboard' && <LeaderboardTab entries={leaderboardEntries} onRefresh={fetchData} loading={initialLoading} />}
+                {tab === 'events' && <EventsTab events={events} loading={initialLoading} />}
+                {tab === 'system' && <SystemTab status={status} capacity={capacity} />}
             </div>
-            <div className="text-2xl font-bold text-white">{value}</div>
-            {sub && <div className="text-xs text-zinc-600 mt-1">{sub}</div>}
-        </div>
+        </AdminFrame>
     )
 }
 
 // ─── Users Tab ───────────────────────────────────────────────────────────────
 
-function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
+function UsersTab({ users, searchQuery, onSearchChange, onRefresh, loading }: {
     users: UserData[]
     searchQuery: string
     onSearchChange: (q: string) => void
     onRefresh: () => void
+    loading?: boolean
 }) {
     const [deleteTarget, setDeleteTarget] = useState<UserData | null>(null)
     const [actionLoading, setActionLoading] = useState<string>('')
@@ -911,7 +873,7 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
         } catch (err) {
             const message = getErrorMessage(err)
             if (!isSuperadminAuthError(message)) {
-                alert(message)
+                toast.error(message, { duration: 8000 })
             }
         } finally {
             setActionLoading('')
@@ -933,7 +895,7 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
         } catch (err) {
             const message = getErrorMessage(err)
             if (!isSuperadminAuthError(message)) {
-                alert(message)
+                toast.error(message, { duration: 8000 })
             }
         } finally {
             setActionLoading('')
@@ -962,11 +924,11 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
             // Typically 20-90s — UI button stays in loading state until the
             // request resolves so the admin sees inline feedback.
             await apiPost('send-report-email', { userId: githubId, period })
-            alert(`${period[0].toUpperCase()}${period.slice(1)} report emailed.`)
+            toast.success(`${period[0].toUpperCase()}${period.slice(1)} report emailed.`)
         } catch (err) {
             const message = getErrorMessage(err)
             if (!isSuperadminAuthError(message)) {
-                alert(`Failed to send: ${message}`)
+                toast.error(`Failed to send: ${message}`, { duration: 8000 })
             }
         } finally {
             setActionLoading('')
@@ -983,11 +945,11 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
             // it into Dodo / a coupon table if/when the user replies.
             const res = await apiPost('send-feedback-email', { userId: githubId })
             const code = res?.couponCode ? ` (code ${res.couponCode})` : ''
-            alert(`Feedback email sent${code}.`)
+            toast.success(`Feedback email sent${code}.`)
         } catch (err) {
             const message = getErrorMessage(err)
             if (!isSuperadminAuthError(message)) {
-                alert(`Failed to send: ${message}`)
+                toast.error(`Failed to send: ${message}`, { duration: 8000 })
             }
         } finally {
             setActionLoading('')
@@ -1007,33 +969,28 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
             const res = await apiPost('generate-weekly-digest', { userId: githubId })
             const wk = `Week ${res?.isoWeek ?? '?'} of ${res?.year ?? '?'}`
             if (res?.persisted) {
-                const headlineLine = res?.headline ? `\n\nHeadline: "${res.headline}"` : ''
+                const headlineLine = res?.headline ? `Headline: "${res.headline}"` : ''
                 const reasonLine = res?.snapshotEmpty
-                    ? `\n(Empty snapshot: ${res?.snapshotReason || 'unknown'})`
+                    ? `Empty snapshot: ${res?.snapshotReason || 'unknown'}`
                     : ''
-                alert(`${wk} digest persisted to /dashboard/weekly.${headlineLine}${reasonLine}`)
+                toast.success(`${wk} digest persisted to /dashboard/weekly.`, {
+                    description: [headlineLine, reasonLine].filter(Boolean).join(' · ') || undefined,
+                    duration: 8000,
+                })
             } else {
                 const reason = res?.error || res?.snapshotReason || 'unknown'
-                alert(`${wk} digest NOT persisted. Reason: ${reason}`)
+                toast.error(`${wk} digest not persisted. Reason: ${reason}`, { duration: 8000 })
             }
         } catch (err) {
             const message = getErrorMessage(err)
             if (!isSuperadminAuthError(message)) {
-                alert(`Failed to generate: ${message}`)
+                toast.error(`Failed to generate: ${message}`, { duration: 8000 })
             }
         } finally {
             setActionLoading('')
         }
     }
 
-    const containerStatusColor = (status: string | undefined | null) => {
-        if (!status) return 'bg-zinc-700 text-zinc-400'
-        const s = status.toLowerCase()
-        if (s === 'running') return 'bg-emerald-500/20 text-emerald-400'
-        if (s === 'stopped' || s === 'exited') return 'bg-red-500/20 text-red-400'
-        if (s === 'initializing' || s === 'starting' || s === 'pending') return 'bg-amber-500/20 text-amber-400'
-        return 'bg-zinc-700 text-zinc-400'
-    }
 
     const selectedProfile = selectedUser ? profileCache[selectedUser.github_id] ?? null : null
     const isProfileLoading = selectedUser ? profileLoadingUserId === selectedUser.github_id : false
@@ -1041,87 +998,95 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
 
     return (
         <div className="space-y-4">
-            {/* Search */}
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    placeholder="Search users by name, email, or ID..."
-                    className="w-full bg-zinc-900/50 border border-white/[0.04] rounded-lg pl-10 pr-10 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/30"
-                />
-                {searchQuery && (
-                    <button onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
-                        <X className="w-4 h-4" />
-                    </button>
-                )}
-            </div>
-
-            {/* Table */}
-            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="border-b border-white/[0.04]">
-                                <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">User</th>
-                                <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Email</th>
-                                <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Plan</th>
-                                <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Credits</th>
-                                <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Signals</th>
-                                <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Feedback</th>
-                                <th className="text-left px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Container</th>
-                                <th className="text-right px-4 py-3 text-xs text-zinc-500 font-medium uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {users.length === 0 && (
-                                <tr>
-                                    <td colSpan={8} className="text-center py-12 text-zinc-600">No users found</td>
-                                </tr>
-                            )}
-                            {users.map(user => {
-                                const counts = (typeof user.id === 'number' ? feedbackCountsByUserId[user.id] : undefined) ?? null
-                                const isExpanded = expandedFeedbackUser === user.github_id
-                                const detail = feedbackDetailCache[user.github_id]
-                                return (
-                                    <Fragment key={user.github_id}>
-                                        <UserRow
-                                            user={user}
-                                            selected={selectedUser?.github_id === user.github_id}
-                                            actionLoading={actionLoading}
-                                            showCreditInput={showCreditInput === user.github_id}
-                                            creditInputValue={creditInputs[user.github_id] || ''}
-                                            containerStatusColor={containerStatusColor}
-                                            onAction={handleAction}
-                                            onDelete={() => setDeleteTarget(user)}
-                                            onOpenDetails={() => handleOpenProfile(user)}
-                                            onToggleCreditInput={() => setShowCreditInput(showCreditInput === user.github_id ? null : user.github_id)}
-                                            onCreditInputChange={(v) => setCreditInputs(prev => ({ ...prev, [user.github_id]: v }))}
-                                            onAddCredits={() => handleAddCredits(user.github_id)}
-                                            emailMenuOpen={emailMenuUser === user.github_id}
-                                            onToggleEmailMenu={() => setEmailMenuUser(emailMenuUser === user.github_id ? null : user.github_id)}
-                                            onSendReportEmail={(period) => handleSendReportEmail(user.github_id, period)}
-                                            onSendFeedbackEmail={() => handleSendFeedbackEmail(user.github_id)}
-                                            onGenerateWeeklyDigest={() => handleGenerateWeeklyDigest(user.github_id)}
-                                            feedbackCounts={counts}
-                                            isFeedbackExpanded={isExpanded}
-                                            onToggleFeedback={() => handleToggleFeedbackExpand(user)}
-                                        />
-                                        {isExpanded && (
-                                            <tr className="bg-zinc-950/40">
-                                                <td colSpan={8} className="px-4 py-3">
-                                                    <FeedbackExpandPanel detail={detail} />
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </Fragment>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <TableCard
+                caption="Users"
+                toolbar={
+                    <>
+                        <SearchInput
+                            value={searchQuery}
+                            onValueChange={onSearchChange}
+                            placeholder="Search users by name, email or ID"
+                            aria-label="Search users"
+                            className="md:w-80"
+                        />
+                        <span className="ml-auto text-meta text-fg-muted tabular-nums">
+                            {users.length} {users.length === 1 ? 'user' : 'users'}
+                        </span>
+                    </>
+                }
+            >
+                <thead>
+                    <tr>
+                        <Th sticky>User</Th>
+                        <Th>Email</Th>
+                        <Th>Plan</Th>
+                        <Th>Credits</Th>
+                        <Th>Signals</Th>
+                        <Th>Feedback</Th>
+                        <Th>Container</Th>
+                        <Th align="right">Actions</Th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {loading && users.length === 0 && Array.from({ length: 6 }, (_, i) => (
+                        <tr key={`sk-${i}`} className="border-b border-border-subtle last:border-0">
+                            <td className="px-4 py-3"><Skeleton className="h-8 w-40" /></td>
+                            {Array.from({ length: 7 }, (_, j) => (
+                                <td key={j} className="px-3 py-3"><Skeleton className="h-4 w-20" /></td>
+                            ))}
+                        </tr>
+                    ))}
+                    {!loading && users.length === 0 && (
+                        <tr>
+                            <td colSpan={8}>
+                                <EmptyState
+                                    variant="inline"
+                                    icon={Users}
+                                    title="No users found"
+                                    description={searchQuery ? 'Try a different name, email or ID.' : 'Users appear here after they sign up.'}
+                                />
+                            </td>
+                        </tr>
+                    )}
+                    {users.map(user => {
+                        const counts = (typeof user.id === 'number' ? feedbackCountsByUserId[user.id] : undefined) ?? null
+                        const isExpanded = expandedFeedbackUser === user.github_id
+                        const detail = feedbackDetailCache[user.github_id]
+                        return (
+                            <Fragment key={user.github_id}>
+                                <UserRow
+                                    user={user}
+                                    selected={selectedUser?.github_id === user.github_id}
+                                    actionLoading={actionLoading}
+                                    showCreditInput={showCreditInput === user.github_id}
+                                    creditInputValue={creditInputs[user.github_id] || ''}
+                                    onAction={handleAction}
+                                    onDelete={() => setDeleteTarget(user)}
+                                    onOpenDetails={() => handleOpenProfile(user)}
+                                    onToggleCreditInput={() => setShowCreditInput(showCreditInput === user.github_id ? null : user.github_id)}
+                                    onCreditInputChange={(v) => setCreditInputs(prev => ({ ...prev, [user.github_id]: v }))}
+                                    onAddCredits={() => handleAddCredits(user.github_id)}
+                                    emailMenuOpen={emailMenuUser === user.github_id}
+                                    onToggleEmailMenu={() => setEmailMenuUser(emailMenuUser === user.github_id ? null : user.github_id)}
+                                    onSendReportEmail={(period) => handleSendReportEmail(user.github_id, period)}
+                                    onSendFeedbackEmail={() => handleSendFeedbackEmail(user.github_id)}
+                                    onGenerateWeeklyDigest={() => handleGenerateWeeklyDigest(user.github_id)}
+                                    feedbackCounts={counts}
+                                    isFeedbackExpanded={isExpanded}
+                                    onToggleFeedback={() => handleToggleFeedbackExpand(user)}
+                                />
+                                {isExpanded && (
+                                    <tr className="border-b border-border-subtle bg-surface-sunken last:border-0">
+                                        <td colSpan={8} className="px-4 py-3">
+                                            <FeedbackExpandPanel detail={detail} />
+                                        </td>
+                                    </tr>
+                                )}
+                            </Fragment>
+                        )
+                    })}
+                </tbody>
+            </TableCard>
 
             <UserProfileDrawer
                 user={selectedUser}
@@ -1132,7 +1097,6 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
                 actionLoading={actionLoading}
                 showCreditInput={showCreditInput === selectedUser?.github_id}
                 creditInputValue={selectedUser ? creditInputs[selectedUser.github_id] || '' : ''}
-                containerStatusColor={containerStatusColor}
                 onClose={() => setSelectedUser(null)}
                 onRefresh={() => selectedUser && void loadUserProfile(selectedUser, true)}
                 onAction={handleAction}
@@ -1149,73 +1113,23 @@ function UsersTab({ users, searchQuery, onSearchChange, onRefresh }: {
             />
 
             {/* Delete Confirmation Modal */}
-            <AnimatePresence>
-                {deleteTarget && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-                        onClick={() => setDeleteTarget(null)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-zinc-900 border border-white/[0.08] rounded-2xl p-6 max-w-md w-full"
-                        >
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                                    <AlertTriangle className="w-5 h-5 text-red-400" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-white">Delete User</h3>
-                                    <p className="text-sm text-zinc-500">{deleteTarget.username} ({deleteTarget.github_id})</p>
-                                </div>
-                            </div>
-                            <p className="text-sm text-zinc-400 mb-6">
-                                This will permanently delete the user, their Telegram bot, and all data. This action cannot be undone.
-                            </p>
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    onClick={() => setDeleteTarget(null)}
-                                    className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 hover:text-white transition-colors text-sm"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(deleteTarget)}
-                                    disabled={actionLoading === `delete-${deleteTarget.github_id}`}
-                                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-                                >
-                                    {actionLoading === `delete-${deleteTarget.github_id}` ? 'Deleting...' : 'Delete Forever'}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <ConfirmModal
+                open={!!deleteTarget}
+                onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+                title={`Delete ${deleteTarget?.username || deleteTarget?.github_id || 'user'}?`}
+                description={`${deleteTarget?.username || 'This user'} (${deleteTarget?.github_id ?? ''}): this permanently deletes the user, their Telegram bot and all data. It cannot be undone.`}
+                confirmLabel="Delete user"
+                loading={!!deleteTarget && actionLoading === `delete-${deleteTarget.github_id}`}
+                onConfirm={() => deleteTarget ? handleDelete(deleteTarget) : undefined}
+            />
         </div>
     )
 }
 
 // ─── User Row ────────────────────────────────────────────────────────────────
 
-function SignalPill({ tone = 'zinc', children }: { tone?: 'zinc' | 'emerald' | 'cyan' | 'amber' | 'purple'; children: ReactNode }) {
-    const toneMap: Record<string, string> = {
-        zinc: 'bg-zinc-800 text-zinc-300 border border-white/[0.06]',
-        emerald: 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/20',
-        cyan: 'bg-cyan-500/15 text-cyan-300 border border-cyan-400/20',
-        amber: 'bg-amber-500/15 text-amber-300 border border-amber-400/20',
-        purple: 'bg-purple-500/15 text-purple-300 border border-purple-400/20',
-    }
-
-    return (
-        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ${toneMap[tone] || toneMap.zinc}`}>
-            {children}
-        </span>
-    )
+function SignalPill({ tone = 'neutral', children }: { tone?: PillTone; children: ReactNode }) {
+    return <Pill tone={tone}>{children}</Pill>
 }
 
 function UserSignals({ user }: { user: UserData }) {
@@ -1227,27 +1141,38 @@ function UserSignals({ user }: { user: UserData }) {
         user.leaderboard_active
 
     if (!hasSignals) {
-        return <span className="text-xs text-zinc-600">No advanced assets yet</span>
+        return <span className="text-meta text-fg-muted">No advanced assets yet</span>
     }
 
     return (
         <div className="flex flex-wrap gap-1.5">
-            {user.has_google && <SignalPill tone="emerald">Google</SignalPill>}
-            {(user.embed_token_count || 0) > 0 && <SignalPill tone="cyan">Globe {user.embed_token_count}</SignalPill>}
-            {(user.shared_dashboard_count || 0) > 0 && <SignalPill tone="amber">Shared {user.shared_dashboard_count}</SignalPill>}
-            {(user.custom_dashboard_count || 0) > 0 && <SignalPill tone="purple">Dashboards {user.custom_dashboard_count}</SignalPill>}
-            {user.leaderboard_active && <SignalPill tone="emerald">Leaderboard</SignalPill>}
+            {user.has_google && <SignalPill tone="up">Google</SignalPill>}
+            {(user.embed_token_count || 0) > 0 && <SignalPill tone="info">Globe {user.embed_token_count}</SignalPill>}
+            {(user.shared_dashboard_count || 0) > 0 && <SignalPill>Shared {user.shared_dashboard_count}</SignalPill>}
+            {(user.custom_dashboard_count || 0) > 0 && <SignalPill tone="brand">Dashboards {user.custom_dashboard_count}</SignalPill>}
+            {user.leaderboard_active && <SignalPill tone="up">Leaderboard</SignalPill>}
         </div>
     )
 }
 
-function UserRow({ user, selected, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onAction, onDelete, onOpenDetails, onToggleCreditInput, onCreditInputChange, onAddCredits, emailMenuOpen, onToggleEmailMenu, onSendReportEmail, onSendFeedbackEmail, onGenerateWeeklyDigest, feedbackCounts, isFeedbackExpanded, onToggleFeedback }: {
+const PLAN_CHOICES = [
+    { value: 'free', label: 'Free' },
+    { value: 'starter', label: 'Starter' },
+    { value: 'growth', label: 'Growth' },
+    { value: 'pro', label: 'Pro' },
+]
+
+/** The four plans, plus the user's current plan when it is something else (so the select never shows blank). */
+function planChoices(current: string) {
+    return PLAN_CHOICES.some(p => p.value === current) ? PLAN_CHOICES : [...PLAN_CHOICES, { value: current, label: current }]
+}
+
+function UserRow({ user, selected, actionLoading, showCreditInput, creditInputValue, onAction, onDelete, onOpenDetails, onToggleCreditInput, onCreditInputChange, onAddCredits, emailMenuOpen, onToggleEmailMenu, onSendReportEmail, onSendFeedbackEmail, onGenerateWeeklyDigest, feedbackCounts, isFeedbackExpanded, onToggleFeedback }: {
     user: UserData
     selected: boolean
     actionLoading: string
     showCreditInput: boolean
     creditInputValue: string
-    containerStatusColor: (s: string | undefined | null) => string
     onAction: (action: string, githubId: string, params?: Record<string, unknown>) => void
     onDelete: () => void
     onOpenDetails: () => void
@@ -1259,7 +1184,7 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
     onSendReportEmail: (period: 'weekly' | 'monthly') => void
     onSendFeedbackEmail: () => void
     onGenerateWeeklyDigest: () => void
-    /** Aggregate 👍/👎 counts for this user (null while summary loads / no data). */
+    /** Aggregate helpful / not helpful counts for this user (null while summary loads / no data). */
     feedbackCounts: { up: number; down: number } | null
     /** Whether the inline feedback-detail panel below this row is open. */
     isFeedbackExpanded: boolean
@@ -1268,251 +1193,237 @@ function UserRow({ user, selected, actionLoading, showCreditInput, creditInputVa
 }) {
     const containerStatus = user.container?.status || null
     const isRunning = containerStatus?.toLowerCase() === 'running'
+    const name = user.username || user.github_id
+    const emailBusy =
+        actionLoading === `email-report-weekly-${user.github_id}` ||
+        actionLoading === `email-report-monthly-${user.github_id}` ||
+        actionLoading === `email-feedback-${user.github_id}` ||
+        actionLoading === `weekly-digest-${user.github_id}`
 
     return (
-        <tr className={`border-b border-white/[0.02] transition-colors ${selected ? 'bg-emerald-500/[0.07]' : 'hover:bg-white/[0.02]'}`}>
-            <td className="px-4 py-3">
+        <Tr selected={selected}>
+            <Td sticky>
                 <div className="flex items-center gap-3">
-                    {user.avatar_url ? (
-                        <img
-                            src={user.avatar_url}
-                            alt={user.username}
-                            className="w-8 h-8 rounded-full bg-zinc-800"
-                        />
-                    ) : (
-                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-500">
-                            {(user.username || '?')[0]?.toUpperCase()}
-                        </div>
-                    )}
+                    <Avatar name={user.username} src={user.avatar_url} size={32} />
                     <div className="min-w-0">
-                        <button onClick={onOpenDetails} className="text-white hover:text-emerald-400 transition-colors font-medium text-left">
-                            {user.username || user.github_id}
+                        <button onClick={onOpenDetails} className="rounded text-left font-medium text-fg hover:underline">
+                            {name}
                         </button>
-                        <div className="text-xs text-zinc-600 truncate">ID: {user.github_id}</div>
+                        <div className="truncate font-mono text-meta text-fg-muted">ID {user.github_id}</div>
                     </div>
                 </div>
-            </td>
+            </Td>
 
-            <td className="px-4 py-3 text-zinc-400">{user.email || '-'}</td>
+            <Td className="max-w-[240px] truncate text-fg-secondary">{user.email || '–'}</Td>
 
-            <td className="px-4 py-3">
-                <select
+            <Td>
+                <Select
+                    size="sm"
+                    ariaLabel={`Plan for ${name}`}
+                    className="w-28 min-w-0"
                     value={user.plan || 'free'}
-                    onChange={(e) => onAction('update-plan', user.github_id, { plan: e.target.value })}
-                    className="bg-black/30 border border-white/[0.08] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500/50 cursor-pointer"
-                >
-                    <option value="free">Free</option>
-                    <option value="starter">Starter</option>
-                    <option value="growth">Growth</option>
-                    <option value="pro">Pro</option>
-                </select>
-            </td>
+                    onValueChange={(plan) => onAction('update-plan', user.github_id, { plan })}
+                    options={planChoices(user.plan || 'free')}
+                />
+            </Td>
 
-            <td className="px-4 py-3">
-                <div className="flex items-center gap-2">
-                    <span className="text-zinc-300 tabular-nums">{formatNumber(user.credits)}</span>
-                    <button
-                        onClick={onToggleCreditInput}
-                        className="p-1 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-400 transition-colors"
-                        title="Add credits"
-                    >
-                        {showCreditInput ? <Minus className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                    </button>
+            <Td>
+                <div className="flex items-center gap-1.5">
+                    <span className="tabular-nums text-fg-secondary">{formatNumber(user.credits)}</span>
+                    <Tooltip content={showCreditInput ? 'Hide credit input' : 'Add credits'}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            iconOnly
+                            icon={showCreditInput ? Minus : Plus}
+                            aria-label={showCreditInput ? `Hide credit input for ${name}` : `Add credits for ${name}`}
+                            aria-expanded={showCreditInput}
+                            onClick={onToggleCreditInput}
+                        />
+                    </Tooltip>
                     {showCreditInput && (
-                        <div className="flex items-center gap-1">
-                            <input
+                        <div className="flex items-center gap-1.5">
+                            <TextInput
+                                size="sm"
                                 type="number"
                                 min="1"
                                 value={creditInputValue}
                                 onChange={(e) => onCreditInputChange(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && onAddCredits()}
                                 placeholder="0"
-                                className="w-16 bg-black/30 border border-white/[0.08] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                                aria-label={`Credits to add for ${name}`}
+                                className="w-20"
                             />
-                            <button
-                                onClick={onAddCredits}
-                                className="px-2 py-1 rounded bg-emerald-600/30 text-emerald-400 text-xs hover:bg-emerald-600/50 transition-colors"
-                            >
-                                Add
-                            </button>
+                            <Button variant="secondary" size="sm" onClick={onAddCredits}>Add</Button>
                         </div>
                     )}
                 </div>
-            </td>
+            </Td>
 
-            <td className="px-4 py-3">
+            <Td>
                 <UserSignals user={user} />
-            </td>
+            </Td>
 
-            <td className="px-4 py-3">
+            <Td>
                 <FeedbackCell
                     counts={feedbackCounts}
                     expanded={isFeedbackExpanded}
                     onToggle={onToggleFeedback}
                 />
-            </td>
+            </Td>
 
-            <td className="px-4 py-3">
-                <div className="flex flex-col gap-1">
-                    <span className={`inline-flex w-fit items-center px-2 py-0.5 rounded-full text-xs font-medium ${containerStatusColor(containerStatus)}`}>
-                        {containerStatus || 'none'}
-                    </span>
-                    {user.container?.port ? <span className="text-[11px] text-zinc-600">Port {user.container.port}</span> : null}
+            <Td>
+                <div className="flex flex-col items-start gap-1">
+                    <ContainerPill status={containerStatus} />
+                    {user.container?.port ? <span className="font-mono text-meta text-fg-muted">Port {user.container.port}</span> : null}
                 </div>
-            </td>
+            </Td>
 
-            <td className="px-4 py-3">
-                <div className="flex items-center justify-end gap-1">
-                    <button
-                        onClick={onOpenDetails}
-                        className="p-1.5 rounded hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-200 transition-colors"
-                        title="Open details"
-                    >
-                        <ExternalLink className="w-4 h-4" />
-                    </button>
+            <Td align="right">
+                <div className="flex items-center justify-end gap-0.5">
+                    <Tooltip content="Open details">
+                        <Button variant="ghost" size="sm" iconOnly icon={PanelRight} aria-label={`Open details for ${name}`} onClick={onOpenDetails} />
+                    </Tooltip>
                     {!isRunning ? (
-                        <button
-                            onClick={() => onAction('start', user.github_id)}
-                            disabled={actionLoading === `start-${user.github_id}`}
-                            className="p-1.5 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-400 transition-colors disabled:opacity-30"
-                            title="Start"
-                        >
-                            <Play className="w-4 h-4" />
-                        </button>
+                        <Tooltip content="Start">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                iconOnly
+                                icon={Play}
+                                aria-label={`Start container for ${name}`}
+                                loading={actionLoading === `start-${user.github_id}`}
+                                onClick={() => onAction('start', user.github_id)}
+                            />
+                        </Tooltip>
                     ) : (
-                        <button
-                            onClick={() => onAction('stop', user.github_id)}
-                            disabled={actionLoading === `stop-${user.github_id}`}
-                            className="p-1.5 rounded hover:bg-amber-500/20 text-zinc-500 hover:text-amber-400 transition-colors disabled:opacity-30"
-                            title="Stop"
-                        >
-                            <Square className="w-4 h-4" />
-                        </button>
+                        <Tooltip content="Stop">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                iconOnly
+                                icon={Square}
+                                aria-label={`Stop container for ${name}`}
+                                loading={actionLoading === `stop-${user.github_id}`}
+                                onClick={() => onAction('stop', user.github_id)}
+                            />
+                        </Tooltip>
                     )}
-                    <button
-                        onClick={() => onAction('restart', user.github_id)}
-                        disabled={actionLoading === `restart-${user.github_id}`}
-                        className="p-1.5 rounded hover:bg-cyan-500/20 text-zinc-500 hover:text-cyan-400 transition-colors disabled:opacity-30"
-                        title="Restart"
-                    >
-                        <RotateCw className="w-4 h-4" />
-                    </button>
-                    {/* Email menu — Weekly / Monthly report (synchronous send, 20-90s)
+                    <Tooltip content="Restart">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            iconOnly
+                            icon={RotateCw}
+                            aria-label={`Restart container for ${name}`}
+                            loading={actionLoading === `restart-${user.github_id}`}
+                            onClick={() => onAction('restart', user.github_id)}
+                        />
+                    </Tooltip>
+                    {/* Email menu: Weekly / Monthly report (synchronous send, 20-90s)
                         + Feedback request (fast Brevo template send with a one-time
-                        coupon code). Button stays in a loading state while any send
-                        is in flight. */}
-                    <div className="relative">
-                        <button
-                            onClick={onToggleEmailMenu}
-                            disabled={
-                                actionLoading === `email-report-weekly-${user.github_id}` ||
-                                actionLoading === `email-report-monthly-${user.github_id}` ||
-                                actionLoading === `email-feedback-${user.github_id}` ||
-                                actionLoading === `weekly-digest-${user.github_id}`
-                            }
-                            className="p-1.5 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-400 transition-colors disabled:opacity-30"
-                            title="Email & report actions"
-                        >
-                            {actionLoading === `email-report-weekly-${user.github_id}` ||
-                            actionLoading === `email-report-monthly-${user.github_id}` ||
-                            actionLoading === `email-feedback-${user.github_id}` ||
-                            actionLoading === `weekly-digest-${user.github_id}` ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Mail className="w-4 h-4" />
-                            )}
-                        </button>
-                        {emailMenuOpen && (
-                            <div className="absolute right-0 top-full mt-1 z-30 w-56 rounded-lg border border-white/[0.08] bg-[#0a0d12] shadow-2xl shadow-black/60 overflow-hidden">
-                                <div className="px-3 py-2 border-b border-white/[0.05] text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.18em]">
-                                    Email {user.email ? 'user' : '(no email)'}
-                                </div>
-                                <button
-                                    onClick={() => onSendReportEmail('weekly')}
-                                    disabled={!user.email}
-                                    className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                >
-                                    <span className="font-medium">Weekly report</span>
-                                    <span className="block text-[10px] text-zinc-500">Last 7 days vs prior week</span>
-                                </button>
-                                <button
-                                    onClick={() => onSendReportEmail('monthly')}
-                                    disabled={!user.email}
-                                    className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed border-t border-white/[0.04]"
-                                >
-                                    <span className="font-medium">Monthly report</span>
-                                    <span className="block text-[10px] text-zinc-500">Last 30 days vs prior month</span>
-                                </button>
-                                <button
-                                    onClick={onSendFeedbackEmail}
-                                    disabled={!user.email}
-                                    className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-cyan-500/10 hover:text-cyan-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed border-t border-white/[0.04]"
-                                >
-                                    <span className="font-medium">Feedback request</span>
-                                    <span className="block text-[10px] text-zinc-500">Ask why they didn&rsquo;t convert + coupon</span>
-                                </button>
-                                {/* Distinct visual treatment (violet) — this one writes
-                                    to the DB rather than sending an email. */}
-                                <button
-                                    onClick={onGenerateWeeklyDigest}
-                                    className="w-full text-left px-3 py-2 text-xs text-zinc-200 hover:bg-violet-500/10 hover:text-violet-300 transition-colors border-t border-white/[0.04]"
-                                >
-                                    <span className="font-medium">Generate weekly digest</span>
-                                    <span className="block text-[10px] text-zinc-500">Snapshot + AI headline → /dashboard/weekly</span>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                    <button
-                        onClick={onDelete}
-                        className="p-1.5 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition-colors"
-                        title="Delete"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
+                        coupon code). The trigger stays in a loading state while any
+                        send is in flight. */}
+                    <DropdownMenu open={emailMenuOpen} onOpenChange={(open) => { if (open !== emailMenuOpen) onToggleEmailMenu() }}>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                iconOnly
+                                icon={Mail}
+                                loading={emailBusy}
+                                aria-label={`Email and report actions for ${name}`}
+                                title="Email and report actions"
+                            />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-72">
+                            <DropdownMenuLabel>{user.email ? 'Email user' : 'Email user (no email on file)'}</DropdownMenuLabel>
+                            <DropdownMenuItem disabled={!user.email} className="h-auto! py-1.5" onSelect={() => onSendReportEmail('weekly')}>
+                                <span className="block font-medium">Weekly report</span>
+                                <span className="block text-meta text-fg-muted">Last 7 days vs prior week</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled={!user.email} className="h-auto! py-1.5" onSelect={() => onSendReportEmail('monthly')}>
+                                <span className="block font-medium">Monthly report</span>
+                                <span className="block text-meta text-fg-muted">Last 30 days vs prior month</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled={!user.email} className="h-auto! py-1.5" onSelect={onSendFeedbackEmail}>
+                                <span className="block font-medium">Feedback request</span>
+                                <span className="block text-meta text-fg-muted">Ask why they didn&rsquo;t convert + coupon</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {/* Writes to the DB rather than sending an email. */}
+                            <DropdownMenuItem className="h-auto! py-1.5" onSelect={onGenerateWeeklyDigest}>
+                                <span className="block font-medium">Generate weekly digest</span>
+                                <span className="block text-meta text-fg-muted">Saves a digest to /dashboard/weekly</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Tooltip content="Delete">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            iconOnly
+                            icon={Trash2}
+                            aria-label={`Delete ${name}`}
+                            className="hover:text-down!"
+                            onClick={onDelete}
+                        />
+                    </Tooltip>
                 </div>
-            </td>
-        </tr>
+            </Td>
+        </Tr>
     )
 }
 
 function DrawerSection({ icon: Icon, title, action, children }: {
-    icon: React.ComponentType<{ className?: string }>
+    icon: LucideIcon
     title: string
     action?: ReactNode
     children: ReactNode
 }) {
     return (
-        <section className="bg-zinc-900/70 border border-white/[0.05] rounded-2xl p-5">
-            <div className="flex items-center justify-between gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                    <Icon className="w-4 h-4 text-emerald-400" />
-                    <h3 className="text-sm font-semibold text-white">{title}</h3>
-                </div>
-                {action}
-            </div>
+        <Card as="section" padding="sm">
+            <CardHeader
+                as="h3"
+                title={
+                    <span className="inline-flex items-center gap-2">
+                        <Icon aria-hidden size={16} strokeWidth={1.75} className="text-fg-muted" />
+                        {title}
+                    </span>
+                }
+                actions={action}
+            />
             {children}
-        </section>
+        </Card>
     )
 }
 
-function DetailStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function DetailStat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
     return (
-        <div className="rounded-xl border border-white/[0.05] bg-black/30 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-zinc-500">{label}</div>
-            <div className="mt-1 text-sm font-semibold text-white break-words">{value}</div>
-            {sub ? <div className="mt-1 text-xs text-zinc-500">{sub}</div> : null}
+        <div className="rounded-control bg-surface-sunken p-3">
+            <div className="text-meta text-fg-muted">{label}</div>
+            <div className="mt-1 text-body font-medium break-words">{value}</div>
+            {sub ? <div className="mt-1 text-meta text-fg-muted">{sub}</div> : null}
         </div>
     )
 }
 
-function EmptyState({ title, description }: { title: string; description: string }) {
-    return (
-        <div className="rounded-xl border border-dashed border-white/[0.08] bg-black/20 p-4 text-sm">
-            <div className="font-medium text-zinc-300">{title}</div>
-            <div className="mt-1 text-zinc-500">{description}</div>
-        </div>
-    )
+/** Small bordered block for one record inside a drawer section (provider, token, dashboard, event). */
+function InnerCard({ children, className }: { children: ReactNode; className?: string }) {
+    return <div className={`rounded-control border border-border-subtle bg-surface-sunken p-3.5 ${className ?? ''}`}>{children}</div>
+}
+
+function EmptyNote({ title, description }: { title: string; description: string }) {
+    return <EmptyState variant="inline" title={title} description={description} className="rounded-control border border-dashed border-border" />
+}
+
+/** Small caps-free label above a control that has no native label (Select). */
+function FieldLabel({ children }: { children: ReactNode }) {
+    return <div className="mb-1.5 text-body-sm font-medium text-fg-secondary">{children}</div>
+}
+
+function SubHeading({ children }: { children: ReactNode }) {
+    return <h4 className="text-body-sm font-medium text-fg-secondary">{children}</h4>
 }
 
 function extractDomain(url: string): string {
@@ -1566,84 +1477,91 @@ function PropertyReportCard({ property, gscSites, hasGsc, defaultSiteUrl, report
     const canEmail = Boolean(userEmail)
 
     return (
-        <div className="rounded-xl border border-white/[0.05] bg-black/25 p-4 space-y-3">
+        <InnerCard className="space-y-3">
             <div>
-                <div className="text-sm font-semibold text-white">{property.display_name || property.property_id}</div>
-                <div className="mt-1 text-xs text-zinc-500">{property.property_id}</div>
+                <div className="text-body font-medium">{property.display_name || property.property_id}</div>
+                <div className="mt-0.5 font-mono text-meta text-fg-muted">{property.property_id}</div>
             </div>
             {hasGsc ? (
                 <>
                     {gscSites.length > 1 && (
                         <div>
-                            <label className="block text-xs text-zinc-500 mb-1">Search Console site for report</label>
-                            <select
+                            <FieldLabel>Search Console site for report</FieldLabel>
+                            <Select
+                                size="sm"
+                                ariaLabel="Search Console site for report"
+                                className="w-full"
                                 value={selectedSite}
-                                onChange={(e) => setSelectedSite(e.target.value)}
-                                className="w-full rounded-lg border border-white/[0.08] bg-zinc-900 px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                            >
-                                {gscSites.map(s => (
-                                    <option key={s.site_url} value={s.site_url || ''}>{s.site_url}</option>
-                                ))}
-                            </select>
+                                onValueChange={setSelectedSite}
+                                options={gscSites.map(s => ({ value: s.site_url || '', label: s.site_url }))}
+                            />
                         </div>
                     )}
                     {gscSites.length === 1 && (
-                        <div className="text-xs text-zinc-500">GSC: {defaultSiteUrl}</div>
+                        <div className="text-meta text-fg-muted">Search Console: <span className="font-mono">{defaultSiteUrl}</span></div>
                     )}
-                    {/* Download flow — admin downloads the PDF locally */}
+                    {/* Download flow: admin downloads the PDF locally */}
                     <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 mb-1.5">Download PDF</div>
+                        <div className="mb-1.5 text-meta font-medium text-fg-muted">Download PDF</div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={FileText}
+                                loading={isLoadingWeekly}
+                                disabled={isAnyLoading}
                                 onClick={() => onGenerate('weekly', selectedSite, { propertyId: property.property_id, label: property.display_name || property.property_id })}
-                                disabled={isAnyLoading}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             >
-                                {isLoadingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-                                {isLoadingWeekly ? 'Generating...' : 'Weekly'}
-                            </button>
-                            <button
+                                {isLoadingWeekly ? 'Generating' : 'Weekly'}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={FileText}
+                                loading={isLoadingMonthly}
+                                disabled={isAnyLoading}
                                 onClick={() => onGenerate('monthly', selectedSite, { propertyId: property.property_id, label: property.display_name || property.property_id })}
-                                disabled={isAnyLoading}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             >
-                                {isLoadingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-                                {isLoadingMonthly ? 'Generating...' : 'Monthly'}
-                            </button>
+                                {isLoadingMonthly ? 'Generating' : 'Monthly'}
+                            </Button>
                         </div>
                     </div>
 
-                    {/* Email flow — same renderer ships through Brevo to user.email */}
-                    <div className="border-t border-white/[0.04] pt-3">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 mb-1.5">
-                            Email to user{userEmail ? ` (${userEmail})` : ' — no email on file'}
+                    {/* Email flow: same renderer ships through Brevo to user.email */}
+                    <div className="border-t border-border-subtle pt-3">
+                        <div className="mb-1.5 text-meta font-medium text-fg-muted">
+                            Email to user{userEmail ? ` (${userEmail})` : ': no email on file'}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <button
-                                onClick={() => onEmailReport('weekly', selectedSite, property.property_id)}
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={Mail}
+                                loading={isEmailingWeekly}
                                 disabled={isAnyEmailLoading || !canEmail}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-[#14C4E1]/30 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#7AD9DA] hover:bg-[#14C4E1]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                 title={canEmail ? 'Email weekly report to user' : 'User has no email on file'}
+                                onClick={() => onEmailReport('weekly', selectedSite, property.property_id)}
                             >
-                                {isEmailingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-                                {isEmailingWeekly ? 'Sending...' : 'Email weekly'}
-                            </button>
-                            <button
-                                onClick={() => onEmailReport('monthly', selectedSite, property.property_id)}
+                                {isEmailingWeekly ? 'Sending' : 'Email weekly'}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={Mail}
+                                loading={isEmailingMonthly}
                                 disabled={isAnyEmailLoading || !canEmail}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-[#14C4E1]/30 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#7AD9DA] hover:bg-[#14C4E1]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                 title={canEmail ? 'Email monthly report to user' : 'User has no email on file'}
+                                onClick={() => onEmailReport('monthly', selectedSite, property.property_id)}
                             >
-                                {isEmailingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-                                {isEmailingMonthly ? 'Sending...' : 'Email monthly'}
-                            </button>
+                                {isEmailingMonthly ? 'Sending' : 'Email monthly'}
+                            </Button>
                         </div>
                     </div>
                 </>
             ) : (
-                <p className="text-xs text-amber-400">No Search Console site available — report generation needs a verified Search Console site.</p>
+                <Banner variant="warn">No Search Console site available. Report generation needs a verified Search Console site.</Banner>
             )}
-        </div>
+        </InnerCard>
     )
 }
 
@@ -1669,63 +1587,71 @@ function SearchConsoleReportCard({ site, reportLoadingKey, weeklyKey, monthlyKey
     const canEmail = Boolean(userEmail) && Boolean(siteUrl)
 
     return (
-        <div className="rounded-xl border border-white/[0.05] bg-black/25 p-4 space-y-3">
-            <div className="text-sm font-semibold text-white break-all">{siteUrl || 'Unknown site'}</div>
+        <InnerCard className="space-y-3">
+            <div className="font-mono text-body font-medium break-all">{siteUrl || 'Unknown site'}</div>
             <div className="flex flex-wrap gap-2">
-                {site.permission_level ? <SignalPill tone="emerald">{site.permission_level}</SignalPill> : null}
-                {site.site_type ? <SignalPill tone="zinc">{site.site_type}</SignalPill> : null}
-                <SignalPill tone="amber">SEO only</SignalPill>
+                {site.permission_level ? <SignalPill>{site.permission_level}</SignalPill> : null}
+                {site.site_type ? <SignalPill>{site.site_type}</SignalPill> : null}
+                <SignalPill tone="warn">SEO only</SignalPill>
             </div>
-            <p className="text-xs text-zinc-500">GA4 property unavailable for this user, so this generates a Search Console-only PDF.</p>
+            <p className="text-meta text-fg-muted">GA4 property unavailable for this user, so this generates a Search Console-only PDF.</p>
             <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 mb-1.5">Download PDF</div>
+                <div className="mb-1.5 text-meta font-medium text-fg-muted">Download PDF</div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={FileText}
+                        loading={isLoadingWeekly}
+                        disabled={isAnyLoading || !siteUrl}
                         onClick={() => onGenerate('weekly', siteUrl, { label: siteUrl })}
-                        disabled={isAnyLoading || !siteUrl}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
-                        {isLoadingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-                        {isLoadingWeekly ? 'Generating...' : 'Weekly'}
-                    </button>
-                    <button
+                        {isLoadingWeekly ? 'Generating' : 'Weekly'}
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={FileText}
+                        loading={isLoadingMonthly}
+                        disabled={isAnyLoading || !siteUrl}
                         onClick={() => onGenerate('monthly', siteUrl, { label: siteUrl })}
-                        disabled={isAnyLoading || !siteUrl}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
-                        {isLoadingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-                        {isLoadingMonthly ? 'Generating...' : 'Monthly'}
-                    </button>
+                        {isLoadingMonthly ? 'Generating' : 'Monthly'}
+                    </Button>
                 </div>
             </div>
-            <div className="border-t border-white/[0.04] pt-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 mb-1.5">
-                    Email to user{userEmail ? ` (${userEmail})` : ' — no email on file'}
+            <div className="border-t border-border-subtle pt-3">
+                <div className="mb-1.5 text-meta font-medium text-fg-muted">
+                    Email to user{userEmail ? ` (${userEmail})` : ': no email on file'}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={Mail}
+                        loading={isEmailingWeekly}
+                        disabled={isAnyEmailLoading || !canEmail}
                         onClick={() => onEmailReport('weekly', siteUrl)}
-                        disabled={isAnyEmailLoading || !canEmail}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#14C4E1]/30 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#7AD9DA] hover:bg-[#14C4E1]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
-                        {isEmailingWeekly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-                        {isEmailingWeekly ? 'Sending...' : 'Email weekly'}
-                    </button>
-                    <button
+                        {isEmailingWeekly ? 'Sending' : 'Email weekly'}
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={Mail}
+                        loading={isEmailingMonthly}
+                        disabled={isAnyEmailLoading || !canEmail}
                         onClick={() => onEmailReport('monthly', siteUrl)}
-                        disabled={isAnyEmailLoading || !canEmail}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#14C4E1]/30 bg-[#14C4E1]/10 px-3 py-1.5 text-xs font-medium text-[#7AD9DA] hover:bg-[#14C4E1]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
-                        {isEmailingMonthly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-                        {isEmailingMonthly ? 'Sending...' : 'Email monthly'}
-                    </button>
+                        {isEmailingMonthly ? 'Sending' : 'Email monthly'}
+                    </Button>
                 </div>
             </div>
-        </div>
+        </InnerCard>
     )
 }
 
-function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLoading, showCreditInput, creditInputValue, containerStatusColor, onClose, onRefresh, onAction, onDelete, onToggleCreditInput, onCreditInputChange, onAddCredits }: {
+function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLoading, showCreditInput, creditInputValue, onClose, onRefresh, onAction, onDelete, onToggleCreditInput, onCreditInputChange, onAddCredits }: {
     user: UserData | null
     profile: UserProfileData | null
     loading: boolean
@@ -1734,7 +1660,6 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
     actionLoading: string
     showCreditInput: boolean
     creditInputValue: string
-    containerStatusColor: (s: string | undefined | null) => string
     onClose: () => void
     onRefresh: () => void
     onAction: (action: string, githubId: string, params?: Record<string, unknown>) => void
@@ -1748,6 +1673,7 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
     const [reportError, setReportError] = useState('')
     const [tokenInput, setTokenInput] = useState('')
     const [showToken, setShowToken] = useState(false)
+    const [destroyOpen, setDestroyOpen] = useState(false)
 
     useEffect(() => {
         setTokenInput('')
@@ -1773,12 +1699,12 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
                 ...(propertyId ? { propertyId } : {}),
                 ...(siteUrl ? { siteUrl } : {}),
             })
-            alert(`${period[0].toUpperCase()}${period.slice(1)} report emailed to ${user.email}.`)
+            toast.success(`${period[0].toUpperCase()}${period.slice(1)} report emailed to ${user.email}.`)
         } catch (err) {
             const message = getErrorMessage(err, 'Email send failed')
             if (isSuperadminAuthError(message)) return
             setReportError(message)
-            alert(`Failed to send: ${message}`)
+            toast.error(`Failed to send: ${message}`, { duration: 8000 })
         } finally {
             setEmailLoadingKey(null)
         }
@@ -1830,396 +1756,438 @@ function UserProfileDrawer({ user, profile, loading, refreshing, error, actionLo
 
     const containerStatus = profile?.container.status || user.container?.status || 'unknown'
     const isRunning = containerStatus.toLowerCase() === 'running'
+    const displayName = profile?.account.username || user.username || user.github_id
+    const savingSettings = actionLoading === `update-settings-${user.github_id}`
+    const currentEngine = user.bot_engine || profile?.container.engine || 'openclaw'
+    const engineOptions = [
+        { value: 'openclaw', label: 'OpenClaw' },
+        { value: 'nanobot', label: 'Nanobot' },
+    ]
+    if (!engineOptions.some(o => o.value === currentEngine)) engineOptions.push({ value: currentEngine, label: currentEngine })
 
     return (
-        <AnimatePresence>
-            <motion.div key={user.github_id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/70" onClick={onClose}>
-                <motion.div initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 40, opacity: 0 }} transition={{ type: 'spring', damping: 26, stiffness: 260 }} onClick={(e) => e.stopPropagation()} className="ml-auto h-full w-full max-w-3xl overflow-y-auto border-l border-white/[0.08] bg-zinc-950/95 backdrop-blur-xl">
-                    <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-zinc-950/90 px-6 py-5 backdrop-blur-xl">
-                        <div className="flex items-start justify-between gap-4">
+        <>
+            <Drawer
+                open
+                onOpenChange={(open) => { if (!open) onClose() }}
+                width="wide"
+                title={
+                    <span className="inline-flex max-w-full items-center gap-2">
+                        <span className="truncate">{displayName}</span>
+                        <ContainerPill status={containerStatus} />
+                    </span>
+                }
+                subtitle={
+                    <>
+                        {profile?.account.email || user.email || 'No email'} · <span className="font-mono">ID {profile?.account.identifier || user.github_id}</span>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    <DrawerSection
+                        icon={Server}
+                        title="Admin actions"
+                        action={
+                            <Button variant="ghost" size="sm" icon={RefreshCw} loading={refreshing} onClick={onRefresh}>
+                                {refreshing ? 'Refreshing' : 'Refresh'}
+                            </Button>
+                        }
+                    >
+                        <div className="space-y-4">
                             <div>
-                                <div className="flex items-center gap-2">
-                                    <h2 className="text-xl font-semibold text-white">{profile?.account.username || user.username || user.github_id}</h2>
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${containerStatusColor(containerStatus)}`}>{containerStatus}</span>
-                                </div>
-                                <div className="mt-1 text-sm text-zinc-400">{profile?.account.email || user.email || 'No email'}</div>
-                                <div className="mt-1 text-xs text-zinc-600">ID: {profile?.account.identifier || user.github_id}</div>
+                                <FieldLabel>Plan</FieldLabel>
+                                <Select
+                                    ariaLabel="Plan"
+                                    className="w-full"
+                                    value={user.plan || 'free'}
+                                    onValueChange={(plan) => onAction('update-plan', user.github_id, { plan })}
+                                    options={planChoices(user.plan || 'free')}
+                                />
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button onClick={onRefresh} className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-sm text-zinc-300 hover:text-white transition-colors">
-                                    <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                                    {refreshing ? 'Refreshing' : 'Refresh'}
-                                </button>
-                                <button onClick={onClose} className="rounded-lg border border-white/[0.08] bg-black/30 p-2 text-zinc-400 hover:text-white transition-colors">
-                                    <X className="w-4 h-4" />
-                                </button>
+                            <div>
+                                <FieldLabel>Credits</FieldLabel>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="inline-flex h-9 items-center rounded-control border border-border-subtle bg-surface-sunken px-3 text-body tabular-nums">
+                                        {formatNumber(profile?.subscription.credits ?? user.credits)}
+                                    </span>
+                                    <Button variant="secondary" icon={showCreditInput ? Minus : Plus} aria-expanded={showCreditInput} onClick={onToggleCreditInput}>
+                                        {showCreditInput ? 'Hide' : 'Add credits'}
+                                    </Button>
+                                    {showCreditInput ? (
+                                        <>
+                                            <TextInput
+                                                type="number"
+                                                min="1"
+                                                value={creditInputValue}
+                                                onChange={(e) => onCreditInputChange(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && onAddCredits()}
+                                                placeholder="0"
+                                                aria-label="Credits to add"
+                                                className="w-24"
+                                            />
+                                            <Button variant="secondary" onClick={onAddCredits}>Apply</Button>
+                                        </>
+                                    ) : null}
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
+                                {!isRunning ? (
+                                    <Button variant="secondary" icon={Play} loading={actionLoading === `start-${user.github_id}`} onClick={() => onAction('start', user.github_id)}>Start</Button>
+                                ) : (
+                                    <Button variant="secondary" icon={Square} loading={actionLoading === `stop-${user.github_id}`} onClick={() => onAction('stop', user.github_id)}>Stop</Button>
+                                )}
+                                <Button variant="secondary" icon={RotateCw} loading={actionLoading === `restart-${user.github_id}`} onClick={() => onAction('restart', user.github_id)}>Restart</Button>
+                                <Button variant="danger" icon={Trash2} className="ml-auto" onClick={onDelete}>Delete user</Button>
                             </div>
                         </div>
-                    </div>
+                    </DrawerSection>
 
-                    <div className="space-y-5 px-6 py-6">
-                        <DrawerSection icon={Server} title="Admin Actions">
-                            <div className="grid gap-4 lg:grid-cols-[1.2fr,1fr]">
-                                <div className="space-y-3">
-                                    <select value={user.plan || 'free'} onChange={(e) => onAction('update-plan', user.github_id, { plan: e.target.value })} className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50">
-                                        <option value="free">Free</option>
-                                        <option value="starter">Starter</option>
-                                        <option value="growth">Growth</option>
-                                        <option value="pro">Pro</option>
-                                    </select>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 text-sm text-white">{formatNumber(profile?.subscription.credits ?? user.credits)}</span>
-                                        <button onClick={onToggleCreditInput} className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 hover:bg-emerald-500/20 transition-colors">
-                                            {showCreditInput ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                                            {showCreditInput ? 'Hide' : 'Add credits'}
-                                        </button>
-                                        {showCreditInput ? (
-                                            <>
-                                                <input type="number" min="1" value={creditInputValue} onChange={(e) => onCreditInputChange(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onAddCredits()} placeholder="0" className="w-24 bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
-                                                <button onClick={onAddCredits} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition-colors">Apply</button>
-                                            </>
-                                        ) : null}
-                                    </div>
-                                </div>
-                                <div className="flex flex-wrap items-start gap-2">
-                                    {!isRunning ? (
-                                        <button onClick={() => onAction('start', user.github_id)} disabled={actionLoading === `start-${user.github_id}`} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 transition-colors"><Play className="w-4 h-4" />Start</button>
-                                    ) : (
-                                        <button onClick={() => onAction('stop', user.github_id)} disabled={actionLoading === `stop-${user.github_id}`} className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-40 transition-colors"><Square className="w-4 h-4" />Stop</button>
-                                    )}
-                                    <button onClick={() => onAction('restart', user.github_id)} disabled={actionLoading === `restart-${user.github_id}`} className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-40 transition-colors"><RotateCw className="w-4 h-4" />Restart</button>
-                                    <button onClick={onDelete} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"><Trash2 className="w-4 h-4" />Delete</button>
-                                </div>
+                    <DrawerSection icon={Bot} title="Container setup">
+                        <div className="space-y-4">
+                            <div>
+                                <FieldLabel>Bot engine</FieldLabel>
+                                <Select
+                                    ariaLabel="Bot engine"
+                                    className="w-full"
+                                    value={currentEngine}
+                                    disabled={savingSettings}
+                                    onValueChange={(bot_engine) => onAction('update-settings', user.github_id, { bot_engine })}
+                                    options={engineOptions}
+                                />
+                                <p className="mt-1.5 text-meta text-fg-muted">After changing engine, destroy the existing container then start it to apply.</p>
                             </div>
-                        </DrawerSection>
 
-                        <DrawerSection icon={Bot} title="Container Setup">
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">Bot engine</label>
-                                    <select
-                                        value={user.bot_engine || profile?.container.engine || 'openclaw'}
-                                        onChange={(e) => onAction('update-settings', user.github_id, { bot_engine: e.target.value })}
-                                        disabled={actionLoading === `update-settings-${user.github_id}`}
-                                        className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50 disabled:opacity-50"
-                                    >
-                                        <option value="openclaw">OpenClaw</option>
-                                        <option value="nanobot">Nanobot</option>
-                                    </select>
-                                    <p className="mt-1 text-xs text-zinc-500">After changing engine, Destroy the existing container then Start to apply.</p>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">Telegram bot token</label>
+                            <Field
+                                label="Telegram bot token"
+                                hint={`Saving triggers a container sync with the new token. Current bot: ${profile?.container.bot_username ? `@${profile.container.bot_username}` : '(none)'}`}
+                            >
+                                {(id) => (
                                     <div className="flex items-stretch gap-2">
                                         <div className="relative flex-1">
-                                            <input
+                                            <TextInput
+                                                id={id}
+                                                mono
+                                                autoComplete="off"
                                                 type={showToken ? 'text' : 'password'}
                                                 value={tokenInput}
                                                 onChange={(e) => setTokenInput(e.target.value)}
                                                 placeholder="Paste token from @BotFather (1234567:ABC...)"
-                                                className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 pr-10 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50"
+                                                className="pr-10"
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => setShowToken(s => !s)}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                                                aria-label={showToken ? 'Hide token' : 'Show token'}
+                                                className="absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-fg-muted transition-colors duration-120 hover:bg-subtle hover:text-fg"
                                             >
-                                                {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                {showToken ? <EyeOff aria-hidden size={16} strokeWidth={1.75} /> : <Eye aria-hidden size={16} strokeWidth={1.75} />}
                                             </button>
                                         </div>
-                                        <button
+                                        <Button
+                                            variant="secondary"
+                                            loading={savingSettings}
+                                            disabled={!tokenInput.trim()}
                                             onClick={() => {
                                                 const v = tokenInput.trim()
                                                 if (!v) return
                                                 onAction('update-settings', user.github_id, { telegram_bot_token: v })
                                                 setTokenInput('')
                                             }}
-                                            disabled={!tokenInput.trim() || actionLoading === `update-settings-${user.github_id}`}
-                                            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                         >
-                                            {actionLoading === `update-settings-${user.github_id}` ? 'Saving...' : 'Save'}
-                                        </button>
+                                            {savingSettings ? 'Saving' : 'Save'}
+                                        </Button>
                                     </div>
-                                    <p className="mt-1 text-xs text-zinc-500">Saving triggers a container sync with the new token. Current bot: {profile?.container.bot_username ? `@${profile.container.bot_username}` : '(none)'}</p>
-                                </div>
+                                )}
+                            </Field>
 
-                                <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
-                                    <div className="min-w-0">
-                                        <div className="text-sm font-medium text-white">Destroy container</div>
-                                        <div className="text-xs text-zinc-500">Stops and removes the Docker container only. Keeps the User row, OAuth tokens, credits, and data directory intact.</div>
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            if (window.confirm('Destroy this container? The user record, OAuth tokens, and data are preserved — only the running Docker container is removed.')) {
-                                                onAction('destroy-container', user.github_id)
-                                            }
-                                        }}
-                                        disabled={actionLoading === `destroy-container-${user.github_id}`}
-                                        className="inline-flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-500/20 disabled:opacity-50 transition-colors shrink-0"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        {actionLoading === `destroy-container-${user.github_id}` ? 'Destroying...' : 'Destroy'}
-                                    </button>
+                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-down/20 bg-down-soft p-3.5">
+                                <div className="min-w-0 flex-1 basis-[220px]">
+                                    <div className="text-body font-medium">Destroy container</div>
+                                    <div className="text-body-sm text-fg-secondary">Stops and removes the Docker container only. Keeps the user row, OAuth tokens, credits and data directory intact.</div>
                                 </div>
+                                <Button variant="secondary" loading={actionLoading === `destroy-container-${user.github_id}`} onClick={() => setDestroyOpen(true)}>
+                                    <span className="inline-flex items-center gap-2 text-down">
+                                        <Trash2 aria-hidden size={16} strokeWidth={1.75} />
+                                        {actionLoading === `destroy-container-${user.github_id}` ? 'Destroying' : 'Destroy'}
+                                    </span>
+                                </Button>
                             </div>
-                        </DrawerSection>
+                        </div>
+                    </DrawerSection>
 
-                        {loading && !profile ? <div className="rounded-2xl border border-white/[0.05] bg-zinc-900/70 p-10 text-center text-zinc-500">Loading full user profile...</div> : null}
-                        {!loading && !profile && error ? <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-sm text-red-300">{error}</div> : null}
-                        {profile ? (
-                            <>
-                                <DrawerSection icon={Users} title="Overview">
-                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                        <DetailStat label="Account" value={profile.account.is_active ? 'Active' : 'Disabled'} />
-                                        <DetailStat label="Providers" value={String(profile.providers.length)} sub={profile.providers.map(provider => provider.provider).join(', ') || 'No connections'} />
-                                        <DetailStat label="Created" value={formatDateTime(profile.account.created_at)} />
-                                        <DetailStat label="Updated" value={formatDateTime(profile.account.updated_at)} />
-                                        <DetailStat label="Engine" value={profile.container.engine || 'openclaw'} sub={profile.container.port ? `Port ${profile.container.port}` : undefined} />
-                                        <DetailStat label="Telegram" value={profile.container.telegram_status || (profile.container.telegram_enabled ? 'enabled' : 'disabled')} sub={profile.container.bot_username ? `@${profile.container.bot_username}` : undefined} />
-                                        <DetailStat label="Memory" value={profile.container.memory_usage_mb ? `${profile.container.memory_usage_mb} MB` : '—'} sub={profile.container.memory_percent !== undefined ? `${profile.container.memory_percent}% of limit` : undefined} />
-                                        <DetailStat label="Health" value={profile.container.health || '—'} sub={profile.container.last_health_check ? `Checked ${formatDateTime(profile.container.last_health_check)}` : undefined} />
-                                    </div>
-                                    {profile.container.error ? <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">{profile.container.error}</div> : null}
-                                </DrawerSection>
+                    {loading && !profile ? (
+                        <Card padding="sm" aria-busy="true" aria-label="Loading full user profile">
+                            <Skeleton className="mb-4 h-4 w-32" />
+                            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                                {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-16" />)}
+                            </div>
+                        </Card>
+                    ) : null}
+                    {!loading && !profile && error ? <Banner variant="danger">{error}</Banner> : null}
+                    {profile ? (
+                        <>
+                            <DrawerSection icon={Users} title="Overview">
+                                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                                    <DetailStat label="Account" value={profile.account.is_active ? 'Active' : 'Disabled'} />
+                                    <DetailStat label="Providers" value={String(profile.providers.length)} sub={profile.providers.map(provider => provider.provider).join(', ') || 'No connections'} />
+                                    <DetailStat label="Created" value={<LocalTime value={profile.account.created_at} />} />
+                                    <DetailStat label="Updated" value={<LocalTime value={profile.account.updated_at} />} />
+                                    <DetailStat label="Engine" value={profile.container.engine || 'openclaw'} sub={profile.container.port ? `Port ${profile.container.port}` : undefined} />
+                                    <DetailStat label="Telegram" value={profile.container.telegram_status || (profile.container.telegram_enabled ? 'enabled' : 'disabled')} sub={profile.container.bot_username ? `@${profile.container.bot_username}` : undefined} />
+                                    <DetailStat label="Memory" value={profile.container.memory_usage_mb ? `${profile.container.memory_usage_mb} MB` : '–'} sub={profile.container.memory_percent !== undefined ? `${profile.container.memory_percent}% of limit` : undefined} />
+                                    <DetailStat label="Health" value={profile.container.health || '–'} sub={profile.container.last_health_check ? <>Checked <LocalTime value={profile.container.last_health_check} /></> : undefined} />
+                                </div>
+                                {profile.container.error ? <Banner variant="warn" className="mt-3">{profile.container.error}</Banner> : null}
+                            </DrawerSection>
 
-                                <DrawerSection icon={Coins} title="Subscription & Credits">
-                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                        <DetailStat label="Plan" value={profile.subscription.plan} />
-                                        <DetailStat label="Credits" value={formatNumber(profile.subscription.credits)} />
-                                        <DetailStat label="Subscription ID" value={profile.subscription.subscription_id || '—'} />
-                                        <DetailStat label="Start" value={formatDateTime(profile.subscription.subscription_start)} />
-                                        <DetailStat label="End" value={formatDateTime(profile.subscription.subscription_end)} />
-                                        <DetailStat label="Flags" value={profile.subscription.subscription_cancelled ? 'Cancelled' : 'Active'} sub={profile.subscription.telegram_bot_enabled ? 'Telegram bot enabled' : 'Telegram bot disabled'} />
-                                    </div>
-                                </DrawerSection>
+                            <DrawerSection icon={Coins} title="Subscription and credits">
+                                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                                    <DetailStat label="Plan" value={<PlanBadge plan={profile.subscription.plan} />} />
+                                    <DetailStat label="Credits" value={formatNumber(profile.subscription.credits)} />
+                                    <DetailStat label="Subscription ID" value={<span className="font-mono text-meta break-all">{profile.subscription.subscription_id || '–'}</span>} />
+                                    <DetailStat label="Start" value={<LocalTime value={profile.subscription.subscription_start} />} />
+                                    <DetailStat label="End" value={<LocalTime value={profile.subscription.subscription_end} />} />
+                                    <DetailStat label="Flags" value={profile.subscription.subscription_cancelled ? 'Cancelled' : 'Active'} sub={profile.subscription.telegram_bot_enabled ? 'Telegram bot enabled' : 'Telegram bot disabled'} />
+                                </div>
+                            </DrawerSection>
 
-                                <DrawerSection icon={Link2} title="Integrations">
-                                    {profile.providers.length === 0 ? <EmptyState title="No connected providers" description="This user has not connected any OAuth providers with active tokens." /> : (
-                                        <div className="space-y-3">
-                                            {profile.providers.map(provider => (
-                                                <div key={`${provider.provider}-${provider.provider_account_id || provider.updated_at || 'provider'}`} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="text-sm font-semibold capitalize text-white">{provider.provider}</span>
-                                                        <SignalPill tone="emerald">Connected</SignalPill>
-                                                        {provider.has_refresh_token ? <SignalPill tone="cyan">Refresh token</SignalPill> : null}
-                                                    </div>
-                                                    <div className="mt-3 grid gap-2 text-sm text-zinc-400 sm:grid-cols-2">
-                                                        <div>Account: {provider.provider_account_id || '—'}</div>
-                                                        <div>Token type: {provider.token_type || '—'}</div>
-                                                        <div>Scopes: {provider.scope?.join(', ') || '—'}</div>
-                                                        <div>Updated: {formatDateTime(provider.updated_at)}</div>
-                                                    </div>
+                            <DrawerSection icon={Link2} title="Integrations">
+                                {profile.providers.length === 0 ? <EmptyNote title="No connected providers" description="This user has not connected any OAuth providers with active tokens." /> : (
+                                    <div className="space-y-3">
+                                        {profile.providers.map(provider => (
+                                            <InnerCard key={`${provider.provider}-${provider.provider_account_id || provider.updated_at || 'provider'}`}>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-body font-medium capitalize">{provider.provider}</span>
+                                                    <SignalPill tone="up">Connected</SignalPill>
+                                                    {provider.has_refresh_token ? <SignalPill tone="info">Refresh token</SignalPill> : null}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </DrawerSection>
+                                                <dl className="mt-3 grid gap-2 text-body-sm text-fg-secondary sm:grid-cols-2">
+                                                    <div><dt className="inline text-fg-muted">Account: </dt><dd className="inline font-mono break-all">{provider.provider_account_id || '–'}</dd></div>
+                                                    <div><dt className="inline text-fg-muted">Token type: </dt><dd className="inline">{provider.token_type || '–'}</dd></div>
+                                                    <div><dt className="inline text-fg-muted">Scopes: </dt><dd className="inline break-all">{provider.scope?.join(', ') || '–'}</dd></div>
+                                                    <div><dt className="inline text-fg-muted">Updated: </dt><dd className="inline"><LocalTime value={provider.updated_at} /></dd></div>
+                                                </dl>
+                                            </InnerCard>
+                                        ))}
+                                    </div>
+                                )}
+                            </DrawerSection>
 
-                                <DrawerSection icon={Globe} title="Google Properties & Sites">
-                                    {profile.google_inventory.warnings.length ? <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">{profile.google_inventory.warnings.map((warning, index) => <div key={index}>{warning}</div>)}</div> : null}
-                                    {reportError && (
-                                        <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{reportError}</div>
-                                    )}
-                                    {!profile.google_inventory.connected ? <EmptyState title="Google not connected" description="GA4 properties and Search Console sites will appear here once the user connects Google." /> : (
-                                        <div className="space-y-6">
-                                            <div className="space-y-3">
-                                                <div className="text-xs uppercase tracking-wider text-zinc-500">GA4 Properties</div>
-                                                {profile.google_inventory.ga_properties.length === 0 ? <EmptyState title="No properties returned" description="The live GA inventory request returned no accessible properties." /> : profile.google_inventory.ga_properties.map(property => {
-                                                    const gscSites = profile.google_inventory.gsc_sites.filter(s => s.site_url)
-                                                    const hasGsc = gscSites.length > 0
-                                                    const defaultSiteUrl = matchGscSite(property.display_name, gscSites)
-                                                    const weeklyKey = `${property.property_id}:weekly`
-                                                    const monthlyKey = `${property.property_id}:monthly`
-                                                    const emailWeeklyKey = `email-${property.property_id}:weekly`
-                                                    const emailMonthlyKey = `email-${property.property_id}:monthly`
-                                                    return (
-                                                        <PropertyReportCard
-                                                            key={property.property_id}
-                                                            property={property}
-                                                            gscSites={gscSites}
-                                                            hasGsc={hasGsc}
-                                                            defaultSiteUrl={defaultSiteUrl}
-                                                            reportLoadingKey={reportLoadingKey}
-                                                            weeklyKey={weeklyKey}
-                                                            monthlyKey={monthlyKey}
-                                                            onGenerate={handleGenerateReport}
-                                                            userEmail={user.email || null}
-                                                            emailLoadingKey={emailLoadingKey}
-                                                            emailWeeklyKey={emailWeeklyKey}
-                                                            emailMonthlyKey={emailMonthlyKey}
-                                                            onEmailReport={handleEmailReport}
-                                                        />
-                                                    )
-                                                })}
-                                            </div>
-                                            <div className="space-y-3">
-                                                <div className="text-xs uppercase tracking-wider text-zinc-500">Search Console Sites</div>
-                                                {profile.google_inventory.ga_properties.length === 0 && profile.google_inventory.gsc_sites.length > 0 ? (
-                                                    <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4 text-sm text-cyan-100">
-                                                        GA4 properties are unavailable for this user. Reports below will use Search Console data only.
-                                                    </div>
-                                                ) : null}
-                                                {profile.google_inventory.gsc_sites.length === 0 ? <EmptyState title="No sites returned" description="The live Search Console request returned no verified sites." /> : profile.google_inventory.gsc_sites.map(site => {
-                                                    const siteKey = site.site_url || `site-${site.permission_level || 'unknown'}`
-                                                    const weeklyKey = `${siteKey}:weekly`
-                                                    const monthlyKey = `${siteKey}:monthly`
-                                                    const emailWeeklyKey = `email-${siteKey}:weekly`
-                                                    const emailMonthlyKey = `email-${siteKey}:monthly`
-                                                    return profile.google_inventory.ga_properties.length === 0 ? (
-                                                        <SearchConsoleReportCard
-                                                            key={siteKey}
-                                                            site={site}
-                                                            reportLoadingKey={reportLoadingKey}
-                                                            weeklyKey={weeklyKey}
-                                                            monthlyKey={monthlyKey}
-                                                            onGenerate={handleGenerateReport}
-                                                            userEmail={user.email || null}
-                                                            emailLoadingKey={emailLoadingKey}
-                                                            emailWeeklyKey={emailWeeklyKey}
-                                                            emailMonthlyKey={emailMonthlyKey}
-                                                            onEmailReport={handleEmailReport}
-                                                        />
-                                                    ) : (
-                                                        <div key={siteKey} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
-                                                            <div className="text-sm font-semibold text-white break-all">{site.site_url || 'Unknown site'}</div>
-                                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                                {site.permission_level ? <SignalPill tone="emerald">{site.permission_level}</SignalPill> : null}
-                                                                {site.site_type ? <SignalPill tone="zinc">{site.site_type}</SignalPill> : null}
-                                                            </div>
+                            <DrawerSection icon={Globe} title="Google properties and sites">
+                                {profile.google_inventory.warnings.length ? <Banner variant="warn" className="mb-4">{profile.google_inventory.warnings.map((warning, index) => <div key={index}>{warning}</div>)}</Banner> : null}
+                                {reportError && (
+                                    <Banner variant="danger" className="mb-4">{reportError}</Banner>
+                                )}
+                                {!profile.google_inventory.connected ? <EmptyNote title="Google not connected" description="GA4 properties and Search Console sites will appear here once the user connects Google." /> : (
+                                    <div className="space-y-6">
+                                        <div className="space-y-3">
+                                            <SubHeading>GA4 properties</SubHeading>
+                                            {profile.google_inventory.ga_properties.length === 0 ? <EmptyNote title="No properties returned" description="The live GA inventory request returned no accessible properties." /> : profile.google_inventory.ga_properties.map(property => {
+                                                const gscSites = profile.google_inventory.gsc_sites.filter(s => s.site_url)
+                                                const hasGsc = gscSites.length > 0
+                                                const defaultSiteUrl = matchGscSite(property.display_name, gscSites)
+                                                const weeklyKey = `${property.property_id}:weekly`
+                                                const monthlyKey = `${property.property_id}:monthly`
+                                                const emailWeeklyKey = `email-${property.property_id}:weekly`
+                                                const emailMonthlyKey = `email-${property.property_id}:monthly`
+                                                return (
+                                                    <PropertyReportCard
+                                                        key={property.property_id}
+                                                        property={property}
+                                                        gscSites={gscSites}
+                                                        hasGsc={hasGsc}
+                                                        defaultSiteUrl={defaultSiteUrl}
+                                                        reportLoadingKey={reportLoadingKey}
+                                                        weeklyKey={weeklyKey}
+                                                        monthlyKey={monthlyKey}
+                                                        onGenerate={handleGenerateReport}
+                                                        userEmail={user.email || null}
+                                                        emailLoadingKey={emailLoadingKey}
+                                                        emailWeeklyKey={emailWeeklyKey}
+                                                        emailMonthlyKey={emailMonthlyKey}
+                                                        onEmailReport={handleEmailReport}
+                                                    />
+                                                )
+                                            })}
+                                        </div>
+                                        <div className="space-y-3">
+                                            <SubHeading>Search Console sites</SubHeading>
+                                            {profile.google_inventory.ga_properties.length === 0 && profile.google_inventory.gsc_sites.length > 0 ? (
+                                                <Banner variant="info">
+                                                    GA4 properties are unavailable for this user. Reports below will use Search Console data only.
+                                                </Banner>
+                                            ) : null}
+                                            {profile.google_inventory.gsc_sites.length === 0 ? <EmptyNote title="No sites returned" description="The live Search Console request returned no verified sites." /> : profile.google_inventory.gsc_sites.map(site => {
+                                                const siteKey = site.site_url || `site-${site.permission_level || 'unknown'}`
+                                                const weeklyKey = `${siteKey}:weekly`
+                                                const monthlyKey = `${siteKey}:monthly`
+                                                const emailWeeklyKey = `email-${siteKey}:weekly`
+                                                const emailMonthlyKey = `email-${siteKey}:monthly`
+                                                return profile.google_inventory.ga_properties.length === 0 ? (
+                                                    <SearchConsoleReportCard
+                                                        key={siteKey}
+                                                        site={site}
+                                                        reportLoadingKey={reportLoadingKey}
+                                                        weeklyKey={weeklyKey}
+                                                        monthlyKey={monthlyKey}
+                                                        onGenerate={handleGenerateReport}
+                                                        userEmail={user.email || null}
+                                                        emailLoadingKey={emailLoadingKey}
+                                                        emailWeeklyKey={emailWeeklyKey}
+                                                        emailMonthlyKey={emailMonthlyKey}
+                                                        onEmailReport={handleEmailReport}
+                                                    />
+                                                ) : (
+                                                    <InnerCard key={siteKey}>
+                                                        <div className="font-mono text-body font-medium break-all">{site.site_url || 'Unknown site'}</div>
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            {site.permission_level ? <SignalPill>{site.permission_level}</SignalPill> : null}
+                                                            {site.site_type ? <SignalPill>{site.site_type}</SignalPill> : null}
                                                         </div>
-                                                    )
-                                                })}
-                                            </div>
+                                                    </InnerCard>
+                                                )
+                                            })}
                                         </div>
-                                    )}
-                                </DrawerSection>
-
-                                <DrawerSection icon={Activity} title="Globe / Embed / Share Usage">
-                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                        <DetailStat label="Active embeds" value={String(profile.globe_assets.summary.active_embed_tokens)} />
-                                        <DetailStat label="Embeds used" value={String(profile.globe_assets.summary.used_embed_tokens)} sub="Tokens with last_used_at" />
-                                        <DetailStat label="Shared dashboards" value={String(profile.globe_assets.summary.shared_dashboards)} sub={`${formatNumber(profile.globe_assets.summary.shared_dashboard_views)} total views`} />
-                                        <DetailStat label="Public dashboards" value={String(profile.globe_assets.summary.public_custom_dashboards)} sub={`${formatNumber(profile.globe_assets.summary.public_custom_dashboard_views)} total views`} />
                                     </div>
-                                    <div className="mt-5 space-y-3">
-                                        <div className="text-xs uppercase tracking-wider text-zinc-500">Embed Tokens</div>
-                                        {profile.globe_assets.embed_tokens.length === 0 ? <EmptyState title="No embed tokens" description="This user is not currently exposing any active globe/embed tokens." /> : profile.globe_assets.embed_tokens.map(token => (
-                                            <div key={token.id} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <div className="text-sm font-semibold text-white">{token.label || token.property_name || token.property_id}</div>
-                                                    <SignalPill tone={token.last_used_at ? 'emerald' : 'zinc'}>{token.last_used_at ? 'Used' : 'Never used'}</SignalPill>
-                                                </div>
-                                                <div className="mt-2 text-xs text-zinc-500">{token.property_name || token.property_id}</div>
-                                                <div className="mt-3 grid gap-2 text-sm text-zinc-400 sm:grid-cols-2">
-                                                    <div>Created: {formatDateTime(token.created_at)}</div>
-                                                    <div>Last used: {formatDateTime(token.last_used_at)}</div>
-                                                    <div className="sm:col-span-2">Allowed origins: {token.allowed_origins.length ? token.allowed_origins.join(', ') : 'Any origin'}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="mt-5 space-y-3">
-                                        <div className="text-xs uppercase tracking-wider text-zinc-500">Shared Dashboards</div>
-                                        {profile.shared_dashboards.length === 0 ? <EmptyState title="No shared dashboards" description="This user has not published any active shared dashboard links." /> : profile.shared_dashboards.map(share => (
-                                            <div key={share.id} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <div className="text-sm font-semibold text-white break-all">{share.site_url || share.property_name || share.property_id}</div>
-                                                    <SignalPill tone="amber">{formatNumber(share.views)} views</SignalPill>
-                                                </div>
-                                                <div className="mt-2 text-xs text-zinc-500">{share.property_name || share.property_id}</div>
-                                                <div className="mt-3 grid gap-2 text-sm text-zinc-400 sm:grid-cols-2">
-                                                    <div>Created: {formatDateTime(share.created_at)}</div>
-                                                    <div>Last viewed: {formatDateTime(share.last_viewed_at)}</div>
-                                                    <div className="sm:col-span-2">Widgets: {Object.entries(share.config || {}).filter(([, enabled]) => enabled).map(([key]) => key).join(', ') || 'Default config'}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </DrawerSection>
+                                )}
+                            </DrawerSection>
 
-                                <DrawerSection icon={LayoutDashboard} title="Custom Dashboards">
-                                    {profile.custom_dashboards.length === 0 ? <EmptyState title="No custom dashboards" description="This user has not created any active custom dashboards yet." /> : (
-                                        <div className="space-y-3">
-                                            {profile.custom_dashboards.map(dashboard => (
-                                                <div key={dashboard.id} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <div className="text-sm font-semibold text-white">{dashboard.name}</div>
-                                                        {dashboard.is_public ? <SignalPill tone="emerald">Public</SignalPill> : null}
-                                                        {dashboard.has_share_link ? <SignalPill tone="cyan">Share link</SignalPill> : null}
-                                                        {dashboard.embed_enabled ? <SignalPill tone="amber">Embed enabled</SignalPill> : null}
-                                                        <SignalPill tone="zinc">{dashboard.widget_count} widgets</SignalPill>
-                                                    </div>
-                                                    <div className="mt-2 text-xs text-zinc-500">{dashboard.property_name || dashboard.property_id}</div>
-                                                    {dashboard.description ? <div className="mt-2 text-sm text-zinc-400">{dashboard.description}</div> : null}
-                                                    <div className="mt-3 grid gap-2 text-sm text-zinc-400 sm:grid-cols-2">
-                                                        <div>Site: {dashboard.site_url || '—'}</div>
-                                                        <div>Views: {formatNumber(dashboard.views)}</div>
-                                                        <div>Created: {formatDateTime(dashboard.created_at)}</div>
-                                                        <div>Updated: {formatDateTime(dashboard.updated_at)}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </DrawerSection>
-
-                                <DrawerSection icon={BarChart3} title="Leaderboard">
-                                    {!profile.leaderboard ? <EmptyState title="Not listed" description="This user does not currently have an active leaderboard entry." /> : (
-                                        <div className="space-y-4">
+                            <DrawerSection icon={Activity} title="Globe, embed and share usage">
+                                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                                    <DetailStat label="Active embeds" value={String(profile.globe_assets.summary.active_embed_tokens)} />
+                                    <DetailStat label="Embeds used" value={String(profile.globe_assets.summary.used_embed_tokens)} sub="Tokens with last_used_at" />
+                                    <DetailStat label="Shared dashboards" value={String(profile.globe_assets.summary.shared_dashboards)} sub={`${formatNumber(profile.globe_assets.summary.shared_dashboard_views)} total views`} />
+                                    <DetailStat label="Public dashboards" value={String(profile.globe_assets.summary.public_custom_dashboards)} sub={`${formatNumber(profile.globe_assets.summary.public_custom_dashboard_views)} total views`} />
+                                </div>
+                                <div className="mt-5 space-y-3">
+                                    <SubHeading>Embed tokens</SubHeading>
+                                    {profile.globe_assets.embed_tokens.length === 0 ? <EmptyNote title="No embed tokens" description="This user is not currently exposing any active globe/embed tokens." /> : profile.globe_assets.embed_tokens.map(token => (
+                                        <InnerCard key={token.id}>
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <div className="text-lg font-semibold text-white">{profile.leaderboard.startup_name}</div>
-                                                {profile.leaderboard.is_verified ? <SignalPill tone="emerald">Verified</SignalPill> : <SignalPill tone="zinc">Unverified</SignalPill>}
-                                                {profile.leaderboard.category ? <SignalPill tone="cyan">{profile.leaderboard.category}</SignalPill> : null}
+                                                <div className="text-body font-medium">{token.label || token.property_name || token.property_id}</div>
+                                                <SignalPill tone={token.last_used_at ? 'up' : 'neutral'}>{token.last_used_at ? 'Used' : 'Never used'}</SignalPill>
                                             </div>
-                                            {profile.leaderboard.description ? <div className="text-sm text-zinc-400">{profile.leaderboard.description}</div> : null}
-                                            {profile.leaderboard.website_url ? <a href={profile.leaderboard.website_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-emerald-300 hover:text-emerald-200">{profile.leaderboard.website_url}<ExternalLink className="w-3.5 h-3.5" /></a> : null}
-                                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                                <DetailStat label="Property" value={profile.leaderboard.ga_property_name || profile.leaderboard.ga_property_id || '—'} />
-                                                <DetailStat label="Visitors" value={formatNumber(profile.leaderboard.monthly_visitors)} />
-                                                <DetailStat label="Pageviews" value={formatNumber(profile.leaderboard.monthly_pageviews)} />
-                                                <DetailStat label="Trend" value={formatPercent(profile.leaderboard.visitor_trend)} />
-                                                <DetailStat label="Engagement" value={formatPercent(profile.leaderboard.engagement_rate)} />
-                                                <DetailStat label="Bounce" value={formatPercent(profile.leaderboard.bounce_rate)} />
-                                                <DetailStat label="Avg session" value={formatDuration(profile.leaderboard.avg_session_duration)} />
-                                                <DetailStat label="Refreshed" value={formatDateTime(profile.leaderboard.last_refreshed)} />
+                                            <div className="mt-1 text-meta text-fg-muted">{token.property_name || token.property_id}</div>
+                                            <div className="mt-3 grid gap-2 text-body-sm text-fg-secondary sm:grid-cols-2">
+                                                <div><span className="text-fg-muted">Created: </span><LocalTime value={token.created_at} /></div>
+                                                <div><span className="text-fg-muted">Last used: </span><LocalTime value={token.last_used_at} /></div>
+                                                <div className="sm:col-span-2"><span className="text-fg-muted">Allowed origins: </span>{token.allowed_origins.length ? token.allowed_origins.join(', ') : 'Any origin'}</div>
                                             </div>
-                                        </div>
-                                    )}
-                                </DrawerSection>
+                                        </InnerCard>
+                                    ))}
+                                </div>
+                                <div className="mt-5 space-y-3">
+                                    <SubHeading>Shared dashboards</SubHeading>
+                                    {profile.shared_dashboards.length === 0 ? <EmptyNote title="No shared dashboards" description="This user has not published any active shared dashboard links." /> : profile.shared_dashboards.map(share => (
+                                        <InnerCard key={share.id}>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <div className="text-body font-medium break-all">{share.site_url || share.property_name || share.property_id}</div>
+                                                <SignalPill>{formatNumber(share.views)} views</SignalPill>
+                                            </div>
+                                            <div className="mt-1 text-meta text-fg-muted">{share.property_name || share.property_id}</div>
+                                            <div className="mt-3 grid gap-2 text-body-sm text-fg-secondary sm:grid-cols-2">
+                                                <div><span className="text-fg-muted">Created: </span><LocalTime value={share.created_at} /></div>
+                                                <div><span className="text-fg-muted">Last viewed: </span><LocalTime value={share.last_viewed_at} /></div>
+                                                <div className="sm:col-span-2"><span className="text-fg-muted">Widgets: </span>{Object.entries(share.config || {}).filter(([, enabled]) => enabled).map(([key]) => key).join(', ') || 'Default config'}</div>
+                                            </div>
+                                        </InnerCard>
+                                    ))}
+                                </div>
+                            </DrawerSection>
 
-                                <DrawerSection icon={Clock} title="Recent Events">
-                                    {profile.recent_events.length === 0 ? <EmptyState title="No recent events" description="Container/admin events for this user will appear here." /> : (
-                                        <div className="space-y-3">
-                                            {profile.recent_events.map(event => (
-                                                <div key={event.id} className="rounded-xl border border-white/[0.05] bg-black/25 p-4">
-                                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                                        <div className="text-sm font-semibold capitalize text-white">{event.event_type.replace(/_/g, ' ')}</div>
-                                                        <div className="text-xs text-zinc-500">{event.created_at ? timeAgo(event.created_at) : '—'}</div>
-                                                    </div>
-                                                    {event.details ? <div className="mt-2 text-sm text-zinc-400">{event.details}</div> : null}
-                                                    <div className="mt-2 text-xs text-zinc-600">{event.container_id ? `Container: ${event.container_id}` : 'No container ID'} · {formatDateTime(event.created_at)}</div>
+                            <DrawerSection icon={LayoutDashboard} title="Custom dashboards">
+                                {profile.custom_dashboards.length === 0 ? <EmptyNote title="No custom dashboards" description="This user has not created any active custom dashboards yet." /> : (
+                                    <div className="space-y-3">
+                                        {profile.custom_dashboards.map(dashboard => (
+                                            <InnerCard key={dashboard.id}>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <div className="text-body font-medium">{dashboard.name}</div>
+                                                    {dashboard.is_public ? <SignalPill tone="up">Public</SignalPill> : null}
+                                                    {dashboard.has_share_link ? <SignalPill tone="info">Share link</SignalPill> : null}
+                                                    {dashboard.embed_enabled ? <SignalPill>Embed enabled</SignalPill> : null}
+                                                    <SignalPill>{dashboard.widget_count} widgets</SignalPill>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </DrawerSection>
+                                                <div className="mt-1 text-meta text-fg-muted">{dashboard.property_name || dashboard.property_id}</div>
+                                                {dashboard.description ? <div className="mt-2 text-body-sm text-fg-secondary">{dashboard.description}</div> : null}
+                                                <div className="mt-3 grid gap-2 text-body-sm text-fg-secondary sm:grid-cols-2">
+                                                    <div><span className="text-fg-muted">Site: </span>{dashboard.site_url || '–'}</div>
+                                                    <div><span className="text-fg-muted">Views: </span>{formatNumber(dashboard.views)}</div>
+                                                    <div><span className="text-fg-muted">Created: </span><LocalTime value={dashboard.created_at} /></div>
+                                                    <div><span className="text-fg-muted">Updated: </span><LocalTime value={dashboard.updated_at} /></div>
+                                                </div>
+                                            </InnerCard>
+                                        ))}
+                                    </div>
+                                )}
+                            </DrawerSection>
 
-                                <DrawerSection icon={Terminal} title="Container Logs">
-                                    {profile.logs?.logs || profile.logs?.error ? <pre className="max-h-80 overflow-auto rounded-xl bg-black/50 p-4 text-xs text-zinc-300 whitespace-pre-wrap">{profile.logs?.logs || profile.logs?.error}</pre> : <EmptyState title="No logs available" description="The container has not emitted logs yet, or the runtime is not provisioned." />}
-                                </DrawerSection>
-                            </>
-                        ) : null}
-                    </div>
-                </motion.div>
-            </motion.div>
-        </AnimatePresence>
+                            <DrawerSection icon={BarChart3} title="Leaderboard">
+                                {!profile.leaderboard ? <EmptyNote title="Not listed" description="This user does not currently have an active leaderboard entry." /> : (
+                                    <div className="space-y-4">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <div className="text-title-sm">{profile.leaderboard.startup_name}</div>
+                                            {profile.leaderboard.is_verified ? <SignalPill tone="up">Verified</SignalPill> : <SignalPill>Unverified</SignalPill>}
+                                            {profile.leaderboard.category ? <SignalPill tone="info">{profile.leaderboard.category}</SignalPill> : null}
+                                        </div>
+                                        {profile.leaderboard.description ? <div className="text-body-sm text-fg-secondary">{profile.leaderboard.description}</div> : null}
+                                        {profile.leaderboard.website_url ? <a href={profile.leaderboard.website_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded text-body-sm text-fg-secondary underline-offset-4 hover:text-fg hover:underline">{profile.leaderboard.website_url}<ExternalLink aria-hidden size={14} strokeWidth={1.75} /></a> : null}
+                                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                                            <DetailStat label="Property" value={profile.leaderboard.ga_property_name || profile.leaderboard.ga_property_id || '–'} />
+                                            <DetailStat label="Visitors" value={formatNumber(profile.leaderboard.monthly_visitors)} />
+                                            <DetailStat label="Pageviews" value={formatNumber(profile.leaderboard.monthly_pageviews)} />
+                                            <DetailStat label="Trend" value={formatPercent(profile.leaderboard.visitor_trend)} />
+                                            <DetailStat label="Engagement" value={formatPercent(profile.leaderboard.engagement_rate)} />
+                                            <DetailStat label="Bounce" value={formatPercent(profile.leaderboard.bounce_rate)} />
+                                            <DetailStat label="Avg session" value={formatDuration(profile.leaderboard.avg_session_duration)} />
+                                            <DetailStat label="Refreshed" value={<LocalTime value={profile.leaderboard.last_refreshed} />} />
+                                        </div>
+                                    </div>
+                                )}
+                            </DrawerSection>
+
+                            <DrawerSection icon={Clock} title="Recent events">
+                                {profile.recent_events.length === 0 ? <EmptyNote title="No recent events" description="Container/admin events for this user will appear here." /> : (
+                                    <div className="space-y-3">
+                                        {profile.recent_events.map(event => (
+                                            <InnerCard key={event.id}>
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <div className="text-body font-medium capitalize">{event.event_type.replace(/_/g, ' ')}</div>
+                                                    <TimeAgo value={event.created_at} className="text-meta text-fg-muted" />
+                                                </div>
+                                                {event.details ? <div className="mt-2 text-body-sm text-fg-secondary">{event.details}</div> : null}
+                                                <div className="mt-2 text-meta text-fg-muted">{event.container_id ? <>Container: <span className="font-mono">{event.container_id}</span></> : 'No container ID'} · <LocalTime value={event.created_at} /></div>
+                                            </InnerCard>
+                                        ))}
+                                    </div>
+                                )}
+                            </DrawerSection>
+
+                            <DrawerSection icon={Terminal} title="Container logs">
+                                {profile.logs?.logs || profile.logs?.error ? <pre className="max-h-80 overflow-auto rounded-control border border-border-subtle bg-surface-sunken p-3 font-mono text-meta whitespace-pre-wrap text-fg-secondary">{profile.logs?.logs || profile.logs?.error}</pre> : <EmptyNote title="No logs available" description="The container has not emitted logs yet, or the runtime is not provisioned." />}
+                            </DrawerSection>
+                        </>
+                    ) : null}
+                </div>
+            </Drawer>
+
+            <ConfirmModal
+                open={destroyOpen}
+                onOpenChange={setDestroyOpen}
+                title="Destroy this container?"
+                description="The user record, OAuth tokens and data are preserved. Only the running Docker container is removed."
+                confirmLabel="Destroy container"
+                onConfirm={() => {
+                    setDestroyOpen(false)
+                    onAction('destroy-container', user.github_id)
+                }}
+            />
+        </>
     )
 }
 
 // ─── Queries Tab ─────────────────────────────────────────────────────────────
 
-function QueriesTab({ queries, onRefresh }: { queries: QueryData[]; onRefresh: () => void }) {
+function QueriesTab({ queries, onRefresh, loading }: { queries: QueryData[]; onRefresh: () => void; loading?: boolean }) {
     const [filter, setFilter] = useState<'all' | 'new' | 'read' | 'replied'>('all')
     const [expandedId, setExpandedId] = useState<number | null>(null)
     const [actionLoading, setActionLoading] = useState('')
@@ -2235,7 +2203,7 @@ function QueriesTab({ queries, onRefresh }: { queries: QueryData[]; onRefresh: (
         } catch (err) {
             const message = getErrorMessage(err)
             if (!isSuperadminAuthError(message)) {
-                alert(message)
+                toast.error(message, { duration: 8000 })
             }
         } finally {
             setActionLoading('')
@@ -2251,18 +2219,18 @@ function QueriesTab({ queries, onRefresh }: { queries: QueryData[]; onRefresh: (
         } catch (err) {
             const message = getErrorMessage(err)
             if (!isSuperadminAuthError(message)) {
-                alert(message)
+                toast.error(message, { duration: 8000 })
             }
         } finally {
             setActionLoading('')
         }
     }
 
-    const statusColor = (s: string) => {
-        if (s === 'new') return 'bg-emerald-500/20 text-emerald-400'
-        if (s === 'read') return 'bg-amber-500/20 text-amber-400'
-        if (s === 'replied') return 'bg-cyan-500/20 text-cyan-400'
-        return 'bg-zinc-700 text-zinc-400'
+    const statusTone = (s: string): PillTone => {
+        if (s === 'new') return 'warn'
+        if (s === 'read') return 'info'
+        if (s === 'replied') return 'up'
+        return 'neutral'
     }
 
     const counts = {
@@ -2275,190 +2243,150 @@ function QueriesTab({ queries, onRefresh }: { queries: QueryData[]; onRefresh: (
     return (
         <div className="space-y-4">
             {/* Filter pills */}
-            <div className="flex gap-2 flex-wrap">
-                {(['all', 'new', 'read', 'replied'] as const).map(f => (
-                    <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
-                            filter === f
-                                ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
-                                : 'bg-zinc-900/50 text-zinc-500 border border-white/[0.04] hover:text-zinc-300'
-                        }`}
-                    >
-                        {f} ({counts[f]})
-                    </button>
-                ))}
-            </div>
+            <Tabs
+                variant="pills"
+                ariaLabel="Filter queries by status"
+                value={filter}
+                onValueChange={setFilter}
+                items={(['all', 'new', 'read', 'replied'] as const).map(f => ({
+                    value: f,
+                    label: <span className="capitalize">{f}</span>,
+                    count: counts[f],
+                }))}
+            />
 
             {/* Queries list */}
             <div className="space-y-3">
-                {filtered.length === 0 && (
-                    <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl p-12 text-center">
-                        <MessageSquare className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-                        <p className="text-zinc-600">No {filter === 'all' ? '' : filter} queries yet</p>
-                    </div>
+                {loading && queries.length === 0 && Array.from({ length: 4 }, (_, i) => (
+                    <Card key={i} padding="sm" className="flex items-center gap-3">
+                        <Skeleton rounded="full" className="size-8" />
+                        <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-40" />
+                            <Skeleton className="h-3 w-56" />
+                        </div>
+                    </Card>
+                ))}
+
+                {!loading && filtered.length === 0 && (
+                    <Card padding="none">
+                        <EmptyState
+                            icon={MessageSquare}
+                            title={`No ${filter === 'all' ? '' : `${filter} `}queries yet`}
+                            description="Messages from the contact form show up here."
+                        />
+                    </Card>
                 )}
 
                 {filtered.map(query => (
-                    <div
-                        key={query.id}
-                        className="bg-zinc-900/50 border border-white/[0.04] rounded-xl overflow-hidden"
-                    >
+                    <Card key={query.id} padding="none" className="overflow-hidden">
                         {/* Header row */}
-                        <div
-                            className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                        <button
+                            type="button"
+                            aria-expanded={expandedId === query.id}
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-120 hover:bg-subtle/60"
                             onClick={() => {
                                 setExpandedId(expandedId === query.id ? null : query.id)
                                 if (query.status === 'new') handleStatusUpdate(query.id, 'read')
                             }}
                         >
-                            {/* Avatar */}
-                            <div className="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                                <span className="text-sm font-bold text-emerald-400">
-                                    {query.name[0]?.toUpperCase() || '?'}
-                                </span>
-                            </div>
+                            <Avatar name={query.name} size={32} />
 
                             {/* Name + email */}
-                            <div className="flex-1 min-w-0">
+                            <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm font-semibold text-white truncate">{query.name}</span>
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColor(query.status)}`}>
-                                        {query.status}
-                                    </span>
+                                    <span className="truncate text-body font-medium">{query.name}</span>
+                                    <Pill tone={statusTone(query.status)} dot>{query.status}</Pill>
                                 </div>
-                                <span className="text-xs text-zinc-500 truncate block">{query.email}</span>
+                                <span className="block truncate text-meta text-fg-muted">{query.email}</span>
                             </div>
 
                             {/* Time */}
-                            <span className="text-xs text-zinc-600 whitespace-nowrap flex-shrink-0">
-                                {query.created_at ? timeAgo(query.created_at) : '-'}
-                            </span>
+                            <TimeAgo value={query.created_at} className="shrink-0 text-meta whitespace-nowrap text-fg-muted" />
 
                             {/* Expand chevron */}
-                            <ChevronDown className={`w-4 h-4 text-zinc-600 transition-transform flex-shrink-0 ${expandedId === query.id ? 'rotate-180' : ''}`} />
-                        </div>
+                            <ChevronDown aria-hidden size={16} className={`shrink-0 text-fg-muted transition-transform duration-120 ${expandedId === query.id ? 'rotate-180' : ''}`} />
+                        </button>
 
                         {/* Expanded content */}
                         {expandedId === query.id && (
-                            <div className="border-t border-white/[0.04] px-5 py-4 bg-black/20">
+                            <div className="space-y-4 border-t border-border-subtle bg-surface-sunken px-4 py-4">
                                 {/* Message */}
-                                <div className="mb-4">
-                                    <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Message</div>
-                                    <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed bg-black/30 rounded-lg p-4">
+                                <div>
+                                    <div className="mb-1.5 text-meta font-medium text-fg-muted">Message</div>
+                                    <p className="rounded-control border border-border-subtle bg-surface p-3.5 text-body leading-relaxed whitespace-pre-wrap text-fg">
                                         {query.message}
                                     </p>
                                 </div>
 
                                 {/* Meta */}
-                                <div className="flex items-center gap-4 text-xs text-zinc-600 mb-4">
-                                    <span>ID: #{query.id}</span>
-                                    {query.ip_address && <span>IP: {query.ip_address}</span>}
-                                    {query.created_at && <span>{new Date(query.created_at).toLocaleString()}</span>}
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-fg-muted">
+                                    <span className="font-mono">ID #{query.id}</span>
+                                    {query.ip_address && <span>IP <span className="font-mono">{query.ip_address}</span></span>}
+                                    {query.created_at && <LocalTime value={query.created_at} />}
                                 </div>
 
                                 {/* Actions */}
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <a
-                                        href={`mailto:${query.email}?subject=${encodeURIComponent(`Re: Your ${BRAND_NAME} query`)}&body=${encodeURIComponent(`Hi ${query.name},\n\nThank you for reaching out to ${BRAND_NAME}.\n\n---\nYour original message:\n${query.message}\n`)}`}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 text-xs font-medium hover:bg-emerald-600/30 transition-colors"
-                                    >
-                                        <Mail className="w-3.5 h-3.5" />
-                                        Reply via Email
-                                        <ExternalLink className="w-3 h-3" />
-                                    </a>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Button asChild variant="secondary" size="sm" icon={Mail} trailingIcon={ExternalLink}>
+                                        <a href={`mailto:${query.email}?subject=${encodeURIComponent(`Re: Your ${BRAND_NAME} query`)}&body=${encodeURIComponent(`Hi ${query.name},\n\nThank you for reaching out to ${BRAND_NAME}.\n\n---\nYour original message:\n${query.message}\n`)}`}>
+                                            Reply by email
+                                        </a>
+                                    </Button>
 
                                     {query.status !== 'replied' && (
-                                        <button
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            icon={Check}
+                                            loading={actionLoading === `status-${query.id}`}
                                             onClick={() => handleStatusUpdate(query.id, 'replied')}
-                                            disabled={actionLoading === `status-${query.id}`}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600/20 text-cyan-400 text-xs font-medium hover:bg-cyan-600/30 transition-colors disabled:opacity-50"
                                         >
-                                            <Check className="w-3.5 h-3.5" />
-                                            Mark as Replied
-                                        </button>
+                                            Mark as replied
+                                        </Button>
                                     )}
 
                                     {query.status === 'replied' && (
-                                        <button
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            loading={actionLoading === `status-${query.id}`}
                                             onClick={() => handleStatusUpdate(query.id, 'new')}
-                                            disabled={actionLoading === `status-${query.id}`}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 text-xs font-medium hover:bg-zinc-700 transition-colors disabled:opacity-50"
                                         >
-                                            Mark as New
-                                        </button>
+                                            Mark as new
+                                        </Button>
                                     )}
 
-                                    <button
-                                        onClick={() => setDeleteTarget(query)}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/10 text-red-400 text-xs font-medium hover:bg-red-600/20 transition-colors ml-auto"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                        Delete
-                                    </button>
+                                    <Button variant="secondary" size="sm" className="ml-auto" onClick={() => setDeleteTarget(query)}>
+                                        <span className="inline-flex items-center gap-1.5 text-down">
+                                            <Trash2 aria-hidden size={14} strokeWidth={1.75} />
+                                            Delete
+                                        </span>
+                                    </Button>
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </Card>
                 ))}
             </div>
 
             {/* Delete Confirmation Modal */}
-            <AnimatePresence>
-                {deleteTarget && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-                        onClick={() => setDeleteTarget(null)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-zinc-900 border border-white/[0.08] rounded-2xl p-6 max-w-md w-full"
-                        >
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                                    <AlertTriangle className="w-5 h-5 text-red-400" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-white">Delete Query</h3>
-                                    <p className="text-sm text-zinc-500">From {deleteTarget.name} ({deleteTarget.email})</p>
-                                </div>
-                            </div>
-                            <p className="text-sm text-zinc-400 mb-6">
-                                This will permanently delete this contact query. This action cannot be undone.
-                            </p>
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    onClick={() => setDeleteTarget(null)}
-                                    className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 hover:text-white transition-colors text-sm"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(deleteTarget)}
-                                    disabled={actionLoading === `delete-${deleteTarget.id}`}
-                                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-                                >
-                                    {actionLoading === `delete-${deleteTarget.id}` ? 'Deleting...' : 'Delete Forever'}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <ConfirmModal
+                open={!!deleteTarget}
+                onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+                title="Delete this query?"
+                description={deleteTarget ? `From ${deleteTarget.name} (${deleteTarget.email}). This permanently deletes the contact query. It cannot be undone.` : undefined}
+                confirmLabel="Delete query"
+                loading={!!deleteTarget && actionLoading === `delete-${deleteTarget.id}`}
+                onConfirm={() => deleteTarget ? handleDelete(deleteTarget) : undefined}
+            />
         </div>
     )
 }
 
+
 // ─── Support Tab (in-app help & support inbox) ───────────────────────────────
 
-function SupportTab({ threads, onRefresh }: { threads: SupportThread[]; onRefresh: () => void }) {
+function SupportTab({ threads, onRefresh, loading }: { threads: SupportThread[]; onRefresh: () => void; loading?: boolean }) {
     const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
     const [detail, setDetail] = useState<SupportThreadDetail | null>(null)
     const [loadingDetail, setLoadingDetail] = useState(false)
@@ -2525,22 +2453,28 @@ function SupportTab({ threads, onRefresh }: { threads: SupportThread[]; onRefres
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-260px)] min-h-[520px]">
+        <div className="grid grid-cols-1 gap-4 lg:h-[calc(100dvh-260px)] lg:min-h-[520px] lg:grid-cols-[320px_1fr]">
             {/* Inbox rail */}
-            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl overflow-hidden flex flex-col">
-                <div className="flex items-center justify-between gap-3 border-b border-white/[0.04] px-4 py-3">
+            <Card padding="none" className="flex max-h-[40dvh] flex-col overflow-hidden lg:max-h-none">
+                <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
                     <div className="flex items-center gap-2">
-                        <LifeBuoy className="w-4 h-4 text-emerald-400" />
-                        <span className="text-sm font-semibold text-white">Inbox</span>
+                        <LifeBuoy aria-hidden size={16} strokeWidth={1.75} className="text-fg-muted" />
+                        <h2 className="text-title-sm">Inbox</h2>
                     </div>
-                    <span className="text-[10px] text-zinc-500">{threads.length} {threads.length === 1 ? 'user' : 'users'}</span>
+                    <span className="text-meta text-fg-muted">{threads.length} {threads.length === 1 ? 'user' : 'users'}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                    {threads.length === 0 ? (
-                        <div className="p-12 text-center">
-                            <LifeBuoy className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
-                            <p className="text-zinc-600 text-sm">No support messages yet</p>
+                    {loading && threads.length === 0 ? (
+                        <div className="space-y-4 p-4" aria-busy="true">
+                            {Array.from({ length: 4 }, (_, i) => (
+                                <div key={i} className="space-y-2">
+                                    <Skeleton className="h-4 w-32" />
+                                    <Skeleton className="h-3 w-full" />
+                                </div>
+                            ))}
                         </div>
+                    ) : threads.length === 0 ? (
+                        <EmptyState icon={LifeBuoy} title="No support messages yet" description="Messages from the in-app help form show up here." />
                     ) : (
                         threads.map((t) => (
                             <SupportThreadRow
@@ -2552,46 +2486,45 @@ function SupportTab({ threads, onRefresh }: { threads: SupportThread[]; onRefres
                         ))
                     )}
                 </div>
-            </div>
+            </Card>
 
             {/* Thread + reply pane */}
-            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl overflow-hidden flex flex-col">
+            <Card padding="none" className="flex h-[70dvh] min-h-[420px] flex-col overflow-hidden lg:h-auto">
                 {!selectedUserId ? (
-                    <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm">
+                    <div className="flex flex-1 items-center justify-center p-6 text-body text-fg-muted">
                         Select a thread on the left to start replying.
                     </div>
                 ) : loadingDetail && !detail ? (
-                    <div className="flex-1 flex items-center justify-center text-zinc-500">
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                    <div className="flex-1 space-y-4 p-5" aria-busy="true">
+                        <Skeleton className="h-5 w-48" />
+                        <Skeleton className="h-16 w-2/3" />
+                        <Skeleton className="ml-auto h-12 w-1/2" />
+                        <Skeleton className="h-12 w-3/5" />
                     </div>
                 ) : !detail ? (
-                    <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm">
+                    <div className="flex flex-1 items-center justify-center p-6 text-body text-fg-muted">
                         Couldn’t load thread.
                     </div>
                 ) : (
                     <>
                         {/* User header */}
-                        <div className="border-b border-white/[0.04] px-5 py-3.5 flex items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-5 py-3.5">
                             <div className="min-w-0">
-                                <div className="text-sm font-semibold text-white truncate">
+                                <h2 className="truncate text-title-sm">
                                     {detail.user.github_username || detail.user.email || `User #${detail.user.id}`}
-                                </div>
-                                <div className="flex items-center gap-2 text-[11px] text-zinc-500 mt-0.5">
+                                </h2>
+                                <div className="mt-0.5 flex items-center gap-2 text-meta text-fg-muted">
                                     {detail.user.email && <span className="truncate">{detail.user.email}</span>}
-                                    {detail.user.plan && (
-                                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-semibold uppercase">
-                                            {detail.user.plan}
-                                        </span>
-                                    )}
+                                    {detail.user.plan && <PlanBadge plan={detail.user.plan} />}
                                 </div>
                             </div>
-                            <div className="text-[10px] text-zinc-600">
+                            <div className="shrink-0 text-meta text-fg-muted">
                                 {detail.messages.length} {detail.messages.length === 1 ? 'message' : 'messages'}
                             </div>
                         </div>
 
                         {/* Messages */}
-                        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+                        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
                             {detail.messages.map((m) => (
                                 <SupportInboxMessage key={m.id} msg={m} />
                             ))}
@@ -2599,13 +2532,11 @@ function SupportTab({ threads, onRefresh }: { threads: SupportThread[]; onRefres
 
                         {/* Reply composer */}
                         {error && (
-                            <div className="mx-3 mb-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">
-                                {error}
-                            </div>
+                            <Banner variant="danger" className="mx-3 mb-2">{error}</Banner>
                         )}
-                        <div className="border-t border-white/[0.04] p-3">
-                            <div className="flex items-end gap-2 bg-white/[0.03] border border-white/[0.04] rounded-xl px-3 py-2.5 focus-within:border-emerald-500/30 transition-colors">
-                                <textarea
+                        <div className="border-t border-border-subtle p-3">
+                            <div className="flex items-end gap-2">
+                                <Textarea
                                     value={reply}
                                     onChange={(e) => setReply(e.target.value)}
                                     onKeyDown={(e) => {
@@ -2614,25 +2545,28 @@ function SupportTab({ threads, onRefresh }: { threads: SupportThread[]; onRefres
                                             void handleReply()
                                         }
                                     }}
+                                    aria-label="Reply"
                                     placeholder="Type your reply… (⌘/Ctrl+Enter to send)"
-                                    className="flex-1 bg-transparent text-sm text-white placeholder-zinc-600 focus:outline-none resize-none leading-relaxed"
+                                    className="flex-1"
                                     rows={2}
                                     disabled={sending}
                                     style={{ minHeight: '44px', maxHeight: '160px' }}
                                 />
-                                <button
+                                <Button
+                                    variant="primary"
+                                    iconOnly
+                                    icon={Send}
+                                    size="lg"
+                                    loading={sending}
+                                    disabled={!reply.trim()}
                                     onClick={handleReply}
-                                    disabled={!reply.trim() || sending}
-                                    className="w-9 h-9 rounded-full bg-zinc-700 flex items-center justify-center enabled:bg-emerald-500 enabled:text-white text-zinc-500 transition-all enabled:hover:bg-emerald-400 flex-shrink-0"
                                     aria-label="Send reply"
-                                >
-                                    {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                                </button>
+                                />
                             </div>
                         </div>
                     </>
                 )}
-            </div>
+            </Card>
         </div>
     )
 }
@@ -2650,31 +2584,32 @@ function SupportThreadRow({
     return (
         <button
             onClick={onSelect}
-            className={`w-full text-left px-4 py-3 border-b border-white/[0.03] transition-colors ${
-                selected ? 'bg-emerald-500/[0.06]' : 'hover:bg-white/[0.02]'
+            aria-current={selected ? 'true' : undefined}
+            className={`w-full border-b border-border-subtle px-4 py-3 text-left transition-colors duration-120 ${
+                selected ? 'bg-subtle' : 'hover:bg-subtle/60'
             }`}
         >
-            <div className="flex items-center justify-between gap-2 mb-1">
-                <div className="flex items-center gap-2 min-w-0">
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${hasUnread ? 'bg-emerald-400' : 'bg-zinc-700'}`} />
-                    <span className="text-sm font-semibold text-white truncate">
+            <div className="mb-1 flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                    <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${hasUnread ? 'bg-brand' : 'bg-border-strong'}`} />
+                    <span className="truncate text-body font-medium">
                         {thread.github_username || thread.email || `User #${thread.user_id}`}
                     </span>
                 </div>
                 {hasUnread && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-black text-[10px] font-bold leading-none flex-shrink-0">
+                    <Badge variant="brand" aria-label={`${thread.unread_user_count} unread`}>
                         {thread.unread_user_count}
-                    </span>
+                    </Badge>
                 )}
             </div>
-            <p className="text-[12px] text-zinc-500 line-clamp-2 leading-snug">
+            <p className="line-clamp-2 text-body-sm text-fg-muted">
                 {thread.last_message_author === 'admin' ? 'You: ' : ''}
                 {thread.last_message_preview}
             </p>
-            <div className="flex items-center gap-2 mt-1.5 text-[10px] text-zinc-600">
-                {thread.plan && <span className="uppercase tracking-wide">{thread.plan}</span>}
-                <span>·</span>
-                <span>{formatRelativeTime(thread.last_message_at)}</span>
+            <div className="mt-1.5 flex items-center gap-2 text-meta text-fg-muted">
+                {thread.plan && <span className="capitalize">{thread.plan}</span>}
+                {thread.plan && <span aria-hidden>·</span>}
+                <TimeAgoOrDate value={thread.last_message_at} />
             </div>
         </button>
     )
@@ -2685,26 +2620,25 @@ function SupportInboxMessage({ msg }: { msg: SupportThreadMessage }) {
     return (
         <div className={`flex gap-3 ${isAdmin ? 'flex-row-reverse' : 'flex-row'}`}>
             <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                    isAdmin ? 'bg-gradient-to-br from-emerald-400 to-cyan-400 text-black' : 'bg-cyan-500/15 text-cyan-300'
+                aria-hidden
+                className={`flex size-7 shrink-0 items-center justify-center rounded-full text-caption font-semibold ${
+                    isAdmin ? 'bg-brand text-brand-fg' : 'bg-subtle text-fg-secondary'
                 }`}
             >
                 {isAdmin ? 'TC' : 'U'}
             </div>
-            <div className={`min-w-0 max-w-[80%] flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}>
-                <div className="flex items-center gap-2 mb-1 px-1">
-                    <span className="text-[11px] font-semibold text-zinc-400">
+            <div className={`flex min-w-0 max-w-[80%] flex-col ${isAdmin ? 'items-end' : 'items-start'}`}>
+                <div className="mb-1 flex items-center gap-2 px-1">
+                    <span className="text-meta font-medium text-fg-secondary">
                         {isAdmin ? 'You (Support)' : 'User'}
                     </span>
-                    <span className="text-[10px] text-zinc-600">
-                        {formatRelativeTime(msg.created_at)}
-                    </span>
+                    <TimeAgoOrDate value={msg.created_at} className="text-meta text-fg-muted" />
                 </div>
                 <div
-                    className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                    className={`rounded-2xl px-4 py-2.5 text-body leading-relaxed break-words whitespace-pre-wrap ${
                         isAdmin
-                            ? 'bg-emerald-500/15 text-emerald-50 border border-emerald-500/20 rounded-tr-md'
-                            : 'bg-white/[0.04] text-zinc-100 border border-white/[0.06] rounded-tl-md'
+                            ? 'rounded-tr-md bg-brand-soft text-fg'
+                            : 'rounded-tl-md border border-border-subtle bg-surface-sunken text-fg'
                     }`}
                 >
                     {msg.content}
@@ -2714,32 +2648,21 @@ function SupportInboxMessage({ msg }: { msg: SupportThreadMessage }) {
     )
 }
 
-function formatRelativeTime(iso: string | null): string {
-    if (!iso) return ''
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return ''
-    const diffMin = Math.round((Date.now() - d.getTime()) / 60000)
-    if (diffMin < 1) return 'just now'
-    if (diffMin < 60) return `${diffMin}m ago`
-    const diffHr = Math.round(diffMin / 60)
-    if (diffHr < 24) return `${diffHr}h ago`
-    const diffDay = Math.round(diffHr / 24)
-    if (diffDay < 7) return `${diffDay}d ago`
-    return d.toLocaleDateString()
-}
-
 // ─── Leaderboard Tab ─────────────────────────────────────────────────────────
 
 function LeaderboardTab({
     entries,
     onRefresh,
+    loading,
 }: {
     entries: LeaderboardModerationEntry[]
     onRefresh: () => void
+    loading?: boolean
 }) {
     const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'mismatch' | 'inactive'>('all')
     const [busyId, setBusyId] = useState<number | null>(null)
     const [actionError, setActionError] = useState('')
+    const [deleteEntry, setDeleteEntry] = useState<LeaderboardModerationEntry | null>(null)
 
     const filtered = entries.filter((e) => {
         if (filter === 'verified') return e.verification_status === 'verified' && e.is_active
@@ -2750,7 +2673,6 @@ function LeaderboardTab({
     })
 
     async function moderate(entryId: number, action: 'verify' | 'unverify' | 'activate' | 'deactivate' | 'delete') {
-        if (action === 'delete' && !confirm('Hard-delete this entry and its history? This cannot be undone.')) return
         setBusyId(entryId)
         setActionError('')
         try {
@@ -2772,235 +2694,214 @@ function LeaderboardTab({
         { key: 'inactive', label: 'Hidden', count: entries.filter((e) => !e.is_active).length },
     ]
 
-    return (
-        <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl">
-            <div className="flex items-center justify-between gap-3 border-b border-white/[0.04] p-4">
-                <div className="flex flex-wrap gap-2">
-                    {FILTERS.map((f) => (
-                        <button
-                            key={f.key}
-                            onClick={() => setFilter(f.key)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                                filter === f.key
-                                    ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-600/30'
-                                    : 'bg-zinc-800/50 text-zinc-400 border border-white/[0.04] hover:text-white'
-                            }`}
+    const columns: TableColumn<LeaderboardModerationEntry>[] = [
+        {
+            key: 'startup',
+            header: 'Startup',
+            cell: (entry) => (
+                <div className="flex items-center gap-2">
+                    <Badge variant="neutral">#{entry.id}</Badge>
+                    <div className="min-w-0">
+                        <div className="max-w-[260px] truncate font-medium">{entry.startup_name}</div>
+                        {entry.website_url && (
+                            <a
+                                href={entry.website_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded text-meta text-fg-muted underline-offset-4 hover:text-fg hover:underline"
+                            >
+                                {entry.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                            </a>
+                        )}
+                    </div>
+                </div>
+            ),
+        },
+        {
+            key: 'owner',
+            header: 'Owner',
+            cell: (entry) =>
+                entry.user ? (
+                    <div>
+                        <div className="text-body-sm">{entry.user.github_username || entry.user.email || '–'}</div>
+                        <div className="font-mono text-meta text-fg-muted">{entry.user.github_id || `id:${entry.user.id}`}</div>
+                    </div>
+                ) : (
+                    <span className="text-fg-muted">–</span>
+                ),
+        },
+        {
+            key: 'property',
+            header: 'GA property',
+            cell: (entry) => entry.ga_property_id ? <span className="font-mono text-meta text-fg-secondary">{entry.ga_property_id}</span> : <span className="text-fg-muted">none</span>,
+        },
+        { key: 'visitors', header: 'Visitors', align: 'right', cell: (entry) => formatNumber(entry.monthly_visitors) },
+        { key: 'status', header: 'Status', cell: (entry) => <ModerationStatusPill status={entry.verification_status} isActive={entry.is_active} /> },
+        {
+            key: 'actions',
+            header: 'Actions',
+            align: 'right',
+            cell: (entry) => (
+                <div className="flex items-center justify-end gap-1.5">
+                    {entry.verification_status !== 'verified' ? (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={ShieldCheck}
+                            disabled={busyId === entry.id}
+                            title="Force verify"
+                            onClick={() => moderate(entry.id, 'verify')}
                         >
-                            {f.label}
-                            <span className="ml-1.5 text-zinc-500">{f.count}</span>
-                        </button>
-                    ))}
+                            Verify
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={ShieldOff}
+                            disabled={busyId === entry.id}
+                            title="Strip verified"
+                            onClick={() => moderate(entry.id, 'unverify')}
+                        >
+                            Unverify
+                        </Button>
+                    )}
+                    {entry.is_active ? (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={EyeOff}
+                            disabled={busyId === entry.id}
+                            title="Hide from public board"
+                            onClick={() => moderate(entry.id, 'deactivate')}
+                        >
+                            Hide
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={Eye}
+                            disabled={busyId === entry.id}
+                            title="Show on public board"
+                            onClick={() => moderate(entry.id, 'activate')}
+                        >
+                            Show
+                        </Button>
+                    )}
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        loading={busyId === entry.id}
+                        title="Hard-delete entry + history"
+                        onClick={() => setDeleteEntry(entry)}
+                    >
+                        <span className="inline-flex items-center gap-1.5 text-down">
+                            <Trash2 aria-hidden size={14} strokeWidth={1.75} />
+                            Delete
+                        </span>
+                    </Button>
                 </div>
-                <button
-                    onClick={onRefresh}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800/50 border border-white/[0.04] text-zinc-400 hover:text-white text-xs"
-                >
-                    <RefreshCw className="w-3 h-3" />
-                    Refresh
-                </button>
-            </div>
+            ),
+        },
+    ]
 
+    return (
+        <div className="space-y-4">
             {actionError && (
-                <div className="m-4 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
-                    {actionError}
-                </div>
+                <Banner variant="danger" onDismiss={() => setActionError('')}>{actionError}</Banner>
             )}
 
-            {filtered.length === 0 ? (
-                <p className="text-center py-12 text-sm text-zinc-600">No entries match this filter.</p>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-zinc-950/40 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
-                            <tr>
-                                <th className="text-left px-4 py-3">Startup</th>
-                                <th className="text-left px-4 py-3">Owner</th>
-                                <th className="text-left px-4 py-3">GA Property</th>
-                                <th className="text-right px-4 py-3">Visitors</th>
-                                <th className="text-left px-4 py-3">Status</th>
-                                <th className="text-right px-4 py-3">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map((entry) => (
-                                <tr key={entry.id} className="border-t border-white/[0.04]">
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-zinc-800 text-[10px] font-semibold text-zinc-300">
-                                                #{entry.id}
-                                            </span>
-                                            <div className="min-w-0">
-                                                <div className="truncate font-medium text-white">{entry.startup_name}</div>
-                                                {entry.website_url && (
-                                                    <a
-                                                        href={entry.website_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-[11px] text-zinc-500 hover:text-emerald-400"
-                                                    >
-                                                        {entry.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-xs text-zinc-400">
-                                        {entry.user ? (
-                                            <div>
-                                                <div className="text-zinc-300">{entry.user.github_username || entry.user.email || '—'}</div>
-                                                <div className="text-[10px] text-zinc-600">{entry.user.github_id || `id:${entry.user.id}`}</div>
-                                            </div>
-                                        ) : (
-                                            <span className="text-zinc-600">—</span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3 text-[11px] font-mono text-zinc-400">
-                                        {entry.ga_property_id || <span className="text-zinc-600">none</span>}
-                                    </td>
-                                    <td className="px-4 py-3 text-right tabular-nums text-zinc-200">
-                                        {formatNumber(entry.monthly_visitors)}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <ModerationStatusPill status={entry.verification_status} isActive={entry.is_active} />
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center justify-end gap-1">
-                                            {entry.verification_status !== 'verified' ? (
-                                                <button
-                                                    onClick={() => moderate(entry.id, 'verify')}
-                                                    disabled={busyId === entry.id}
-                                                    className="inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50"
-                                                    title="Force verify"
-                                                >
-                                                    <ShieldCheck className="w-3 h-3" /> Verify
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    onClick={() => moderate(entry.id, 'unverify')}
-                                                    disabled={busyId === entry.id}
-                                                    className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
-                                                    title="Strip verified"
-                                                >
-                                                    <ShieldOff className="w-3 h-3" /> Unverify
-                                                </button>
-                                            )}
-                                            {entry.is_active ? (
-                                                <button
-                                                    onClick={() => moderate(entry.id, 'deactivate')}
-                                                    disabled={busyId === entry.id}
-                                                    className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-zinc-800/50 px-2 py-1 text-[10px] font-medium text-zinc-300 hover:bg-zinc-700/50 disabled:opacity-50"
-                                                    title="Hide from public board"
-                                                >
-                                                    <EyeOff className="w-3 h-3" /> Hide
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    onClick={() => moderate(entry.id, 'activate')}
-                                                    disabled={busyId === entry.id}
-                                                    className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-zinc-800/50 px-2 py-1 text-[10px] font-medium text-zinc-300 hover:bg-zinc-700/50 disabled:opacity-50"
-                                                    title="Show on public board"
-                                                >
-                                                    <Eye className="w-3 h-3" /> Show
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => moderate(entry.id, 'delete')}
-                                                disabled={busyId === entry.id}
-                                                className="inline-flex items-center gap-1 rounded-md border border-red-500/20 bg-red-500/10 px-2 py-1 text-[10px] font-medium text-red-300 hover:bg-red-500/20 disabled:opacity-50"
-                                                title="Hard-delete entry + history"
-                                            >
-                                                {busyId === entry.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            <Table<LeaderboardModerationEntry>
+                caption="Leaderboard moderation"
+                columns={columns}
+                rows={filtered}
+                rowKey={(entry) => String(entry.id)}
+                loading={loading && entries.length === 0}
+                density="comfortable"
+                empty={<EmptyState variant="inline" icon={Trophy} title="No entries match this filter" description="Pick another filter to see more entries." />}
+                toolbar={
+                    <>
+                        <Tabs
+                            variant="pills"
+                            ariaLabel="Filter leaderboard entries"
+                            className="min-w-0 max-w-full"
+                            value={filter}
+                            onValueChange={setFilter}
+                            items={FILTERS.map((f) => ({ value: f.key, label: f.label, count: f.count }))}
+                        />
+                        <Button variant="secondary" size="sm" icon={RefreshCw} className="ml-auto" onClick={onRefresh}>
+                            Refresh
+                        </Button>
+                    </>
+                }
+            />
+
+            <ConfirmModal
+                open={!!deleteEntry}
+                onOpenChange={(open) => { if (!open) setDeleteEntry(null) }}
+                title={`Delete ${deleteEntry?.startup_name ?? 'this entry'}?`}
+                description="This hard-deletes the entry and its history. It cannot be undone."
+                confirmLabel="Delete entry"
+                loading={!!deleteEntry && busyId === deleteEntry.id}
+                onConfirm={async () => {
+                    if (!deleteEntry) return
+                    await moderate(deleteEntry.id, 'delete')
+                    setDeleteEntry(null)
+                }}
+            />
         </div>
     )
 }
 
 function ModerationStatusPill({ status, isActive }: { status: string; isActive: boolean }) {
     if (!isActive) {
-        return (
-            <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.06] bg-zinc-800/60 px-2 py-0.5 text-[10px] font-medium text-zinc-500">
-                Hidden
-            </span>
-        )
+        return <Pill>Hidden</Pill>
     }
     if (status === 'verified') {
-        return (
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
-                <ShieldCheck className="w-3 h-3" /> Verified
-            </span>
-        )
+        return <Pill tone="up" icon={<ShieldCheck aria-hidden size={12} strokeWidth={1.75} />}>Verified</Pill>
     }
     if (status === 'host_mismatch' || status === 'no_web_stream') {
-        return (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">
-                <AlertTriangle className="w-3 h-3" /> Mismatch
-            </span>
-        )
+        return <Pill tone="warn" icon={<AlertTriangle aria-hidden size={12} strokeWidth={1.75} />}>Mismatch</Pill>
     }
     if (status === 'failed') {
-        return (
-            <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-300">
-                Failed
-            </span>
-        )
+        return <Pill tone="down">Failed</Pill>
     }
-    return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-zinc-400">
-            Pending
-        </span>
-    )
+    return <Pill tone="warn" dot>Pending</Pill>
 }
 
 // ─── Events Tab ──────────────────────────────────────────────────────────────
 
-function EventsTab({ events }: { events: EventData[] }) {
-    const eventTypeColor = (type: string) => {
+function EventsTab({ events, loading }: { events: EventData[]; loading?: boolean }) {
+    const eventTypeVariant = (type: string): BadgeVariant => {
         const t = type.toLowerCase()
-        if (t.includes('create') || t.includes('start')) return 'bg-emerald-500/20 text-emerald-400'
-        if (t.includes('delete') || t.includes('destroy')) return 'bg-red-500/20 text-red-400'
-        if (t.includes('stop')) return 'bg-amber-500/20 text-amber-400'
-        if (t.includes('restart')) return 'bg-cyan-500/20 text-cyan-400'
-        return 'bg-zinc-700 text-zinc-400'
+        if (t.includes('create') || t.includes('start')) return 'up'
+        if (t.includes('delete') || t.includes('destroy')) return 'down'
+        if (t.includes('stop')) return 'warn'
+        if (t.includes('restart')) return 'info'
+        return 'neutral'
     }
 
+    const columns: TableColumn<EventData>[] = [
+        { key: 'type', header: 'Event', cell: (event) => <Badge variant={eventTypeVariant(event.event_type)}>{event.event_type}</Badge> },
+        {
+            key: 'user',
+            header: 'User',
+            cell: (event) => event.github_id ? <span className="font-mono text-meta text-fg-secondary">{event.github_id}</span> : <span className="text-fg-muted">–</span>,
+        },
+        { key: 'details', header: 'Details', cell: (event) => <span className="block max-w-[520px] truncate text-fg-secondary" title={event.details}>{event.details}</span> },
+        { key: 'when', header: 'When', align: 'right', cell: (event) => <TimeAgo value={event.timestamp} className="text-meta whitespace-nowrap text-fg-muted" /> },
+    ]
+
     return (
-        <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl p-4">
-            {events.length === 0 && (
-                <p className="text-center py-12 text-zinc-600">No events recorded</p>
-            )}
-            <div className="space-y-3">
-                {events.map((event, i) => (
-                    <div key={event.id || i} className="flex items-start gap-3 py-2 border-b border-white/[0.02] last:border-0">
-                        <div className="mt-0.5">
-                            <Clock className="w-4 h-4 text-zinc-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${eventTypeColor(event.event_type)}`}>
-                                    {event.event_type}
-                                </span>
-                                {event.github_id && (
-                                    <span className="text-xs text-zinc-600">User: {event.github_id}</span>
-                                )}
-                            </div>
-                            <p className="text-sm text-zinc-400 mt-1 truncate">{event.details}</p>
-                        </div>
-                        <span className="text-xs text-zinc-600 whitespace-nowrap shrink-0">
-                            {event.timestamp ? timeAgo(event.timestamp) : '-'}
-                        </span>
-                    </div>
-                ))}
-            </div>
-        </div>
+        <Table<EventData>
+            caption="Container and admin events"
+            columns={columns}
+            rows={events}
+            rowKey={(event, i) => String(event.id || i)}
+            loading={loading && events.length === 0}
+            empty={<EmptyState variant="inline" icon={Clock} title="No events recorded" description="Container and admin events show up here as they happen." />}
+        />
     )
 }
 
@@ -3008,78 +2909,53 @@ function EventsTab({ events }: { events: EventData[] }) {
 
 function SystemTab({ status, capacity }: { status: StatusData | null; capacity: number }) {
     if (!status) {
-        return <p className="text-zinc-600 text-center py-12">Loading system data...</p>
+        return (
+            <div className="space-y-6" aria-busy="true" aria-label="Loading system data">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    {Array.from({ length: 3 }, (_, i) => <AdminStat key={i} label="Loading" loading />)}
+                </div>
+                <Card>
+                    <Skeleton className="mb-4 h-4 w-32" />
+                    <BarList items={[]} metric="neutral" loading limit={3} />
+                </Card>
+            </div>
+        )
     }
 
     const plans = status.plans || { free: 0, starter: 0, pro: 0 }
-    const totalPlans = plans.free + plans.starter + plans.pro || 1
 
     return (
         <div className="space-y-6">
             {/* Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl p-6">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Users className="w-5 h-5 text-emerald-400" />
-                        <span className="text-sm text-zinc-500">Total Users</span>
-                    </div>
-                    <div className="text-4xl font-bold">{status.total_users}</div>
-                    <div className="text-xs text-zinc-600 mt-1">of {status.max_users || 50} max capacity</div>
-                </div>
-                <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl p-6">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Bot className="w-5 h-5 text-cyan-400" />
-                        <span className="text-sm text-zinc-500">Running Containers</span>
-                    </div>
-                    <div className="text-4xl font-bold">{status.running_containers}</div>
-                    <div className="text-xs text-zinc-600 mt-1">active right now</div>
-                </div>
-                <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl p-6">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Server className="w-5 h-5 text-purple-400" />
-                        <span className="text-sm text-zinc-500">Capacity Used</span>
-                    </div>
-                    <div className="text-4xl font-bold">{capacity}%</div>
-                    <div className="w-full bg-zinc-800 rounded-full h-2 mt-3">
-                        <div
-                            className={`h-2 rounded-full transition-all ${capacity > 80 ? 'bg-red-500' : capacity > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                            style={{ width: `${Math.min(capacity, 100)}%` }}
-                        />
-                    </div>
-                </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <AdminStat icon={Users} label="Total users" value={status.total_users} sub={`of ${status.max_users || 50} max capacity`} />
+                <AdminStat icon={Bot} label="Running containers" value={status.running_containers} sub="active right now" />
+                <AdminStat icon={Server} label="Capacity used" value={`${capacity}%`}>
+                    <UsageBar percent={capacity} label="Capacity used" />
+                </AdminStat>
             </div>
 
-            {/* Plan Breakdown Bar Chart */}
-            <div className="bg-zinc-900/50 border border-white/[0.04] rounded-xl p-6">
-                <h3 className="text-sm font-medium text-zinc-400 mb-4">Plan Breakdown</h3>
-                <div className="space-y-4">
-                    <PlanBar label="Free" count={plans.free} total={totalPlans} color="bg-zinc-500" />
-                    <PlanBar label="Starter" count={plans.starter} total={totalPlans} color="bg-cyan-500" />
-                    <PlanBar label="Pro" count={plans.pro} total={totalPlans} color="bg-emerald-500" />
-                </div>
-            </div>
+            {/* Plan Breakdown */}
+            <Card>
+                <CardHeader title="Plan breakdown" description="Users per plan" />
+                <BarList
+                    metric="neutral"
+                    showShare
+                    limit={3}
+                    items={[
+                        { key: 'free', label: 'Free', value: plans.free },
+                        { key: 'starter', label: 'Starter', value: plans.starter },
+                        { key: 'pro', label: 'Pro', value: plans.pro },
+                    ]}
+                />
+            </Card>
         </div>
     )
 }
 
-function PlanBar({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
-    const pct = Math.round((count / total) * 100)
-    return (
-        <div>
-            <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-zinc-400">{label}</span>
-                <span className="text-sm text-zinc-500">{count} ({pct}%)</span>
-            </div>
-            <div className="w-full bg-zinc-800 rounded-full h-3">
-                <div className={`h-3 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
-            </div>
-        </div>
-    )
-}
-
-/* Per-user 👍/👎 cell rendered inside UserRow. Click toggles the inline
- * expand row below. Shows "—" until the aggregate summary loads, then
- * "0/0" if the user has no feedback yet, then "N up / M down" once data. */
+/* Per-user helpful / not helpful cell rendered inside UserRow. Click toggles
+ * the inline expand row below. Counts show 0 until the aggregate summary
+ * loads; the button is disabled while the user has no feedback. */
 function FeedbackCell({ counts, expanded, onToggle }: {
     counts: { up: number; down: number } | null
     expanded: boolean
@@ -3089,23 +2965,24 @@ function FeedbackCell({ counts, expanded, onToggle }: {
     const down = counts?.down ?? 0
     const hasAny = (counts !== null) && (up > 0 || down > 0)
     return (
-        <button
-            type="button"
+        <Button
+            variant={expanded ? 'subtle' : 'secondary'}
+            size="sm"
             onClick={onToggle}
             disabled={!hasAny}
+            aria-expanded={hasAny ? expanded : undefined}
+            aria-label={`${up} helpful, ${down} not helpful${hasAny ? (expanded ? '. Hide feedback' : '. Show recent feedback') : '. No feedback yet'}`}
             title={hasAny ? (expanded ? 'Hide feedback' : 'Show recent feedback') : 'No feedback yet'}
-            className={`inline-flex items-center gap-2 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
-                hasAny
-                    ? expanded
-                        ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-200'
-                        : 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:border-cyan-500/30 hover:bg-cyan-500/[0.08] hover:text-cyan-300'
-                    : 'border-white/[0.04] bg-transparent text-zinc-600 cursor-default'
-            }`}
         >
-            <span className="text-emerald-400">👍 {up}</span>
-            <span className="text-zinc-700">·</span>
-            <span className="text-red-400">👎 {down}</span>
-        </button>
+            <span className="inline-flex items-center gap-1 tabular-nums">
+                <ThumbsUp aria-hidden size={14} strokeWidth={1.75} className="text-up" />
+                {up}
+            </span>
+            <span className="inline-flex items-center gap-1 tabular-nums">
+                <ThumbsDown aria-hidden size={14} strokeWidth={1.75} className="text-down" />
+                {down}
+            </span>
+        </Button>
     )
 }
 
@@ -3116,43 +2993,40 @@ function FeedbackExpandPanel({ detail }: {
     detail: FeedbackItem[] | 'loading' | { error: string } | undefined
 }) {
     if (detail === undefined || detail === 'loading') {
-        return <div className="text-[11px] text-zinc-500">Loading feedback…</div>
+        return <SkeletonText lines={2} className="max-w-md" />
     }
     if (typeof detail === 'object' && !Array.isArray(detail) && 'error' in detail) {
-        return <div className="text-[11px] text-red-400">Failed to load: {detail.error}</div>
+        return <div className="text-body-sm text-down">Failed to load: {detail.error}</div>
     }
     if (detail.length === 0) {
-        return <div className="text-[11px] text-zinc-500">No feedback recorded yet.</div>
+        return <div className="text-body-sm text-fg-muted">No feedback recorded yet.</div>
     }
     return (
         <div className="space-y-2">
             {detail.map(item => (
                 <div
                     key={item.id}
-                    className={`rounded-md border px-3 py-2 ${
-                        item.rating === 'up'
-                            ? 'border-emerald-500/15 bg-emerald-500/[0.04]'
-                            : 'border-red-500/15 bg-red-500/[0.04]'
-                    }`}
+                    className="rounded-control border border-border-subtle bg-surface px-3 py-2.5"
                 >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                        {item.rating === 'up'
+                            ? <ThumbsUp aria-hidden size={14} strokeWidth={1.75} className="mt-0.5 shrink-0 text-up" />
+                            : <ThumbsDown aria-hidden size={14} strokeWidth={1.75} className="mt-0.5 shrink-0 text-down" />}
                         <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider">
-                                <span className={item.rating === 'up' ? 'text-emerald-400' : 'text-red-400'}>
-                                    {item.rating === 'up' ? '👍 Helpful' : '👎 Not helpful'}
+                            <div className="flex flex-wrap items-center gap-x-2 text-meta">
+                                <span className="font-medium text-fg">
+                                    {item.rating === 'up' ? 'Helpful' : 'Not helpful'}
                                 </span>
-                                {item.reason ? <span className="text-zinc-500">· {item.reason}</span> : null}
+                                {item.reason ? <span className="text-fg-muted">· {item.reason}</span> : null}
                                 {item.created_at ? (
-                                    <span className="ml-auto text-zinc-600">
-                                        {new Date(item.created_at).toLocaleString()}
-                                    </span>
+                                    <LocalTime value={item.created_at} className="ml-auto text-fg-muted" />
                                 ) : null}
                             </div>
                             {item.comment ? (
-                                <p className="mt-1 text-[12px] leading-relaxed text-zinc-200">{item.comment}</p>
+                                <p className="mt-1 text-body-sm leading-relaxed text-fg">{item.comment}</p>
                             ) : null}
                             {item.message_excerpt ? (
-                                <p className="mt-1 truncate text-[11px] text-zinc-500" title={item.message_excerpt}>
+                                <p className="mt-1 truncate text-meta text-fg-muted" title={item.message_excerpt}>
                                     Re: {item.message_excerpt.slice(0, 180)}{item.message_excerpt.length > 180 ? '…' : ''}
                                 </p>
                             ) : null}

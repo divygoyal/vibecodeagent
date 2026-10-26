@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Play, Plus, RotateCw, Server, Square, Trash2, ArrowUp, X, Circle, Users } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Circle, Clock, Play, Plus, RotateCw, Server, Square, Trash2, Users, X } from 'lucide-react';
 
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminStat, UsageBar } from '@/components/admin/AdminStat';
@@ -250,7 +250,7 @@ export default function AdminPage() {
                                 icon={Trash2}
                                 aria-label={`Delete ${name}`}
                                 loading={actionLoading === `delete-${user.github_id}`}
-                                className="hover:text-down"
+                                className="hover:text-down!"
                                 onClick={() => setDeleteTarget({ githubId: user.github_id, label: name })}
                             />
                         </Tooltip>
@@ -288,7 +288,7 @@ export default function AdminPage() {
                 <AdminStat icon={Users} label="Total users" value={systemStatus?.total_users ?? '–'} sub="registered accounts" />
                 <AdminStat
                     icon={Server}
-                    label="Running containers"
+                    label="Running"
                     value={systemStatus?.running_containers ?? '–'}
                     sub={`of ${systemStatus?.total_users ?? '–'} containers`}
                 />
@@ -348,7 +348,7 @@ export default function AdminPage() {
                     /* ─── Events Timeline ─── */
                     <Card padding="none">
                         {events.length === 0 ? (
-                            <EmptyState variant="card" icon={Circle} title="No events yet" description="Container events show up here as they happen." />
+                            <EmptyState variant="card" icon={Clock} title="No events yet" description="Container events show up here as they happen." />
                         ) : (
                             <ul className="divide-y divide-border-subtle">
                                 {events.map((event) => {
