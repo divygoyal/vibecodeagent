@@ -6,10 +6,25 @@
  * AI tools see. Server-only.
  */
 import { AdminStoreError, adminStore } from '@/lib/portfolio/adminStore';
-import { NO_PAIR, pairingOverridesFrom } from '@/lib/portfolio/snapshot';
+import { NO_PAIR, pairingOverridesFrom, type StoreAsset } from '@/lib/portfolio/snapshot';
 import type { PairingOverrides } from './pairing';
 
 const TTL_MS = 10 * 60_000;
+
+/**
+ * The resolved pairing of every GA4 property in the store: GA4 property ->
+ * the GSC site URL it is paired with (auto or manual), or null when it is
+ * GA4-only. Missing (no longer accessible) properties are left out.
+ */
+export function storedPairs(assets: Pick<StoreAsset, 'asset_kind' | 'asset_id' | 'paired_with' | 'missing'>[]): Record<string, string | null> {
+    const gsc = new Set(assets.filter((a) => a.asset_kind === 'gsc' && !a.missing).map((a) => a.asset_id));
+    const out: Record<string, string | null> = {};
+    for (const a of assets) {
+        if (a.asset_kind !== 'ga4' || a.missing) continue;
+        out[a.asset_id] = a.paired_with && gsc.has(a.paired_with) ? a.paired_with : null;
+    }
+    return out;
+}
 const cache = new Map<string, { value: PairingOverrides; until: number }>();
 
 /** Overrides of one user (GA4 property -> GSC site URL | null). Empty when the user has none or the store is down. */

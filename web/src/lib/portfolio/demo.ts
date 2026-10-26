@@ -32,12 +32,13 @@ export interface DemoPortfolioOptions {
 
 const DEFAULT_STARRED = ['acmeanalytics.example', 'healthinsights.example'];
 
-interface DemoInventory {
+export interface DemoInventory {
     properties: (Ga4PropertyInput & { accountName?: string })[];
     sites: GscSiteInput[];
 }
 
-function demoInventory(accountKey: string): DemoInventory {
+/** The demo account's Google inventory (GA4 properties with stream URIs, GSC sites), as fetchInventory returns it. */
+export function demoInventory(accountKey: string = DEMO_DEFAULT_ACCOUNT): DemoInventory {
     const account = getDemoAccount(accountKey);
     const summaries = demoAccountSummaries(account) as {
         accountSummaries: { displayName: string; propertySummaries: { property: string; displayName: string }[] }[];

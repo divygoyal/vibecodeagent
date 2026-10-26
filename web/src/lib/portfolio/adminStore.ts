@@ -10,8 +10,11 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const ROW_BATCH = 5000;
 
 export class AdminStoreError extends Error {
-    constructor(public status: number, message: string) {
+    status: number;
+
+    constructor(status: number, message: string) {
         super(message);
+        this.status = status;
     }
 }
 

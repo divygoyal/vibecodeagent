@@ -2,6 +2,7 @@
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
+import useSWR from 'swr';
 import { usePathname, useRouter } from 'next/navigation';
 
 import {
@@ -11,11 +12,17 @@ import {
 } from '@/lib/dashboardSelection';
 import { isRangePreset, LEGACY_RANGES, toLegacyRange } from '@/lib/dateRange';
 import { DEMO_DOMAIN_LABEL } from '@/lib/demoWorkspace';
-import { buildSiteDirectory, siteForSelection } from '@/lib/sites/siteDirectory';
+import { buildSiteDirectory, PAIRS_KEY, siteForSelection } from '@/lib/sites/siteDirectory';
 import { useConnections, usePropertyList, useSiteList } from '@/lib/useDashboardData';
 import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
 import { useChatStore } from '@/stores/chatStore';
 import { WorkspaceContext, type WorkspaceSaveInput } from './workspaceContext';
+
+async function pairsFetcher(url: string): Promise<{ pairs: Record<string, string | null> }> {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return { pairs: {} };
+    return res.json();
+}
 
 type SessionUser = { id?: string; name?: string | null; email?: string | null; image?: string | null };
 
@@ -386,11 +393,19 @@ function InventoryLayer({ children, user, pathname, isSetupRoute, router, getUse
         && !siteInventoryError && !propertyInventoryError
         && typedSites.length === 0 && typedProperties.length === 0;
 
+    // The pairing the portfolio stored (stream URIs + manual overrides), so the switcher,
+    // setup and site pages pair sites exactly like the portfolio and the MCP tools.
+    const { data: pairsData } = useSWR<{ pairs: Record<string, string | null> }>(
+        user && hasGoogleConnection ? PAIRS_KEY : null,
+        pairsFetcher,
+        { revalidateOnFocus: false, dedupingInterval: 60_000 },
+    );
+    const storedPairs = pairsData?.pairs;
     const siteDirectory = useMemo(() => buildSiteDirectory({
         sites: typedSites,
         properties: typedProperties,
-        savedPair: { siteUrl: selectedSite, propertyId: selectedProperty },
-    }), [typedSites, typedProperties, selectedSite, selectedProperty]);
+        pairs: storedPairs,
+    }), [typedSites, typedProperties, storedPairs]);
     const siteDirectoryLoading = hasGoogleConnection ? !(siteInventoryLoaded && propertyInventoryLoaded) && !(siteInventoryError && propertyInventoryError) : false;
 
     // Stale saved selection: old single-site pages send the user to the picker.

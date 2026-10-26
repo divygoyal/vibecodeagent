@@ -7,11 +7,14 @@
  * A site = one hostname with at most one Search Console property (domain
  * preferred, then https, then http) and at most one GA4 property.
  *
- * GA4 pairing here is a name heuristic because the list endpoint has no web
- * stream URIs: a property pairs with the site whose host label appears in its
- * display name ("Acme Analytics – Web" -> acmeanalytics.example). The
- * workspace's saved pair always wins. Replace with lib/sites/pairing.ts
- * pairSites() fed by stream URIs once /api/portfolio exposes them.
+ * GA4 pairing comes from the portfolio store (`pairs`, from
+ * /api/portfolio/pairs): the stream-URI host match plus the user's manual
+ * overrides, exactly what the portfolio cards and the MCP tools use. A
+ * property the store has not seen yet (before the first portfolio sync)
+ * falls back to a name heuristic: it pairs with the site whose host label
+ * appears in its display name ("Acme Analytics – Web" -> acmeanalytics.example).
+ * The saved workspace selection never decides a pairing: it can be stale
+ * (a site from one pick, a property from another).
  *
  * Route keys ([host] in /dashboard/s/[host]):
  *  - lowercase host without www ('acme.com');
@@ -35,9 +38,15 @@ export interface SiteEntry {
 export interface DirectoryInput {
     sites: { siteUrl: string }[];
     properties: { property?: string; propertyId?: string; displayName?: string }[];
-    /** The workspace's saved pair: always paired together. */
-    savedPair?: { siteUrl?: string | null; propertyId?: string | null };
+    /**
+     * Stored pairing (GA4 property -> GSC site URL, or null for GA4-only) from
+     * the portfolio store. Properties listed here never use the heuristic.
+     */
+    pairs?: Record<string, string | null>;
 }
+
+/** SWR key of the stored pairing endpoint (revalidate it after a pairing change). */
+export const PAIRS_KEY = '/api/portfolio/pairs';
 
 const HOST_KEY_RE = /^[a-z0-9.-]+(--\d+)?$|^ga4-\d+$/;
 
@@ -68,7 +77,7 @@ function rank(siteUrl: string): number {
     return 3;
 }
 
-export function buildSiteDirectory({ sites, properties, savedPair }: DirectoryInput): SiteEntry[] {
+export function buildSiteDirectory({ sites, properties, pairs }: DirectoryInput): SiteEntry[] {
     const sorted = [...sites]
         .filter((s) => typeof s?.siteUrl === 'string' && s.siteUrl)
         .sort((a, b) => rank(a.siteUrl) - rank(b.siteUrl) || a.siteUrl.localeCompare(b.siteUrl));
@@ -96,26 +105,32 @@ export function buildSiteDirectory({ sites, properties, savedPair }: DirectoryIn
         .filter((p): p is { id: string; name: string } => Boolean(p.id));
     const paired = new Set<string>();
 
-    // 1. The saved workspace pair.
-    if (savedPair?.siteUrl && savedPair.propertyId) {
-        const e = entries.find((x) => x.gscSiteUrl === savedPair.siteUrl);
-        const p = props.find((x) => x.id === savedPair.propertyId || x.id === `properties/${savedPair.propertyId}`);
-        if (e && p) {
+    // 1. The stored pairing (portfolio store). A property stored as GA4-only stays GA4-only.
+    const decided = new Set<string>();
+    for (const p of props) {
+        if (!pairs || !(p.id in pairs)) continue;
+        decided.add(p.id);
+        const siteUrl = pairs[p.id];
+        if (!siteUrl) continue;
+        const e = entries.find((x) => x.gscSiteUrl === siteUrl && !x.ga4PropertyId);
+        if (e) {
             e.ga4PropertyId = p.id;
             e.ga4Name = p.name;
             paired.add(p.id);
         }
     }
 
-    // 2. Name heuristic: best (longest) host label contained in the display name.
+    // 2. Name heuristic for properties the store has not seen yet: best (longest) host
+    //    label contained in the display name, among sites the store has not paired.
+    const storedSites = new Set(Object.values(pairs ?? {}).filter((v): v is string => Boolean(v)));
     for (const p of props) {
-        if (paired.has(p.id)) continue;
+        if (paired.has(p.id) || decided.has(p.id)) continue;
         const name = compact(p.name);
         if (!name) continue;
         let best: SiteEntry | null = null;
         let bestLen = 0;
         for (const e of entries) {
-            if (e.ga4PropertyId || e.host.includes('--')) continue;
+            if (e.ga4PropertyId || e.host.includes('--') || (e.gscSiteUrl && storedSites.has(e.gscSiteUrl))) continue;
             const label = hostLabel(e.host);
             if (label.length >= 3 && name.includes(label) && label.length > bestLen) {
                 best = e;

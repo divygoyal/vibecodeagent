@@ -3,13 +3,14 @@
 import { useCallback, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
-import useSWR from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 
 import { toast } from '@/components/ui';
 import { useDateRange } from '@/components/shell/DateRangeControl';
 import type { RangePreset } from '@/lib/dateRange';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite, SitePatch } from '@/lib/portfolio/types';
 import { parseFilter, parseSort, type FilterKey, type SortKey } from '@/lib/portfolio/view';
+import { PAIRS_KEY } from '@/lib/sites/siteDirectory';
 import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
 import { PortfolioView } from './PortfolioView';
 
@@ -100,6 +101,8 @@ export function PortfolioPage() {
             toast.error((body as { error?: string }).error || 'Could not save the change', { duration: 8000 });
         }
         await mutate();
+        // The app's site directory (switcher, setup, site pages) reads the stored pairing too.
+        if (patch.ga4Property !== undefined || patch.gscSite !== undefined || patch.resetPairing) void globalMutate(PAIRS_KEY);
         return res.ok;
     }, [mutate]);
 

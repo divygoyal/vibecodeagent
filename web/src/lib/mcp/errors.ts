@@ -15,13 +15,15 @@ export type ToolErrorCode =
     | 'queries_excluded';
 
 export class ToolError extends Error {
-    constructor(
-        public code: ToolErrorCode,
-        message: string,
-        public hint?: string,
-        public retryAfterS?: number,
-    ) {
+    code: ToolErrorCode;
+    hint?: string;
+    retryAfterS?: number;
+
+    constructor(code: ToolErrorCode, message: string, hint?: string, retryAfterS?: number) {
         super(message);
         this.name = 'ToolError';
+        this.code = code;
+        this.hint = hint;
+        this.retryAfterS = retryAfterS;
     }
 }
