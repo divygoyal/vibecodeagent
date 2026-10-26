@@ -4,7 +4,7 @@
  * logged in, take desktop and mobile screenshots, and write a report of HTTP
  * status, console errors, uncaught exceptions and failed requests per route.
  *
- *   node scripts/dev/crawl.mjs <webPort> <outDir> [--user demo|demo2|admin] [--only a,b] [--skip a,b] [--part k/n]
+ *   node scripts/dev/crawl.mjs <webPort> <outDir> [--user demo|demo2|admin] [--host h] [--only a,b] [--skip a,b] [--part k/n]
  *                              [--desktop-only | --mobile-only] [--dark] [--wait ms] [--show-dev-ui]
  *
  * RAM: every route compiled grows the dev server (a full crawl reaches ~3.5 GB).
@@ -26,15 +26,16 @@ const THIRD_PARTY = /tawk\.to|cloudflareinsights|googletagmanager|google-analyti
 
 function usage(msg) {
     if (msg) console.error(`crawl.mjs: ${msg}`);
-    console.error('usage: node scripts/dev/crawl.mjs <webPort> <outDir> [--user demo|demo2|admin] [--only a,b] [--skip a,b] [--desktop-only|--mobile-only] [--dark] [--wait ms] [--show-dev-ui]');
+    console.error('usage: node scripts/dev/crawl.mjs <webPort> <outDir> [--user demo|demo2|admin] [--host h] [--only a,b] [--skip a,b] [--desktop-only|--mobile-only] [--dark] [--wait ms] [--show-dev-ui]');
     process.exit(2);
 }
 
 const argv = process.argv.slice(2);
-const opts = { port: null, out: null, user: 'demo', only: null, skip: [], part: null, desktop: true, mobile: true, dark: false, wait: 1200, showDevUi: false };
+const opts = { port: null, out: null, user: 'demo', host: 'acmeanalytics.example', only: null, skip: [], part: null, desktop: true, mobile: true, dark: false, wait: 1200, showDevUi: false };
 for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--user') opts.user = argv[++i];
+    else if (a === '--host') opts.host = argv[++i];
     else if (a === '--only') opts.only = argv[++i].split(',').map(s => s.trim()).filter(Boolean);
     else if (a === '--skip') opts.skip = argv[++i].split(',').map(s => s.trim()).filter(Boolean);
     else if (a === '--part') {
@@ -107,6 +108,8 @@ function fillRoute(route, seed) {
         if (route === '/embed/[siteId]') return `/embed/${v}`;
         return route.replace(/\[[^\]]+\]/, encodeURIComponent(String(v)));
     }
+    // Site pages: one demo site (--host, default acmeanalytics.example: GA4 + Search Console).
+    if (route.startsWith('/dashboard/s/[host]')) return route.replace('[host]', encodeURIComponent(opts.host));
     return route.replace(/\[\.\.\.[^\]]+\]/g, 'x').replace(/\[[^\]]+\]/g, 'demo-token');
 }
 

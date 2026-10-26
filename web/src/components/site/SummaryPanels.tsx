@@ -141,7 +141,7 @@ export function SearchSummary({ href, className }: { href?: string; className?: 
 
     return (
         <section aria-label="Search" className={cn('flex min-w-0 flex-col gap-3', className)}>
-            <SectionTitle title="Search" source={`Google Search Console · ${label}${d?.lastDate ? ` · data through ${fmtDateRange(d.lastDate, d.lastDate)}` : ''}`} href={hasGsc ? href : undefined} linkLabel="Open Search" />
+            <SectionTitle title="Search" source={hasGsc ? `Google Search Console · ${label}${d?.lastDate ? ` · data through ${fmtDateRange(d.lastDate, d.lastDate)}` : ''}` : 'Google Search Console · not connected'} href={hasGsc ? href : undefined} linkLabel="Open Search" />
             {!hasGsc ? <SourceMissing source="gsc" /> : (
                 <>
                     {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : null}

@@ -53,7 +53,7 @@ export function SearchPage() {
             <SiteHeader
                 section="Search"
                 search
-                source={site.site?.gscKind === 'domain' ? 'Search Console · domain property' : 'Search Console · URL-prefix property'}
+                source={!site.hasGsc ? 'Search Console · not connected' : site.site?.gscKind === 'domain' ? 'Search Console · domain property' : 'Search Console · URL-prefix property'}
                 actions={site.hasGsc ? <AskButton prompt={`How is Google Search doing for ${site.siteHost ?? site.label}? What are the biggest search opportunities right now?`} site={{ ga4: site.ga4, gsc: site.gsc }} from="seo:overview" /> : undefined}
                 tabs={site.hasGsc ? <Tabs<SearchTab> ariaLabel="Search reports" items={ITEMS} value={tab} onValueChange={setTab} panelIdPrefix="search" /> : undefined}
             />
