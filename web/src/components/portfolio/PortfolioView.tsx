@@ -188,6 +188,12 @@ export function PortfolioView(props: PortfolioViewProps) {
                 We fetch 16 months of history once. Numbers fill in as data arrives; you can leave this page.
             </Banner>
         );
+    } else if (data?.state === 'first_sync') {
+        banner = (
+            <Banner variant="info" title="Finding your sites">
+                We&apos;re listing your Search Console and Analytics properties. Cards appear in a few seconds and fill in as data arrives.
+            </Banner>
+        );
     } else if (data?.demo && !readOnly) {
         banner = <Banner variant="neutral">You&apos;re looking at demo data.</Banner>;
     }
