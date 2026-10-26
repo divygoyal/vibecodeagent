@@ -118,7 +118,7 @@ export function DemoSiteCard({ site, portfolio, view = 'search', sparkHeight = 7
         </>
     );
 
-    const base = 'tc-card flex flex-col gap-3 rounded-card border border-border-subtle bg-surface p-4 shadow-card';
+    const base = 'tc-card flex min-w-0 flex-col gap-3 rounded-card border border-border-subtle bg-surface p-4 shadow-card';
     if (!linked) return <div className={cn(base, className)}>{body}</div>;
     return (
         <Link

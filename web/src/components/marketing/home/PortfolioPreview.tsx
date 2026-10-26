@@ -57,7 +57,7 @@ export function PortfolioPreview({ portfolio, cards = 6 }: { portfolio: DemoPort
                 <Total metric="sessions" cur={totals.traffic?.cur.sessions} prev={totals.traffic?.prev?.sessions} />
             </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {sites.map((site, i) => (
                     <DemoSiteCard
                         key={site.key}

@@ -113,7 +113,7 @@ export function DemoPortfolioView({ portfolios }: { portfolios: Record<DemoRange
             </div>
 
             {sites.length ? (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {sites.map((site) => (
                         <DemoSiteCard key={site.key} site={site} portfolio={portfolio} view={view} />
                     ))}
