@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getValidAccessToken } from '@/lib/googleApi';
 import { fetchInventory } from '@/lib/sites/fetchInventory';
 import { pairSites, siteKind } from '@/lib/sites/pairing';
 import { digits, loadMine, requireUser } from '@/lib/leaderboard/owner';
@@ -15,7 +16,8 @@ export async function GET() {
     const auth = await requireUser();
     if ('error' in auth) return auth.error;
     const { user } = auth;
-    const token = user.accessToken;
+    // The session's access token may be an hour old: always go through the refresh logic.
+    const token = await getValidAccessToken(user.accessToken, user.refreshToken).catch(() => null);
     if (!token) {
         return NextResponse.json({ sites: [], errors: { ga4: { status: 401, message: 'Reconnect Google.' } } });
     }

@@ -56,8 +56,6 @@ export function badgeSvg(opts: {
 
     const verified = d.verification.label;
     const visitors = metricText(d.visitors);
-    const delta = d.visitors?.delta_pct;
-    const deltaLabel = deltaText(delta ?? null);
     const rangeLabel = d.range === '3m' ? '3 mo' : d.range;
 
     if (opts.variant === 'minimal' || opts.variant === 'rank') {
@@ -74,22 +72,32 @@ export function badgeSvg(opts: {
 `;
     }
 
-    // stats / live: 300 x 76 card with sparkline.
+    // stats / live: 300 x 76 card with sparkline. Shows visitors, else search clicks, else
+    // says the owner does not share numbers (never a dash that implies "zero").
     const w = 300;
     const h = 76;
+    const primary = d.visitors ?? d.clicks;
+    const primaryText = metricText(primary);
+    const primaryLabel = d.visitors ? 'visitors' : 'search clicks';
+    const primaryDelta = deltaText(primary?.delta_pct ?? null);
     const spark = d.spark ? sparkPath(d.spark.values, 176, 28, 108, 28) : '';
     const live = opts.variant === 'live' && d.live_enabled && opts.liveUsers !== null && opts.liveUsers !== undefined;
     const liveLine = live ? `<circle cx="22" cy="63" r="3.5" fill="${c.live}"/><text x="31" y="67" font-family="${FONT}" font-size="11" fill="${c.muted}">${compact(opts.liveUsers as number)} online now</text>` : '';
-    const deltaColor = (delta ?? 0) >= 0 ? c.up : c.down;
+    const deltaColor = (primary?.delta_pct ?? 0) >= 0 ? c.up : c.down;
+    const numY = live ? 56 : 62;
+    const numSize = live ? 18 : 20;
+    const body = primaryText
+        ? `<text x="16" y="${numY}" font-family="${FONT}" font-size="${numSize}" font-weight="650" fill="${c.fg}">${escapeXml(primaryText)}</text>
+  <text x="${16 + Math.min(primaryText.length, 9) * (live ? 10.5 : 11.5) + 6}" y="${numY}" font-family="${FONT}" font-size="10.5" fill="${c.muted}">${primaryLabel} / ${rangeLabel}</text>`
+        : `<text x="16" y="${numY}" font-family="${FONT}" font-size="12" fill="${c.muted}">Numbers not shared by the owner</text>`;
     return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${name} on ${brand}: ${visitors ? escapeXml(visitors) + ' visitors' : escapeXml(verified)}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${name} on ${brand}: ${primaryText ? escapeXml(primaryText) + ' ' + primaryLabel : escapeXml(verified)}">
   <rect x=".5" y=".5" width="${w - 1}" height="${h - 1}" rx="12" fill="${c.bg}" stroke="${c.border}"/>
   ${check(c, 26, 24)}
   <text x="46" y="21" font-family="${FONT}" font-size="12" font-weight="600" fill="${c.fg}">${name}</text>
   <text x="46" y="35" font-family="${FONT}" font-size="10.5" fill="${c.brand}">${escapeXml(verified)}</text>
-  <text x="16" y="${live ? 56 : 62}" font-family="${FONT}" font-size="${live ? 18 : 20}" font-weight="650" fill="${c.fg}">${visitors ? escapeXml(visitors) : '&#8212;'}</text>
-  <text x="${16 + (visitors ? Math.min(visitors.length, 9) * (live ? 10.5 : 11.5) + 6 : 28)}" y="${live ? 56 : 62}" font-family="${FONT}" font-size="10.5" fill="${c.muted}">visitors / ${rangeLabel}${deltaLabel ? '' : ''}</text>
-  ${deltaLabel ? `<text x="${w - 16}" y="20" text-anchor="end" font-family="${FONT}" font-size="11" font-weight="600" fill="${deltaColor}">${escapeXml(deltaLabel)}</text>` : ''}
+  ${body}
+  ${primaryDelta ? `<text x="${w - 16}" y="20" text-anchor="end" font-family="${FONT}" font-size="11" font-weight="600" fill="${deltaColor}">${escapeXml(primaryDelta)}</text>` : ''}
   ${spark ? `<path d="${spark}" fill="none" stroke="${c.spark}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
   ${liveLine}
   <text x="${w - 16}" y="${h - 9}" text-anchor="end" font-family="${FONT}" font-size="9" fill="${c.muted}">${brand}</text>
