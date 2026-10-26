@@ -309,6 +309,27 @@ class CustomDashboard(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Builder v2 (022_dashboards_v2.sql). v1 rows keep widgets/grid_layouts/theme and are
+    # migrated in memory by the web app; a v2 save writes doc + schema_version 2.
+    schema_version = Column(Integer, nullable=False, default=1)
+    doc = Column(Text, nullable=True)                    # DashboardDocV2 JSON
+    rev = Column(Integer, nullable=False, default=1)     # optimistic concurrency
+    share_settings = Column(Text, nullable=True)         # JSON (allowCopy, badge, viewerControls, embed, expiresAt)
+    share_password_hash = Column(Text, nullable=True)    # scrypt$salt$hash, never returned
+    thumbnail = Column(Text, nullable=True)
+
+
+class CustomDashboardVersion(Base):
+    """Last 20 saved revisions of a builder v2 dashboard (022_dashboards_v2.sql)."""
+    __tablename__ = "custom_dashboard_versions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    dashboard_id = Column(String(36), nullable=False, index=True)
+    rev = Column(Integer, nullable=False)
+    doc = Column(Text, nullable=False)
+    label = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 class AnalyticsGoalDefinition(Base):
     """User-saved goal definitions scoped to a property"""
