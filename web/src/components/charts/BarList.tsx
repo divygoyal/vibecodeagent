@@ -31,6 +31,12 @@ export interface BarListProps {
     showShare?: boolean;
     /** Override the value format (default full numbers for the metric). */
     formatValue?: (v: number) => string;
+    /**
+     * Serializable alternative to `formatValue`, for Server Components (which
+     * cannot pass functions to this client component). 'percent100' renders a
+     * 0-100 share as a percentage.
+     */
+    valueFormat?: 'percent100';
     onItemClick?: (item: BarListItem) => void;
     /** Header of the label column in the "View all" table. */
     labelHeader?: string;
@@ -48,10 +54,12 @@ export interface BarListProps {
  * pages, countries, devices, queries.
  */
 export function BarList({
-    items, metric, limit = 8, showShare, formatValue, onItemClick, labelHeader = 'Name', valueHeader, onViewAll, viewAllTitle = 'All rows', loading, empty, className,
+    items, metric, limit = 8, showShare, formatValue, valueFormat, onItemClick, labelHeader = 'Name', valueHeader, onViewAll, viewAllTitle = 'All rows', loading, empty, className,
 }: BarListProps) {
     const [open, setOpen] = useState(false);
-    const fmt = formatValue ?? ((v: number) => (metric === 'neutral' ? fmtFull(v) : fmtMetric(metric, v)));
+    const fmt = formatValue
+        ?? (valueFormat === 'percent100' ? (v: number) => fmtPercent(v / 100, { tile: true }) : undefined)
+        ?? ((v: number) => (metric === 'neutral' ? fmtFull(v) : fmtMetric(metric, v)));
     const total = items.reduce((a, b) => a + (Number.isFinite(b.value) ? b.value : 0), 0);
     const max = Math.max(0, ...items.map((i) => i.value));
     const shown = items.slice(0, limit);

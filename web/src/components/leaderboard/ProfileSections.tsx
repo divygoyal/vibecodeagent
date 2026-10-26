@@ -86,7 +86,7 @@ export function Breakdowns({ p }: { p: ProfilePayload }) {
                 <BarList
                     metric="users"
                     limit={6}
-                    formatValue={(v) => fmtPercent(v / 100, { tile: true })}
+                    valueFormat="percent100"
                     items={b.countries.map((c) => ({ key: c.name, label: c.name, text: c.name, value: c.share, icon: flag(c.iso2) ? <span aria-hidden className="text-body-lg leading-none">{flag(c.iso2)}</span> : undefined }))}
                 />
             </Card>,
@@ -99,7 +99,7 @@ export function Breakdowns({ p }: { p: ProfilePayload }) {
                 <BarList
                     metric="sessions"
                     limit={6}
-                    formatValue={(v) => fmtPercent(v / 100, { tile: true })}
+                    valueFormat="percent100"
                     items={b.channels.map((c) => ({ key: c.name, label: c.name, text: c.name, value: c.share, icon: <span aria-hidden className="size-2 rounded-full" style={{ background: channelColor(c.name) }} /> }))}
                 />
             </Card>,
@@ -112,7 +112,7 @@ export function Breakdowns({ p }: { p: ProfilePayload }) {
                 <BarList
                     metric="users"
                     limit={4}
-                    formatValue={(v) => fmtPercent(v / 100, { tile: true })}
+                    valueFormat="percent100"
                     items={b.devices.map((c) => ({ key: c.name, label: <span className="capitalize">{c.name}</span>, text: c.name, value: c.share, icon: <span aria-hidden className="size-2 rounded-full" style={{ background: deviceColor(c.name) }} /> }))}
                 />
             </Card>,
@@ -126,7 +126,7 @@ export function Breakdowns({ p }: { p: ProfilePayload }) {
                 <BarList
                     metric="pageviews"
                     limit={6}
-                    formatValue={hasViews ? undefined : (v) => fmtPercent(v / 100, { tile: true })}
+                    valueFormat={hasViews ? undefined : 'percent100'}
                     items={b.pages.map((x) => ({ key: x.path, label: x.path, text: x.path, value: hasViews ? (x.views ?? 0) : x.share }))}
                 />
             </Card>,
