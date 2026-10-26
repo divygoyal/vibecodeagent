@@ -69,6 +69,9 @@ const nextConfig: NextConfig = {
     // Separate share studio: sharing lives in Dashboards now
     { source: '/dashboard/share', destination: '/dashboard/dashboards', permanent: true },
     { source: '/dashboard/share/:path*', destination: '/dashboard/dashboards', permanent: true },
+    // Weekly page became the weekly report email setting (DESIGN 4.1, 4.3)
+    { source: '/dashboard/weekly', destination: '/dashboard/settings?tab=notifications', permanent: true },
+    { source: '/dashboard/weekly/:path*', destination: '/dashboard/settings?tab=notifications', permanent: true },
     // AI chat is "Ask"
     { source: '/dashboard/ai-chat', destination: '/dashboard/ask', permanent: true },
     { source: '/dashboard/ai-chat/:path*', destination: '/dashboard/ask/:path*', permanent: true },

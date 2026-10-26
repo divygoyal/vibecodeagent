@@ -9,14 +9,10 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { AlertsBell } from './AlertsBell';
+import { CommandPalette, openCommandPalette } from './CommandPalette';
 import { parseSitePath, routeTitle, SITE_NAV, siteHref } from './nav';
 import { useShell } from './ShellContext';
 import { useCurrentSite } from './useCurrentSite';
-
-function openCommandPalette() {
-    // components/CommandPalette listens for ⌘K / Ctrl+K on window.
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true, bubbles: true }));
-}
 
 interface Crumb {
     label: string;
@@ -93,6 +89,7 @@ export function Topbar() {
                 )}
                 <AlertsBell />
             </div>
+            <CommandPalette />
         </header>
     );
 }

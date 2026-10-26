@@ -1,23 +1,9 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import useSWR from 'swr';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import { parseAsStringEnum, useQueryState } from 'nuqs';
 import {
-    Activity,
-    ArrowUpRight,
-    Clock3,
-    Eye,
-    Globe2,
-    MousePointerClick,
-    ShieldCheck,
-    TrendingUp,
-    Users,
-} from 'lucide-react';
-import {
-    Area,
-    AreaChart,
     Bar,
     BarChart,
     CartesianGrid,
@@ -25,38 +11,29 @@ import {
     Tooltip,
     XAxis,
     YAxis,
+    type TooltipContentProps,
 } from 'recharts';
+
+import { cn } from '@/lib/cn';
+import { fmtAxis, fmtCompact, fmtDuration, fmtFull } from '@/lib/format';
+import { METRICS, type MetricKey } from '@/lib/metrics';
 import type { ShareUmamiDashboardData, ShareUmamiRealtimeData } from '@/lib/shareUmamiData';
-import { BRAND_NAME } from '@/lib/brand';
+import { Banner } from '@/components/ui/Banner';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { DeltaArrow } from '@/components/ui/MetricDelta';
+import { Pill } from '@/components/ui/Pill';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { Favicon } from '@/components/ui/Favicon';
+import { BarList } from '@/components/charts/BarList';
+import { ChartCard, ChartSkeleton } from '@/components/charts/ChartCard';
+import { ChartTooltipCard } from '@/components/charts/ChartTooltip';
+import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
+import { SHARE_CONTAINER, SharePage, ShareFooter, ShareHeader, shareSiteLabel } from '@/components/share/ShareChrome';
 
 const RANGE_OPTIONS = ['7d', '30d', '90d'] as const;
-
-function formatNumber(value: number) {
-    return new Intl.NumberFormat('en-US', {
-        notation: value >= 1000 ? 'compact' : 'standard',
-        maximumFractionDigits: value >= 1000 ? 1 : 0,
-    }).format(value);
-}
-
-function formatDuration(seconds: number) {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.round(seconds % 60);
-
-    if (minutes <= 0) {
-        return `${remainingSeconds}s`;
-    }
-
-    return `${minutes}m ${remainingSeconds}s`;
-}
-
-function formatDelta(value: number | null) {
-    if (value === null || Number.isNaN(value)) {
-        return 'No comparison';
-    }
-
-    const sign = value > 0 ? '+' : '';
-    return `${sign}${value}% vs previous`;
-}
+type RangeOption = (typeof RANGE_OPTIONS)[number];
+const RANGE_LABELS: Record<RangeOption, string> = { '7d': '7 days', '30d': '30 days', '90d': '90 days' };
 
 async function fetcher<T>(url: string): Promise<T> {
     const response = await fetch(url, { cache: 'no-store' });
@@ -67,52 +44,101 @@ async function fetcher<T>(url: string): Promise<T> {
     return response.json() as Promise<T>;
 }
 
-function StatCard({
-    label,
-    value,
-    delta,
-    icon,
-}: {
-    label: string;
-    value: string;
-    delta: string;
-    icon: ReactNode;
-}) {
+/** Relative change from the API ("12" = +12% vs the previous period), coloured by polarity. */
+function ChangeChip({ change, better = 'up' }: { change: number | null; better?: 'up' | 'down' }) {
+    if (change === null || Number.isNaN(change)) {
+        return <span className="text-meta text-fg-muted">No comparison</span>;
+    }
+    const direction = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
+    const good = direction === 'flat' ? null : (direction === 'up') === (better === 'up');
+    const tone = good === null ? 'bg-subtle text-fg-muted' : good ? 'bg-up-soft text-up' : 'bg-down-soft text-down';
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.05)]">
-            <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-slate-500">{label}</span>
-                <span className="rounded-xl bg-emerald-50 p-2 text-emerald-600">{icon}</span>
-            </div>
-            <div className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">{value}</div>
-            <div className="mt-2 text-xs font-medium text-slate-500">{delta}</div>
-        </div>
+        <span className={cn('inline-flex h-5 items-center gap-0.5 rounded-badge px-1.5 text-meta font-medium tabular-nums', tone)}>
+            {direction === 'flat' ? null : <DeltaArrow direction={direction} />}
+            {Math.abs(change)}%
+            <span className="sr-only">{direction === 'flat' ? 'no change' : direction === 'up' ? 'up' : 'down'} versus the previous period</span>
+        </span>
     );
 }
 
-function BreakdownCard({
-    title,
-    items,
+function KpiTile({
+    label,
+    metric,
+    value,
+    change,
+    better,
 }: {
-    title: string;
-    items: Array<{ label: string; value: number }>;
+    label: string;
+    /** Colour family of the dot (DESIGN 2.3: derived metrics borrow their family colour). */
+    metric: MetricKey;
+    value: string;
+    change: number | null;
+    better?: 'up' | 'down';
 }) {
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.05)]">
-            <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-                <span className="text-xs text-slate-400">{items.length} rows</span>
+        <Card padding="sm" className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+                <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: METRICS[metric].color }} />
+                <span className="truncate text-body-sm font-medium text-fg-secondary">{label}</span>
             </div>
-            <div className="mt-4 space-y-3">
-                {items.length ? items.map((item) => (
-                    <div key={`${title}-${item.label}`} className="flex items-center justify-between gap-3">
-                        <span className="truncate text-sm text-slate-600">{item.label}</span>
-                        <span className="shrink-0 text-sm font-medium text-slate-900">{formatNumber(item.value)}</span>
-                    </div>
-                )) : (
-                    <p className="text-sm text-slate-400">No data available for this range.</p>
-                )}
+            <span className="text-stat text-fg">{value}</span>
+            <div className="flex items-center gap-1.5">
+                <ChangeChip change={change} better={better} />
+                {change !== null && !Number.isNaN(change) ? <span className="text-meta text-fg-muted">vs previous period</span> : null}
             </div>
+        </Card>
+    );
+}
+
+function KpiSkeleton() {
+    return (
+        <Card padding="sm" className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-7 w-20" />
+            <Skeleton className="h-4 w-32" />
+        </Card>
+    );
+}
+
+function LegendDot({ metric, label }: { metric: MetricKey; label: string }) {
+    return (
+        <span className="inline-flex items-center gap-1.5 text-meta text-fg-muted">
+            <span aria-hidden className="size-2 rounded-full" style={{ background: METRICS[metric].color }} />
+            {label}
+        </span>
+    );
+}
+
+function BreakdownCard({ title, items }: { title: string; items: Array<{ label: string; value: number }> }) {
+    return (
+        <Card>
+            <CardHeader title={title} actions={<span className="text-meta text-fg-muted tabular-nums">{fmtFull(items.length)} rows</span>} />
+            <BarList
+                metric="neutral"
+                items={items.map((item) => ({ key: item.label, label: item.label, text: item.label, value: item.value }))}
+                labelHeader={title}
+                viewAllTitle={title}
+                empty={<p className="py-6 text-center text-body text-fg-muted">No data for this range</p>}
+            />
+        </Card>
+    );
+}
+
+function RealtimeTooltip({ active, payload, label }: Partial<TooltipContentProps<number, string>>) {
+    if (!active || !payload?.length) return null;
+    return (
+        <ChartTooltipCard
+            title={label}
+            rows={[{ key: 'views', label: 'Views', color: METRICS.pageviews.color, value: fmtFull(Number(payload[0]?.value ?? 0)) }]}
+        />
+    );
+}
+
+function RealtimeStat({ label, value }: { label: string; value: number | undefined }) {
+    return (
+        <div className="rounded-control bg-surface-sunken p-3">
+            <p className="text-meta text-fg-muted">{label}</p>
+            <p className="mt-1 text-stat-sm text-fg tabular-nums">{fmtCompact(value ?? 0)}</p>
         </div>
     );
 }
@@ -136,11 +162,7 @@ function SharedUmamiPage({
     const dashboardUrl = `/api/share/${token}/umami/dashboard?range=${range}`;
     const realtimeUrl = `/api/share/${token}/umami/realtime`;
 
-    const {
-        data,
-        error,
-        isLoading,
-    } = useSWR<ShareUmamiDashboardData>(dashboardUrl, fetcher, {
+    const { data, error, isLoading } = useSWR<ShareUmamiDashboardData>(dashboardUrl, fetcher, {
         revalidateOnFocus: false,
     });
 
@@ -151,260 +173,132 @@ function SharedUmamiPage({
     });
 
     const realtime = liveData || data?.realtime;
-    const siteLabel = siteUrl || 'Shared Property';
+    const host = shareSiteLabel(siteUrl);
+    const rangeControl = (
+        <SegmentedControl
+            options={RANGE_OPTIONS.map((option) => ({ value: option, label: RANGE_LABELS[option] }))}
+            value={range}
+            onChange={(v) => setRange(v)}
+            size="sm"
+            ariaLabel="Date range"
+        />
+    );
 
     return (
-        <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_transparent_34%),linear-gradient(180deg,_#f8fafc_0%,_#f3f4f6_100%)] text-slate-900">
-            <div className={embedMode ? 'mx-auto w-full max-w-7xl px-3 py-3 sm:px-4 sm:py-4' : 'mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8'}>
-                <header className={embedMode ? 'rounded-[24px] border border-slate-200/80 bg-white/90 p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:p-5' : 'rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur'}>
-                    <div className={`flex flex-col ${embedMode ? 'gap-4 lg:flex-row lg:items-start lg:justify-between' : 'gap-6 lg:flex-row lg:items-start lg:justify-between'}`}>
-                        <div className="space-y-4">
-                            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                                <ShieldCheck className="h-3.5 w-3.5" />
-                                {embedMode ? `${BRAND_NAME} Embedded Analytics` : `${BRAND_NAME} Shared Analytics`}
-                            </div>
-                            <div>
-                                <h1 className={`${embedMode ? 'text-2xl sm:text-[28px]' : 'text-3xl'} font-semibold tracking-tight text-slate-950`}>
-                                    {embedMode ? 'Embedded shared analytics' : 'Umami Share Fork Preview'}
-                                </h1>
-                                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                                    {embedMode
-                                        ? 'Responsive shared analytics optimized for iframe embeds and narrow mobile widths.'
-                                        : `The public URL stays on ${BRAND_NAME} while this page blends ${BRAND_NAME} history with Umami-style reporting for the post-cutover window.`}
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
-                                    <Globe2 className="h-4 w-4 text-slate-400" />
-                                    {siteLabel}
-                                </span>
-                                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
-                                    <Eye className="h-4 w-4 text-slate-400" />
-                                    {views} share views
-                                </span>
-                                {data?.source.label && (
-                                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">
-                                        <ArrowUpRight className="h-4 w-4" />
-                                        {data.source.label}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex items-center gap-2 rounded-2xl bg-slate-100 p-1">
-                                {RANGE_OPTIONS.map((option) => (
-                                    <button
-                                        key={option}
-                                        onClick={() => setRange(option)}
-                                        className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                                            range === option
-                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-700'
-                                        }`}
-                                    >
-                                        {option.toUpperCase()}
-                                    </button>
-                                ))}
-                            </div>
-                            {data?.source.message && (
-                                <p className="max-w-sm text-xs leading-5 text-slate-500">
-                                    {data.source.message}
-                                </p>
-                            )}
-                        </div>
+        <SharePage>
+            {embedMode ? null : <ShareHeader siteUrl={siteUrl} views={views} label="Shared analytics" />}
+            <main className={cn(SHARE_CONTAINER, 'flex flex-col gap-4 md:gap-6', embedMode ? 'py-3 md:py-4' : 'py-4 md:py-6')}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        {embedMode && host ? (
+                            <span className="flex min-w-0 items-center gap-2">
+                                <Favicon host={host} size={20} />
+                                <span className="truncate text-title-sm text-fg">{host}</span>
+                            </span>
+                        ) : null}
+                        {data?.source.label ? <Pill tone="neutral">{data.source.label}</Pill> : null}
+                        {data?.source.message ? <p className="text-meta text-fg-muted">{data.source.message}</p> : null}
                     </div>
-                </header>
+                    {rangeControl}
+                </div>
 
-                {error && (
-                    <div className={`${embedMode ? 'mt-4' : 'mt-6'} rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700`}>
-                        {error.message}
-                    </div>
-                )}
+                {error ? <Banner variant="danger">{error.message}</Banner> : null}
 
-                {isLoading && !data && (
-                    <div className={`${embedMode ? 'mt-4' : 'mt-6'} rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-500`}>
-                        Loading shared analytics...
-                    </div>
-                )}
-
-                {data && (
+                {isLoading && !data ? (
                     <>
-                        <section className={`${embedMode ? 'mt-4' : 'mt-6'} grid gap-4 sm:grid-cols-2 xl:grid-cols-5`}>
-                            <StatCard
-                                label="Pageviews"
-                                value={formatNumber(data.summary.pageviews.value)}
-                                delta={formatDelta(data.summary.pageviews.change)}
-                                icon={<TrendingUp className="h-4 w-4" />}
-                            />
-                            <StatCard
-                                label="Visitors"
-                                value={formatNumber(data.summary.visitors.value)}
-                                delta={formatDelta(data.summary.visitors.change)}
-                                icon={<Users className="h-4 w-4" />}
-                            />
-                            <StatCard
-                                label="Visits"
-                                value={formatNumber(data.summary.visits.value)}
-                                delta={formatDelta(data.summary.visits.change)}
-                                icon={<MousePointerClick className="h-4 w-4" />}
-                            />
-                            <StatCard
-                                label="Bounce Rate"
-                                value={`${data.summary.bounceRate.value}%`}
-                                delta={formatDelta(data.summary.bounceRate.change)}
-                                icon={<Activity className="h-4 w-4" />}
-                            />
-                            <StatCard
-                                label="Visit Duration"
-                                value={formatDuration(data.summary.visitDuration.value)}
-                                delta={formatDelta(data.summary.visitDuration.change)}
-                                icon={<Clock3 className="h-4 w-4" />}
-                            />
+                        <section aria-busy className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+                            {Array.from({ length: 5 }, (_, i) => <KpiSkeleton key={i} />)}
+                        </section>
+                        <Card>
+                            <Skeleton className="mb-4 h-5 w-32" />
+                            <ChartSkeleton height={280} />
+                        </Card>
+                    </>
+                ) : null}
+
+                {data ? (
+                    <>
+                        <section aria-label="Totals" className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+                            <KpiTile label="Pageviews" metric="pageviews" value={fmtCompact(data.summary.pageviews.value)} change={data.summary.pageviews.change} />
+                            <KpiTile label="Visitors" metric="users" value={fmtCompact(data.summary.visitors.value)} change={data.summary.visitors.change} />
+                            <KpiTile label="Visits" metric="sessions" value={fmtCompact(data.summary.visits.value)} change={data.summary.visits.change} />
+                            <KpiTile label="Bounce rate" metric="sessions" value={`${data.summary.bounceRate.value}%`} change={data.summary.bounceRate.change} better="down" />
+                            <KpiTile label="Visit duration" metric="sessions" value={fmtDuration(data.summary.visitDuration.value)} change={data.summary.visitDuration.change} />
                         </section>
 
-                        <section className={`${embedMode ? 'mt-4' : 'mt-6'} grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]`}>
-                            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_16px_60px_rgba(15,23,42,0.06)]">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <h2 className="text-lg font-semibold text-slate-950">Traffic Trend</h2>
-                                        <p className="mt-1 text-sm text-slate-500">
-                                            Daily pageviews and visits across the selected shared range.
-                                        </p>
-                                    </div>
-                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
-                                        {range.toUpperCase()}
+                        <section className="grid gap-4 md:gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]">
+                            <ChartCard
+                                title="Traffic"
+                                subtitle={`Pageviews and visits per day, last ${RANGE_LABELS[range]}`}
+                                state={data.series.length ? 'ready' : 'empty'}
+                                actions={
+                                    <span className="flex items-center gap-3 max-sm:hidden">
+                                        <LegendDot metric="pageviews" label="Pageviews" />
+                                        <LegendDot metric="sessions" label="Visits" />
                                     </span>
-                                </div>
-                                <div className="mt-6 h-[320px]">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={data.series}>
-                                            <defs>
-                                                <linearGradient id="trafficclaw-pageviews" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                                                    <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
-                                                </linearGradient>
-                                                <linearGradient id="trafficclaw-visits" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#0f172a" stopOpacity={0.2} />
-                                                    <stop offset="100%" stopColor="#0f172a" stopOpacity={0.02} />
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid stroke="#e2e8f0" vertical={false} />
-                                            <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                                            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                                            <Tooltip
-                                                contentStyle={{
-                                                    borderRadius: 16,
-                                                    border: '1px solid #e2e8f0',
-                                                    background: '#ffffff',
-                                                    boxShadow: '0 16px 50px rgba(15,23,42,0.08)',
-                                                }}
-                                            />
-                                            <Area
-                                                type="monotone"
-                                                dataKey="pageviews"
-                                                stroke="#10b981"
-                                                fill="url(#trafficclaw-pageviews)"
-                                                strokeWidth={2.5}
-                                            />
-                                            <Area
-                                                type="monotone"
-                                                dataKey="visits"
-                                                stroke="#0f172a"
-                                                fill="url(#trafficclaw-visits)"
-                                                strokeWidth={2}
-                                            />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
+                                }
+                            >
+                                <TimeSeriesChart
+                                    mode="overlay"
+                                    data={data.series}
+                                    series={[
+                                        { metric: 'pageviews', key: 'pageviews', label: 'Pageviews' },
+                                        { metric: 'sessions', key: 'visits', label: 'Visits' },
+                                    ]}
+                                    ariaLabel={`Pageviews and visits per day, last ${RANGE_LABELS[range]}`}
+                                />
+                            </ChartCard>
 
-                            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_16px_60px_rgba(15,23,42,0.06)]">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <h2 className="text-lg font-semibold text-slate-950">Realtime Pulse</h2>
-                                        <p className="mt-1 text-sm text-slate-500">
-                                            Refreshed every 20 seconds using the active source.
-                                        </p>
-                                    </div>
-                                    {realtime && (
-                                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                            {realtime.activeVisitors} live
-                                        </span>
-                                    )}
+                            <Card>
+                                <CardHeader
+                                    title="Realtime"
+                                    description="Refreshes every 20 seconds"
+                                    actions={realtime ? <Pill tone="up" dot>{fmtFull(realtime.activeVisitors)} live</Pill> : undefined}
+                                />
+                                <div className="grid grid-cols-3 gap-2">
+                                    <RealtimeStat label="Active" value={realtime?.activeVisitors} />
+                                    <RealtimeStat label="Views" value={realtime?.totalViews} />
+                                    <RealtimeStat label="Visitors" value={realtime?.totalVisitors} />
                                 </div>
-                                <div className="mt-5 grid grid-cols-3 gap-3">
-                                    <div className="rounded-2xl bg-slate-50 p-4">
-                                        <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Active</p>
-                                        <p className="mt-2 text-2xl font-semibold text-slate-900">
-                                            {realtime ? formatNumber(realtime.activeVisitors) : '0'}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-2xl bg-slate-50 p-4">
-                                        <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Views</p>
-                                        <p className="mt-2 text-2xl font-semibold text-slate-900">
-                                            {realtime ? formatNumber(realtime.totalViews) : '0'}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-2xl bg-slate-50 p-4">
-                                        <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Visitors</p>
-                                        <p className="mt-2 text-2xl font-semibold text-slate-900">
-                                            {realtime ? formatNumber(realtime.totalVisitors) : '0'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="mt-5 h-[180px]">
+                                <div className="mt-4 h-[180px]">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={realtime?.series || []}>
-                                            <CartesianGrid stroke="#e2e8f0" vertical={false} />
-                                            <XAxis dataKey="time" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                                            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                                            <Tooltip
-                                                contentStyle={{
-                                                    borderRadius: 16,
-                                                    border: '1px solid #e2e8f0',
-                                                    background: '#ffffff',
-                                                    boxShadow: '0 16px 50px rgba(15,23,42,0.08)',
-                                                }}
-                                            />
-                                            <Bar dataKey="views" radius={[10, 10, 0, 0]} fill="#10b981" />
+                                        <BarChart data={realtime?.series || []} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                                            <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
+                                            <XAxis dataKey="time" tickLine={false} axisLine={false} tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }} minTickGap={16} />
+                                            <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} tickFormatter={(v: number) => fmtAxis(v)} tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }} />
+                                            <Tooltip cursor={{ fill: 'var(--color-subtle)' }} content={<RealtimeTooltip />} />
+                                            <Bar dataKey="views" radius={[3, 3, 0, 0]} fill={METRICS.pageviews.color} isAnimationActive={false} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
-                            </div>
+                            </Card>
                         </section>
 
-                        <section className={`${embedMode ? 'mt-4' : 'mt-6'} grid gap-4 lg:grid-cols-2 2xl:grid-cols-4`}>
-                            <BreakdownCard title="Top Pages" items={data.breakdowns.pages} />
+                        <section className="grid gap-4 md:gap-6 lg:grid-cols-2 2xl:grid-cols-4">
+                            <BreakdownCard title="Top pages" items={data.breakdowns.pages} />
                             <BreakdownCard title="Referrers" items={data.breakdowns.referrers} />
                             <BreakdownCard title="Devices" items={data.breakdowns.devices} />
                             <BreakdownCard title="Countries" items={data.breakdowns.countries} />
                         </section>
 
-                        {realtime && (
-                            <section className={`${embedMode ? 'mt-4' : 'mt-6'} grid gap-4 lg:grid-cols-3`}>
-                                <BreakdownCard title="Live Pages" items={realtime.pages} />
-                                <BreakdownCard title="Live Referrers" items={realtime.referrers} />
-                                <BreakdownCard title="Live Countries" items={realtime.countries} />
+                        {realtime ? (
+                            <section className="grid gap-4 md:gap-6 lg:grid-cols-3">
+                                <BreakdownCard title="Live pages" items={realtime.pages} />
+                                <BreakdownCard title="Live referrers" items={realtime.referrers} />
+                                <BreakdownCard title="Live countries" items={realtime.countries} />
                             </section>
-                        )}
+                        ) : null}
 
-                        {!embedMode ? (
-                            <footer className="mt-10 flex flex-col gap-3 border-t border-slate-200 px-1 py-6 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                    Shared via {BRAND_NAME} using a {BRAND_NAME}-branded Umami bridge.
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span>Token: {token.slice(0, 12)}...</span>
-                                    {data.source.cutoverAt && (
-                                        <span>Cutover: {new Date(data.source.cutoverAt).toLocaleDateString('en-US')}</span>
-                                    )}
-                                </div>
-                            </footer>
+                        {!embedMode && data.source.cutoverAt ? (
+                            <p className="text-meta text-fg-muted">
+                                Data source changed on {new Date(data.source.cutoverAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.
+                            </p>
                         ) : null}
                     </>
-                )}
-            </div>
-        </div>
+                ) : null}
+            </main>
+            {embedMode ? null : <ShareFooter />}
+        </SharePage>
     );
 }
 

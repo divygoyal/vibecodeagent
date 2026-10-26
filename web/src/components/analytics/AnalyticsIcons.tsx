@@ -26,41 +26,24 @@ export function CountryFlag({ country }: { country: string }) {
 }
 
 // ─── Browser icon ───
-const BROWSER_COLORS: Record<string, string> = {
-    'chrome': 'bg-yellow-500', 'safari': 'bg-blue-500', 'firefox': 'bg-orange-500',
-    'edge': 'bg-cyan-500', 'opera': 'bg-red-500', 'samsung internet': 'bg-violet-500',
-    'instagram': 'bg-pink-500', 'chrome webview': 'bg-yellow-600', 'brave': 'bg-orange-600',
-};
-
-export function BrowserIcon({ browser }: { browser: string }) {
-    const b = typeof browser === 'string' ? browser : String(browser ?? '');
-    const color = BROWSER_COLORS[b.toLowerCase()] || 'bg-zinc-500';
+// Neutral letter tiles: colour is for metrics only (DESIGN 2.8).
+function LetterTile({ name }: { name: string }) {
     return (
-        <div className={`w-4 h-4 rounded-sm ${color} flex items-center justify-center flex-shrink-0`} title={b}>
-            <span className="text-[8px] text-white font-bold">{b.charAt(0).toUpperCase()}</span>
-        </div>
+        <span className="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-subtle text-[9px] font-semibold text-fg-secondary" title={name}>
+            {name.charAt(0).toUpperCase()}
+        </span>
     );
 }
 
-// ─── OS icon ───
-const OS_COLORS: Record<string, string> = {
-    'windows': 'bg-blue-500', 'macos': 'bg-zinc-400', 'ios': 'bg-zinc-400',
-    'android': 'bg-green-500', 'linux': 'bg-amber-600', 'chrome os': 'bg-yellow-500',
-};
+export function BrowserIcon({ browser }: { browser: string }) {
+    const b = typeof browser === 'string' ? browser : String(browser ?? '');
+    return <LetterTile name={b} />;
+}
 
+// ─── OS icon ───
 export function OSIcon({ os }: { os: string }) {
     const o = typeof os === 'string' ? os : String(os ?? '');
-    const color = OS_COLORS[o.toLowerCase()] || 'bg-zinc-500';
-    const icons: Record<string, string> = {
-        'windows': '⊞', 'macos': '', 'ios': '', 'android': '🤖', 'linux': '🐧',
-    };
-    const icon = icons[o.toLowerCase()];
-    return (
-        <div className={`w-4 h-4 rounded-sm ${color} flex items-center justify-center flex-shrink-0`} title={o}>
-            {icon ? <span className="text-[8px]">{icon}</span> :
-                <span className="text-[8px] text-white font-bold">{o.charAt(0).toUpperCase()}</span>}
-        </div>
-    );
+    return <LetterTile name={o} />;
 }
 
 // ─── Device icon ───
@@ -87,7 +70,7 @@ export function ReferrerIcon({ referrer }: { referrer: string }) {
     const icon = REFERRER_ICONS[r] || REFERRER_ICONS[r.split('/')[0]] || '🔗';
     return (
         <span className="text-sm w-5 h-5 flex items-center justify-center flex-shrink-0" title={referrer}>
-            {icon.length <= 2 ? <span className="text-xs font-bold text-zinc-400">{icon}</span> : icon}
+            {icon.length <= 2 ? <span className="text-meta font-semibold text-fg-muted">{icon}</span> : icon}
         </span>
     );
 }

@@ -32,10 +32,10 @@ export default function OfflineBanner() {
     <div
       role="alert"
       aria-live="assertive"
-      className={`fixed top-0 left-0 right-0 z-[200] flex items-center justify-center gap-2 py-2 px-4 text-xs font-medium transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-[200] flex items-center justify-center gap-2 border-b px-4 py-2 text-meta font-medium ${
         isOffline
-          ? 'bg-red-500/10 border-b border-red-500/20 text-red-400'
-          : 'bg-emerald-500/10 border-b border-emerald-500/20 text-emerald-400'
+          ? 'border-down/20 bg-down-soft text-down'
+          : 'border-up/20 bg-up-soft text-up'
       }`}
     >
       {isOffline ? (
@@ -46,7 +46,7 @@ export default function OfflineBanner() {
       ) : (
         <>
           <Wifi className="w-3.5 h-3.5" />
-          Back online!
+          Back online
         </>
       )}
     </div>

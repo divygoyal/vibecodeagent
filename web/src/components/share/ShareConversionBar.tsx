@@ -19,8 +19,11 @@
  * enforced by the caller in page.tsx.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Sparkles, X } from 'lucide-react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { ArrowRight, X } from 'lucide-react';
+
+import { Button, buttonClasses } from '@/components/ui/Button';
+import { BrandMark } from '@/components/shell/BrandMark';
 
 interface ShareConversionBarProps {
     /** CTA destination — defaults to marketing home with UTM so this surface is attributable. */
@@ -45,6 +48,8 @@ function markDismissed(): void {
     } catch { /* private mode — non-fatal */ }
 }
 
+const subscribeNever = () => () => {};
+
 function trackClarity(name: string, payload?: Record<string, unknown>): void {
     if (typeof window === 'undefined') return;
     try {
@@ -56,29 +61,24 @@ function trackClarity(name: string, payload?: Record<string, unknown>): void {
 export default function ShareConversionBar({
     ctaUrl = 'https://trafficclaw.com/?utm_source=share-bar&utm_medium=embed&utm_campaign=viewer-conversion',
 }: ShareConversionBarProps) {
-    // Render visible by default so SSR delivers a non-empty bar; the client
-    // immediately hides it on mount if the viewer already dismissed it this
-    // session. Brief flash on dismissed-returning-viewer is acceptable and
-    // matches SharePromoPopup behaviour.
-    const [visible, setVisible] = useState(true);
+    // The server renders the bar; the browser hides it when the viewer already
+    // dismissed it this session (read from sessionStorage, no effect needed).
+    const dismissedEarlier = useSyncExternalStore(subscribeNever, isAlreadyDismissed, () => false);
+    const [dismissedNow, setDismissedNow] = useState(false);
     const impressionFiredRef = useRef(false);
 
     useEffect(() => {
-        if (isAlreadyDismissed()) {
-            setVisible(false);
-            return;
-        }
-        if (impressionFiredRef.current) return;
+        if (dismissedEarlier || impressionFiredRef.current) return;
         impressionFiredRef.current = true;
         trackClarity('share-cta-bar-shown');
-    }, []);
+    }, [dismissedEarlier]);
 
-    if (!visible) return null;
+    if (dismissedEarlier || dismissedNow) return null;
 
     const handleCtaClick = () => {
         markDismissed();
         trackClarity('share-cta-bar-clicked');
-        // Don't manually setVisible(false) — link is target=_blank and the
+        // Don't hide the bar here: the link is target=_blank and the
         // viewer remains on the page. Marking dismissed prevents the bar
         // from re-appearing on a soft navigation back.
     };
@@ -86,44 +86,32 @@ export default function ShareConversionBar({
     const handleDismiss = () => {
         markDismissed();
         trackClarity('share-cta-bar-dismissed');
-        setVisible(false);
+        setDismissedNow(true);
     };
 
     return (
-        <div className="relative w-full border-b border-white/[0.06] bg-gradient-to-r from-[#0a0d12] via-[#0d1218] to-[#0a0d12]">
-            {/* Subtle cyan accent line at top — visually anchors as TrafficClaw branding without shouting */}
-            <div
-                aria-hidden
-                className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#14C4E1]/40 to-transparent"
-            />
-            <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-                <div className="flex min-w-0 items-center gap-2 text-[13px] text-zinc-300">
-                    <Sparkles className="h-3.5 w-3.5 flex-shrink-0 text-[#7AD9DA]" />
+        <div className="tc-root w-full border-b border-border-subtle bg-surface">
+            <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-4 py-2 md:px-6">
+                <div className="flex min-w-0 items-center gap-2 text-body-sm text-fg-secondary">
+                    <BrandMark size={16} />
                     <span className="truncate">
                         Like this dashboard?{' '}
-                        <span className="hidden text-zinc-500 sm:inline">Built on TrafficClaw — </span>
-                        <span className="font-medium text-white">build yours free.</span>
+                        <span className="text-fg-muted max-sm:hidden">Built on TrafficClaw. </span>
+                        <span className="font-medium text-fg">Build yours free.</span>
                     </span>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1">
                     <a
                         href={ctaUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={handleCtaClick}
-                        className="group inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#14C4E1] to-[#0891B2] px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-[0_8px_20px_-6px_rgba(20,196,225,0.5)] transition hover:from-[#22d3ee] hover:to-[#14C4E1]"
+                        className={buttonClasses({ variant: 'primary', size: 'sm' })}
                     >
-                        <span>Try free</span>
-                        <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                        Try free
+                        <ArrowRight aria-hidden size={14} strokeWidth={1.75} />
                     </a>
-                    <button
-                        type="button"
-                        onClick={handleDismiss}
-                        aria-label="Dismiss"
-                        className="ml-0.5 flex h-7 w-7 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-200"
-                    >
-                        <X className="h-3.5 w-3.5" />
-                    </button>
+                    <Button variant="ghost" size="sm" iconOnly icon={X} onClick={handleDismiss} aria-label="Dismiss" />
                 </div>
             </div>
         </div>
