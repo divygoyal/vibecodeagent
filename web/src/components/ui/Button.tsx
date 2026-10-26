@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { forwardRef, isValidElement, type ButtonHTMLAttributes, type ReactElement, type ReactNode } from 'react';
 import { Loader2, type LucideIcon } from 'lucide-react';
 import { Slot } from 'radix-ui';
 
@@ -55,11 +55,24 @@ export function buttonClasses({ variant = 'secondary', size = 'md', iconOnly = f
     );
 }
 
+export type ButtonIcon = LucideIcon | ReactElement;
+
+function renderIcon(icon: ButtonIcon | undefined, size: number): ReactNode {
+    if (!icon) return null;
+    if (isValidElement(icon)) return icon;
+    const Icon = icon as LucideIcon;
+    return <Icon aria-hidden size={size} strokeWidth={1.75} />;
+}
+
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, Omit<ButtonStyleOptions, 'className'> {
-    /** Icon before the label (replaced by a spinner while loading). */
-    icon?: LucideIcon;
-    /** Icon after the label, e.g. ArrowRight for "Details →". */
-    trailingIcon?: LucideIcon;
+    /**
+     * Icon before the label (replaced by a spinner while loading). Pass the
+     * component from client code, or an element (`<ArrowRight />`) from a
+     * Server Component, which cannot pass functions to this client component.
+     */
+    icon?: ButtonIcon;
+    /** Icon after the label, e.g. ArrowRight for "Details →". Same rules as `icon`. */
+    trailingIcon?: ButtonIcon;
     loading?: boolean;
     /** Render the single child element (e.g. <Link>) with button styles. */
     asChild?: boolean;
@@ -74,8 +87,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     const iconSize = iconOnly && size === 'lg' ? 20 : px;
     const leading = loading
         ? <Loader2 aria-hidden className="animate-spin" size={iconSize} strokeWidth={1.75} />
-        : Icon ? <Icon aria-hidden size={iconSize} strokeWidth={1.75} /> : null;
-    const trailing = Trailing && !iconOnly ? <Trailing aria-hidden size={px} strokeWidth={1.75} /> : null;
+        : renderIcon(Icon, iconSize);
+    const trailing = iconOnly ? null : renderIcon(Trailing, px);
     const classes = buttonClasses({ variant, size, iconOnly, className });
 
     if (asChild) {

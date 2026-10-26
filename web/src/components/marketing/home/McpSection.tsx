@@ -57,7 +57,7 @@ export function McpSection({ portfolio }: { portfolio: DemoPortfolio }) {
                         <p className="mt-2 text-body-sm text-fg-muted">Works with {CLIENTS.join(', ')} and other MCP clients.</p>
                     </div>
                     <div className="mt-8">
-                        <Button asChild variant="secondary" size="lg" trailingIcon={ArrowRight}>
+                        <Button asChild variant="secondary" size="lg" trailingIcon={<ArrowRight aria-hidden size={18} strokeWidth={1.75} />}>
                             <Link href="/ai">How to set it up</Link>
                         </Button>
                     </div>

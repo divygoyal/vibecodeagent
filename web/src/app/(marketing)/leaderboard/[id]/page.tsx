@@ -92,7 +92,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
                 <div className="flex items-center gap-2">
                     {!pending ? <ShareButton url={profileUrl} title={`${p.name} on the ${BRAND_NAME} verified traffic leaderboard`} ogPath={`/leaderboard/${slug}/opengraph-image`} /> : null}
                     {p.website_url ? (
-<Button asChild variant="secondary" size="md" trailingIcon={ExternalLink}>
+<Button asChild variant="secondary" size="md" trailingIcon={<ExternalLink aria-hidden size={16} strokeWidth={1.75} />}>
                             <a href={p.website_url} target="_blank" rel="noopener noreferrer">Visit site</a>
                         </Button>
                     ) : null}

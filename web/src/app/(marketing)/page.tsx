@@ -87,7 +87,7 @@ export default function HomePage() {
                                 ))}
                             </ul>
                             <div className="mt-8">
-                                <Button asChild variant="secondary" size="lg" trailingIcon={ArrowRight}>
+                                <Button asChild variant="secondary" size="lg" trailingIcon={<ArrowRight aria-hidden size={18} strokeWidth={1.75} />}>
                                     <Link href={`/demo/${dashboard.site.slug}`}>Open a sample dashboard</Link>
                                 </Button>
                             </div>

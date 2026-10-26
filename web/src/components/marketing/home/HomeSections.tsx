@@ -19,7 +19,7 @@ export function HomeHero() {
             </p>
             <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
                 <ConnectGoogleButton size="xl" mark />
-                <Button asChild variant="secondary" size="xl" trailingIcon={ArrowRight}>
+                <Button asChild variant="secondary" size="xl" trailingIcon={<ArrowRight aria-hidden size={18} strokeWidth={1.75} />}>
                     <Link href="/demo">See the live demo</Link>
                 </Button>
             </div>

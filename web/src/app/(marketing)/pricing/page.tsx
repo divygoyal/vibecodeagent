@@ -86,7 +86,7 @@ export default function PricingPage() {
                                 The connector is free on every plan and does not use Ask messages: the AI runs on your own ChatGPT or Claude account.
                             </p>
                         </div>
-                        <Button asChild variant="secondary" trailingIcon={ArrowRight} className="self-start sm:self-auto">
+                        <Button asChild variant="secondary" trailingIcon={<ArrowRight aria-hidden size={16} strokeWidth={1.75} />} className="self-start sm:self-auto">
                             <Link href="/ai">How it works</Link>
                         </Button>
                     </div>
@@ -127,7 +127,7 @@ export default function PricingPage() {
                         <p className="text-title-sm text-fg">Advertisers: reach founders on the leaderboard</p>
                         <p className="mt-0.5 text-body text-fg-secondary">Sponsor slots on the public leaderboard are always labelled “Sponsored”.</p>
                     </div>
-                    <Button asChild variant="secondary" trailingIcon={ArrowRight} className="self-start sm:self-auto">
+                    <Button asChild variant="secondary" trailingIcon={<ArrowRight aria-hidden size={16} strokeWidth={1.75} />} className="self-start sm:self-auto">
                         <Link href="/sponsor">See sponsor slots</Link>
                     </Button>
                 </div>
