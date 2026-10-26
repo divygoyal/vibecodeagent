@@ -34,7 +34,7 @@ export function PortfolioPreview({ portfolio, cards = 6 }: { portfolio: DemoPort
     const { totals } = portfolio;
     const sites = portfolio.sites.slice(0, cards);
     return (
-        <BrowserFrame url="trafficclaw.com/dashboard/portfolio" bodyClassName="p-4 md:p-6">
+        <BrowserFrame url="trafficclaw.com/dashboard" bodyClassName="p-4 md:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                     <p className="text-title text-fg">Portfolio</p>

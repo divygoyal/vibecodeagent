@@ -8,6 +8,7 @@ import { Sparkline } from '@/components/charts';
 import { cn } from '@/lib/cn';
 import { fmtDateRange, fmtPercent } from '@/lib/format';
 import { fmtMetric, METRICS, type MetricKey } from '@/lib/metrics';
+import { VariantChip } from '@/components/portfolio/SiteCard';
 import { SiteIcon } from '../site/SiteIcon';
 import type { DemoPortfolio, DemoPortfolioSite } from './types';
 
@@ -57,6 +58,7 @@ export function DemoSiteCard({ site, portfolio, view = 'search', sparkHeight = 7
             <div className="flex items-center gap-2">
                 <SiteIcon host={site.host} size={20} />
                 <span className="min-w-0 truncate text-title-sm text-fg" title={site.label}>{site.label}</span>
+                {site.variant ? <VariantChip text={site.variant} /> : null}
                 <Badge>{badge}</Badge>
                 {site.gsc && site.ga4 ? <Badge className="hidden sm:inline-flex">GA4</Badge> : null}
                 <span className="flex-1" />
