@@ -1490,7 +1490,7 @@ export async function fetchJourneyData(
 // shim (TC_DEMO_DATA) working.
 
 /** GA4 batchRunReports: up to 5 reports for ONE property in one HTTP call. */
-export async function runGABatch(token: string, propertyId: string, requests: any[], signal?: AbortSignal) {
+export async function runGABatch(token: string, propertyId: string, requests: Record<string, unknown>[], signal?: AbortSignal) {
     if (requests.length > 5) throw new Error('runGABatch: at most 5 reports per batch');
     return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:batchRunReports`, token, { requests }, signal);
 }

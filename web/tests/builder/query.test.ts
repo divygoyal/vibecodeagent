@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- loosely typed Google request/response fixtures */
 /**
  * Builder v2 query API tests: date resolution, compile, leaf dedupe and GA4 batching, cache,
  * limiter, per-family filters, v1 migration and the privacy of the public endpoint.
