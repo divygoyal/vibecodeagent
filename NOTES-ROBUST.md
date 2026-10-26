@@ -43,6 +43,8 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
   now forces). The exact-users report backs off 5 min after a failed run (429/5xx) instead of restarting per poll.
 - 7f67727 Search tab: with a failed summary (429/403/500) the four metric tiles kept skeletons forever; now a dash (the
   chart shows the error and Try again).
+- 7ebd3f4 ChunkLoadError (a tab opened before a deploy asks for chunks the new build no longer has) showed "Something went
+  wrong"; the error screen now reloads once (60 s guard in sessionStorage) for chunk-load errors.
 - 890b76d `shot.mjs`/`crawl.mjs --dark` produced light pages (theme is `localStorage['tc-theme']`); pw.newContext sets it.
 
 ## Server log audit (integrate + preview web.log)
