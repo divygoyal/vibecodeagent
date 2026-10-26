@@ -16,6 +16,11 @@
 -- day's metrics. GA4 rows fill users..engagement_rate, GSC rows fill
 -- clicks..position. Missing days count as zero when summed.
 --
+-- portfolio_range_totals: exact (de-duplicated) GA4 users for one range key
+-- (7d/28d/3m/12m) and its previous period, per property. Fetched lazily for the
+-- range being viewed (one runReport without the date dimension) and refreshed
+-- after 6 hours or when the window moves; summing daily users would overcount.
+--
 -- Additive only. Read and written by admin/portfolio_api.py, which also runs
 -- these statements at startup (idempotent).
 
@@ -68,3 +73,20 @@ CREATE TABLE IF NOT EXISTS site_daily_metrics (
     -- of a user's assets, which becomes one contiguous range scan.
     PRIMARY KEY (user_id, asset_kind, date, asset_id)
 ) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS portfolio_range_totals (
+    user_id INTEGER NOT NULL,
+    asset_kind VARCHAR(8) NOT NULL,
+    asset_id VARCHAR(500) NOT NULL,
+    range_key VARCHAR(8) NOT NULL,
+    cur_start VARCHAR(10) NOT NULL,
+    cur_end VARCHAR(10) NOT NULL,
+    prev_start VARCHAR(10) NOT NULL,
+    prev_end VARCHAR(10) NOT NULL,
+    active_users_cur INTEGER,
+    active_users_prev INTEGER,
+    total_users_cur INTEGER,
+    total_users_prev INTEGER,
+    fetched_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, asset_kind, asset_id, range_key)
+);

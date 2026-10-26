@@ -7,8 +7,9 @@ stores the results here; the portfolio API then reads aggregates from these
 tables, so opening the portfolio never waits on Google.
 
 Tables (migrations/020_add_portfolio.sql):
-    portfolio_assets    one row per (user, kind, asset): flags, pairing, sync status
-    site_daily_metrics  one row per (user, kind, asset, date): the day's metrics
+    portfolio_assets        one row per (user, kind, asset): flags, pairing, sync status
+    site_daily_metrics      one row per (user, kind, date, asset): the day's metrics
+    portfolio_range_totals  exact GA4 users per (asset, range key), current + previous window
 
 All endpoints sit behind the admin X-API-Key (internal network only). Asset
 ids contain "/" and ":" ("properties/123", "https://www.x.com/",
@@ -99,7 +100,7 @@ async def ensure_portfolio_schema(engine) -> None:
 
 async def delete_user_portfolio_rows(db, user_id: int) -> None:
     """Remove every portfolio row of a user (called from DELETE /api/users/{id})."""
-    for table in ("site_daily_metrics", "portfolio_assets"):
+    for table in ("site_daily_metrics", "portfolio_range_totals", "portfolio_assets"):
         await db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user_id})
 
 
@@ -203,6 +204,26 @@ class SnapshotQuery(BaseModel):
     windows: Dict[str, Window]
     bucket_days: int = 1
     recent_days: int = 7
+    # Also return the stored exact-users rows of this range key ("7d", "28d", "3m", "12m").
+    range_key: Optional[str] = Field(None, max_length=8)
+
+
+class RangeTotal(BaseModel):
+    kind: str = "ga4"
+    asset_id: str = Field(..., max_length=500)
+    range_key: str = Field(..., max_length=8)
+    cur_start: str
+    cur_end: str
+    prev_start: str
+    prev_end: str
+    active_users_cur: Optional[int] = None
+    active_users_prev: Optional[int] = None
+    total_users_cur: Optional[int] = None
+    total_users_prev: Optional[int] = None
+
+
+class RangeTotalsBatch(BaseModel):
+    rows: List[RangeTotal]
 
 
 # ───────────────────────── router ─────────────────────────
@@ -492,8 +513,44 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
             out["series"][kind] = {"n": n, "span_days": w.days, "by_asset": cur_series, "prev_by_asset": prev_series}
             out["recent"][kind] = recent
 
+        if body.range_key:
+            rows = (await db.execute(text(
+                "SELECT asset_kind, asset_id, range_key, cur_start, cur_end, prev_start, prev_end, active_users_cur, "
+                "active_users_prev, total_users_cur, total_users_prev, fetched_at FROM portfolio_range_totals "
+                "WHERE user_id = :u AND range_key = :r"
+            ), {"u": user_id, "r": body.range_key})).fetchall()
+            out["range_totals"] = [dict(r._mapping) for r in rows]
+
         # Large portfolios produce MBs of numbers: skip FastAPI's per-item encoder.
         return Response(content=json.dumps(out, separators=(",", ":")), media_type="application/json")
+
+    @router.post("/users/{identifier}/range-totals")
+    async def upsert_range_totals(identifier: str, body: RangeTotalsBatch, db=Depends(get_db)):
+        """Store exact users per (property, range key) for the current and previous window."""
+        user_id = await resolve_user_id(db, identifier)
+        now = _now()
+        params = []
+        for r in body.rows[:MAX_ASSETS]:
+            _check_kind(r.kind)
+            for d in (r.cur_start, r.cur_end, r.prev_start, r.prev_end):
+                _valid_date(d)
+            params.append({"u": user_id, "now": now, **r.model_dump()})
+        if params:
+            await db.execute(text(
+                """
+                INSERT INTO portfolio_range_totals (user_id, asset_kind, asset_id, range_key, cur_start, cur_end,
+                    prev_start, prev_end, active_users_cur, active_users_prev, total_users_cur, total_users_prev, fetched_at)
+                VALUES (:u, :kind, :asset_id, :range_key, :cur_start, :cur_end, :prev_start, :prev_end,
+                    :active_users_cur, :active_users_prev, :total_users_cur, :total_users_prev, :now)
+                ON CONFLICT(user_id, asset_kind, asset_id, range_key) DO UPDATE SET
+                    cur_start = excluded.cur_start, cur_end = excluded.cur_end, prev_start = excluded.prev_start,
+                    prev_end = excluded.prev_end, active_users_cur = excluded.active_users_cur,
+                    active_users_prev = excluded.active_users_prev, total_users_cur = excluded.total_users_cur,
+                    total_users_prev = excluded.total_users_prev, fetched_at = excluded.fetched_at
+                """
+            ), params)
+        await db.commit()
+        return {"ok": True, "rows": len(params)}
 
     # ── cron support ──
     @router.get("/stale-users")
