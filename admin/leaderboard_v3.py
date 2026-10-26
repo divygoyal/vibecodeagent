@@ -299,7 +299,27 @@ def _trim_trailing_none(points: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # ─── public row / profile builders ──────────────────────────────────────────
 
 
-def _row_base(c: Candidate, rank: Optional[int]) -> Dict[str, Any]:
+# "New" badge: listed in the last 14 days. When more than a third of the board
+# is that new (a fresh board, launch day, a seeded demo) the badge says nothing,
+# so no row gets it; the New tab still lists entries by date.
+NEW_BADGE_DAYS = 14
+NEW_BADGE_MAX_SHARE = 1 / 3
+
+
+def _is_recent(entry: Dict[str, Any], now: Optional[datetime] = None) -> bool:
+    created = entry.get("created_at")
+    return isinstance(created, datetime) and ((now or datetime.utcnow()) - created).days < NEW_BADGE_DAYS
+
+
+def new_badge_ids(entries: List[Dict[str, Any]], now: Optional[datetime] = None) -> set:
+    """Entry ids that show the "New" badge on this board (see NEW_BADGE_*)."""
+    recent = {e["id"] for e in entries if _is_recent(e, now)}
+    if not entries or len(recent) > len(entries) * NEW_BADGE_MAX_SHARE:
+        return set()
+    return recent
+
+
+def _row_base(c: Candidate, rank: Optional[int], new_ids: Optional[set] = None) -> Dict[str, Any]:
     e = c["entry"]
     created = e.get("created_at")
     return {
@@ -320,7 +340,7 @@ def _row_base(c: Candidate, rank: Optional[int]) -> Dict[str, Any]:
         "min_slot_price_cents": c["min_price"],
         "topic_labels": core.public_topics(_serialize_audience_row(c["audience"]), c["settings"]["privacy"]),
         "created_at": iso(created) if isinstance(created, datetime) else created,
-        "is_new": bool(isinstance(created, datetime) and (datetime.utcnow() - created).days <= 30),
+        "is_new": (e["id"] in new_ids) if new_ids is not None else _is_recent(e),
         "last_refreshed": iso(e.get("last_refreshed")),
     }
 
@@ -422,9 +442,10 @@ async def build_board(
     await attach_audience(db, page_items)
     daily = await _daily_for(db, [c["entry"]["id"] for c in page_items], _today() - timedelta(days=days))
 
+    new_ids = new_badge_ids([c["entry"] for c in cands])
     rows = []
     for i, c in enumerate(page_items):
-        row = _row_base(c, start + i + 1 if ranked else None)
+        row = _row_base(c, start + i + 1 if ranked else None, new_ids)
         spark = _spark(c, focus, daily.get(c["entry"]["id"], {}), days)
         if spark is None and focus == "visitors":
             spark = _spark(c, "clicks", daily.get(c["entry"]["id"], {}), days)

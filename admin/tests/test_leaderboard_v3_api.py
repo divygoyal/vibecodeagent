@@ -121,6 +121,21 @@ class LeaderboardV3ApiTests(unittest.TestCase):
         self.assertEqual(prof["breakdowns"], {})
         self.assertFalse(prof["live"]["enabled"])
 
+    def test_12_new_badge_is_relative_to_the_board(self):
+        import leaderboard_v3
+        now = datetime.utcnow()
+        old = [{"id": i, "created_at": now - timedelta(days=200)} for i in range(6)]
+        fresh = [{"id": 100 + i, "created_at": now - timedelta(days=2)} for i in range(2)]
+        stale = [{"id": 200, "created_at": now - timedelta(days=20)}]
+        # a couple of fresh listings on an established board get the badge (14 days, not 30)
+        self.assertEqual(leaderboard_v3.new_badge_ids(old + fresh + stale, now), {100, 101})
+        # a fresh board (every listing created today) shows no badge at all
+        everyone = [{"id": i, "created_at": now - timedelta(hours=i)} for i in range(10)]
+        self.assertEqual(leaderboard_v3.new_badge_ids(everyone, now), set())
+        self.assertEqual(leaderboard_v3.new_badge_ids([], now), set())
+        # string or missing dates never count as new
+        self.assertEqual(leaderboard_v3.new_badge_ids(old + [{"id": 300, "created_at": None}], now), set())
+
     def test_04_range_hidden_and_pause(self):
         eid = self.join("Private Co", "private.test", status="verified")
         self.verify(eid, "owner")
