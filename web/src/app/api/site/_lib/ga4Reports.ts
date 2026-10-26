@@ -292,3 +292,48 @@ export async function ga4Retention(userId: string, token: string, property: stri
     const at = (n: number) => curve[Math.min(n, curve.length - 1)]?.retention ?? 0;
     return { mode, cohorts, averages: { day1: at(1), day7: at(7), day14: at(14), day30: at(30) }, curve };
 }
+
+// ─── One page (Pages drawer) ────────────────────────────────────────────────
+
+export interface Ga4PageDetail {
+    series: { date: string; pageviews: number; users: number; prevDate?: string | null; prev_pageviews?: number | null }[];
+    totals: { pageviews: number; users: number; engagement: number; conversions: number };
+    previous: { pageviews: number; users: number; engagement: number; conversions: number } | null;
+    sources: { name: string; views: number }[];
+}
+
+export async function ga4PageDetail(userId: string, token: string, property: string, path: string, host: string | null, r: RangeParams): Promise<Ga4PageDetail> {
+    const multi = Boolean(r.cmp);
+    const exprs: Record<string, unknown>[] = [{ filter: { fieldName: 'pagePath', stringFilter: { matchType: 'EXACT', value: path, caseSensitive: false } } }];
+    if (host) exprs.push({ filter: { fieldName: 'hostName', stringFilter: { matchType: 'ENDS_WITH', value: host, caseSensitive: false } } });
+    const dimensionFilter = exprs.length > 1 ? { andGroup: { expressions: exprs } } : exprs[0];
+    const [daily, totals, sources] = await Promise.all([
+        ga4Report(userId, token, property, { dateRanges: ranges(r), dimensions: [{ name: 'date' }], metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }], dimensionFilter, limit: 2000 }),
+        ga4Report(userId, token, property, { dateRanges: ranges(r), metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }, { name: 'userEngagementDuration' }, { name: 'keyEvents' }], dimensionFilter, limit: 5 }),
+        ga4Report(userId, token, property, { dateRanges: [{ startDate: r.cur.start, endDate: r.cur.end }], dimensions: [{ name: 'sessionSource' }], metrics: [{ name: 'screenPageViews' }], dimensionFilter, orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }], limit: 15 }),
+    ]);
+    const d = byRange(daily, 1, multi);
+    const t = byRange(totals, 0, multi);
+    const cur = new Map(d.cur.map((x) => [gaDate(x.dims[0]), x.m]));
+    const cmp = new Map(d.cmp.map((x) => [gaDate(x.dims[0]), x.m]));
+    const curDays = fillDays(r.cur.start, r.cur.end);
+    const cmpDays = r.cmp ? fillDays(r.cmp.start, r.cmp.end) : [];
+    const tot = (m: number[] | undefined) => {
+        const users = m?.[1] ?? 0;
+        return { pageviews: m?.[0] ?? 0, users, engagement: users > 0 ? (m?.[2] ?? 0) / users : 0, conversions: m?.[3] ?? 0 };
+    };
+    return {
+        series: curDays.map((date, i) => {
+            const pd = cmpDays[i] ?? null;
+            return {
+                date,
+                pageviews: cur.get(date)?.[0] ?? 0,
+                users: cur.get(date)?.[1] ?? 0,
+                ...(r.cmp ? { prevDate: pd, prev_pageviews: pd ? cmp.get(pd)?.[0] ?? 0 : null } : {}),
+            };
+        }),
+        totals: tot(t.cur[0]?.m),
+        previous: multi ? tot(t.cmp[0]?.m) : null,
+        sources: (sources.rows ?? []).map((row) => ({ name: row.dimensionValues?.[0]?.value || '(not set)', views: num(row.metricValues?.[0]?.value) })),
+    };
+}

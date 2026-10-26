@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 
 import { getSiteContext, googleErrorResponse, jsonError, NO_STORE, PRIVATE_CACHE } from '../_lib/context';
-import { ga4Breakdown, ga4RealtimeSnapshot, ga4Retention, ga4Summary, isBreakdown } from '../_lib/ga4Reports';
+import { ga4Breakdown, ga4PageDetail, ga4RealtimeSnapshot, ga4Retention, ga4Summary, isBreakdown } from '../_lib/ga4Reports';
 import { parseProperty, parseRange } from '../_lib/params';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/site/ga4?property=properties/123&report=summary|<breakdown>|realtime|retention
+ * GET /api/site/ga4?property=properties/123&report=summary|<breakdown>|page|realtime|retention
  *   &start=YYYY-MM-DD&end=YYYY-MM-DD[&cmpStart=&cmpEnd=][&mode=daily|weekly|monthly]
  *
  * One small cached GA4 report per call (summary = 3), so each tab and card
@@ -33,6 +33,13 @@ export async function GET(req: Request) {
         const range = parseRange(sp);
         if (report === 'summary') {
             return NextResponse.json(await ga4Summary(ctx.userId, ctx.token, property, range), { headers: PRIVATE_CACHE });
+        }
+        if (report === 'page') {
+            const path = sp.get('path') ?? '';
+            const host = sp.get('host');
+            if (!path.startsWith('/') || path.length > 1000) return jsonError('A page path is required.', 400);
+            const okHost = host && /^[a-z0-9.-]{1,253}$/i.test(host) ? host : null;
+            return NextResponse.json(await ga4PageDetail(ctx.userId, ctx.token, property, path, okHost, range), { headers: PRIVATE_CACHE });
         }
         if (isBreakdown(report)) {
             return NextResponse.json(await ga4Breakdown(ctx.userId, ctx.token, property, report, range), { headers: PRIVATE_CACHE });

@@ -9,6 +9,9 @@ export interface MergedPage {
     label: string;
     /** Full URL when known (from Search Console), for "open page" links and GSC filters. */
     url: string | null;
+    /** The GA4 pagePath / hostName as reported (for GA4 page filters). */
+    gaPath: string | null;
+    gaHost: string | null;
     views: number | null;
     users: number | null;
     /** Average engagement time per user, seconds. */
@@ -26,13 +29,17 @@ export interface MergedPage {
 export function mergePages(ga4: Ga4Row[] | undefined, gsc: GscRow[] | undefined, siteHost: string | null): MergedPage[] {
     const map = new Map<string, MergedPage>();
     const blank = (key: string, path: string, label: string): MergedPage => ({
-        key, path, label, url: null, views: null, users: null, engagement: null, engagementRate: null, conversions: null,
+        key, path, label, url: null, gaPath: null, gaHost: null, views: null, users: null, engagement: null, engagementRate: null, conversions: null,
         clicks: null, impressions: null, ctr: null, position: null, prevViews: undefined, prevClicks: undefined,
     });
     for (const r of ga4 ?? []) {
         const ref = pageRef(r.dims.pagePath ?? '/', r.dims.hostName || siteHost);
         const m = map.get(ref.key) ?? blank(ref.key, ref.path, displayPage(ref, siteHost));
         const views = r.cur.screenPageViews ?? 0;
+        if (!m.gaPath || views > (m.views ?? 0)) {
+            m.gaPath = r.dims.pagePath ?? '/';
+            m.gaHost = r.dims.hostName || null;
+        }
         const users = r.cur.activeUsers ?? 0;
         // Several GA4 paths can normalise to one key (trailing slash, case): add them up.
         const prevUsers = m.users ?? 0;
