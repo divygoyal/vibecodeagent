@@ -7,6 +7,8 @@
 # - Data, logs and pids live in /root/.trafficclaw-dev/<name>/ (never in the repo).
 # - --fresh deletes that instance's admin DB first.
 # - Idempotent: running it again leaves healthy processes alone.
+# - At most 3 next dev servers run on the box at once (slot locks in
+#   /root/.trafficclaw-dev/slots); waits up to TC_SLOT_WAIT_MIN (10) minutes for one.
 # See scripts/dev/README.md.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -56,6 +58,30 @@ EOF
 
 BASE_ENV=(PATH="/usr/local/bin:/usr/bin:/bin" HOME="$HOME" LANG=C.UTF-8 TZ=UTC TC_DEMO_DATA=1)
 
+# ─── Dev-server slot (before starting anything, so a refusal leaves nothing behind) ───
+SLOT=""
+if ! { web_pid_now="$(owned_pid "$INST/web.pid" "$REPO/web")" && port_listening "$WEB_PORT"; }; then
+    # Take one of the $TC_MAX_SLOTS dev-server slots (waits up to TC_SLOT_WAIT_MIN minutes, default 10).
+    mkdir -p "$TC_SLOTS_DIR"
+    exec 8>"$TC_SLOTS_DIR/.alloc.lock"
+    flock 8
+    wait_until=$(( $(date +%s) + ${TC_SLOT_WAIT_MIN:-10} * 60 ))
+    announced=0
+    until SLOT="$(find_free_slot)"; do
+        if [ "$(date +%s)" -ge "$wait_until" ]; then
+            flock -u 8
+            slot_report >&2
+            die "no free dev slot: $TC_MAX_SLOTS next dev servers are already running on this box. Stop one (scripts/dev/down.sh <name>) or retry later; TC_SLOT_WAIT_MIN sets the wait."
+        fi
+        if [ "$announced" = 0 ]; then
+            slot_report >&2
+            log "all $TC_MAX_SLOTS dev slots are busy; waiting up to ${TC_SLOT_WAIT_MIN:-10} min for one to free up"
+            announced=1
+        fi
+        flock -u 8; sleep 10; flock 8
+    done
+fi
+
 # ─── Admin API ───
 admin_pid="$(owned_pid "$INST/admin.pid" "$INST" || true)"
 if [ -n "$admin_pid" ] && port_listening "$ADMIN_PORT"; then
@@ -85,7 +111,7 @@ else
             CORS_ORIGINS="http://localhost:$WEB_PORT" \
             PUBLIC_DASHBOARD_URL="http://localhost:$WEB_PORT/dashboard" \
             setsid "$TC_VENV/bin/python" -m uvicorn main:app --app-dir "$REPO/admin" --host 127.0.0.1 --port "$ADMIN_PORT" \
-            >> "$INST/admin.log" 2>&1 < /dev/null &
+            >> "$INST/admin.log" 2>&1 < /dev/null 8>&- &
         echo $! > "$INST/admin.pid"
     )
     wait_http "http://127.0.0.1:$ADMIN_PORT/health" "admin API" 60 || { tail -n 30 "$INST/admin.log" >&2; die "admin API did not start (log: $INST/admin.log)"; }
@@ -98,7 +124,11 @@ if [ -n "$web_pid" ] && port_listening "$WEB_PORT"; then
 else
     if [ -n "$web_pid" ]; then kill -TERM -- "-$web_pid" 2>/dev/null || true; sleep 1; fi
     port_listening "$WEB_PORT" && die "web port $WEB_PORT is in use by another process"
-    echo "=== $(date -u +%FT%TZ) start web from $REPO ===" >> "$INST/web.log"
+
+    [ -n "$SLOT" ] || die "internal: no dev slot reserved; run up.sh again"
+    log "using dev slot $SLOT"
+    echo "$SLOT" > "$INST/web.slot"
+    echo "=== $(date -u +%FT%TZ) start web from $REPO (slot $SLOT) ===" >> "$INST/web.log"
     (
         cd "$REPO/web"
         env -i "${BASE_ENV[@]}" \
@@ -122,10 +152,15 @@ else
             PUBLIC_DASHBOARD_URL="http://localhost:$WEB_PORT/dashboard" \
             PUBLIC_DASHBOARD_BASE_URL="http://localhost:$WEB_PORT" \
             NEXT_PUBLIC_SITE_URL="http://localhost:$WEB_PORT" \
-            setsid node_modules/.bin/next dev -p "$WEB_PORT" -H 127.0.0.1 \
-            >> "$INST/web.log" 2>&1 < /dev/null &
+            setsid flock -w 30 "$(slot_file "$SLOT")" node_modules/.bin/next dev -p "$WEB_PORT" -H 127.0.0.1 \
+            >> "$INST/web.log" 2>&1 < /dev/null 8>&- &
         echo $! > "$INST/web.pid"
     )
+    # The server's flock (and every child that inherits its fd) now holds the slot.
+    for _ in $(seq 1 50); do slot_free "$SLOT" || break; sleep 0.1; done
+    echo "$NAME web=$WEB_PORT admin=$ADMIN_PORT pid=$(read_pid "$INST/web.pid") repo=$REPO since=$(date -u +%FT%TZ)" > "$TC_SLOTS_DIR/slot$SLOT.owner"
+    flock -u 8
+    exec 8>&-
     wait_http "http://localhost:$WEB_PORT/api/auth/providers" "web (next dev)" 240 || { tail -n 40 "$INST/web.log" >&2; die "next dev did not start (log: $INST/web.log)"; }
 fi
 

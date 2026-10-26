@@ -26,11 +26,19 @@ Never `npm install` inside a hard-linked `node_modules` (it would modify the
 shared files). If you need different packages: `rm -rf web/node_modules && npm ci`.
 Never `next build` (disk is tight).
 
-## 2. Pick ports
+## 2. Pick ports (and get a dev slot)
 
-Each agent takes one slot: web **3101–3109**, admin **8101–8109** (same last
-digit), and uses its own name. `scripts/dev/status.sh` shows what is taken.
-The kit itself uses `kit 3101 8101`.
+Each agent takes one port pair: web **3101–3109**, admin **8101–8109** (same
+last digit), and uses its own name. The kit itself uses `kit 3101 8101`.
+
+**At most 3 `next dev` servers may run on this box at once, across all
+worktrees.** `up.sh` takes one of three slot locks
+(`/root/.trafficclaw-dev/slots/slot{1,2,3}.lock`); the running web server
+holds it and the kernel releases it when the server stops or dies, so there
+are no stale slots. If all three are busy, `up.sh` waits up to
+`TC_SLOT_WAIT_MIN` minutes (default 10) and then exits with
+`no free dev slot` — nothing is started in that case. `down.sh` frees the
+slot; `scripts/dev/status.sh` shows ports, pids and who holds each slot.
 
 ## 3. Start, log in, look
 

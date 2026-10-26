@@ -6,6 +6,13 @@ TC_VENV="$TC_DEV_HOME/venv"
 TC_DEV_ENV="$TC_DEV_HOME/dev.env"
 DEV_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# At most this many `next dev` servers on the box at once, across all worktrees
+# (the box also runs production). Each running web server holds one flock'ed
+# slot file; the kernel drops the lock when the server dies, so a crashed
+# instance never leaves a stale slot behind.
+TC_SLOTS_DIR="$TC_DEV_HOME/slots"
+TC_MAX_SLOTS=3
+
 # Fixed demo identities (Google "sub" values). login.mjs uses the same ones.
 TC_SUPERADMIN_SUB="100000000000000000009"
 
@@ -139,4 +146,33 @@ instance_for_port() {
         if grep -qx "WEB_PORT=$1" "$f"; then dirname "$f"; return 0; fi
     done
     return 1
+}
+
+# ─── Next dev slots ───
+
+slot_file() { echo "$TC_SLOTS_DIR/slot$1.lock"; }
+
+# True when nobody holds slot $1 (probes with a non-blocking flock).
+slot_free() { flock -n "$(slot_file "$1")" true 2>/dev/null; }
+
+# Print the first free slot number; non-zero exit when all are taken.
+find_free_slot() {
+    local n
+    for n in $(seq 1 "$TC_MAX_SLOTS"); do
+        if slot_free "$n"; then echo "$n"; return 0; fi
+    done
+    return 1
+}
+
+# One line per slot: free, or who holds it.
+slot_report() {
+    local n owner
+    for n in $(seq 1 "$TC_MAX_SLOTS"); do
+        if slot_free "$n"; then
+            echo "slot $n: free"
+        else
+            owner="$(cat "$TC_SLOTS_DIR/slot$n.owner" 2>/dev/null || echo 'unknown holder')"
+            echo "slot $n: $owner"
+        fi
+    done
 }
