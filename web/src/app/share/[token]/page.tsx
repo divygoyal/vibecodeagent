@@ -21,7 +21,7 @@ const PROMO_POPUP_DELAY_MS = 20000;
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-    title: `Shared dashboard · ${BRAND_NAME}`,
+    title: 'Shared dashboard',
     description: `A shared analytics dashboard, powered by ${BRAND_NAME}`,
 };
 

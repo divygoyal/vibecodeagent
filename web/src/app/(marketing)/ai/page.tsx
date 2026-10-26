@@ -7,7 +7,7 @@ import { Badge, Button, Card } from '@/components/ui';
 import { resourceUrl } from '@/lib/mcp/config';
 
 export const metadata: Metadata = {
-    title: 'Use your Google Analytics and Search Console in ChatGPT and Claude · TrafficClaw',
+    title: 'Use your Google Analytics and Search Console in ChatGPT and Claude',
     description: 'Connect Google Analytics 4 and Search Console to ChatGPT, Claude, Cursor and any MCP app. Ask about every site you own. Read-only, you choose the sites, free.',
     alternates: { canonical: '/ai' },
     openGraph: {

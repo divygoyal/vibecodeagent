@@ -238,6 +238,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
         <div className="tc-root fixed inset-0 z-[45] flex flex-col bg-canvas text-fg" data-editor>
             {/* Toolbar */}
             <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border-subtle bg-surface px-3">
+                <h1 className="sr-only">Edit dashboard: {doc.name}</h1>
                 <Tooltip content="Back to the dashboard"><Button asChild variant="ghost" iconOnly icon={ArrowLeft} aria-label="Back"><Link href={`/dashboard/dashboards/${s.id}`} /></Button></Tooltip>
                 {nameEdit ? (
                     <input autoFocus aria-label="Dashboard name" defaultValue={doc.name} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== doc.name) s.apply((d) => ({ ...d, name: v.slice(0, 200) })); setNameEdit(false); }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setNameEdit(false); }} className="h-8 w-64 rounded-md border border-border bg-surface px-2 text-title-sm text-fg" />

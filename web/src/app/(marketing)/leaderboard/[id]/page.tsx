@@ -27,7 +27,7 @@ export async function generateMetadata({ params, searchParams }: { params: Param
     const { id } = await params;
     const sp = await searchParams;
     const p = await getProfile(id, parseRange(sp.range));
-    if (!p) return { title: `Site not found | ${BRAND_NAME} leaderboard`, robots: { index: false, follow: false } };
+    if (!p) return { title: 'Site not found', robots: { index: false, follow: false } };
 
     const visitors = metricText(p.kpis?.visitors);
     const title = visitors
@@ -38,7 +38,8 @@ export async function generateMetadata({ params, searchParams }: { params: Param
     const canonical = `${SITE_ORIGIN}/leaderboard/${p.slug || p.id}`;
     const indexable = p.status === 'ranked' && !sp.range;
     return {
-        title,
+        // The page title gets "| TrafficClaw" from the root template only when it does not already name it.
+        title: { absolute: title.includes(BRAND_NAME) ? title : `${title} | ${BRAND_NAME}` },
         description,
         alternates: { canonical },
         robots: indexable ? { index: true, follow: true } : { index: false, follow: true },

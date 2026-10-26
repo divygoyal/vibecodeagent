@@ -7,7 +7,7 @@ import { BRAND_NAME } from '@/lib/brand';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-    title: `Shared events report — ${BRAND_NAME}`,
+    title: 'Shared events report',
     description: `View a shared events report powered by ${BRAND_NAME}`,
 };
 

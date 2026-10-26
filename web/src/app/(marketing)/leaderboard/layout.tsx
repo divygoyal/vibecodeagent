@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
-import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-    title: `Verified traffic leaderboard | ${BRAND_NAME}`,
+    title: 'Verified traffic leaderboard',
     description: 'Real Google Analytics and Search Console numbers from sites whose owners are verified, checked daily.',
 };
 

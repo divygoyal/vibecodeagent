@@ -12,7 +12,7 @@ import { classifyRedirectUri, safeEqual } from '@/lib/oauth/primitives';
 import { csrfBinding, csrfCookieName, decodeTxn } from '@/lib/oauth/txn';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Connect an AI app · TrafficClaw', robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: 'Connect an AI app', robots: { index: false, follow: false } };
 
 function Shell({ children }: { children: React.ReactNode }) {
     return (
