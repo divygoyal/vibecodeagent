@@ -149,6 +149,17 @@ export async function createDashboard(userId: string, doc: DashboardDocV2, opts:
     }), 'create');
 }
 
+/** Old (v1) clients: store the row as v1 exactly as before; it is migrated in memory on read. */
+export async function createDashboardV1(userId: string, body: { name: string; description?: string; propertyId: string; siteUrl?: string; widgets: unknown; gridLayouts?: unknown; theme?: unknown }): Promise<AdminDashboardRow> {
+    return ok<AdminDashboardRow>(await admin('/api/custom-dashboards', {
+        method: 'POST',
+        json: {
+            user_identifier: userId, name: body.name.slice(0, 255), description: body.description ?? '', property_id: body.propertyId, site_url: body.siteUrl ?? '',
+            widgets: JSON.stringify(body.widgets ?? []), grid_layouts: JSON.stringify(body.gridLayouts ?? { lg: [], md: [], sm: [] }), theme: JSON.stringify(body.theme ?? {}),
+        },
+    }), 'create v1');
+}
+
 export type UpdateResult = { ok: true; row: AdminDashboardRow } | { ok: false; conflict: true; rev: number };
 
 export async function updateDashboard(

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { sessionUserId } from '@/lib/builder/server/access';
 import { jsonError, directoryFor } from '@/lib/builder/server/service';
-import { createDashboard, listDashboards, propertyIdFor, StoreError, toRecord } from '@/lib/builder/server/store';
+import { createDashboard, createDashboardV1, listDashboards, propertyIdFor, StoreError, toRecord } from '@/lib/builder/server/store';
 import { buildFromTemplate, templateMeta } from '@/lib/builder/templates';
-import { migrateV1toV2 } from '@/lib/builder/migrate';
 import { validateDoc } from '@/lib/builder/schema';
 import type { DashboardDocV2 } from '@/lib/builder/types';
 
@@ -90,7 +89,17 @@ export async function POST(req: Request) {
         doc = v.value;
         isTemplate = body.isTemplate === true;
     } else if (Array.isArray(body.widgets) && typeof body.propertyId === 'string') {
-        doc = migrateV1toV2({ name, propertyId: body.propertyId, siteUrl: typeof body.siteUrl === 'string' ? body.siteUrl : '', widgets: body.widgets, gridLayouts: body.gridLayouts, theme: body.theme });
+        // v1 client: keep the row v1 (migrated in memory on read, saved as v2 on the first edit).
+        try {
+            const row = await createDashboardV1(userId, {
+                name, description: typeof body.description === 'string' ? body.description : '', propertyId: body.propertyId,
+                siteUrl: typeof body.siteUrl === 'string' ? body.siteUrl : '', widgets: body.widgets, gridLayouts: body.gridLayouts, theme: body.theme,
+            });
+            return NextResponse.json({ dashboard: toRecord(row) });
+        } catch (err) {
+            console.error('[dashboards] create v1 failed', err);
+            return jsonError(err instanceof StoreError ? err.status : 500, 'Failed to create dashboard');
+        }
     } else {
         const templateId = typeof body.templateId === 'string' && templateMeta(body.templateId) ? body.templateId : 'blank';
         const tm = templateMeta(templateId)!;
