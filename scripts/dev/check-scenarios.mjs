@@ -78,7 +78,7 @@ for (const user of opts.users) {
 
 // Combined table.
 const lines = ['# Edge-case scenarios', '', `Port ${opts.port}, 390 px, light, settle up to ${opts.settle} ms. Generated ${new Date().toISOString()}.`, '',
-    'Cells: `ok`, or what went wrong (E = error boundary / uncaught / 5xx, N = NaN/undefined on screen, L = still loading, A = /api 5xx or non-JSON error).', ''];
+    'Cells: `ok`, or what went wrong (E = error boundary / uncaught / page 5xx, N = NaN/undefined on screen, L = still loading after 20 s, A = /api error that is not JSON, j = /api JSON 5xx with a message).', ''];
 // Every scenario run in the out dir (earlier runs of other users included).
 const byUser = {};
 const allPaths = new Set();
@@ -93,7 +93,10 @@ for (const file of fs.readdirSync(opts.out).filter((f) => /^mobile-scen-.+\.json
         if (r.status >= 500 || r.pageErrors.length || r.navError || w.error || w.auditError) flags.push('E');
         if (w.badText?.length) flags.push('N');
         if (w.loadingCount) flags.push('L');
-        if (r.api?.length) flags.push('A');
+        // A: an /api answer that is not JSON (or JSON without a message); j: a JSON 5xx with a message (proper, but worth a look).
+        const api = r.api || [];
+        if (api.some((x) => !x.contentType.includes('json') || !/"(error|message)"/.test(x.body))) flags.push('A');
+        else if (api.length) flags.push('j');
         const key = r.route.replace(/#.*/, '').replace(/\/dashboard\/s\/[^/]+/, '/dashboard/s/[host]').replace(/\/dashboards\/[0-9a-f-]{36}/, '/dashboards/[id]');
         allPaths.add(key);
         byUser[s.user][key] = { flags, r, w };
