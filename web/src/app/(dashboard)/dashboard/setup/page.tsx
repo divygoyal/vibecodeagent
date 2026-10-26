@@ -139,10 +139,11 @@ function MiniStarField() {
 // Only paths starting with "/dashboard/" are accepted, so a malicious caller
 // can't send users to an arbitrary external site after setup completes.
 function safeReturnTo(raw: string | null): string {
-    if (!raw) return '/dashboard/ask';
-    if (!raw.startsWith('/dashboard/')) return '/dashboard/ask';
+    // Default landing after setup is Portfolio (/dashboard).
+    if (!raw) return '/dashboard';
+    if (raw !== '/dashboard' && !raw.startsWith('/dashboard/') && !raw.startsWith('/dashboard?')) return '/dashboard';
     // Reject protocol-relative paths and embedded URLs.
-    if (raw.startsWith('//') || raw.includes('\\') || /:\/\//.test(raw)) return '/dashboard/ask';
+    if (raw.startsWith('//') || raw.includes('\\') || /:\/\//.test(raw)) return '/dashboard';
     return raw;
 }
 
@@ -155,7 +156,7 @@ export default function SetupPage() {
     // statically pre-renderable (no useSearchParams) and avoids the
     // cascading-render hit of useState+useEffect.
     const resolveReturnTo = useCallback(() => {
-        if (typeof window === 'undefined') return '/dashboard/ask';
+        if (typeof window === 'undefined') return '/dashboard';
         const params = new URLSearchParams(window.location.search);
         return safeReturnTo(params.get('returnTo'));
     }, []);

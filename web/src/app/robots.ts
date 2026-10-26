@@ -20,7 +20,6 @@ export default function robots(): MetadataRoute.Robots {
                     '/view',
                     '/embed',
                     '/demo',
-                    '/share-popup-preview',
                 ],
             },
         ],

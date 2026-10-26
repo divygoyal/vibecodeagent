@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import {
-    Bot, BarChart3, Search, Plug, Zap, Crown,
-    Copy, CheckCircle2, Code2, MessageSquare, Coins
+    BarChart3, Search, Plug, Zap, Crown,
+    CheckCircle2, MessageSquare, Coins
 } from 'lucide-react';
 import { BRAND_NAME } from '@/lib/brand';
 
@@ -13,28 +13,8 @@ const SECTIONS = [
     { id: 'plans', label: 'Plans & Credits', icon: Coins },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'seo', label: 'SEO Intelligence', icon: Search },
-    { id: 'bot-setup', label: 'Telegram Bot', icon: Bot },
     { id: 'integrations', label: 'Integrations', icon: Plug },
 ];
-
-function CodeBlock({ code, language = 'bash' }: { code: string; language?: string }) {
-    const [copied, setCopied] = useState(false);
-    return (
-        <div className="relative group my-4">
-            <div className="absolute top-2 right-2 z-10">
-                <button
-                    onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                    className="p-1.5 bg-zinc-800/80 rounded-md hover:bg-zinc-700 transition opacity-0 group-hover:opacity-100"
-                >
-                    {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-zinc-400" />}
-                </button>
-            </div>
-            <pre className="bg-[#0a0a10] border border-white/[0.06] rounded-xl px-4 py-3 overflow-x-auto">
-                <code className="text-sm text-zinc-300 font-mono">{code}</code>
-            </pre>
-        </div>
-    );
-}
 
 export default function DocsPage() {
     const [activeSection, setActiveSection] = useState('getting-started');
@@ -72,18 +52,18 @@ export default function DocsPage() {
                             <h1 className="text-2xl font-bold text-white mb-2">Getting Started</h1>
                             <p className="text-zinc-400 text-sm leading-relaxed">
                                 {BRAND_NAME} is your AI-powered SEO & analytics platform. Connect Google Analytics and Search Console,
-                                get AI-driven verdicts on your data, and optionally connect a Telegram bot for on-the-go insights.
+                                get AI-driven verdicts on your data, and ask ChatGPT or Claude about your traffic.
                             </p>
                         </div>
 
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
                             <h2 className="text-lg font-semibold text-white mb-4">Quick Start</h2>
                             <div className="space-y-4">
-                                <Step num={1} title="Sign in with GitHub or Google" desc="Create your account in seconds using OAuth." />
+                                <Step num={1} title="Sign in with Google" desc="Create your account in seconds. We only ask for read-only access." />
                                 <Step num={2} title="Connect Google" desc="Link your Google account to pull Analytics (GA4) and Search Console data." />
                                 <Step num={3} title="Explore your dashboard" desc="View traffic trends, SEO metrics, AI insights, and site audits." />
                                 <Step num={4} title="Chat with AI Analyst" desc="Ask questions about your data — get verdicts backed by real numbers." />
-                                <Step num={5} title="Upgrade for more" desc="Free accounts get 5 AI messages. Upgrade for 50-100 credits/month + Telegram bot." />
+                                <Step num={5} title="Upgrade for more" desc="Free accounts get 5 AI messages. Upgrade for 50-100 AI messages a month." />
                             </div>
                         </div>
 
@@ -155,13 +135,13 @@ export default function DocsPage() {
                     <>
                         <div>
                             <h1 className="text-2xl font-bold text-white mb-2">Plans & Credits</h1>
-                            <p className="text-zinc-400 text-sm">All dashboard features are free. Plans unlock AI credits and Telegram bot access.</p>
+                            <p className="text-zinc-400 text-sm">All dashboard features are free. Plans only add AI messages.</p>
                         </div>
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6">
                             <h2 className="text-lg font-semibold text-white mb-4">Monthly Plans</h2>
                             <div className="space-y-3">
                                 <PlanRow icon={<BarChart3 className="w-4 h-4 text-emerald-400" />} name="Growth" price="$19/mo" credits="50" features="Full dashboard, SEO tools, site audits, priority AI" highlight />
-                                <PlanRow icon={<Crown className="w-4 h-4 text-violet-400" />} name="Pro" price="$29/mo" credits="100" features="Everything in Growth + Telegram bot, priority support" />
+                                <PlanRow icon={<Crown className="w-4 h-4 text-violet-400" />} name="Pro" price="$29/mo" credits="100" features="Everything in Growth + more AI messages, priority support" />
                             </div>
                         </div>
                         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-3">
@@ -240,34 +220,6 @@ export default function DocsPage() {
                     </>
                 )}
 
-                {activeSection === 'bot-setup' && (
-                    <>
-                        <div>
-                            <h1 className="text-2xl font-bold text-white mb-2">Telegram Bot</h1>
-                            <p className="text-zinc-400 text-sm">Get analytics and SEO insights on the go via Telegram. <span className="text-violet-400 font-medium">Pro plan required.</span></p>
-                        </div>
-                        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-4">
-                            <h2 className="text-lg font-semibold text-white">Setting Up Your Bot</h2>
-                            <p className="text-sm text-zinc-400">The Telegram bot is available on the <span className="text-violet-400 font-semibold">Pro plan ($29/mo)</span>.</p>
-                            <CodeBlock code={`# 1. Open Telegram and message @BotFather\n/newbot\n# 2. Follow the prompts to name your bot\n# 3. Copy the API token\n# 4. Paste it in Dashboard → Bot page`} />
-                            <p className="text-sm text-zinc-400">
-                                TrafficClaw provisions a container for your bot and connects it automatically.
-                                Your bot will have access to all your connected Google data.
-                            </p>
-                        </div>
-                        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 space-y-4">
-                            <h2 className="text-lg font-semibold text-white">What Your Bot Can Do</h2>
-                            <div className="space-y-3">
-                                <FeatureItem label="Deep analytics insights" desc="Ask about traffic, sessions, bounce rates — get cross-dimensional analysis" />
-                                <FeatureItem label="Search Console analysis" desc="Analyze queries, CTR, positions, and find keyword opportunities" />
-                                <FeatureItem label="SEO optimization" desc="Get meta tag recommendations, schema markup, and ranking strategies" />
-                                <FeatureItem label="Content strategy" desc="Generate SEO-optimized content ideas based on your real data" />
-                                <FeatureItem label="Site audits" desc="Detect broken links, 404s, schema errors with fix recommendations" />
-                            </div>
-                        </div>
-                    </>
-                )}
-
                 {activeSection === 'integrations' && (
                     <>
                         <div>
@@ -275,10 +227,9 @@ export default function DocsPage() {
                             <p className="text-zinc-400 text-sm">Connect TrafficClaw with your tools.</p>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <IntegrationItem emoji="🐙" name="GitHub" desc="Sign in and sync repositories" status="Available" />
+                            <IntegrationItem emoji="🤖" name="ChatGPT and Claude" desc="Ask about your traffic from your AI assistant" status="Coming Soon" />
                             <IntegrationItem emoji="📊" name="Google Analytics" desc="GA4 traffic, events, and real-time data" status="Available" />
                             <IntegrationItem emoji="🔍" name="Search Console" desc="SEO rankings, queries, and search data" status="Available" />
-                            <IntegrationItem emoji="✈️" name="Telegram" desc="AI bot for on-the-go insights (Pro plan)" status="Available" />
                             <IntegrationItem emoji="💬" name="Slack" desc="Team notifications and alerts" status="Coming Soon" />
                             <IntegrationItem emoji="📝" name="WordPress" desc="Content publishing and management" status="Coming Soon" />
                             <IntegrationItem emoji="🛒" name="Shopify" desc="E-commerce analytics and orders" status="Coming Soon" />
