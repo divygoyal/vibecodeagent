@@ -47,6 +47,8 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
   wrong"; the error screen now reloads once (60 s guard in sessionStorage) for chunk-load errors.
 - cce8bdc Dashboards: the pie widget's donut and legend were cut top and bottom on phones (legend below needs more
   height than the cell); the donut leaves room for 3 legend rows and the rest folds into "Other".
+- f716de8 Site filter chips (Striking distance, Declining, …) 32px on touch.
+- c652a0d check-mobile: timeouts on every page call (a page call hung the dashboards run for 20 min).
 - 890b76d `shot.mjs`/`crawl.mjs --dark` produced light pages (theme is `localStorage['tc-theme']`); pw.newContext sets it.
 
 ## Server log audit (integrate + preview web.log)
@@ -62,7 +64,31 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
 | `middleware file convention is deprecated` / `inferred your workspace root` | 15 | Next 16 rename / lockfile in /root | harmless (README) |
 | MCP `{"evt":"mcp_tool",…"status":"error:rate_limited|site_not_in_grant|…"}` | ~25 | structured logs of the MCP tests' expected refusals | harmless |
 
+## Results (robust/ reports)
+- Mobile, all routes, 360/390/414, light + dark app routes: `mobile-demo.md` (baseline, after the home fixes) and
+  `mobile-final.md` (65 route/theme pairs re-run before the stop; the rest of the marketing/share/tools routes were
+  clean in the baseline). Baseline real issues: leaderboard profile 99 elements off-screen, every dashboard with a pie
+  widget 12 clipped; home before ddb59dc 48 off-screen + 18 clipped. Final: 0 overflow / off-screen / clipped / text
+  clipped / tab-bar overlaps; tap targets under 32px 1542 -> 343 on the same pages (summed over 3 widths).
+- Scenarios (`scenarios.md`, 390px, 18 app pages × 14 users + 4 cookie runs × 10 public pages): no error boundary, no
+  NaN/undefined. Remaining flags are explained: L on f403/f429 = before 8b2ae64/7f67727 (re-checked by hand after:
+  syncing false, tiles show a dash), L on ftimeout/many = a real first sync still running (15 s timeouts, 200 sites),
+  E on ga4only/ftimeout = dev-server restart / HMR ChunkLoadError (now auto-reloads), A on frevoked dashboards = HTML
+  500s during the Turbopack crash, j = JSON 5xx with a message (fine).
+- Dashboards: 9 templates + every-widget showcase, light/dark, 3 widths (`mobile-dash-none.md`, stopped at 14/20 by a
+  hung page call, now guarded) and 390px under 403/429/500/empty/huge/revoked/timeout (`mobile-dash-*.md`): every
+  widget shows data, an empty state or an error with Try again. The builder's 60 s circuit breaker shows "Google is
+  rate limiting this property" for a minute after 3 server errors (by design).
+- Leaderboard: all 13 public profiles + embeds (light, 5 dark), join, advertise, unknown slug: `mobile-leaderboard.md`.
+- Not finished (stopped for the usage limit): `check-api.mjs` over every GET route × faults, the re-run of the fixed
+  scenario pages, and the last ~16 routes of `mobile-final`. Run: `node scripts/dev/check-api.mjs 3101`,
+  `node scripts/dev/check-scenarios.mjs 3101 --users f403,f429,ftimeout`, `node scripts/dev/check-mobile.mjs 3101 --label final`.
+
 ## Open (severity)
+- Medium (sweep area, report only): `/api/share/<token>/overview/stats` answers 500 with an empty body when Google
+  fails (429/500 cookie runs on /share/<token>); should be JSON 4xx/5xx with a message.
+- Low: with counts × 10M (`cookie:huge`) public share/view pages show 81 text-spill spots (numbers wider than their
+  box, not clipped); check `mobile-scen-cookie-huge.md`.
 - Medium: a sync interrupted by a restart or deploy leaves assets `syncing`; the portfolio then reports `syncing` and
   polls every 2 s for up to 15 min (SYNC_STUCK_S in build.ts/sync.ts) before a new sync runs. With one web process,
   "syncing in the store but no sync running in this process" means interrupted and could resync at once; not changed
