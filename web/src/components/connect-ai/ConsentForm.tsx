@@ -3,7 +3,6 @@
 import { signIn, signOut } from 'next-auth/react';
 import { useMemo, useState } from 'react';
 import { Badge, Banner, Button, Checkbox, GoogleMark, Pill, RadioGroup, SearchInput } from '@/components/ui';
-import { RADIX_TOUCH_FIX } from './touchFix';
 
 export interface ConsentSite {
     site_id: string;
@@ -38,7 +37,7 @@ export function ConsentForm(p: ConsentFormProps) {
     const canAllow = connected && (mode === 'all' || picked.size > 0);
 
     return (
-        <form method="post" action="/oauth/authorize/decision" className={`space-y-5 ${RADIX_TOUCH_FIX}`} onSubmit={(e) => {
+        <form method="post" action="/oauth/authorize/decision" className="space-y-5" onSubmit={(e) => {
             const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
             setSubmitting(submitter?.value ?? 'allow');
         }}>

@@ -110,15 +110,3 @@ button:focus-visible {
     border-color: CanvasText;
   }
 }
-
-/* legacy.css gives every button a 44px min size on phones. New components set
-   their own touch sizes (pointer-coarse:), so inside the new UI, outside
-   LegacyFrame, fall back to the layered (Tailwind) values. */
-@media (max-width: 640px) {
-  .tc-root button:not(.legacy *),
-  .tc-root a[role="button"]:not(.legacy *),
-  .tc-root [role="switch"]:not(.legacy *) {
-    min-height: revert-layer;
-    min-width: revert-layer;
-  }
-}

@@ -14,7 +14,6 @@ import { CodeBlock, CopyButton } from './CopyButton';
 import { SetupTabs } from './SetupTabs';
 import { EXAMPLE_PROMPTS } from './setupClients';
 import { TOOL_SUMMARIES } from './toolSummaries';
-import { RADIX_TOUCH_FIX } from './touchFix';
 
 interface Grant {
     id: number;
@@ -198,7 +197,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                     ) : grants.length === 0 ? (
                         <EmptyState variant="inline" icon={Plug} title="No apps yet" description="Add the server URL in ChatGPT, Claude or another app and approve it." />
                     ) : (
-                        <ul className={`divide-y divide-border-subtle ${RADIX_TOUCH_FIX}`}>
+                        <ul className="divide-y divide-border-subtle">
                             {grants.map((g) => (
                                 <li key={g.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
                                     <div className="min-w-0 flex-1">
@@ -329,7 +328,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                     </>
                 }
             >
-                <div className={`space-y-4 ${RADIX_TOUCH_FIX}`}>
+                <div className="space-y-4">
                     <label className="block space-y-1.5">
                         <span className="text-body-sm font-medium text-fg">Name</span>
                         <input value={keyName} onChange={(e) => setKeyName(e.target.value)} maxLength={60} placeholder="e.g. Cursor on my laptop" className="h-9 w-full rounded-control border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint focus:border-focus focus:outline-none" />
