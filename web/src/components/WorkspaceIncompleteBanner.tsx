@@ -8,7 +8,7 @@
  */
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
-import { useWorkspace } from '@/app/(dashboard)/dashboard/layout';
+import { useWorkspace } from '@/components/shell/workspaceContext';
 
 export default function WorkspaceIncompleteBanner() {
     const { selectedSite, selectedProperty, isDemoWorkspace, isWorkspaceLoaded } = useWorkspace();

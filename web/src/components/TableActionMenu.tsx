@@ -79,7 +79,7 @@ export function useTableActions() {
     });
 
     // Note: the previous `site` param is no longer threaded through — the
-    // dedicated /dashboard/ai-chat page reads the active site/property from
+    // dedicated /dashboard/ask page reads the active site/property from
     // the workspace context, which is the single source of truth.
     const analyzeWithAI = (context: string, _site?: string) => ({
         label: 'Analyze with AI',

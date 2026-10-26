@@ -17,7 +17,7 @@ interface GoogleAuthButtonProps {
 export default function GoogleAuthButton({
     children,
     className,
-    // /dashboard server-redirects to /dashboard/setup or /dashboard/ai-chat
+    // /dashboard server-redirects to /dashboard/setup or /dashboard/ask
     // based on workspace_setup_completed. The middleware also enforces this.
     callbackUrl = '/dashboard',
     onClick,

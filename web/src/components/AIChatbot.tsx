@@ -22,7 +22,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useContainerStatus, useSiteList, usePropertyList, useAnalyticsData, useSeoData } from '@/lib/useDashboardData';
 import { buildAnalyticsContext, buildSeoContext, buildSnapshot } from '@/lib/chatUtils';
-import { useWorkspace } from '@/app/(dashboard)/dashboard/layout';
+import { useWorkspace } from '@/components/shell/workspaceContext';
 import { useChatStore, persistMessage, getOrCreateThreadId, setActiveThreadId, type ChatMessage } from '@/stores/chatStore';
 import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';

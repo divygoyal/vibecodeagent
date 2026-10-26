@@ -27,7 +27,6 @@ const COMPARISON_FEATURES = [
     { name: 'CSV/JSON Export', free: false, growth: true, pro: true },
     { name: 'Multi-site Support', free: false, growth: true, pro: true },
     { name: 'Priority AI Responses', free: false, growth: true, pro: true },
-    { name: 'Telegram Bot (AI SEO Assistant)', free: false, growth: false, pro: true },
     { name: 'Custom Alerts', free: false, growth: false, pro: true },
     { name: 'Priority Support', free: false, growth: false, pro: true },
 ];
