@@ -314,7 +314,7 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                     isPhone ? (
                         // Phones: the preview sits under the form, collapsed (DESIGN 5.12).
                         <details className="group min-w-0 rounded-card border border-border-subtle bg-surface p-4">
-                            <summary className="flex cursor-pointer list-none items-center justify-between text-title-sm text-fg">
+                            <summary className="flex cursor-pointer list-none items-center justify-between pointer-coarse:min-h-11 text-title-sm text-fg">
                                 Preview
                                 <span className="text-body-sm text-fg-muted group-open:hidden">Show</span>
                                 <span className="hidden text-body-sm text-fg-muted group-open:inline">Hide</span>

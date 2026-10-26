@@ -87,7 +87,7 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
 ## Open (severity)
 - ~~Medium~~ fixed, see "Fixed after robustness": `/api/share/<token>/overview/stats` answers 500 with an empty body when Google
   fails (429/500 cookie runs on /share/<token>); should be JSON 4xx/5xx with a message.
-- Low: with counts × 10M (`cookie:huge`) public share/view pages show 81 text-spill spots (numbers wider than their
+- ~~Low~~ fixed, see "Polish pass": with counts × 10M (`cookie:huge`) public share/view pages show 81 text-spill spots (numbers wider than their
   box, not clipped); check `mobile-scen-cookie-huge.md`.
 - ~~Medium~~ fixed, see "Fixed after robustness": a sync interrupted by a restart or deploy leaves assets `syncing`; the portfolio then reports `syncing` and
   polls every 2 s for up to 15 min (SYNC_STUCK_S in build.ts/sync.ts) before a new sync runs. With one web process,
@@ -98,10 +98,10 @@ f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
 - ~~Low~~ fixed, see "Fixed after robustness": `/api/analytics?mode=list` and `/api/seo?mode=list` answer 502 with the raw Google JSON inside `error`
   (`Google API error 401: {"error":…}`), also for a revoked token where 401 + "Reconnect Google" would be right. JSON,
   not shown in the UI.
-- Low: standalone text links are 18–20px tall ("Open the full demo", "See pricing", breadcrumbs) and the marketing logo
+- ~~Low~~ fixed, see "Polish pass": standalone text links are 18–20px tall ("Open the full demo", "See pricing", breadcrumbs) and the marketing logo
   link 28px; footer, toggles, tabs, table headers, segmented controls and pills are fixed (touch only).
 - Low (dev only): `/` 500s for some URL lengths (see the log table). Prod build unaffected.
-- Info: ~70 responsive grids still have no `grid-cols-1` base; none overflowed with the tested data (90-character hosts
+- ~~Info~~ fixed, see "Polish pass": ~70 responsive grids still have no `grid-cols-1` base; none overflowed with the tested data (90-character hosts
   at 390px, counts × 10M at 360px), but unusual content could. Fix as found: `grid-cols-1` / `minmax(0,…)`.
 - Info: the synthetic `nogoogle` user (GitHub session without a token) gets 503 from /api/auth/register-provider
   (`missing-session-data`, handled as degraded); a real GitHub sign-in carries a token.
@@ -130,3 +130,30 @@ Checked on :3101 (demo data, fault cookie / `f…` users). Tests: `web/tests/rob
    `google_timeout`; 429 → 502 `google_rate_limited`; 403 → 502 `google_forbidden`; else 502 `google_error`.
    Before: `frevoked` `?mode=list` 502 with raw JSON; data calls 502 raw for 403/429/500/504. After: 401 `google_reauth`
    (list and data), `list:500|429|timeout` 502/502/504 with short messages. `useDashboardData` fetcher prefers `message`.
+
+## Polish pass (before launch)
+Commits: 38403f4 (touch), cc91799 (grids), 1e16ceb (share numbers), plus the small touch follow-up below. `tsc --noEmit` and `npm test` (59) pass.
+
+1. **Tap targets on coarse pointers.** Two utilities in `globals.css`: `tap-area` (invisible 44px hit area via `::after`, only under
+   `pointer: coarse`, only grows an axis that is under 44px, no layout change; skipped for absolute/fixed/sticky elements) and
+   `tap-inline` (padding + negative margin, for an inline link inside an `overflow:hidden` / `truncate` box where a pseudo-element
+   would be clipped). Used by Button (every variant but `link`, which got a taller `after`: 20px text -> 44px), Select trigger,
+   StatusPill button, Tabs (pill tabs get room inside the scroll box; narrow routing tabs such as "Top" get +20px sideways),
+   SegmentedControl, table sort headers, page back arrow, and the standalone text links (Open Traffic, Ask AI, breadcrumbs, cross links,
+   site path cells, marketing CTAs, brand links, Built/Made with TrafficClaw, contact links). DropdownMenu and Select items are 44px tall on
+   touch (they are inside a popover, so the layout change is fine). `/ai` FAQ and the leaderboard Preview `<summary>` have `min-h-11` on touch.
+   Real bug found on the way: the audit URL input had `flex-1` inside a `flex-col` form, so it was squeezed to 23px tall; now `sm:flex-1`.
+   Checker: `check-mobile` now resolves a stretched link's `::after` against the nearest positioned ancestor (`after:absolute after:inset-0`
+   covers the whole card: 14 of the 30 "small" targets on /leaderboard were this, tappable all along).
+   Not done: popover content is only measured when open (not by the checker); `Badge` is not interactive anywhere (no change).
+   Numbers (390px, light, targets under 32px): /dashboard 11 -> 0, /dashboard/s/acmeanalytics.example/search 1 -> 0, /dashboard/dashboards 0 -> 0,
+   /leaderboard 16 -> 0 (14 checker-only), / 2 -> 0: **30 -> 0** (16 real fixes). Share page under the `huge` cookie 21 -> 0. Extra routes
+   (/dashboard/plan, /pricing, /ai, /contact, /tools, /dashboard/dashboards/new, /dashboard/leaderboard) 0. The old 343 (3 widths, all routes)
+   was not re-run in full; the 111 at 390px in `mobile-final` included the filter chips fixed in f716de8 and the ones above.
+2. **Grid base columns.** 64 responsive grids had `sm:/md:/lg:/xl:grid-cols-N` and no base column: `grid-cols-1` added (strings with a
+   `grid` token; `cn()` conditionals got it on the base string). The dashboard-builder canvas (react-grid-layout) is untouched.
+   BoardRows' container-query grid is not a grid below `@3xl`, so it needs none. No overflow or off-screen on the routes re-run.
+3. **Huge numbers on share/view pages.** Breakdown table value cells (64-72px) use exact numbers up to 999,999 and `fmtCompact` (339B)
+   above, with `min-w-0 truncate tabular-nums` and the exact value in the title; KPI tile values in the openpanel, umami and shared dashboard
+   clients got `min-w-0 truncate tabular-nums`; the home leaderboard preview value column is `min-w-20` (50K-100K spilled 5px).
+   Cookie `tc_demo_faults=huge` at 390 and 360px on /share/<token>, /view/<token>, /: text spills 81 -> 0.

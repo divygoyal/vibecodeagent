@@ -119,12 +119,12 @@ export function ContactAlternatives() {
             <p className="inline-flex items-center gap-2">
                 <Mail aria-hidden size={16} strokeWidth={1.75} className="text-fg-muted" />
                 Prefer email?{' '}
-                <a href="mailto:trafficclaw@gmail.com" className="font-medium text-brand-text underline-offset-4 hover:underline">trafficclaw@gmail.com</a>
+                <a href="mailto:trafficclaw@gmail.com" className="tap-area inline-block font-medium text-brand-text underline-offset-4 hover:underline">trafficclaw@gmail.com</a>
             </p>
             <p className="inline-flex items-center gap-2">
                 <svg aria-hidden className="size-4 text-fg-muted" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
                 On X:{' '}
-                <a href="https://x.com/devdivygoyal" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-text underline-offset-4 hover:underline">@devdivygoyal</a>
+                <a href="https://x.com/devdivygoyal" target="_blank" rel="noopener noreferrer" className="tap-area inline-block font-medium text-brand-text underline-offset-4 hover:underline">@devdivygoyal</a>
             </p>
         </div>
     );
