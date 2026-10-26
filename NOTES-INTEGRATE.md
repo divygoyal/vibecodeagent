@@ -53,8 +53,16 @@ Admin changes are verified by the migration-upgrade script on its own throwaway 
 ## Crawl
 (see "Crawl results" below)
 
-## Migration upgrade check
-(see below)
+## Migration upgrade check (019-023)
+`/root/.trafficclaw-dev/venv/bin/python scripts/dev/check_migrations.py` (own throwaway admins on 8130/8131, temp dir,
+Docker stub mode). Builds an old-schema DB with admin/ from live commit 1b62be9 (user, 2 v1 dashboards with a public
+share, a verified + a pending leaderboard entry via the old API), upgrades a COPY in place with this worktree's admin,
+starts it a second time, then deletes a second user. Result 2026-10-26: **37/37 passed** -
+additive (every old table/column kept, row counts unchanged), all 019-023 tables + the 022 columns created,
+mcp_site_links not created, user/dashboards/public share link/leaderboard entries survive (verified entry ranked by
+grace, pending entry a numberless shell, owner sees both), /connections works, container status no error in stub mode,
+second start: no traceback, identical schema and counts; delete-user removes portfolio_assets, site_action_states and
+mcp_tokens rows and leaves the other user alone.
 
 ## Open / for the coordinator
 - Dead legacy components nothing imports (left for a cleanup pass): components/{AnnotationBadge,AnnotationModal,
