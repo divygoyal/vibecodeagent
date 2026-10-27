@@ -18,6 +18,7 @@
  * Writes <out>/demo-check.{json,md}. Exit 0 = every check passed.
  */
 import fs from 'node:fs';
+import nodeHttp from 'node:http';
 import path from 'node:path';
 import { launchBrowser, newContext } from './pw.mjs';
 import { findInstance } from './routes.mjs';
@@ -49,18 +50,36 @@ const check = (name, ok, detail = '') => {
     console.error(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail && !ok ? ` -- ${String(detail).slice(0, 300)}` : ''}`);
 };
 
-async function http(method, p, { cookie, body, headers = {} } = {}) {
-    const res = await fetch(base + p, {
-        method,
-        redirect: 'manual',
-        headers: { ...(cookie ? { Cookie: cookie } : {}), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
-        body: body !== undefined ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
-        signal: AbortSignal.timeout(120_000),
+// node:http, not fetch: Node's fetch always sends Sec-Fetch-Mode: cors, which the demo (rightly) treats as a script
+// fetch and refuses to start a session for. A browser page load sends "navigate"; plain HTTP sends none.
+function http(method, p, { cookie, body, headers = {} } = {}) {
+    const payload = body !== undefined ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined;
+    return new Promise((resolve, reject) => {
+        const req = nodeHttp.request(base + p, {
+            method,
+            headers: {
+                ...(cookie ? { Cookie: cookie } : {}),
+                ...(payload !== undefined ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
+                ...headers,
+            },
+            timeout: 120_000,
+        }, (res) => {
+            const chunks = [];
+            res.on('data', (c) => chunks.push(c));
+            res.on('end', () => {
+                const text = Buffer.concat(chunks).toString('utf8');
+                let data = null;
+                try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+                const h = new Headers();
+                for (const [k, v] of Object.entries(res.headers)) if (k !== 'set-cookie' && v !== undefined) h.set(k, Array.isArray(v) ? v.join(', ') : String(v));
+                resolve({ status: res.statusCode, headers: h, data, text, setCookies: res.headers['set-cookie'] ?? [] });
+            });
+        });
+        req.on('timeout', () => req.destroy(new Error(`timeout ${method} ${p}`)));
+        req.on('error', reject);
+        if (payload !== undefined) req.write(payload);
+        req.end();
     });
-    const text = await res.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-    return { status: res.status, headers: res.headers, data, text, setCookies: res.headers.getSetCookie?.() ?? [] };
 }
 
 const cookieOf = (setCookies, name) => {
