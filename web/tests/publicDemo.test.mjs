@@ -184,3 +184,15 @@ test('kill switch', () => {
     assert.equal(cfg.publicDemoEnabled({ TC_PUBLIC_DEMO: '1' }), true);
     assert.equal(cfg.publicDemoEnabled({ TC_PUBLIC_DEMO: '0' }), false);
 });
+
+test('per-visitor demo rate limit: fixed one-minute windows', async () => {
+    const { demoRateOk, clientIp } = await import('../src/lib/publicDemo/rateLimit.ts');
+    const t = 1_000_000;
+    for (let i = 0; i < 5; i++) assert.equal(demoRateOk('k1', 5, t + i), true);
+    assert.equal(demoRateOk('k1', 5, t + 10), false);
+    assert.equal(demoRateOk('k2', 5, t + 10), true, 'other visitors are not affected');
+    assert.equal(demoRateOk('k1', 5, t + 60_001), true, 'a new minute starts fresh');
+    assert.equal(clientIp(new Headers({ 'cf-connecting-ip': '1.2.3.4', 'x-forwarded-for': '9.9.9.9' })), '1.2.3.4');
+    assert.equal(clientIp(new Headers({ 'x-forwarded-for': '5.6.7.8, 10.0.0.1' })), '5.6.7.8');
+    assert.equal(clientIp(new Headers()), 'unknown');
+});

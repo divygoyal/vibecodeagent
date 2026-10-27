@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 import { DEMO_COOKIE, DEMO_HEADER, DEMO_READONLY_MESSAGE, DEMO_REQUEST_HEADER, publicDemoEnabled } from '@/lib/publicDemo/config';
 import { ownSessionCookie, projectDemoCookieHeader } from '@/lib/publicDemo/cookies';
 import { demoApiDecision } from '@/lib/publicDemo/guard';
+import { clientIp, DEMO_API_LIMIT_PER_MIN, DEMO_START_LIMIT_PER_MIN, demoRateOk } from '@/lib/publicDemo/rateLimit';
 import { demoSessionJson } from '@/lib/publicDemo/session';
 import { readDemoJwt, sessionJwtIsDemo } from '@/lib/publicDemo/token';
 
@@ -57,6 +58,13 @@ function passThrough(request: NextRequest): NextResponse {
     return NextResponse.next({ request: { headers } });
 }
 
+function demoTooFast(): NextResponse {
+    return NextResponse.json(
+        { error: 'The demo is getting a lot of clicks from you. Wait a minute and try again.', demo: true },
+        { status: 429, headers: { [DEMO_HEADER]: 'busy', 'Retry-After': '60', 'Cache-Control': 'no-store' } },
+    );
+}
+
 function demoRefusal(): NextResponse {
     return NextResponse.json(
         { error: DEMO_READONLY_MESSAGE, demo: true },
@@ -74,6 +82,7 @@ function demoApi(request: NextRequest, token: JWT, demoJwt: string | null): Next
         return NextResponse.json(demoSessionJson(token, { realSession }), { headers: { 'Cache-Control': 'no-store' } });
     }
     const { decision, noopBody } = demoApiDecision(pathname, request.method);
+    if (decision === 'allow' && !demoRateOk(`api:${clientIp(request.headers)}`, DEMO_API_LIMIT_PER_MIN)) return demoTooFast();
     switch (decision) {
         case 'allow':
             if (demoJwt) return projectAsDemo(request, demoJwt);
@@ -125,9 +134,12 @@ function demoEntry(request: NextRequest): NextResponse {
     // The marketing page stays reachable (link previews, ?static=1 fallback) and its OG images are assets.
     const ua = request.headers.get('user-agent') || '';
     if (searchParams.get('static') === '1' || UNFURL_BOTS.test(ua) || /\/(opengraph|twitter)-image/.test(pathname)) return NextResponse.next();
-    if (pathname === '/demo' || pathname === '/demo/') return rewrite('/api/demo/start');
-    const slug = pathname.slice('/demo/'.length);
-    if (/^[a-z0-9.-]{1,80}$/i.test(slug)) return rewrite('/api/demo/start', { slug });
+    const slug = pathname === '/demo' || pathname === '/demo/' ? '' : pathname.slice('/demo/'.length);
+    if (slug && !/^[a-z0-9.-]{1,80}$/i.test(slug)) return NextResponse.next();
+    // Too many starts from one address: the static demo page instead (no session, nothing computed per visit).
+    if (!demoRateOk(`start:${clientIp(request.headers)}`, DEMO_START_LIMIT_PER_MIN)) return rewrite('/demo', { static: '1' });
+    if (!slug) return rewrite('/api/demo/start');
+    return rewrite('/api/demo/start', { slug });
     return NextResponse.next();
 }
 
@@ -221,7 +233,7 @@ export async function middleware(request: NextRequest) {
         if (moved) return moved;
     }
 
-    const res = NextResponse.next();
+    const res = passThrough(request);
     if (staleDemoCookie) clearDemoCookie(res);
     return res;
 }

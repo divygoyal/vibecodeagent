@@ -65,6 +65,10 @@ export function discoverRoutes(appDir) {
  * the login user, `host` the site for /dashboard/s/[host] pages.
  */
 export function fillRoute(route, seed, { user = 'demo', host = 'acmeanalytics.example' } = {}) {
+    // /demo now starts the live demo (a session cookie that would turn the rest of a crawl into the public demo
+    // user); crawls check the static demo pages it falls back to. check-demo.mjs covers the live demo itself.
+    if (route === '/demo') return '/demo?static=1';
+    if (route === '/demo/[slug]') return '/demo/acme?static=1';
     const s = seed.demo || seed[user] || {};
     const fills = {
         '/dashboard/dashboards/[id]': s.dashboardId,
