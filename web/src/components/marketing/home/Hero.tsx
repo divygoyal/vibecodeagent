@@ -60,7 +60,7 @@ export function HeroCopy({ demoHref }: { demoHref: string }) {
                     <li key={t} className="inline-flex items-center gap-1.5">
                         <Check aria-hidden size={14} strokeWidth={2.5} className="text-brand-text" />
                         {t === 'Read-only access' ? (
-                            <Link href="/security" className="underline decoration-border-strong decoration-dotted underline-offset-4 hover:text-fg hover:decoration-solid">{t}</Link>
+                            <Link href="/security" className="tap-area underline decoration-border-strong decoration-dotted underline-offset-4 hover:text-fg hover:decoration-solid">{t}</Link>
                         ) : t}
                     </li>
                 ))}

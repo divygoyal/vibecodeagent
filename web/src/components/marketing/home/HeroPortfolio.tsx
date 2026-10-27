@@ -11,6 +11,7 @@ import { cn } from '@/lib/cn';
 import { RANGE_LABEL } from '@/lib/portfolio/ranges';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite } from '@/lib/portfolio/types';
 import { filterSites, SORT_OPTIONS, sortSites, type FilterKey, type SortKey } from '@/lib/portfolio/view';
+import { useIsMobile } from '@/lib/useIsMobile';
 import { demoHref } from './demoLinks';
 
 const RANGES: PortfolioRange[] = ['7d', '28d', '3m', '12m'];
@@ -34,6 +35,9 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
         Object.fromEntries(byRange['28d'].sites.filter((s) => s.variant).map((s) => [s.key, false])),
     );
 
+    // Phones get the app's compact card (chevron instead of "Details", shorter chart), as in the app. The cards
+    // sit below the first screen on phones, so the switch after hydration moves nothing in view.
+    const compact = useIsMobile();
     const data = byRange[range];
     const sites = useMemo(
         () => data.sites.map((s): PortfolioSite => (s.key in starred ? { ...s, starred: starred[s.key] } : s)),
@@ -85,6 +89,7 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
                 metric={activeMetric}
                 onMetricChange={setMetric}
                 comparisonLabel={comparisonLabel}
+                compact={compact}
                 trendOpen={trendOpen}
                 onTrendOpenChange={setTrendOpen}
             />
@@ -117,6 +122,7 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
                                 syncing={false}
                                 href={demoHref(`/dashboard/s/${encodeURIComponent(s.slug)}`)}
                                 onToggleStar={(site) => setStarred((m) => ({ ...m, [site.key]: !site.starred }))}
+                                compact={compact}
                             />
                         </div>
                     ))}
