@@ -26,12 +26,31 @@ Branch tc/r2-sec (from tc/integrate). Dev instance name r2sec, ports 3116/8116.
   never names googleRefreshToken/googleAccessToken/githubAccessToken (verified it fails on a regression).
 - tsc exit 0; npm test 69/69; eslint on changed files: no new errors (counts equal or lower per file).
 
-## Next
-1. Account deletion cascade (admin): delete-user must remove custom_dashboards + v2 versions, chat
-   threads/messages/embeddings, leaderboard entries/profiles/daily/range stats/inquiries/audience,
-   digests, alerts, embed tokens, MCP rows, portfolio rows, site action states. Check admin/models.py +
-   migrations (see tc-r2-home/NOTES-R2-HOME.md). Add admin test: user with rows in every table -> delete -> none left.
-2. Admin tests (NOTES-INTEGRATE command) + new test; MCP unit test (npx -y tsx --test tests/mcp/unit.test.ts).
-3. Dev kit r2sec 3116/8116: login, /api/auth/session has no tokens; portfolio, site pages, dashboards,
-   Ask, leaderboard join, MCP in demo mode; crawl clean. Then down.sh + rm -rf web/.next.
-4. Final commit(s) + report.
+## Done (part 2, commit "fix(admin): delete-user removes every row of the user")
+- admin/user_delete.py delete_user_rows(db, user_id): USER_TABLES (user_id), PUBLISHER_TABLES
+  (publisher_user_id), ENTRY_TABLES (children of the user's leaderboard entries), THREAD_TABLES (children of the
+  user's chat threads), custom_dashboard_versions (dashboard_id). Skips tables missing on older SQLite DBs.
+  main.py DELETE /api/users/{id} calls it (replaces the separate MCP/portfolio/site-action/OAuth deletes).
+- Not deleted (no user link): contact_queries (by email, from the public contact form), mcp_oauth_clients.
+- admin/tests/test_user_delete.py: introspects every SQLite table with user_id / publisher_user_id / entry_id /
+  thread_id / dashboard_id, inserts a row for two users, deletes one via the API, asserts none of theirs is left
+  and the other user's rows remain; also fails if a table with user_id is missing from USER_TABLES.
+  Verified it fails against the old main.py (leaderboard_entries, chat_threads, ... left behind).
+- Admin suite (leaderboard_core, leaderboard_v3_api, plugin_security, user_delete): Ran 42 tests OK.
+  MCP unit tests 22/22. npm test 69/69. tsc exit 0.
+
+## Dev-kit check
+- 2026-10-27 10:06-10:11 UTC, r2sec 3116/8116 (demo user): /api/auth/session =
+  {id,name,email,image:null,provider:"google",hasGoogle:true,hasGithub:false,workspaceSetupCompleted:true}, no token
+  key or demo-access/demo-refresh value. login.mjs seeding (dashboards, share, embed, leaderboard entry) OK.
+  200 with data: /api/portfolio (first_sync -> ready), /api/connections, /api/leaderboard/me, /api/leaderboard/me/sites,
+  /api/ai-connections, /api/site/gsc, /api/analytics, /api/seo, /api/insights; register-provider {"registered":true,"synced":true}.
+- Crawl (desktop): 16 routes, 0 uncaught / console errors / failed requests (portfolio, site traffic tabs,
+  pages, audit, Ask, Connect AI, dashboards + a dashboard). It stopped early because the box had little free RAM
+  (other dev servers running), not because of a page error. Server down, web/.next removed.
+
+## Not done / follow-ups
+- middleware.ts still reads googleAccessToken off the JWT (edge, server-only; fine).
+- MCP consent page and the leaderboard join POST were not driven end to end on the dev kit. They are covered by
+  type checks and the shared helper, and the seeded leaderboard entry went through POST /api/leaderboard/me.
+- The "## Next" list above is finished.
