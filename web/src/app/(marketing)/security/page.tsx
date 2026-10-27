@@ -130,8 +130,8 @@ export default function SecurityPage() {
                     ))}
                 </ul>
                 <p className="mt-4 text-body text-fg-muted">
-                    Full scope names: <code className="font-mono text-caption">https://www.googleapis.com/auth/analytics.readonly</code> and{' '}
-                    <code className="font-mono text-caption">https://www.googleapis.com/auth/webmasters.readonly</code>.
+                    Full scope names: <code className="font-mono text-caption [overflow-wrap:anywhere]">https://www.googleapis.com/auth/analytics.readonly</code> and{' '}
+                    <code className="font-mono text-caption [overflow-wrap:anywhere]">https://www.googleapis.com/auth/webmasters.readonly</code>.
                 </p>
             </section>
 
@@ -242,8 +242,8 @@ export default function SecurityPage() {
                             body: (
                                 <>
                                     Open{' '}
-                                    <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-brand-text underline underline-offset-4 hover:text-fg">
-                                        Google account permissions<ExternalLink aria-hidden size={12} />
+                                    <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="text-brand-text underline underline-offset-4 hover:text-fg">
+                                        Google account permissions<ExternalLink aria-hidden size={12} className="ml-1 inline align-baseline" />
                                     </a>
                                     , pick {BRAND_NAME} and remove access. Google then refuses our requests, background syncs included. You can
                                     connect again at any time.

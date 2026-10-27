@@ -38,7 +38,7 @@ export function HomeHero() {
                 </Button>
             </div>
             <p className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-meta text-fg-muted">
-                <Link href="/security" className="underline decoration-border-strong decoration-dotted underline-offset-4 hover:text-fg hover:decoration-solid">
+                <Link href="/security" className="tap-area underline decoration-border-strong decoration-dotted underline-offset-4 hover:text-fg hover:decoration-solid">
                     Read-only access
                 </Link>
                 <span aria-hidden>·</span>
