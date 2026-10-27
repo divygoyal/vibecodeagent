@@ -37,7 +37,7 @@ const ICONS: Record<TourKey, LucideIcon> = {
  * pictures are regenerated; update them if the script's crops change.
  */
 const SIZES: Record<TourKey, { desktop: [number, number]; mobile: [number, number] }> = {
-    portfolio: { desktop: [1800, 1240], mobile: [720, 1432] },
+    portfolio: { desktop: [1800, 1240], mobile: [720, 494] },
     site: { desktop: [1800, 1240], mobile: [720, 1432] },
     fixes: { desktop: [1800, 1240], mobile: [720, 1432] },
     traffic: { desktop: [1800, 1240], mobile: [720, 1432] },

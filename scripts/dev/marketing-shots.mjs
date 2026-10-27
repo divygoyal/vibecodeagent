@@ -66,8 +66,10 @@ const SHOTS = [
         // The table layout (the hero already shows the cards): every site in one sortable list.
         name: 'portfolio',
         path: '/dashboard',
-        storage: { 'tc-portfolio-trend': '0', 'tc-portfolio-layout': 'table' },
-        crop: { from: 'main', height: { desktop: 700, mobile: 760 } },
+        // Desktop: the table (the hero already shows the cards); phones: the combined trend of all sites (the hero
+        // shows the cards there too, and the app's KPI strip scrolls sideways on phones, which looks cut in a still).
+        storage: { desktop: { 'tc-portfolio-trend': '0', 'tc-portfolio-layout': 'table' }, mobile: { 'tc-portfolio-trend': '1', 'tc-portfolio-layout': 'grid' } },
+        crop: { from: { desktop: 'main', mobile: '#portfolio-trend' }, offset: -14, height: { desktop: 700, mobile: 262 } },
     },
     { name: 'site', path: `/dashboard/s/${SITE}`, crop: { from: 'main', height: { desktop: 700, mobile: 760 } } },
     {
@@ -155,11 +157,12 @@ async function cropRect(page, crop, form) {
         const main = document.querySelector('#main-content');
         const inner = main?.firstElementChild ?? main;
         const box = (crop.container ? pick(crop.container) : inner)?.getBoundingClientRect();
-        const start = pick(crop.from);
+        const from = typeof crop.from === 'string' ? crop.from : crop.from[form];
+        const start = pick(from);
         if (!box || !start) return null;
         const pad = form === 'mobile' ? 12 : 16;
         let top = start.getBoundingClientRect().top + window.scrollY + (crop.offset ?? 0);
-        if (crop.from === 'main') top = (inner?.getBoundingClientRect().top ?? 0) + window.scrollY - pad;
+        if (from === 'main') top = (inner?.getBoundingClientRect().top ?? 0) + window.scrollY - pad;
         const height = crop.height[form];
         const x = Math.max(0, box.left - pad);
         return { x, y: Math.max(0, top), width: Math.min(document.documentElement.clientWidth - x, box.width + pad * 2), height };
@@ -224,7 +227,8 @@ try {
         for (const form of ['desktop', 'mobile']) {
             for (const theme of ['light', 'dark']) {
                 const file = `${shot.name}-${form}-${theme}`;
-                const context = await newContext(browser, form, theme, { storage: shot.storage });
+                const storage = shot.storage && (shot.storage.desktop || shot.storage.mobile) ? shot.storage[form] : shot.storage;
+                const context = await newContext(browser, form, theme, { storage });
                 const page = await context.newPage();
                 const report = watchPage(page, BASE);
                 try {

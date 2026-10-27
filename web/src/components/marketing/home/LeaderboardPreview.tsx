@@ -122,8 +122,8 @@ export function LeaderboardPreview() {
                     <SectionHeading
                         id="lb-title"
                         eyebrow="Leaderboard"
-                        title="Real traffic, straight from Google"
-                        description="Numbers straight from Google. Only verified owners rank."
+                        title="A public board of verified traffic"
+                        description="Numbers come straight from Google. Only verified site owners rank."
                     />
                     {proof.length ? (
                         <p className="mt-5 text-body-lg text-fg-secondary">
@@ -149,7 +149,7 @@ export function LeaderboardPreview() {
                     <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
                         <p className="min-w-0 truncate text-title-sm text-fg">Top sites right now</p>
                         {sample ? (
-                            <span className="rounded-full bg-subtle px-2 py-0.5 text-meta font-medium text-fg-secondary">Sample rows · test server</span>
+                            <span title="Test server: these rows are seed data. Real visitors only ever see real listings." className="shrink-0 rounded-full bg-subtle px-2 py-0.5 text-meta font-medium text-fg-secondary">Sample rows</span>
                         ) : (
                             <span className="inline-flex shrink-0 items-center gap-1.5 text-meta text-fg-muted">
                                 <span aria-hidden className="size-1.5 animate-live-dot rounded-full bg-up" />
