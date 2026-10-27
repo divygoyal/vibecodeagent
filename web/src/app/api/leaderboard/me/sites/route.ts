@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getValidAccessToken } from '@/lib/googleApi';
-import { fetchInventory } from '@/lib/sites/fetchInventory';
+import { loadUserInventory } from '@/lib/googleAccounts';
 import { pairSites, siteKind } from '@/lib/sites/pairing';
 import { digits, loadMine, requireUser } from '@/lib/leaderboard/owner';
 import type { SiteChoice } from '@/lib/leaderboard/types';
@@ -22,7 +22,8 @@ export async function GET() {
         return NextResponse.json({ sites: [], errors: { ga4: { status: 401, message: 'Reconnect Google.' } } });
     }
     const [inv, mine] = await Promise.all([
-        fetchInventory(token, { cacheKey: user.userId }).catch(() => null),
+        // Every Google connection of the user (sign-in account + linked accounts).
+        loadUserInventory(user.userId, { primary: { ok: true, token } }).catch(() => null),
         loadMine(user.userId),
     ]);
     if (!inv) return NextResponse.json({ sites: [], errors: { ga4: { status: 502, message: 'Could not read your Google account.' } } });

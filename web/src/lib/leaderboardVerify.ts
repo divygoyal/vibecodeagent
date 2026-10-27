@@ -1,4 +1,5 @@
 import { getValidAccessToken, listSearchConsoleSites } from '@/lib/googleApi';
+import { credentialsForAsset, listLinkedGoogleConnections, loadUserInventory } from '@/lib/googleAccounts';
 import { normalizeHost as pairingHost, siteKind } from '@/lib/sites/pairing';
 import { buildFix, decideLevel, ga4StreamIsOwned, gscCoverage, type GscSiteEntry } from '@/lib/leaderboard/ownership';
 import type { OwnershipOutcome, VerificationDetail, VerificationLevel } from '@/lib/leaderboard/types';
@@ -149,6 +150,11 @@ export interface CheckOwnershipInput {
     gaPropertyId?: string | null;
     accessToken?: string;
     refreshToken?: string;
+    /**
+     * The owner (session user id). With extra Google accounts linked, Search Console sites of every
+     * account count and the GA4 stream is read with the token of the account that lists the property.
+     */
+    userIdentifier?: string | null;
 }
 
 /**
@@ -189,11 +195,26 @@ export async function checkOwnership(input: CheckOwnershipInput): Promise<Owners
         return transient(`Could not reach Google with your saved sign-in: ${err instanceof Error ? err.message : 'unknown error'}.`);
     }
 
+    // Linked Google accounts: Search Console sites of every account, GA4 through the property's account.
+    const primaryCreds = { accessToken: input.accessToken, refreshToken: input.refreshToken };
+    const linked = input.userIdentifier ? await listLinkedGoogleConnections(input.userIdentifier) : [];
+    let gaCreds = primaryCreds;
+    if (linked.length > 0 && input.gaPropertyId) {
+        const c = await credentialsForAsset(input.userIdentifier!, { kind: 'ga4', id: input.gaPropertyId }, async () => primaryCreds);
+        gaCreds = { accessToken: c.accessToken, refreshToken: c.refreshToken };
+    }
+
     // Search Console ownership.
     let sites: GscSiteEntry[] = [];
     let ownerSite: GscSiteEntry | null = null;
     try {
-        sites = (await listSearchConsoleSites(token, AbortSignal.timeout(15_000))) as GscSiteEntry[];
+        if (linked.length > 0) {
+            const inv = await loadUserInventory(input.userIdentifier!, { primary: { ok: true, token }, linked });
+            if (inv.sites.length === 0 && inv.errors.gsc) throw new Error(`Google API error ${inv.errors.gsc.status}: ${inv.errors.gsc.message}`);
+            sites = inv.sites.map((s) => ({ siteUrl: s.siteUrl, permissionLevel: s.permissionLevel ?? '' })) as GscSiteEntry[];
+        } else {
+            sites = (await listSearchConsoleSites(token, AbortSignal.timeout(15_000))) as GscSiteEntry[];
+        }
         const cov = gscCoverage(sites, host);
         ownerSite = cov.ok ? cov.site : null;
         detail.gsc = {
@@ -214,7 +235,9 @@ export async function checkOwnership(input: CheckOwnershipInput): Promise<Owners
 
     // GA4 data stream (second signal).
     if (input.gaPropertyId) {
-        const ga = await verifyPropertyDomain(input.gaPropertyId, input.websiteUrl, input.accessToken || token, input.refreshToken);
+        const ga = gaCreds === primaryCreds
+            ? await verifyPropertyDomain(input.gaPropertyId, input.websiteUrl, input.accessToken || token, input.refreshToken)
+            : await verifyPropertyDomain(input.gaPropertyId, input.websiteUrl, gaCreds.accessToken ?? '', gaCreds.refreshToken);
         if (ga.ok) {
             detail.ga4 = { ok: true, reason: 'ok', hosts: ga.actualHosts };
         } else if (ga.status === 'failed') {

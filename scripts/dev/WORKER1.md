@@ -10,8 +10,8 @@ The dev kit (see `README.md`) runs `next dev` next to production on the main VPS
 cd /root/projects/worktrees/tc-<you>
 scripts/dev/worker1.sh sync  .                 # rsync code (no node_modules/.next/.git/.env*), npm ci once per lockfile hash
 scripts/dev/worker1.sh build <name>            # production `next build` (~50 s)
-scripts/dev/worker1.sh up    <name> [N]        # N instances (default 4): web 3201.., admin 8201.., fresh SQLite, demo users seeded (~15 s)
-scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden] [--golden-base dirA,dirB]
+scripts/dev/worker1.sh up    <name> [N] [--first K]  # N instances (default 4) at the first free run of slots (exactly 3200+K.. with --first): web 3201.., admin 8201.., fresh SQLite, demo users seeded (~15 s)
+scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden|multi|mcp] [--golden-base dirA,dirB]
 scripts/dev/worker1.sh down  <name>
 scripts/dev/worker1.sh run   . [what] [N]      # sync + build + up + check + down
 scripts/dev/worker1.sh status                  # load, memory, running instances, disk
@@ -31,6 +31,11 @@ What `check` does, on the N running instances at once (the slowest job is the ph
 - **mobile**: `check-mobile.mjs --part k/N --no-shots` (360/390/414, light + dark).
 - **scenarios**: `check-scenarios.mjs`, the 9 users of the main-VPS final gate spread over the instances
   (`TC_W1_SCEN_USERS=a,b,c` changes the list).
+- **multi**: `check-multi-account.mjs` on the first instance: the `multi` user (two Google accounts, the second
+  linked as a data connection) end to end: Settings list and screenshots, union directory and portfolio, account-2
+  data, Disconnect in the UI, the demo link flow (added / same / cancelled / forged state), a revoked extra account.
+- **mcp** (not part of `all`): `web/tests/mcp/browser-consent.mjs` on the first instance: the MCP OAuth consent page
+  in real Chromium (DCR + PKCE): demo, Allow and Cancel.
 - **golden**: two captures of the same build in parallel (a stability sample), then `compare` against the
   baselines given with `--golden-base` (exact pixels; a shot passes if it equals any baseline). It also compares the
   two captures with each other.
@@ -54,7 +59,7 @@ What `check` does, on the N running instances at once (the slowest job is the ph
 credential, no user data: demo data only (`TC_DEMO_DATA=1`), Docker stub mode for the admin
 (`DOCKER_HOST` points at a missing socket, as in the kit), Google client ids are dummies.
 
-Rules it follows: only ports 3201-3210 and 8201-8210 on 127.0.0.1 (it refuses to start if one is taken); every
+Rules it follows: only ports 3201-3210 and 8201-8210 on 127.0.0.1 (it skips to the next free run of slots, or refuses with `--first K` if one of those is taken); every
 process under `env -i`, `nice -n 10` and `setsid`; stop/kill only pids from its own pid files after checking the
 process runs in our directory; one build at a time (`build.lock`), builds refused under 8 GB free RAM; no
 instances under 6 GB free RAM. The other projects on worker1 (autopilot-repo, deepflast-worker, workday-engine,

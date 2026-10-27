@@ -94,6 +94,7 @@ async function preparePayload(
     rawBody: RawEntryBody,
     googleAccessToken: string | undefined,
     googleRefreshToken: string | undefined,
+    userIdentifier?: string,
 ): Promise<
     | { ok: true; payload: Record<string, unknown>; verifiedHost: string | null; verificationStatus: string; outcome: OwnershipCheck | null }
     | { ok: false; response: NextResponse }
@@ -148,6 +149,7 @@ async function preparePayload(
             gaPropertyId: rawBody.ga_property_id,
             accessToken: googleAccessToken,
             refreshToken: googleRefreshToken,
+            userIdentifier,
         });
         if (outcome.level === 'owner') {
             verificationStatus = 'verified';
@@ -241,7 +243,7 @@ export async function POST(req: Request) {
     // otherwise bubble to Next.js's default HTML 500 page, which the proxy
     // can't always pass through and surfaces as a Cloudflare 502 with HTML.
     try {
-        const prepared = await preparePayload(rawBody, googleAccessToken, googleRefreshToken);
+        const prepared = await preparePayload(rawBody, googleAccessToken, googleRefreshToken, String(userId));
         if (!prepared.ok) return prepared.response;
 
         const adminUrl = `${ADMIN_API_URL}/api/leaderboard/${userId}/join`;
@@ -300,6 +302,7 @@ export async function POST(req: Request) {
                     websiteUrl: String(prepared.payload.website_url || ''),
                     accessToken: googleAccessToken,
                     refreshToken: googleRefreshToken,
+                    userIdentifier: String(userId),
                     skipVerify: true,
                     gscSiteUrl: outcome?.gscSiteUrl ?? null,
                 });
@@ -394,7 +397,7 @@ export async function PUT(req: Request) {
 
     // Server-only: Google tokens from the session JWT, then the admin DB.
     const { accessToken: googleAccessToken, refreshToken: googleRefreshToken } = await getGoogleCredentialsForRequest(req, String(userId));
-    const prepared = await preparePayload(rawBody, googleAccessToken, googleRefreshToken);
+    const prepared = await preparePayload(rawBody, googleAccessToken, googleRefreshToken, String(userId));
     if (!prepared.ok) return prepared.response;
 
     try {

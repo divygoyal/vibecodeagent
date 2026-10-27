@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { cachedFetch } from '@/lib/apiCache';
 import { getValidAccessToken } from '@/lib/googleApi';
-import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
+import { getGoogleCredentialsForAsset } from '@/lib/serverAuth';
 import { DEMO_PROPERTY_ID, isDemoRequest } from '@/lib/demoWorkspace';
 import { parseOverviewRequest, SHARE_OVERVIEW_CACHE_TTL } from '@/lib/shareOverviewServer';
 
@@ -85,7 +85,7 @@ export async function getAnalyticsOverviewContext(req: Request): Promise<{
             }
 
             // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
-            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId));
+            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForAsset(req, String(userId), propertyId ? { kind: 'ga4', id: propertyId } : null);
 
             if (!googleAccess && !googleRefresh) {
                 return {

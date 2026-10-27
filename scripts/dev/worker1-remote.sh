@@ -3,8 +3,8 @@
 #
 #   worker1-remote.sh deps  <name>              npm ci once per lockfile hash (cached node_modules) + admin venv
 #   worker1-remote.sh build <name>              production `next build`
-#   worker1-remote.sh up    <name> [N]          N instances (default 4): web 3201.. + admin 8201.., fresh DB, demo users
-#   worker1-remote.sh check <name> [what] [out] crawl|mobile|scenarios|golden|mcp|all, results into <out> (mcp is not part of all)
+#   worker1-remote.sh up    <name> [N] [K]      N instances (default 4) from slot K (default: first free run): web 3200+K.. + admin 8200+K.., fresh DB, demo users
+#   worker1-remote.sh check <name> [what] [out] crawl|mobile|scenarios|golden|multi|mcp|all, results into <out> (mcp is not part of all)
 #   worker1-remote.sh down  <name>
 #   worker1-remote.sh status
 #   worker1-remote.sh clean [--all]
@@ -202,19 +202,27 @@ cmd_down() {
 }
 
 cmd_up() {
-    local name="$1" n="${2:-4}" src="$SRC_ROOT/$1" i t0 avail
+    local name="$1" n="${2:-4}" first="${3:-}" fixed=1 src="$SRC_ROOT/$1" i t0 avail
     [[ "$n" =~ ^[0-9]+$ ]] && [ "$n" -ge 1 ] && [ "$n" -le "$MAX_N" ] || die "N must be 1..$MAX_N"
+    # --first K: instances K..K+N-1 (ports 3200+K..), so two worktrees can run side by side. Empty: first free slot.
+    [ -n "$first" ] || { first=1; fixed=0; }
+    [[ "$first" =~ ^[0-9]+$ ]] && [ "$first" -ge 1 ] && [ $((first + n - 1)) -le "$MAX_N" ] || die "first + N - 1 must be <= $MAX_N"
     [ -f "$src/web/.next/BUILD_ID" ] || die "no production build in $src/web/.next (run worker1.sh build $name)"
     [ -d "$src/web/node_modules/next" ] || die "node_modules missing"
     ensure_dev_home; load_dev_env
     cmd_down "$name"
     avail="$(mem_available_mb)"; [ "$avail" -ge "$MIN_MEM_MB" ] || die "only ${avail} MB RAM available (need $MIN_MEM_MB)"
-    # Other sessions can hold the low slots (another worktree's instances): start at the first run of N free slots.
-    local first=1 ok
+    # --first K: exactly instances K..K+N-1 (ports 3200+K..), refused if one of their ports is taken. Without it,
+    # other sessions can hold the low slots (another worktree's instances): start at the first run of N free slots.
+    local ok
     while :; do
         ok=1
         for i in $(seq "$first" $((first + n - 1))); do
-            for p in "$(web_port "$i")" "$(admin_port "$i")"; do port_listening "$p" && ok=0; done
+            for p in "$(web_port "$i")" "$(admin_port "$i")"; do
+                port_listening "$p" || continue
+                [ "$fixed" = 1 ] && die "port $p is already in use on worker1 (not ours); refusing to start (--first $first)"
+                ok=0
+            done
         done
         [ "$ok" = 1 ] && break
         first=$((first + 1))
@@ -295,6 +303,7 @@ job_mobile() { chk "$RES/mobile-p$1.log" "$KIT/check-mobile.mjs" "$3" --label "p
 job_scen() { chk "$RES/scen-$1.log" "$KIT/check-scenarios.mjs" "$3" --users "$4" --out "$RES/scenarios/u$1"; }
 # mcp: the real-browser MCP consent test (web/tests/mcp/browser-consent.mjs) on the first instance only.
 job_mcp() { chk "$RES/mcp-browser.log" "$src_web_tests/mcp/browser-consent.mjs" "$1" --out "$RES/mcp-browser"; }
+job_multi() { chk "$RES/multi.log" "$KIT/check-multi-account.mjs" "$1" --out "$RES/multi"; }   # port (linked Google accounts e2e)
 job_golden() { chk "$RES/golden-capture-$1.log" "$KIT/dash-golden.mjs" capture "$2" "$RES/golden/cand$1"; }
 
 cmd_check() {
@@ -345,6 +354,12 @@ cmd_check() {
         phase_job job_mcp "$(web_port "${insts[0]}")"
         phase_end
         cat "$RES/mcp-browser.log" >&2 || true
+    fi
+    if [ "$all" = 1 ] || [ "$what" = multi ]; then
+        # "Connect another Google account" end to end as the `multi` user (one instance is enough).
+        phase_start multi
+        phase_job job_multi "$(web_port "${insts[0]}")"
+        phase_end
     fi
     if [ "$all" = 1 ] || [ "$what" = golden ]; then
         # Two captures of the same build in parallel (like base/base2 on the VPS: a stability sample), then
@@ -403,7 +418,7 @@ cmd="${1:-}"; shift || true
 case "$cmd" in
     deps)   validate_name "${1:-}"; cmd_deps "$1" ;;
     build)  validate_name "${1:-}"; cmd_build "$1" ;;
-    up)     validate_name "${1:-}"; cmd_up "$1" "${2:-4}" ;;
+    up)     validate_name "${1:-}"; cmd_up "$1" "${2:-4}" "${3:-}" ;;
     down)   validate_name "${1:-}"; ensure_dev_home; cmd_down "$1" ;;
     check)  validate_name "${1:-}"; cmd_check "$1" "${2:-all}" "${3:-}" ;;
     status) ensure_dev_home; cmd_status ;;

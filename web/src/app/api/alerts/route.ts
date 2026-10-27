@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getValidAccessToken } from '@/lib/googleApi';
-import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
+import { getGoogleCredentialsForAsset } from '@/lib/serverAuth';
 import { computeAlerts } from '@/lib/alertEngine';
 
 export const dynamic = 'force-dynamic';
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
 
         // Get Google token
         // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
-        const { accessToken: accessToken, refreshToken: refreshToken } = await getGoogleCredentialsForRequest(req, String(userId));
+        const { accessToken: accessToken, refreshToken: refreshToken } = await getGoogleCredentialsForAsset(req, String(userId), { kind: 'gsc', id: siteUrl });
 
         if (!accessToken && !refreshToken) {
             return NextResponse.json({ alerts: [], alertCount: 0, error: 'No Google connection' });

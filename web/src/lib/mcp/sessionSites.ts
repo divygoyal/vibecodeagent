@@ -4,7 +4,8 @@
  * tools use (siteResolver.buildSiteRecords).
  */
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
-import { fetchInventory, type Inventory } from '@/lib/sites/fetchInventory';
+import { loadUserInventory } from '@/lib/googleAccounts';
+import type { Inventory } from '@/lib/sites/fetchInventory';
 import { loadPairingOverrides } from '@/lib/sites/pairingStore';
 import { buildSiteRecords, type SiteRecord } from './siteResolver';
 import type { SessionUser } from './session';
@@ -36,7 +37,8 @@ export async function loadSessionSites(user: SessionUser): Promise<SessionSites>
     } catch {
         return empty(true);
     }
-    const inv = await fetchInventory(token, { cacheKey: `session:${user.id}` });
+    // Every Google connection of the user (sign-in account + linked accounts).
+    const inv = await loadUserInventory(user.id, { primary: { ok: true, token }, cacheKey: `session:${user.id}` });
     const reauth = inv.errors.ga4?.status === 401 || inv.errors.gsc?.status === 401;
     const overrides = await loadPairingOverrides(user.id);
     return {

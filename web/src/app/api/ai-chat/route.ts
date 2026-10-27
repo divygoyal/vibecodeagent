@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getServerAuthUser } from '@/lib/serverAuth';
+import { accessForAsset, listLinkedGoogleConnections, loadUserInventory } from '@/lib/googleAccounts';
 import type { GoogleGenAI } from '@google/genai';
 import { authOptions } from '@/lib/auth';
 import { AI_CHAT_TOOL_DECLARATIONS, executeAiChatTool } from '@/services/aiChatTools';
@@ -678,10 +679,19 @@ export async function POST(req: NextRequest) {
         try {
             validGoogleToken = await getValidAccessToken(googleAccessToken, googleRefreshToken);
             const cacheKey = `sites:${userId}`;
+            const primaryToken = validGoogleToken;
             [cachedSites, cachedGa4Properties] = await Promise.all([
-                getCachedOrFetch(`${cacheKey}:gsc`, () => listSearchConsoleSites(validGoogleToken).catch(() => [])),
-                getCachedOrFetch(`${cacheKey}:ga4`, () => listAnalyticsProperties(validGoogleToken).catch(() => [])),
+                getCachedOrFetch(`${cacheKey}:gsc`, () => listSearchConsoleSites(primaryToken).catch(() => [])),
+                getCachedOrFetch(`${cacheKey}:ga4`, () => listAnalyticsProperties(primaryToken).catch(() => [])),
             ]);
+            // Extra Google accounts linked in Settings: their sites and properties count too.
+            if (userId && (await listLinkedGoogleConnections(String(userId))).length > 0) {
+                const inv = await loadUserInventory(String(userId), { primary: { ok: true, token: primaryToken } }).catch(() => null);
+                if (inv) {
+                    cachedSites = inv.sites.map((s) => ({ siteUrl: s.siteUrl, permissionLevel: s.permissionLevel }));
+                    cachedGa4Properties = inv.properties.map((p) => ({ displayName: p.displayName, property: p.property, parent: p.account ?? '' }));
+                }
+            }
         } catch {
             return new Response(JSON.stringify(ga4RequiredResponse), {
                 status: 409,
@@ -752,12 +762,22 @@ export async function POST(req: NextRequest) {
         // (otherwise they'd be lost). Capture them into a buffer here and flush
         // on stream open inside the ReadableStream below.
         const sourceLoadEvents: string[] = [];
+        // Linked Google accounts: each property / site is read with the token of the account that lists it.
+        const primaryCreds = { accessToken: googleAccessToken, refreshToken: googleRefreshToken };
+        const hasLinked = Boolean(userId) && (await listLinkedGoogleConnections(String(userId))).length > 0;
+        const tokenForAsset = hasLinked
+            ? async (asset: { kind: 'ga4' | 'gsc'; id: string }) => {
+                const a = await accessForAsset(String(userId), asset, async () => primaryCreds);
+                return a.ok ? a.token : null;
+            }
+            : undefined;
+        const siteToken = async (site: string) => (tokenForAsset ? (await tokenForAsset({ kind: 'gsc', id: site })) ?? validGoogleToken : validGoogleToken);
         const enrichmentPromise: Promise<EnrichedSnapshot | null> = (selectedSite && validGoogleToken && userId && seoContext)
-            ? threadStatePromise.then(state => buildEnrichedSnapshot({
+            ? threadStatePromise.then(async state => buildEnrichedSnapshot({
                 userId: String(userId),
                 siteUrl: selectedSite,
                 propertyId: ga4PropertyId,
-                googleToken: validGoogleToken,
+                googleToken: await siteToken(selectedSite),
                 seoContext,
                 analyticsContext,
                 recentlySurfacedIds: state.surfacedInsightIds,
@@ -1244,6 +1264,7 @@ CRITICAL SYSTEM CONTEXT:
                                         toolResult = await executeAiChatTool(fcName, fcArgs, {
                                             googleAccessToken,
                                             googleRefreshToken,
+                                            tokenFor: tokenForAsset,
                                             githubAccessToken,
                                             userId: userId ? String(userId) : undefined,
                                             // A2 / A10: pass dashboard snapshots so get_alerts and

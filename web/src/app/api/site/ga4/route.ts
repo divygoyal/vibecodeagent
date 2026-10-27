@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     const property = parseProperty(sp.get('property'));
     if (!property) return jsonError('A GA4 property is required.', 400);
     const report = sp.get('report') ?? 'summary';
-    const ctx = await getSiteContext(req);
+    const ctx = await getSiteContext(req, { kind: 'ga4', id: property });
     if (ctx instanceof NextResponse) return ctx;
 
     try {

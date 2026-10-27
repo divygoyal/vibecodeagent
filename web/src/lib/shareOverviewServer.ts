@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getShareData } from '@/app/api/share/route';
 import { cachedFetch } from '@/lib/apiCache';
-import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
+import { getValidAccessToken } from '@/lib/googleApi';
+import { storedCredentialsForAsset } from '@/lib/googleAccounts';
 import { googleErrorResponse } from '@/lib/googleErrors';
 import { parseShareOverviewEventNames, parseShareOverviewFilters } from '@/lib/shareOverviewFilters';
 import type { ShareData } from '@/lib/shareTypes';
@@ -161,7 +162,8 @@ export async function getShareOverviewContextWithOptions(
                 };
             }
 
-            const tokens = await fetchGoogleTokensFromDb(share.userId);
+            // The owner's token for the shared property (a linked Google account's when it lists it).
+            const tokens = await storedCredentialsForAsset(share.userId, share.propertyId ? { kind: 'ga4', id: share.propertyId } : null);
             if (!tokens) {
                 if (!requireGoogle) {
                     return {

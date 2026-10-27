@@ -21,10 +21,12 @@ import { cachedFetch, CACHE_TTL, invalidateCache } from '@/lib/apiCache';
 import { describeGoogleError } from '@/lib/googleErrors';
 import { listAnalyticsProperties, listSearchConsoleSites } from '@/lib/googleApi';
 import { invalidateInventory } from '@/lib/sites/fetchInventory';
+import { linkedAccess, listLinkedGoogleConnections } from '@/lib/googleAccounts';
 import { AdminStoreError, adminStore } from '@/lib/portfolio/adminStore';
 import type { GoogleAccess } from '@/lib/portfolio/auth';
 import type { StoreAsset } from '@/lib/portfolio/snapshot';
 import { storedPairs } from './pairingStore';
+import { propertyKey, siteKey } from './unionInventory';
 import type { DirectoryError, DirectoryPayload, DirectoryProperty, DirectorySite } from './directoryTypes';
 
 export type { DirectoryError, DirectoryPayload, DirectoryProperty, DirectorySite };
@@ -83,8 +85,8 @@ export async function loadStoreDirectory(identifier: string): Promise<DirectoryP
     return {
         source: 'store',
         connected: true,
-        sites: assets.filter((a) => a.asset_kind === 'gsc').map((a) => ({ siteUrl: a.asset_id, ...(a.permission_level ? { permissionLevel: a.permission_level } : {}) })),
-        properties: assets.filter((a) => a.asset_kind === 'ga4').map((a) => ({ property: a.asset_id, displayName: a.display_name || a.asset_id, ...(a.host ? { host: a.host } : {}) })),
+        sites: assets.filter((a) => a.asset_kind === 'gsc').map((a) => ({ siteUrl: a.asset_id, ...(a.permission_level ? { permissionLevel: a.permission_level } : {}), ...(a.connection_id ? { connectionId: a.connection_id } : {}) })),
+        properties: assets.filter((a) => a.asset_kind === 'ga4').map((a) => ({ property: a.asset_id, displayName: a.display_name || a.asset_id, ...(a.host ? { host: a.host } : {}), ...(a.connection_id ? { connectionId: a.connection_id } : {}) })),
         pairs: storedPairs(assets),
         errors: {},
     };
@@ -96,19 +98,22 @@ export async function loadStoreDirectory(identifier: string): Promise<DirectoryP
  * lists Google afresh and stores a site the user just added.
  */
 export async function loadLiveDirectory(identifier: string, getAccess: () => Promise<GoogleAccess>, opts: { refresh?: boolean } = {}): Promise<DirectoryPayload> {
+    const linked = await listLinkedGoogleConnections(identifier);
     if (opts.refresh) {
-        for (const key of [`gsc:sites:${identifier}`, `ga:properties:${identifier}`]) {
-            invalidateCache(key);
-            failureMemo.delete(key);
+        for (const suffix of ['', ...linked.map((c) => `#${c.sub}`)]) {
+            for (const key of [`gsc:sites:${identifier}${suffix}`, `ga:properties:${identifier}${suffix}`]) {
+                invalidateCache(key);
+                failureMemo.delete(key);
+            }
+            invalidateInventory(`${identifier}${suffix}`);
         }
-        invalidateInventory(identifier);
     }
-    const [access, assets] = await Promise.all([getAccess(), storedAssets(identifier)]);
+    const [access, assets, extra] = await Promise.all([getAccess(), storedAssets(identifier), linkedLists(identifier, linked)]);
     const pairs = storedPairs(assets.filter((a) => !a.missing));
     if (!access.ok) {
-        if (access.reason === 'not_connected') return { source: 'live', connected: false, sites: [], properties: [], pairs, errors: {} };
-        const err: DirectoryError = { code: 'google_reauth', message: 'Google access expired or was revoked. Reconnect Google.' };
-        return { source: 'live', connected: true, sites: [], properties: [], pairs, errors: { sites: err, properties: err } };
+        if (access.reason === 'not_connected' && !extra.any) return { source: 'live', connected: false, sites: [], properties: [], pairs, errors: {} };
+        const err: DirectoryError | undefined = access.reason === 'not_connected' ? undefined : { code: 'google_reauth', message: 'Google access expired or was revoked. Reconnect Google.' };
+        return { source: 'live', connected: true, sites: extra.sites, properties: extra.properties, pairs, errors: err ? { sites: err, properties: err } : {} };
     }
     const token = access.token;
     const [sites, properties] = await Promise.all([
@@ -118,13 +123,51 @@ export async function loadLiveDirectory(identifier: string, getAccess: () => Pro
     const errors: DirectoryPayload['errors'] = {};
     if (!Array.isArray(sites)) errors.sites = toError(sites);
     if (!Array.isArray(properties)) errors.properties = toError(properties);
+    // Linked Google accounts add what the sign-in account cannot see (the sign-in account wins a tie).
+    const ownSites = Array.isArray(sites) ? sites : [];
+    const ownProps = Array.isArray(properties) ? properties : [];
+    const siteSeen = new Set(ownSites.map((s) => siteKey(s.siteUrl)));
+    const propSeen = new Set(ownProps.map((p) => propertyKey(p.property)));
     const hostOf = new Map(assets.filter((a) => a.asset_kind === 'ga4' && a.host).map((a) => [a.asset_id, a.host as string]));
+    const withHost = (p: DirectoryProperty): DirectoryProperty => (hostOf.has(p.property) && !p.host ? { ...p, host: hostOf.get(p.property) } : p);
     return {
         source: 'live',
         connected: true,
-        sites: Array.isArray(sites) ? sites : [],
-        properties: Array.isArray(properties) ? properties.map((p) => (hostOf.has(p.property) && !p.host ? { ...p, host: hostOf.get(p.property) } : p)) : [],
+        sites: [...ownSites, ...extra.sites.filter((s) => !siteSeen.has(siteKey(s.siteUrl)))],
+        properties: [...ownProps, ...extra.properties.filter((p) => !propSeen.has(propertyKey(p.property)))].map(withHost),
         pairs,
         errors,
     };
+}
+
+/** The lists of each linked Google account (cached like the primary ones), deduped in connection order. */
+async function linkedLists(identifier: string, linked: Awaited<ReturnType<typeof listLinkedGoogleConnections>>): Promise<{ any: boolean; sites: DirectorySite[]; properties: DirectoryProperty[] }> {
+    const out = { any: false, sites: [] as DirectorySite[], properties: [] as DirectoryProperty[] };
+    const parts = await Promise.all(linked.filter((c) => c.status !== 'needs_reconnect').map(async (conn) => {
+        const access = await linkedAccess(identifier, conn);
+        if (!access.ok) return null;
+        const token = access.token;
+        const [sites, properties] = await Promise.all([
+            cachedList<DirectorySite[]>(`gsc:sites:${identifier}#${conn.sub}`, () => listSearchConsoleSites(token, AbortSignal.timeout(LIST_TIMEOUT_MS))),
+            cachedList<DirectoryProperty[]>(`ga:properties:${identifier}#${conn.sub}`, () => listAnalyticsProperties(token, AbortSignal.timeout(LIST_TIMEOUT_MS))),
+        ]);
+        return { sub: conn.sub, sites: Array.isArray(sites) ? sites : [], properties: Array.isArray(properties) ? properties : [] };
+    }));
+    const siteSeen = new Set<string>();
+    const propSeen = new Set<string>();
+    for (const part of parts) {
+        if (!part) continue;
+        out.any = true;
+        for (const s of part.sites) {
+            if (siteSeen.has(siteKey(s.siteUrl))) continue;
+            siteSeen.add(siteKey(s.siteUrl));
+            out.sites.push({ siteUrl: s.siteUrl, ...(s.permissionLevel ? { permissionLevel: s.permissionLevel } : {}), connectionId: part.sub });
+        }
+        for (const p of part.properties) {
+            if (propSeen.has(propertyKey(p.property))) continue;
+            propSeen.add(propertyKey(p.property));
+            out.properties.push({ property: p.property, displayName: p.displayName, ...(p.parent ? { parent: p.parent } : {}), connectionId: part.sub });
+        }
+    }
+    return out;
 }

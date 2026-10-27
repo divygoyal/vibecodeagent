@@ -9,6 +9,7 @@
  */
 import { createHash } from 'node:crypto';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
+import { accessForAsset, listLinkedGoogleConnections, type GoogleAssetRef } from '@/lib/googleAccounts';
 import { createDemoGoogleFetch, demoGoogleAccessToken, type FetchLike } from '@/lib/sites/fetchInventory';
 import type { McpPrincipal } from './auth';
 import { ToolError } from './errors';
@@ -166,23 +167,30 @@ function googleMessage(text: string): string {
     return text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 200);
 }
 
+/** The token for one asset when the user has extra Google accounts linked (lib/googleAccounts.ts). */
+export type AssetTokenRouter = (asset: GoogleAssetRef) => Promise<string>;
+
 export class GoogleClient {
     constructor(
+        /** The primary connection's token (the inventory and assets it lists). */
         readonly token: string,
         private readonly fetchFn: FetchLike,
         readonly userKey: string,
         readonly demo: boolean,
         readonly stats: CallStats,
         private readonly signal?: AbortSignal,
+        /** Set when linked Google accounts exist: each property or site is read with its own connection's token. */
+        private readonly route?: AssetTokenRouter,
     ) {}
 
-    private async request(url: string, body: unknown, method: 'GET' | 'POST'): Promise<{ status: number; text: string }> {
+    private async request(url: string, body: unknown, method: 'GET' | 'POST', asset?: GoogleAssetRef): Promise<{ status: number; text: string }> {
+        const token = asset && this.route ? await this.route(asset) : this.token;
         const signals = [AbortSignal.timeout(CALL_TIMEOUT_MS)];
         if (this.signal) signals.push(this.signal);
         try {
             const res = await this.fetchFn(url, {
                 method,
-                headers: { Authorization: `Bearer ${this.token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+                headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
                 body: body ? JSON.stringify(body) : undefined,
                 signal: AbortSignal.any(signals),
             });
@@ -237,7 +245,7 @@ export class GoogleClient {
             if (block) throw new ToolError('quota_exhausted', block, 'Cached results are still served; try again later.', 600);
             return ga4Semaphore(property).run(async () => {
                 for (let attempt = 0; ; attempt++) {
-                    const { status, text } = await this.request(`${GA_DATA}/${property}:${kind}`, reqBody, 'POST');
+                    const { status, text } = await this.request(`${GA_DATA}/${property}:${kind}`, reqBody, 'POST', { kind: 'ga4', id: property });
                     if (status === 429 && attempt < 2) {
                         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
                         continue;
@@ -261,7 +269,7 @@ export class GoogleClient {
 
     ga4Metadata(property: string): Promise<GaMetadata> {
         return this.cached(`ga4:metadata:${property}`, 24 * 3600_000, async () => {
-            const { status, text } = await this.request(`${GA_DATA}/${property}/metadata`, undefined, 'GET');
+            const { status, text } = await this.request(`${GA_DATA}/${property}/metadata`, undefined, 'GET', { kind: 'ga4', id: property });
             if (status !== 200) this.fail('GA4', status, text, `ga4:${property}`);
             return { value: JSON.parse(text) as GaMetadata, size: text.length };
         });
@@ -281,7 +289,7 @@ export class GoogleClient {
         const ttl = body.dataState === 'all' ? 5 * 60_000 : 30 * 60_000;
         return this.cached(`gsc:query:${siteUrl}:${bodyHash(body)}`, ttl, () => gscSemaphore(this.userKey).run(async () => {
             const circuitKey = this.gscGuard(siteUrl);
-            const { status, text } = await this.request(`${GSC}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, body, 'POST');
+            const { status, text } = await this.request(`${GSC}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, body, 'POST', { kind: 'gsc', id: siteUrl });
             if (status !== 200) {
                 if (status === 429 || /load quota/i.test(text)) circuits.set(circuitKey, Date.now() + 15 * 60_000);
                 this.fail('Search Console', status, text, circuitKey);
@@ -293,7 +301,7 @@ export class GoogleClient {
     gscSitemaps(siteUrl: string): Promise<{ sitemap?: GscSitemap[] }> {
         return this.cached(`gsc:sitemaps:${siteUrl}`, 30 * 60_000, () => gscSemaphore(this.userKey).run(async () => {
             const circuitKey = this.gscGuard(siteUrl);
-            const { status, text } = await this.request(`${GSC}/sites/${encodeURIComponent(siteUrl)}/sitemaps`, undefined, 'GET');
+            const { status, text } = await this.request(`${GSC}/sites/${encodeURIComponent(siteUrl)}/sitemaps`, undefined, 'GET', { kind: 'gsc', id: siteUrl });
             if (status !== 200) this.fail('Search Console', status, text, circuitKey);
             return { value: JSON.parse(text) as { sitemap?: GscSitemap[] }, size: text.length };
         }));
@@ -302,7 +310,7 @@ export class GoogleClient {
     gscInspect(siteUrl: string, inspectionUrl: string, languageCode: string): Promise<GscInspection> {
         return this.cached(`gsc:inspect:${siteUrl}:${inspectionUrl}:${languageCode}`, 10 * 60_000, () => gscSemaphore(this.userKey).run(async () => {
             const circuitKey = this.gscGuard(siteUrl);
-            const { status, text } = await this.request(`${GSC_V1}/urlInspection/index:inspect`, { siteUrl, inspectionUrl, languageCode }, 'POST');
+            const { status, text } = await this.request(`${GSC_V1}/urlInspection/index:inspect`, { siteUrl, inspectionUrl, languageCode }, 'POST', { kind: 'gsc', id: siteUrl });
             if (status !== 200) this.fail('Search Console', status, text, circuitKey);
             return { value: JSON.parse(text) as GscInspection, size: text.length };
         }));
@@ -368,5 +376,14 @@ export async function googleForPrincipal(p: McpPrincipal, stats: CallStats, sign
         credCache.delete(userKey);
         throw new ToolError('google_reauth_required', 'The Google connection expired or was revoked', 'Ask the user to open TrafficClaw > Connect AI and press "Re-connect Google".');
     }
-    return new GoogleClient(token, (input, init) => fetch(input, init), userKey, false, stats, signal);
+    // Extra Google accounts linked in Settings -> Google: route each property / site to its account's token.
+    const identifier = p.userIdentifier;
+    const primaryCreds = { accessToken: creds.access, refreshToken: creds.refresh };
+    const linked = await listLinkedGoogleConnections(identifier);
+    const route: AssetTokenRouter | undefined = linked.length === 0 ? undefined : async (asset) => {
+        const a = await accessForAsset(identifier, asset, async () => primaryCreds);
+        if (a.ok) return a.token;
+        throw new ToolError('google_reauth_required', 'The Google account that can read this site needs to be reconnected', 'Ask the user to open TrafficClaw > Settings > Google and press "Reconnect" on that account.');
+    };
+    return new GoogleClient(token, (input, init) => fetch(input, init), userKey, false, stats, signal, route);
 }

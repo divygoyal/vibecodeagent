@@ -7,6 +7,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
+import { accessForAsset, listLinkedGoogleConnections } from '@/lib/googleAccounts';
 
 export async function sessionUserId(): Promise<string | null> {
     const session = (await getServerSession(authOptions)) as { user?: { id?: string } } | null;
@@ -23,6 +24,16 @@ export async function googleTokenFor(userIdentifier: string): Promise<string | n
     } catch {
         return null;
     }
+}
+
+/**
+ * Token for one asset of the user when extra Google accounts are linked: the account that lists it.
+ * Null without linked accounts (the engine then uses googleTokenFor's token for everything).
+ */
+export async function googleTokenForAsset(userIdentifier: string, asset: { kind: 'ga4' | 'gsc'; id: string }): Promise<string | null> {
+    if ((await listLinkedGoogleConnections(userIdentifier)).length === 0) return null;
+    const access = await accessForAsset(userIdentifier, asset, async () => (await fetchGoogleTokensFromDb(userIdentifier)) ?? {});
+    return access.ok ? access.token : null;
 }
 
 // ── unlock keys (24 h, HMAC with the app secret) ─────────────────────────

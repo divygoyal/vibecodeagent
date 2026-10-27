@@ -29,6 +29,8 @@ export interface StoreAsset {
     /** Last day covered by the newest fetch. */
     data_end: string | null;
     backfill_done: boolean;
+    /** Google connection the asset was listed from: null/absent = the primary, else a linked account's Google sub. */
+    connection_id?: string | null;
 }
 
 export const NO_PAIR = '__none__';

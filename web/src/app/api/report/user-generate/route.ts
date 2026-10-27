@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getValidAccessToken } from '@/lib/googleApi';
-import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
+import { getGoogleAccessTokenForAsset, getGoogleCredentialsForAsset } from '@/lib/serverAuth';
 import { fetchReportData, computePeriod } from '@/lib/reportDataFetcher';
 import { analyzeReportData } from '@/lib/reportAnalysis';
 import { synthesizeWithGemini } from '@/lib/reportGeminiSynth';
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     const userId = session.user.id as string;
 
     // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
-    const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId));
+    const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForAsset(req, String(userId), { kind: 'gsc', id: siteUrl });
 
     if (!googleAccess && !googleRefresh) {
       return NextResponse.json(
@@ -78,7 +78,8 @@ export async function POST(req: NextRequest) {
     // Stage 1: Data fetching
     const t1 = Date.now();
     console.log(`[UserReport] Fetching data for ${userId} (${periodType}): ${period.startDate} -> ${period.endDate}`);
-    const rawData = await fetchReportData(accessToken, propertyId, siteUrl, period);
+    const gaAccess = propertyId ? await getGoogleAccessTokenForAsset(req, String(userId), { kind: 'ga4', id: propertyId }) : null;
+    const rawData = await fetchReportData(accessToken, propertyId, siteUrl, period, gaAccess?.ok ? gaAccess.token : undefined);
     console.log(`[UserReport] Data fetch: ${Date.now() - t1}ms`);
 
     // Stage 2: Analysis

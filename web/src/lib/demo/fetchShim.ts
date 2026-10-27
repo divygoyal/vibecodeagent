@@ -21,7 +21,7 @@
  * token; see faults.ts.
  */
 
-import { accountCanReadProperty, accountCanReadSite, accountKeyFromToken, demoAccessToken, findSiteByPropertyId, findSiteBySiteUrl, getDemoAccount, type DemoGoogleAccount } from './catalog';
+import { accountCanReadProperty, accountCanReadSite, accountKeyFromToken, demoAccessToken, demoAccountSub, demoRefreshToken, findSiteByPropertyId, findSiteBySiteUrl, getDemoAccount, getDemoAccounts, type DemoGoogleAccount } from './catalog';
 import { demoAccountSummaries, demoDataStreams, demoProperty, demoPropertyList } from './gaAdmin';
 import { DemoApiError, demoMetadata, demoRunRealtimeReport, demoRunReport } from './ga4';
 import { demoGetSite, demoListSites, demoSearchAnalytics, demoSitemaps, demoUrlInspection } from './gsc';
@@ -253,6 +253,7 @@ async function answer(req: Awaited<ReturnType<typeof readRequest>>, host: string
             case 'oauth2.googleapis.com': {
                 if (path !== '/token') break;
                 const form = new URLSearchParams(req.body);
+                if (form.get('grant_type') === 'authorization_code') return demoCodeExchange(form);
                 const { spec } = splitFaultToken(form.get('refresh_token'));
                 const key = accountKeyFromToken(form.get('refresh_token'));
                 if (!key) return json({ error: 'invalid_grant', error_description: 'Demo mode only refreshes demo tokens.' }, 400);
@@ -285,6 +286,27 @@ async function answer(req: Awaited<ReturnType<typeof readRequest>>, host: string
         if (!(err instanceof DemoApiError)) console.error('[demo-data] generator error', err);
         return errorResponse(err);
     }
+}
+
+/**
+ * The demo OAuth code exchange (the "Connect another Google account" flow in demo mode): a code
+ * 'demo-code:<account>' becomes that demo account's tokens plus an id_token naming it. The
+ * id_token is unsigned (alg none), which only a demo server accepts (lib/googleLink.ts).
+ */
+function demoCodeExchange(form: URLSearchParams): Response {
+    const m = /^demo-code:([a-z0-9_-]+)$/i.exec(form.get('code') || '');
+    const account = m ? getDemoAccounts().find((a) => a.key === m[1]) : undefined;
+    if (!account || !form.get('code_verifier')) return json({ error: 'invalid_grant', error_description: 'Bad demo authorization code.' }, 400);
+    const now = Math.floor(Date.now() / 1000);
+    const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    const idToken = `${b64({ alg: 'none', typ: 'JWT' })}.${b64({
+        iss: 'https://accounts.google.com', aud: form.get('client_id') || '', sub: demoAccountSub(account.key),
+        email: account.email, email_verified: true, name: account.name, iat: now, exp: now + 3600,
+    })}.`;
+    return json({
+        access_token: demoAccessToken(account.key), refresh_token: demoRefreshToken(account.key), expires_in: 3599, token_type: 'Bearer', id_token: idToken,
+        scope: 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly',
+    });
 }
 
 const INSTALLED = Symbol.for('trafficclaw.demoFetchInstalled');

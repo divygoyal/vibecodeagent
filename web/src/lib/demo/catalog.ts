@@ -693,6 +693,21 @@ const EDGE_ACCOUNTS: DemoGoogleAccount[] = [
     },
     // Search Console only.
     { key: 'gsconly', email: 'gsconly@trafficclaw.example', name: 'Search Console Only User', gaAccounts: [], gscSiteKeys: ['acme', 'acmedocs', 'recipenest', 'healthlegacy'] },
+    // Two Google accounts of one person ("Connect another Google account"): `multi` signs in,
+    // `multi2` is linked in Settings -> Google. Acme's Search Console site is in both (the primary wins).
+    {
+        key: 'multi', email: 'multi@trafficclaw.example', name: 'Two Accounts User',
+        gaAccounts: [{ account: 'accounts/198700001', displayName: 'Acme Holdings', siteKeys: ['acme', 'dataviz'] }],
+        gscSiteKeys: ['acme', 'dataviz'],
+    },
+    {
+        key: 'multi2', email: 'multi.agency@trafficclaw.example', name: 'Two Accounts User (agency)',
+        gaAccounts: [
+            { account: 'accounts/198700002', displayName: 'Side Projects', siteKeys: ['puzzle'] },
+            { account: 'accounts/198700003', displayName: 'Client Sites', siteKeys: ['health', 'creativeprints'] },
+        ],
+        gscSiteKeys: ['puzzle', 'health', 'recipenest', 'acme'],
+    },
     // 200 sites across 5 GA4 accounts.
     {
         key: 'many', email: 'many@trafficclaw.example', name: 'Two Hundred Sites User',
@@ -777,6 +792,24 @@ export function demoAccessToken(accountKey: string = DEMO_DEFAULT_ACCOUNT): stri
 
 export function demoRefreshToken(accountKey: string = DEMO_DEFAULT_ACCOUNT): string {
     return `demo-refresh:${accountKey}`;
+}
+
+/**
+ * The Google `sub` of a demo account (what an id_token would carry). The scenario users of
+ * scripts/dev/login.mjs keep their own fixed subs; this one is for accounts linked through the
+ * demo OAuth flow (/api/google/link in demo mode), stable per key.
+ */
+export function demoAccountSub(accountKey: string): string {
+    const fixed: Record<string, string> = { multi: '100000000000000000041', multi2: '100000000000000000042' };
+    if (fixed[accountKey]) return fixed[accountKey];
+    let h = 0;
+    for (const ch of accountKey) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return `1000000000${String(h).padStart(11, '0')}`.slice(0, 21);
+}
+
+/** Authorization codes the demo OAuth flow hands out: 'demo-code:<account>'. */
+export function demoAuthCode(accountKey: string): string {
+    return `demo-code:${accountKey}`;
 }
 
 export function accountKeyFromToken(token: string | null | undefined): string | null {

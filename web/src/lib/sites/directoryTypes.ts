@@ -9,6 +9,8 @@ export interface DirectoryError {
 export interface DirectorySite {
     siteUrl: string;
     permissionLevel?: string;
+    /** Extra Google account (its Google sub) the site was listed from; absent = the sign-in account. */
+    connectionId?: string;
 }
 
 export interface DirectoryProperty {
@@ -17,6 +19,8 @@ export interface DirectoryProperty {
     parent?: string;
     /** Web stream host the portfolio stored for this property ('acme.com'), when known: ranks link suggestions. */
     host?: string;
+    /** Extra Google account the property was listed from; absent = the sign-in account. */
+    connectionId?: string;
 }
 
 export interface DirectoryPayload {

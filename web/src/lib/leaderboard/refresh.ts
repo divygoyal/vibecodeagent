@@ -9,6 +9,7 @@
  * query; nothing here runs on page views of the public site.
  */
 import { getValidAccessToken, runGSCQuery } from '@/lib/googleApi';
+import { accessForAsset, credentialsForAsset, listLinkedGoogleConnections } from '@/lib/googleAccounts';
 import { checkOwnership, type OwnershipCheck } from '@/lib/leaderboardVerify';
 import { collectAudience } from '@/lib/audienceFetch';
 import { lbAdmin } from './admin';
@@ -37,6 +38,12 @@ export interface RefreshInput {
     gscSiteUrl?: string | null;
     /** Skip the (slower) audience breakdowns. */
     skipAudience?: boolean;
+    /**
+     * The owner (session user id, or the admin's numeric user id for the scheduled refresh). With
+     * extra Google accounts linked, the property and the Search Console site are each read with the
+     * token of the account that lists them; the given tokens are the primary connection's.
+     */
+    userIdentifier?: string | null;
 }
 
 export interface RefreshResult {
@@ -170,8 +177,17 @@ export async function storeVerification(entryId: number, outcome: OwnershipOutco
     });
 }
 
-export async function refreshEntry(input: RefreshInput): Promise<RefreshResult> {
+export async function refreshEntry(rawInput: RefreshInput): Promise<RefreshResult> {
     const result: RefreshResult = { ok: false, verification: null, days: 0, gsc: false, audience: false };
+    const primaryCreds = { accessToken: rawInput.accessToken, refreshToken: rawInput.refreshToken };
+    const owner = rawInput.userIdentifier ? String(rawInput.userIdentifier) : '';
+    const linked = owner ? await listLinkedGoogleConnections(owner) : [];
+    let input = rawInput;
+    if (linked.length > 0) {
+        // The GA4 property's own Google account (the sign-in account unless a linked one lists it).
+        const c = await credentialsForAsset(owner, { kind: 'ga4', id: rawInput.gaPropertyId }, async () => primaryCreds);
+        input = { ...rawInput, accessToken: c.accessToken, refreshToken: c.refreshToken };
+    }
     let token: string;
     try {
         token = await getValidAccessToken(input.accessToken, input.refreshToken);
@@ -188,8 +204,9 @@ export async function refreshEntry(input: RefreshInput): Promise<RefreshResult> 
             const outcome = await checkOwnership({
                 websiteUrl: input.websiteUrl,
                 gaPropertyId: input.gaPropertyId,
-                accessToken: input.accessToken,
-                refreshToken: input.refreshToken,
+                accessToken: primaryCreds.accessToken,
+                refreshToken: primaryCreds.refreshToken,
+                userIdentifier: owner || null,
             });
             result.verification = outcome;
             await storeVerification(input.entryId, outcome);
@@ -200,11 +217,16 @@ export async function refreshEntry(input: RefreshInput): Promise<RefreshResult> 
     }
 
     // 2. Numbers. GA4 is required; Search Console is best effort.
+    let gscToken = token;
+    if (linked.length > 0 && gscSiteUrl) {
+        const a = await accessForAsset(owner, { kind: 'gsc', id: gscSiteUrl }, async () => primaryCreds);
+        if (a.ok) gscToken = a.token;
+    }
     try {
         const [ranges, daily, gscDaily] = await Promise.all([
             Promise.all(RANGE_DAYS.map((r) => fetchRange(token, pid, r.days))),
             fetchGaDaily(token, pid),
-            gscSiteUrl ? fetchGscDaily(token, gscSiteUrl).catch((err) => { console.warn(`[leaderboard] GSC daily failed for entry ${input.entryId}:`, err); return null; }) : Promise.resolve(null),
+            gscSiteUrl ? fetchGscDaily(gscToken, gscSiteUrl).catch((err) => { console.warn(`[leaderboard] GSC daily failed for entry ${input.entryId}:`, err); return null; }) : Promise.resolve(null),
         ]);
         const rangeBody: Record<string, RangeNumbers> = {};
         RANGE_DAYS.forEach((r, i) => { rangeBody[r.key] = ranges[i]; });
