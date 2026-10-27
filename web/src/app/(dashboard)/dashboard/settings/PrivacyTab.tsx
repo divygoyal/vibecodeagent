@@ -19,7 +19,8 @@ const KEPT = [
 ];
 
 /** Data and privacy (DESIGN 5.14): export what we hold, what we keep, and the way to delete it. */
-export function PrivacyTab({ goToDanger }: { goToDanger: () => void }) {
+/** goToDanger is left out in the public live demo, which has no Danger zone (and no account to delete). */
+export function PrivacyTab({ goToDanger }: { goToDanger?: () => void }) {
     const { data: session } = useSession();
     const [exporting, setExporting] = useState(false);
 
@@ -63,13 +64,15 @@ export function PrivacyTab({ goToDanger }: { goToDanger: () => void }) {
                 </div>
             </SettingsSection>
 
-            <SettingsSection title="Delete your account" description="Removes your account and the data above.">
-                <SettingsRow
-                    title="Ask us to delete everything"
-                    description="You confirm in the Danger zone. We then delete your account and all its data."
-                    control={<Button variant="secondary" icon={ShieldAlert} onClick={goToDanger}>Go to danger zone</Button>}
-                />
-            </SettingsSection>
+            {goToDanger ? (
+                <SettingsSection title="Delete your account" description="Removes your account and the data above.">
+                    <SettingsRow
+                        title="Ask us to delete everything"
+                        description="You confirm in the Danger zone. We then delete your account and all its data."
+                        control={<Button variant="secondary" icon={ShieldAlert} onClick={goToDanger}>Go to danger zone</Button>}
+                    />
+                </SettingsSection>
+            ) : null}
         </>
     );
 }

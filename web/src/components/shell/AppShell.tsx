@@ -11,6 +11,7 @@ import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAppTheme } from '@/lib/theme';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { DemoBar } from '@/components/demo/DemoBar';
 import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
 import { Button } from '@/components/ui/Button';
 import { useHideChatWidget } from '@/components/ui/useHideChatWidget';
@@ -130,6 +131,8 @@ function ShellBody({ children }: { children: ReactNode }) {
                 </div>
             </aside>
             <div className="flex min-w-0 flex-1 flex-col">
+                {/* Public live demo only (renders nothing otherwise). */}
+                <DemoBar />
                 <Topbar />
                 <main
                     id="main-content"
