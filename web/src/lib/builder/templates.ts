@@ -4,6 +4,8 @@
  * templates use all sites). The gallery draws thumbnails from these layouts.
  */
 import { tableColumns } from './registry';
+import { applyThemePreset, isThemeId, type ThemeId } from './themes';
+import { BUILDERS_R2, TEMPLATES_R2, type BuildCtx, type BuiltR2 } from './templates.round2';
 import type {
     BarWidget,
     ControlDef,
@@ -23,7 +25,7 @@ import type {
     WidgetDef,
 } from './types';
 
-export type TemplateCategory = 'Overview' | 'Search' | 'Traffic' | 'Content' | 'Portfolio' | 'Reporting';
+export type TemplateCategory = 'Overview' | 'Search' | 'Traffic' | 'Content' | 'Portfolio' | 'Reporting' | 'AI' | 'Ecommerce' | 'Local' | 'Leads' | 'Display';
 
 export interface TemplateMeta {
     id: string;
@@ -32,6 +34,10 @@ export interface TemplateMeta {
     category: TemplateCategory;
     needs: Array<'gsc' | 'ga4'>;
     portfolio?: boolean;
+    /** Round 2: who it is for, the suggested theme, and a "New" badge in the gallery. */
+    audience?: string;
+    themeId?: string;
+    isNew?: boolean;
 }
 
 // ── widget helpers ───────────────────────────────────────────────────────
@@ -133,9 +139,12 @@ export function defaultTheme(mode: ThemeV2['mode'] = 'light'): ThemeV2 {
 
 interface Built { pages: PageDef[]; widgets: Record<string, WidgetDef>; controls: ControlDef[]; theme?: ThemeV2 }
 
+/** The eight shipped builders below plus the sixteen round-2 ones (templates.round2.ts). */
+type Builder = (ctx: BuildCtx) => Built & Partial<Omit<BuiltR2, keyof Built>>;
+
 const SEARCH_COLS = ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position'];
 
-const BUILDERS: Record<string, () => Built> = {
+const BUILDERS_V1: Record<string, () => Built> = {
     'site-overview': () => {
         const w: Record<string, WidgetDef> = {};
         return {
@@ -274,7 +283,11 @@ export const TEMPLATES: TemplateMeta[] = [
     { id: 'client-report', name: 'Client report', description: 'A three-page, shareable report with your logo and notes.', category: 'Reporting', needs: ['gsc', 'ga4'] },
     { id: 'audience-geography', name: 'Audience and geography', description: 'Who your visitors are and where they are.', category: 'Traffic', needs: ['ga4'] },
     { id: 'key-events-revenue', name: 'Key events and revenue', description: 'Conversions and ecommerce by channel and product.', category: 'Traffic', needs: ['ga4'] },
+    // Round 2: sixteen new templates, appended (the eight above keep their ids and order).
+    ...TEMPLATES_R2.map((t): TemplateMeta => ({ ...t, isNew: true })),
 ];
+
+const BUILDERS: Record<string, Builder> = { ...BUILDERS_V1, ...BUILDERS_R2 };
 
 export const BLANK_TEMPLATE: TemplateMeta = { id: 'blank', name: 'Blank', description: 'Start from an empty page.', category: 'Overview', needs: [] };
 
@@ -282,8 +295,19 @@ export function templateMeta(id: string): TemplateMeta | undefined {
     return id === 'blank' ? BLANK_TEMPLATE : TEMPLATES.find((t) => t.id === id);
 }
 
-export function buildFromTemplate(id: string, opts: { name: string; defaultSource: DashboardDocV2['defaultSource'] }): DashboardDocV2 {
-    const b = (BUILDERS[id] ?? BUILDERS.blank)();
+/**
+ * A template as a document. The shipped eight produce exactly what they always did; round-2
+ * templates may also carry a suggested theme, a cover page and TV settings. `themeId` (from the
+ * gallery) overrides the suggested theme; 'trafficclaw' means today's look.
+ */
+export function buildFromTemplate(id: string, opts: { name: string; defaultSource: DashboardDocV2['defaultSource']; themeId?: string }): DashboardDocV2 {
+    const b = (BUILDERS[id] ?? BUILDERS.blank)({ defaultSource: opts.defaultSource });
+    let theme: ThemeV2 = b.theme ?? defaultTheme('light');
+    const wanted = opts.themeId && isThemeId(opts.themeId) ? opts.themeId : b.themeId;
+    if (wanted && isThemeId(wanted) && (wanted !== 'trafficclaw' || opts.themeId)) theme = applyThemePreset(theme, wanted as ThemeId);
+    if (b.cover) theme = { ...theme, cover: { enabled: true, layout: 'left', title: b.cover.title, subtitle: b.cover.subtitle } };
+    const settings: DashboardDocV2['settings'] = { widthMode: b.widthMode ?? 'contained', autoRefreshSec: b.autoRefreshSec ?? 0 };
+    if (b.tv) settings.tv = { rotateSec: ([0, 15, 30, 60, 120].includes(b.tv.rotateSec) ? b.tv.rotateSec : 30) as 0 | 15 | 30 | 60 | 120, hideControls: b.tv.hideControls };
     return {
         schemaVersion: 2,
         name: opts.name,
@@ -291,8 +315,8 @@ export function buildFromTemplate(id: string, opts: { name: string; defaultSourc
         controls: b.controls,
         pages: b.pages,
         widgets: b.widgets,
-        theme: b.theme ?? defaultTheme('light'),
-        settings: { widthMode: 'contained', autoRefreshSec: 0 },
+        theme,
+        settings,
         meta: { createdFrom: BUILDERS[id] ? id : 'blank' },
     };
 }

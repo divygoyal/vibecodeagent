@@ -1,0 +1,286 @@
+/* =====================================================================
+   TrafficClaw dashboard themes (round 2). Layers over styles/tokens.css.
+
+   Every rule is scoped to a themed dashboard root ([data-dash-theme], set by DashThemeRoot only
+   when a dashboard picks a theme or an option). A dashboard without a theme has no such
+   attribute, so nothing below applies and it renders exactly as before.
+
+   Plain CSS (no Tailwind directives). Unlayered on purpose: it wins over the utility layer, so
+   cards and numbers can be restyled without touching the components' classes.
+   ===================================================================== */
+
+/* 0. Defaults on the themed root (equal to today's builder). */
+[data-dash-theme] {
+  --tc-dash-gap: 16px;
+  --tc-dash-card-pad: 16px;
+  --tc-dash-title-size: 0.9375rem;
+  --tc-dash-title-weight: 600;
+  --tc-dash-stat-scale: 1;
+  --tc-dash-header-rule: none;
+  --tc-dash-canvas-image: none;
+  --tc-dash-canvas-size: auto;
+  --tc-dash-font-heading: inherit;
+  --tc-dash-font-num: inherit;
+  --tc-dash-radius: 16px;
+
+  /* Charts and thumbnails read var(--color-*) from JS. Those aliases are computed on :root, so
+     a token override on a descendant would not reach them: re-declare them here. */
+  --color-canvas: var(--tc-canvas);
+  --color-surface: var(--tc-surface);
+  --color-surface-raised: var(--tc-surface-raised);
+  --color-surface-sunken: var(--tc-surface-sunken);
+  --color-subtle: var(--tc-subtle);
+  --color-border: var(--tc-border);
+  --color-border-subtle: var(--tc-border-subtle);
+  --color-border-strong: var(--tc-border-strong);
+  --color-fg: var(--tc-fg);
+  --color-fg-secondary: var(--tc-fg-secondary);
+  --color-fg-muted: var(--tc-fg-muted);
+  --color-fg-faint: var(--tc-fg-faint);
+  --color-fg-inverse: var(--tc-fg-inverse);
+  --color-brand: var(--tc-brand);
+  --color-chart-grid: var(--tc-chart-grid);
+  --color-chart-axis: var(--tc-chart-axis);
+  --color-chart-tick: var(--tc-chart-tick);
+  --color-chart-cursor: var(--tc-chart-cursor);
+  --color-m-clicks: var(--tc-m-clicks);
+  --color-m-impressions: var(--tc-m-impressions);
+  --color-m-ctr: var(--tc-m-ctr);
+  --color-m-position: var(--tc-m-position);
+  --color-m-users: var(--tc-m-users);
+  --color-m-sessions: var(--tc-m-sessions);
+  --color-m-pageviews: var(--tc-m-pageviews);
+  --color-m-conversions: var(--tc-m-conversions);
+  --color-m-ai: var(--tc-m-ai);
+  --color-cat-1: var(--tc-cat-1);
+  --color-cat-2: var(--tc-cat-2);
+  --color-cat-3: var(--tc-cat-3);
+  --color-cat-4: var(--tc-cat-4);
+  --color-cat-5: var(--tc-cat-5);
+  --color-cat-6: var(--tc-cat-6);
+  --color-cat-7: var(--tc-cat-7);
+  --color-cat-8: var(--tc-cat-8);
+  --color-cat-other: var(--tc-cat-other);
+
+  /* Shapes and numbers follow the theme. */
+  --radius-card: var(--tc-dash-radius);
+  --text-stat: calc(1.5rem * var(--tc-dash-stat-scale));
+  --text-stat--line-height: calc(1.875rem * var(--tc-dash-stat-scale));
+  --text-stat-lg: calc(2rem * var(--tc-dash-stat-scale));
+  --text-stat-lg--line-height: calc(2.375rem * var(--tc-dash-stat-scale));
+
+  color: var(--tc-fg);
+  background-color: var(--tc-canvas);
+  background-image: var(--tc-dash-canvas-image);
+  background-size: var(--tc-dash-canvas-size);
+}
+
+/* The view wraps the whole dashboard (header, controls, canvas) in a canvas panel. */
+[data-dash-theme][data-dash-panel] {
+  border-radius: 20px;
+  padding: 24px;
+  border: 1px solid var(--tc-border-subtle);
+}
+@media (max-width: 640px) {
+  [data-dash-theme][data-dash-panel] { padding: 12px; border-radius: 14px; }
+}
+
+/* Widget cards (WidgetFrame, scorecard, KPI strip, card-style text) carry data-dash-widget. */
+[data-dash-theme] [data-dash-widget] { border-radius: var(--radius-card); }
+[data-dash-theme] [data-dash-widget] h3 { font-size: var(--tc-dash-title-size); font-weight: var(--tc-dash-title-weight); }
+[data-dash-theme] [data-dash-widget="md"] { padding: var(--tc-dash-card-pad); }
+
+/* Header rule under the dashboard title (Executive, Paper, Studio). */
+[data-dash-theme] [data-dash-header] { border-bottom: var(--tc-dash-header-rule); padding-bottom: 12px; }
+[data-dash-theme][data-dash-header-rule="none"] [data-dash-header] { padding-bottom: 0; }
+
+/* 1. Density (mirrored in densityPx() for the grid row height and gap). */
+[data-dash-density="compact"] { --tc-dash-card-pad: 12px; }
+[data-dash-density="airy"] { --tc-dash-card-pad: 20px; }
+
+/* 2. Card styles. */
+[data-dash-card="outlined"] [data-dash-widget] { border-color: var(--tc-border); box-shadow: none; }
+[data-dash-card="flat"] [data-dash-widget] { border-color: transparent; box-shadow: none; background-color: var(--tc-surface); }
+[data-dash-card="ruled"] [data-dash-widget] {
+  border-color: transparent; border-top: 2px solid var(--tc-border-strong); border-radius: 0; box-shadow: none; background-color: transparent;
+}
+[data-dash-card="glass"] [data-dash-widget] {
+  /* no backdrop-filter: the PDF export (html2canvas) cannot draw it */
+  background-color: color-mix(in oklab, var(--tc-surface) 84%, transparent);
+  border-color: var(--tc-border-subtle);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 8px 24px -12px rgb(0 0 0 / 0.5);
+}
+
+/* 3. Canvas patterns. */
+[data-dash-pattern="dots"] { --tc-dash-canvas-image: radial-gradient(var(--tc-border) 1px, transparent 1px); --tc-dash-canvas-size: 16px 16px; }
+[data-dash-pattern="grid"] {
+  --tc-dash-canvas-image: linear-gradient(var(--tc-border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--tc-border-subtle) 1px, transparent 1px);
+  --tc-dash-canvas-size: 24px 24px;
+}
+[data-dash-pattern="glow"] {
+  --tc-dash-canvas-image: radial-gradient(1100px 340px at 50% -140px, color-mix(in oklab, var(--tc-brand) 16%, transparent), transparent);
+  --tc-dash-canvas-size: auto;
+}
+@media print { [data-dash-theme] { background-image: none !important; } }
+
+/* 4. Fonts. Source Serif 4 is declared once (lib/builder/fonts.ts, preload off): 0 bytes unless used. */
+[data-dash-font="system"] { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+[data-dash-font="serif-headings"] { --tc-dash-font-heading: var(--font-source-serif), Georgia, "Times New Roman", serif; }
+[data-dash-font="mono-numbers"] { --tc-dash-font-num: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace; }
+[data-dash-font="serif-headings"] :is(h1, h2, [data-dash-widget] h3, [data-dash-cover-title]) { font-family: var(--tc-dash-font-heading); letter-spacing: -0.01em; font-weight: 600; }
+[data-dash-font="mono-numbers"] :is(.text-stat, .text-stat-lg, .tabular-nums) { font-family: var(--tc-dash-font-num); letter-spacing: -0.02em; }
+
+/* 5. Chart strokes. */
+[data-dash-theme="analyst"] .recharts-line .recharts-curve:not([stroke-dasharray]) { stroke-width: 1.5px; }
+[data-dash-theme="contrast"] .recharts-line .recharts-curve:not([stroke-dasharray]) { stroke-width: 3px; }
+[data-dash-theme="midnight"] .recharts-line .recharts-curve:not([stroke-dasharray]) { stroke-width: 2.5px; }
+
+/* =====================================================================
+   6. Theme presets. 'trafficclaw' has no block on purpose (today's tokens).
+   ===================================================================== */
+
+/* executive */
+[data-dash-theme="executive"] { --tc-dash-radius: 12px; --tc-dash-stat-scale: 1.25; --tc-dash-header-rule: 2px solid var(--tc-brand); }
+[data-dash-theme="executive"][data-theme="light"] {
+  --tc-canvas:#f3f4f6; --tc-surface:#fff; --tc-surface-raised:#fff; --tc-surface-sunken:#f3f4f6; --tc-subtle:#eceef1; --tc-subtle-strong:#e2e5e9;
+  --tc-border-subtle:#e3e6ea; --tc-border:#d3d8de; --tc-border-strong:#b8bfc9;
+  --tc-fg:#101828; --tc-fg-secondary:#475467; --tc-fg-muted:#566170;
+  --tc-brand:#1d3557; --tc-brand-hover:#162a46; --tc-brand-fg:#fff; --tc-brand-text:#1d4e89; --tc-brand-soft:#eaf0f8; --tc-brand-soft-fg:#1d3557; --tc-focus:#2f6db5;
+  --tc-shadow-card:none; --tc-chart-grid:#eceef1; --tc-chart-axis:#d3d8de; --tc-chart-tick:#566170; --tc-chart-cursor:#b8bfc9;
+}
+[data-dash-theme="executive"][data-theme="dark"] {
+  --tc-canvas:#0c111b; --tc-surface:#141b29; --tc-surface-raised:#1a2233; --tc-surface-sunken:#0f1520; --tc-subtle:#1a2336; --tc-subtle-strong:#222c42;
+  --tc-border-subtle:#1f2a3c; --tc-border:#2a3750; --tc-border-strong:#3a4a68;
+  --tc-fg:#eaeef5; --tc-fg-secondary:#b3bdcc; --tc-fg-muted:#8d99ab; --tc-fg-faint:#626d80;
+  --tc-brand:#8fb4e8; --tc-brand-hover:#a8c5ee; --tc-brand-fg:#0c1626; --tc-brand-text:#8fb4e8; --tc-brand-soft:rgb(143 180 232 / 0.12); --tc-brand-soft-fg:#c4d7f2; --tc-focus:#6f9bdc;
+  --tc-shadow-card:inset 0 1px 0 rgb(255 255 255 / 0.03); --tc-chart-grid:#1f2a3c; --tc-chart-axis:#2a3750; --tc-chart-tick:#8d99ab; --tc-chart-cursor:#3a4a68;
+}
+
+/* analyst */
+[data-dash-theme="analyst"] { --tc-dash-radius: 8px; --tc-dash-title-size: 0.8125rem; --tc-dash-stat-scale: 0.85; }
+[data-dash-theme="analyst"][data-theme="light"] {
+  --tc-canvas:#eceff3; --tc-surface:#fff; --tc-surface-raised:#fff; --tc-surface-sunken:#f4f6f8; --tc-subtle:#e8ebef; --tc-subtle-strong:#dde1e7;
+  --tc-border-subtle:#e0e4ea; --tc-border:#d2d7de; --tc-border-strong:#b3bac5;
+  --tc-fg:#14171c; --tc-fg-secondary:#4b5361; --tc-fg-muted:#5b6472;
+  --tc-brand:#1e4fd8; --tc-brand-hover:#1a43b8; --tc-brand-fg:#fff; --tc-brand-text:#1e4fd8; --tc-brand-soft:#e8eefc; --tc-brand-soft-fg:#173ea8; --tc-focus:#1e4fd8;
+  --tc-shadow-card:none; --tc-chart-grid:#e8ebef; --tc-chart-axis:#d2d7de; --tc-chart-tick:#5b6472; --tc-chart-cursor:#b3bac5;
+}
+[data-dash-theme="analyst"][data-theme="dark"] {
+  --tc-canvas:#0a0b0e; --tc-surface:#12141a; --tc-surface-raised:#181b22; --tc-surface-sunken:#0e1014; --tc-subtle:#181b22; --tc-subtle-strong:#20242c;
+  --tc-border-subtle:#1d2027; --tc-border:#2a2f3a; --tc-border-strong:#3a414e;
+  --tc-fg:#e9ecf1; --tc-fg-secondary:#aeb4be; --tc-fg-muted:#8a929e; --tc-fg-faint:#5f6672;
+  --tc-brand:#7aa7ff; --tc-brand-hover:#9bbcff; --tc-brand-fg:#06122b; --tc-brand-text:#7aa7ff; --tc-brand-soft:rgb(122 167 255 / 0.12); --tc-brand-soft-fg:#b9d0ff; --tc-focus:#7aa7ff;
+  --tc-shadow-card:none; --tc-chart-grid:#1d2027; --tc-chart-axis:#2a2f3a; --tc-chart-tick:#8a929e; --tc-chart-cursor:#3a414e;
+}
+
+/* midnight (dark first; the light variant is "Daylight") */
+[data-dash-theme="midnight"] { --tc-dash-radius: 14px; --tc-dash-stat-scale: 1.5; --tc-dash-title-weight: 500; }
+[data-dash-theme="midnight"][data-theme="dark"] {
+  --tc-canvas:#05070b; --tc-surface:#0d1117; --tc-surface-raised:#151b24; --tc-surface-sunken:#090c11; --tc-subtle:#131923; --tc-subtle-strong:#1b2330;
+  --tc-border-subtle:#1b2330; --tc-border:#263041; --tc-border-strong:#35435a;
+  --tc-fg:#e8edf5; --tc-fg-secondary:#b6c0d0; --tc-fg-muted:#8b97aa; --tc-fg-faint:#5f6b7e;
+  --tc-brand:#5ac8fa; --tc-brand-hover:#86d8fc; --tc-brand-fg:#04141f; --tc-brand-text:#5ac8fa; --tc-brand-soft:rgb(90 200 250 / 0.12); --tc-brand-soft-fg:#a6e0fb; --tc-focus:#5ac8fa;
+  --tc-shadow-card:inset 0 1px 0 rgb(255 255 255 / 0.04); --tc-chart-grid:#1b2330; --tc-chart-axis:#263041; --tc-chart-tick:#8b97aa; --tc-chart-cursor:#35435a;
+}
+[data-dash-theme="midnight"][data-theme="light"] {
+  --tc-canvas:#edf2f7; --tc-surface:#fff; --tc-surface-raised:#fff; --tc-surface-sunken:#e6ecf2; --tc-subtle:#e6ecf2; --tc-subtle-strong:#dbe3ec;
+  --tc-border-subtle:#dde5ee; --tc-border:#cdd6e0; --tc-border-strong:#aab6c4;
+  --tc-fg:#0f1722; --tc-fg-secondary:#43505f; --tc-fg-muted:#566273;
+  --tc-brand:#0b6ea8; --tc-brand-hover:#09598a; --tc-brand-fg:#fff; --tc-brand-text:#0b6ea8; --tc-brand-soft:#e3f1fa; --tc-brand-soft-fg:#08537f; --tc-focus:#0b6ea8;
+  --tc-chart-grid:#e6ecf2; --tc-chart-axis:#cdd6e0; --tc-chart-tick:#566273; --tc-chart-cursor:#aab6c4;
+}
+
+/* paper (light only, whatever data-theme says) */
+[data-dash-theme="paper"][data-theme] {
+  --tc-dash-radius: 4px; --tc-dash-stat-scale: 1.15; --tc-dash-header-rule: 1px solid var(--tc-fg);
+  --tc-canvas:#fff; --tc-surface:#fff; --tc-surface-raised:#fff; --tc-surface-sunken:#f7f8f9; --tc-subtle:#f1f3f5; --tc-subtle-strong:#e6e9ec;
+  --tc-border-subtle:#e4e7ec; --tc-border:#c9ced6; --tc-border-strong:#9aa3af;
+  --tc-fg:#111; --tc-fg-secondary:#444b55; --tc-fg-muted:#575e69; --tc-fg-faint:#7b8390;
+  --tc-brand:#0d3a2c; --tc-brand-hover:#0e4b39; --tc-brand-fg:#fff; --tc-brand-text:#125e47; --tc-brand-soft:#f1f3f2; --tc-brand-soft-fg:#0d3a2c; --tc-focus:#157459;
+  --tc-shadow-card:none; --tc-chart-grid:#e4e7ec; --tc-chart-axis:#c9ced6; --tc-chart-tick:#575e69; --tc-chart-cursor:#9aa3af;
+  color-scheme: light;
+}
+
+/* sunrise */
+[data-dash-theme="sunrise"] { --tc-dash-radius: 20px; --tc-dash-stat-scale: 1.15; }
+[data-dash-theme="sunrise"][data-theme="light"] {
+  --tc-canvas:#fbf7f0; --tc-surface:#fffdf9; --tc-surface-raised:#fff; --tc-surface-sunken:#f6efe3; --tc-subtle:#f3ece0; --tc-subtle-strong:#ebe2d2;
+  --tc-border-subtle:#eee6d8; --tc-border:#e0d5c1; --tc-border-strong:#c9bba3;
+  --tc-fg:#231f1a; --tc-fg-secondary:#574e44; --tc-fg-muted:#665c50;
+  --tc-brand:#a8401a; --tc-brand-hover:#8f3513; --tc-brand-fg:#fff; --tc-brand-text:#a33a14; --tc-brand-soft:#fdeee6; --tc-brand-soft-fg:#8a3112; --tc-focus:#b4441c;
+  --tc-shadow-card:0 1px 2px rgb(60 40 10 / 0.05), 0 6px 20px -8px rgb(60 40 10 / 0.12);
+  --tc-chart-grid:#f3ece0; --tc-chart-axis:#e0d5c1; --tc-chart-tick:#665c50; --tc-chart-cursor:#c9bba3;
+}
+[data-dash-theme="sunrise"][data-theme="dark"] {
+  --tc-canvas:#17120d; --tc-surface:#201a14; --tc-surface-raised:#28211a; --tc-surface-sunken:#1b1510; --tc-subtle:#28211a; --tc-subtle-strong:#31281f;
+  --tc-border-subtle:#302820; --tc-border:#41362a; --tc-border-strong:#5a4c3a;
+  --tc-fg:#f3ece1; --tc-fg-secondary:#cbbfae; --tc-fg-muted:#a1957f; --tc-fg-faint:#766b59;
+  --tc-brand:#f0a47c; --tc-brand-hover:#f4b996; --tc-brand-fg:#2a1306; --tc-brand-text:#f0a47c; --tc-brand-soft:rgb(240 164 124 / 0.12); --tc-brand-soft-fg:#f6c8ac; --tc-focus:#f0a47c;
+  --tc-shadow-card:inset 0 1px 0 rgb(255 255 255 / 0.03); --tc-chart-grid:#302820; --tc-chart-axis:#41362a; --tc-chart-tick:#a1957f; --tc-chart-cursor:#5a4c3a;
+}
+
+/* studio (the brand kit overrides --tc-brand* inline; these are the defaults) */
+[data-dash-theme="studio"] { --tc-dash-radius: 12px; --tc-dash-header-rule: 3px solid var(--tc-brand); }
+[data-dash-theme="studio"][data-theme="light"] {
+  --tc-canvas:#f7f7f8; --tc-surface:#fff; --tc-surface-raised:#fff; --tc-surface-sunken:#f7f7f8; --tc-subtle:#f1f1f3; --tc-subtle-strong:#e8e8ec;
+  --tc-border-subtle:#e9e9ec; --tc-border:#d4d4d8; --tc-border-strong:#a1a1aa;
+  --tc-fg:#18181b; --tc-fg-secondary:#52525b; --tc-fg-muted:#5f5f69;
+  --tc-brand:#3b4cca; --tc-brand-hover:#2f3fb0; --tc-brand-fg:#fff; --tc-brand-text:#3b4cca; --tc-brand-soft:#eceefb; --tc-brand-soft-fg:#2c3aa3; --tc-focus:#3b4cca;
+  --tc-shadow-card:0 1px 2px rgb(16 19 26 / 0.05); --tc-chart-grid:#f1f1f3; --tc-chart-axis:#d4d4d8; --tc-chart-tick:#5f5f69; --tc-chart-cursor:#a1a1aa;
+}
+[data-dash-theme="studio"][data-theme="dark"] {
+  --tc-canvas:#09090b; --tc-surface:#131316; --tc-surface-raised:#1a1a1f; --tc-surface-sunken:#0e0e11; --tc-subtle:#1a1a1f; --tc-subtle-strong:#222228;
+  --tc-border-subtle:#222228; --tc-border:#2e2e35; --tc-border-strong:#43434c;
+  --tc-fg:#fafafa; --tc-fg-secondary:#b4b4bc; --tc-fg-muted:#8e8e98; --tc-fg-faint:#62626c;
+  --tc-brand:#9aa6ff; --tc-brand-hover:#b1bbff; --tc-brand-fg:#0a0d33; --tc-brand-text:#9aa6ff; --tc-brand-soft:rgb(154 166 255 / 0.12); --tc-brand-soft-fg:#c7ceff; --tc-focus:#9aa6ff;
+  --tc-shadow-card:inset 0 1px 0 rgb(255 255 255 / 0.03); --tc-chart-grid:#222228; --tc-chart-axis:#2e2e35; --tc-chart-tick:#8e8e98; --tc-chart-cursor:#43434c;
+}
+
+/* contrast: AAA text, 3:1+ borders, thick lines, its own validated metric and categorical sets */
+[data-dash-theme="contrast"] { --tc-dash-radius: 6px; }
+[data-dash-theme="contrast"][data-theme="light"] {
+  --tc-canvas:#fff; --tc-surface:#fff; --tc-surface-raised:#fff; --tc-surface-sunken:#f2f4f7; --tc-subtle:#eef1f5; --tc-subtle-strong:#dfe4ea;
+  --tc-border-subtle:#7b8696; --tc-border:#5b6573; --tc-border-strong:#3b4350;
+  --tc-fg:#000; --tc-fg-secondary:#26303d; --tc-fg-muted:#3b4350; --tc-fg-faint:#5b6573;
+  --tc-brand:#0a3a8a; --tc-brand-hover:#082d6b; --tc-brand-fg:#fff; --tc-brand-text:#0a3a8a; --tc-brand-soft:#e6eefb; --tc-brand-soft-fg:#082d6b; --tc-focus:#0a3a8a;
+  --tc-shadow-card:none; --tc-chart-grid:#c3cad4; --tc-chart-axis:#5b6573; --tc-chart-tick:#26303d; --tc-chart-cursor:#3b4350;
+  --tc-m-clicks:#3964e1; --tc-m-impressions:#9f4965; --tc-m-ctr:#219b74; --tc-m-position:#a17400;
+  --tc-m-users:#7d4cdb; --tc-m-sessions:#0d8dbf; --tc-m-pageviews:#893d61; --tc-m-conversions:#df3f10; --tc-m-ai:#508536;
+  --tc-cat-1:#6487ce; --tc-cat-2:#a24e3a; --tc-cat-3:#2ba277; --tc-cat-4:#916a00; --tc-cat-5:#a54461; --tc-cat-6:#3c812e; --tc-cat-7:#6c5aa8; --tc-cat-8:#c43514; --tc-cat-other:#5b6573;
+}
+[data-dash-theme="contrast"][data-theme="dark"] {
+  --tc-canvas:#000; --tc-surface:#0a0a0b; --tc-surface-raised:#121214; --tc-surface-sunken:#050506; --tc-subtle:#141417; --tc-subtle-strong:#1e1e22;
+  --tc-border-subtle:#6b7380; --tc-border:#8a94a3; --tc-border-strong:#b4bcc8;
+  --tc-fg:#fff; --tc-fg-secondary:#dde3ec; --tc-fg-muted:#c2cad6; --tc-fg-faint:#8a94a3;
+  --tc-brand:#9cc2ff; --tc-brand-hover:#bad4ff; --tc-brand-fg:#00122e; --tc-brand-text:#9cc2ff; --tc-brand-soft:#0f2347; --tc-brand-soft-fg:#cfe1ff; --tc-focus:#9cc2ff;
+  --tc-shadow-card:none; --tc-chart-grid:#3a414e; --tc-chart-axis:#8a94a3; --tc-chart-tick:#dde3ec; --tc-chart-cursor:#b4bcc8;
+  --tc-m-clicks:#229adf; --tc-m-impressions:#b068a6; --tc-m-ctr:#178b42; --tc-m-position:#e5450a;
+  --tc-m-users:#9152a6; --tc-m-sessions:#17a79b; --tc-m-pageviews:#dc6169; --tc-m-conversions:#68810a; --tc-m-ai:#2b7def;
+  --tc-cat-1:#2374ce; --tc-cat-2:#af501c; --tc-cat-3:#21a05a; --tc-cat-4:#94710a; --tc-cat-5:#c46596; --tc-cat-6:#61a444; --tc-cat-7:#9f6fcf; --tc-cat-8:#ed4841; --tc-cat-other:#8a94a3;
+}
+
+/* Paper uses the high-contrast light sets so a greyscale print still separates series. */
+[data-dash-palette="contrast"][data-dash-theme="paper"][data-theme] {
+  --tc-m-clicks:#3964e1; --tc-m-impressions:#9f4965; --tc-m-ctr:#219b74; --tc-m-position:#a17400;
+  --tc-m-users:#7d4cdb; --tc-m-sessions:#0d8dbf; --tc-m-pageviews:#893d61; --tc-m-conversions:#df3f10; --tc-m-ai:#508536;
+  --tc-cat-1:#6487ce; --tc-cat-2:#a24e3a; --tc-cat-3:#2ba277; --tc-cat-4:#916a00; --tc-cat-5:#a54461; --tc-cat-6:#3c812e; --tc-cat-7:#6c5aa8; --tc-cat-8:#c43514; --tc-cat-other:#5b6573;
+}
+
+/* =====================================================================
+   7. Conditional formatting and targets (any theme, including the default look: these only
+      render on widgets that have rules or a target).
+   ===================================================================== */
+.tc-cf-good { color: var(--tc-up); }
+.tc-cf-bad { color: var(--tc-down); }
+.tc-cf-warn { color: var(--tc-warn); }
+.tc-cf-cell { position: relative; }
+.tc-cf-cell::before { content: ""; position: absolute; inset: 2px -6px 2px -6px; border-radius: 6px; z-index: 0; }
+.tc-cf-cell.tc-cf-good::before { background: var(--tc-up-soft); }
+.tc-cf-cell.tc-cf-bad::before { background: var(--tc-down-soft); }
+.tc-cf-cell.tc-cf-warn::before { background: var(--tc-warn-soft); }
+
+/* =====================================================================
+   8. TV mode: full screen, no chrome, cursor hides when idle.
+   ===================================================================== */
+[data-tv-root] { cursor: default; }
+[data-tv-root][data-tv-idle="1"], [data-tv-root][data-tv-idle="1"] * { cursor: none !important; }

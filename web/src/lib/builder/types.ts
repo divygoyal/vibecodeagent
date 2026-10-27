@@ -131,12 +131,49 @@ export interface ThemeV2 {
     };
     badge: { show: boolean };
     legacy?: Record<string, unknown>;
+    // ── round 2 (all optional; missing = today's look) ──
+    /** Theme preset (lib/builder/themes.ts). Missing = 'trafficclaw'. */
+    id?: 'trafficclaw' | 'executive' | 'analyst' | 'midnight' | 'paper' | 'sunrise' | 'studio' | 'contrast';
+    density?: 'compact' | 'comfortable' | 'airy';
+    card?: 'elevated' | 'outlined' | 'flat' | 'ruled' | 'glass';
+    pattern?: 'none' | 'dots' | 'grid' | 'glow';
+    font?: 'geist' | 'system' | 'serif-headings' | 'mono-numbers';
+    palette?: 'standard' | 'contrast';
+    /** White-label kit: one brand colour (derived into accessible tokens), dark logo, credits. */
+    brand?: BrandKit;
+    /** Cover page above page one and as the first PDF page. */
+    cover?: CoverPage;
+}
+
+export interface BrandKit {
+    /** '#rrggbb' only. */
+    color?: string;
+    /** https only; used when the dashboard renders dark. */
+    logoDarkUrl?: string;
+    /** Up to 160 characters, at the bottom of the report and in the PDF footer. */
+    footer?: string;
+    preparedFor?: string;
+    preparedBy?: string;
+}
+
+export interface CoverPage {
+    enabled: boolean;
+    layout: 'left' | 'center' | 'split';
+    /** {{name}}, {{site}} and {{date_range}} are filled in. */
+    title?: string;
+    subtitle?: string;
+    /** https only (split layout). */
+    imageUrl?: string;
+    /** The first KPI strip of page one under the title. */
+    showKpis?: boolean;
 }
 
 export interface DashboardSettings {
     widthMode: 'contained' | 'full';
     autoRefreshSec: 0 | 300 | 900 | 1800 | 3600;
     timezone?: string;
+    /** TV mode (round 2): page rotation in seconds (0 = off) and whether filters hide. */
+    tv?: { rotateSec: 0 | 15 | 30 | 60 | 120; hideControls: boolean };
 }
 
 export interface DashboardDocV2 {
@@ -204,6 +241,7 @@ export interface ScorecardConfig {
     comparison: ComparisonDisplay;
     sparkline: SparklineConfig;
     align?: 'left' | 'center';
+    /** Goal for the period: progress bar and colour under the number (round 2). */
     target?: { value: number; label?: string };
 }
 export type ScorecardWidget = WidgetBase<'scorecard', ScorecardConfig>;
@@ -275,7 +313,14 @@ export interface TableColumn {
     pin?: 'left';
     link?: boolean;
 }
-export interface ConditionalRule { column: string; op: 'gt' | 'lt' | 'between'; value: number | [number, number]; style: 'good' | 'bad' | 'warn' }
+export interface ConditionalRule {
+    column: string;
+    op: 'gt' | 'gte' | 'lt' | 'lte' | 'between';
+    value: number | [number, number];
+    style: 'good' | 'bad' | 'warn';
+    /** Test the value (default) or its relative change vs the comparison period (-0.2 = 20 % drop). */
+    on?: 'value' | 'change';
+}
 export interface TableConfig {
     dimensions: DimId[];
     columns: TableColumn[];
