@@ -18,6 +18,7 @@ import { Button, EmptyState, Skeleton } from '@/components/ui';
 import { DashboardView, useUrlControls } from '@/components/dashboard-builder/DashboardView';
 import { DashboardBrandHeader, MadeWithBadge } from '@/components/dashboard-builder/DashboardBrandHeader';
 import { TvFrame, tvRefreshMs } from '@/components/dashboard-builder/TvMode';
+import { interactionToParam } from '@/components/dashboard-builder/Interactions';
 import { dashRootProps } from '@/components/dashboard-builder/theme/DashTheme';
 import { fetchJson, publicPageLoader, QueryHttpError, usePageResults } from '@/components/dashboard-builder/useWidgetData';
 import { canonicalJson } from '@/lib/builder/compile';
@@ -130,6 +131,7 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
         q.set('range', rangeToParam(ctl.state.date.range));
         q.set('compare', compareToParam(ctl.state.date.compare));
         for (const [k, v] of Object.entries(ctl.state.filters)) if (v.length) q.set(`f.${k}`, v.join(','));
+        if (ctl.state.interaction?.length) q.set('x', interactionToParam(ctl.state.interaction) ?? '');
         return q;
     }, [ctl.state]);
     const page = usePageResults(`pub:${token}:${pub.rev}:${canonicalJson(ctl.state)}:${unlockKey ?? ''}`, publicPageLoader(token, query, unlockKey), tv ? tvRefreshMs(doc) : doc.settings.autoRefreshSec ? doc.settings.autoRefreshSec * 1000 : 300_000);
@@ -198,6 +200,8 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
                 refetching={page.isValidating && Boolean(page.data)}
                 onRetry={() => void page.mutate()}
                 options={{}}
+                onVariable={allow.filters ? ctl.setVariable : undefined}
+                onInteraction={allow.filters ? ctl.setInteraction : undefined}
                 header={header}
                 footer={pub.share?.badge ? <div className="flex justify-center pt-2"><MadeWithBadge /></div> : null}
                 shell="inherit"

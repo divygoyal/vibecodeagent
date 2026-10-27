@@ -4,7 +4,7 @@
  * render pixel for pixel the same after the theme/template work, as long as it uses the default
  * theme.
  *
- *   node scripts/dev/dash-golden.mjs capture <webPort> <outDir> [--user demo]
+ *   node scripts/dev/dash-golden.mjs capture <webPort> <outDir> [--user demo] [--only name,name] [--modes light,dark]
  *   node scripts/dev/dash-golden.mjs compare <baseDir>[,<baseDir2>…] <candDir> [--diff <diffDir>]
  *
  * capture: makes sure one dashboard per shipped template exists (scripts/dev/seed-dashboards.mjs,
@@ -88,11 +88,18 @@ async function capture() {
     if (v1 !== undefined) jobs.push(['v1-seeded', `/dashboard/dashboards/${v1}`, false]);
     if (seedUser.dashboardPublicToken) jobs.push(['v1-seeded-public', `/view/${seedUser.dashboardPublicToken}`, true]);
 
+    // --only a,b: re-shoot just these shots (names without -1440-<mode>.png), e.g. after a flaky frame.
+    const only = opt('--only', '');
+    if (only) {
+        const want = new Set(only.split(','));
+        for (let i = jobs.length - 1; i >= 0; i--) if (!want.has(jobs[i][0])) jobs.splice(i, 1);
+    }
+    const modes = opt('--modes', 'light,dark').split(',');
     fs.mkdirSync(outDir, { recursive: true });
     const browser = await launchBrowser();
     const results = [];
     try {
-        for (const dark of [false, true]) {
+        for (const dark of [false, true].filter((d) => modes.includes(d ? 'dark' : 'light'))) {
             const context = await newContext(browser, { stateFile, dark });
             await context.route('**/*', (route) => {
                 const u = route.request().url();
@@ -155,7 +162,7 @@ async function capture() {
     } finally {
         await browser.close();
     }
-    fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify({ at: new Date().toISOString(), port, jobs, results }, null, 2));
+    if (!only) fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify({ at: new Date().toISOString(), port, jobs, results }, null, 2));
     console.log(JSON.stringify({ shots: results.length, outDir }, null, 2));
 }
 

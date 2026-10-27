@@ -82,7 +82,7 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
 
 // ── Bar ──────────────────────────────────────────────────────────────────
 
-function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, labels }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; height: number; currency?: string; labels?: Record<string, string> }) {
+function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, labels, onPick }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; height: number; currency?: string; labels?: Record<string, string>; onPick?: (value: string) => void }) {
     const c = widget.config;
     const anim = !useReducedMotion();
     const vertical = c.orientation === 'vertical';
@@ -108,7 +108,8 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, lab
     const catAxis = { dataKey: '__label', type: 'category' as const, tick: { fill: 'var(--color-chart-tick)', fontSize: 11 }, tickLine: false, axisLine: { stroke: 'var(--color-chart-axis)' }, interval: 0 as const };
     const valAxis = { type: 'number' as const, tickFormatter: fmtV(metrics[0]), tick: { fill: 'var(--color-chart-tick)', fontSize: 11 }, tickLine: false, axisLine: false, tickCount: 5, domain: [0, 'auto'] as [number, 'auto'] };
     return (
-        <BarChart responsive data={data} layout={vertical ? 'horizontal' : 'vertical'} style={{ width: '100%', height }} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barCategoryGap="24%" accessibilityLayer>
+        <BarChart responsive data={data} layout={vertical ? 'horizontal' : 'vertical'} style={{ width: '100%', height, ...(onPick ? { cursor: 'pointer' } : {}) }}
+            onClick={onPick ? (st: { activeLabel?: string | number; activeIndex?: number | string | null }) => { const r = typeof st?.activeIndex === 'number' ? rows[st.activeIndex] : rows.find((x) => dimText(dim, x[`d:${dim}`], labels) === st?.activeLabel); const raw = r?.[`d:${dim}`]; if (raw !== undefined && raw !== null && raw !== '(other)') onPick(String(raw)); } : undefined} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barCategoryGap="24%" accessibilityLayer>
             <CartesianGrid horizontal={vertical} vertical={!vertical} stroke="var(--color-chart-grid)" />
             {vertical ? <XAxis {...catAxis} tickFormatter={(v: string) => (v.length > 12 ? `${v.slice(0, 11)}…` : v)} /> : <YAxis {...catAxis} width={Math.min(140, Math.max(60, Math.max(...data.map((d) => String(d.__label).length)) * 6.5))} tickFormatter={(v: string) => (v.length > 20 ? `${v.slice(0, 19)}…` : v)} />}
             {vertical ? <YAxis {...valAxis} width={44} /> : <XAxis {...valAxis} />}
@@ -140,6 +141,7 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
             ) : useList ? (
                 <div className="h-full overflow-y-auto">
                     <BarList
+                        onItemClick={props.onFilterClick ? (it) => { const raw = String(it.key).replace(/-\d+$/, ''); if (raw && raw !== '(other)') props.onFilterClick!(raw); } : undefined}
                         items={rows.map((r, i) => ({
                             key: `${String(r[`d:${c.dimension}`])}-${i}`,
                             label: dimText(c.dimension, r[`d:${c.dimension}`], frame.labels),
@@ -156,7 +158,7 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
                     />
                 </div>
             ) : (
-                <BarChartPlot widget={widget} rows={rows} seriesKeys={frame.seriesKeys} compare={compare} height={h} currency={ok?.flags.currency} labels={frame.labels} />
+                <BarChartPlot widget={widget} rows={rows} seriesKeys={frame.seriesKeys} compare={compare} height={h} currency={ok?.flags.currency} labels={frame.labels} onPick={props.onFilterClick} />
             )}
         </WidgetFrame>
     );

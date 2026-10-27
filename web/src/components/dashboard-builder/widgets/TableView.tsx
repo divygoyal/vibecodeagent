@@ -46,9 +46,12 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                     const text = dimText(dim, r[`d:${dim}`], frame?.labels);
                     const raw = String(r[`d:${dim}`] ?? '');
                     const href = col.link && /^https?:\/\//.test(raw) ? raw : null;
+                    const pick = props.onFilterClick && dim === c.dimensions[0] && raw && raw !== '(other)' ? props.onFilterClick : undefined;
                     return (
                         <span className="flex min-w-0 items-center gap-1">
-                            <span className="truncate" title={text}>{text}</span>
+                            {pick ? (
+                                <button type="button" onClick={() => pick(raw)} title={`Filter the page by ${text}`} className={cn('truncate text-left hover:text-brand-text hover:underline', props.selectedValue === raw && 'font-semibold text-brand-text')}>{text}</button>
+                            ) : <span className="truncate" title={text}>{text}</span>}
                             {href && props.mode !== 'edit' ? <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${text}`} className="shrink-0 text-fg-faint hover:text-fg-muted"><ExternalLink aria-hidden size={12} /></a> : null}
                         </span>
                     );

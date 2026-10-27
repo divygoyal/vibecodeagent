@@ -13,6 +13,7 @@ import { dimLabel, getDim } from '@/lib/builder/catalog';
 import { widgetMetrics } from '@/lib/builder/registry';
 import { brandRegex } from '@/lib/builder/templates.round2';
 import { AI_SOURCE_PATTERN } from '@/components/site/lib/rules';
+import { variableControls } from '@/lib/builder/variables';
 import type { DashboardDocV2, FilterClause, FilterControl, FilterOp, WidgetDef } from '@/lib/builder/types';
 import { DimensionPicker, Field, Toggle } from './Fields';
 
@@ -75,6 +76,8 @@ export function WidgetFilters({ widget, doc, edit }: { widget: WidgetDef; doc: D
         return n;
     }), key);
     const firstDim = metrics.some((m) => m.startsWith('gsc:')) ? 'query' : 'page';
+    const varNames = variableControls(doc.controls).map((v) => `{{var:${v.id}}}`);
+    const clickable = widget.type === 'bar' || widget.type === 'table' || widget.type === 'geo';
     return (
         <div className="space-y-3">
             <Field label="Filters" hint={filters.length ? 'All rows must match. Dashboard filter controls still apply unless ignored below.' : 'Show only part of the data in this widget, for example AI traffic or brand searches.'}>
@@ -94,6 +97,7 @@ export function WidgetFilters({ widget, doc, edit }: { widget: WidgetDef; doc: D
                                     onChange={(e) => setRow(i, { value: f.op === 'in' || f.op === 'not_in' ? e.target.value.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 100) : e.target.value.slice(0, 500) }, `filter-${i}`)}
                                     className="h-8 w-full rounded-control border border-border bg-surface px-2 font-mono text-meta text-fg placeholder:font-sans placeholder:text-fg-faint" />
                                 {note ? <p className="text-caption text-warn">{note}</p> : null}
+                                {varNames.length ? <p className="text-caption text-fg-muted">Variables: {varNames.join(', ')}</p> : null}
                             </div>
                         );
                     })}
@@ -116,6 +120,10 @@ export function WidgetFilters({ widget, doc, edit }: { widget: WidgetDef; doc: D
                     ) : null}
                 </div>
             </Field>
+            {clickable ? (
+                <Toggle label="Click to filter the page" description={widget.type === 'geo' ? 'A click on a country filters the other widgets.' : widget.type === 'table' ? 'A click on a row filters the other widgets by it.' : 'A click on a bar filters the other widgets by it.'}
+                    checked={Boolean(widget.interactions?.clickToFilter)} onChange={(v) => edit((w) => ({ ...w, interactions: v ? { ...(w.interactions ?? {}), clickToFilter: true } : undefined }) as WidgetDef)} />
+            ) : null}
             {controls.length ? (
                 <Field label="Dashboard filters">
                     <div className="space-y-1">

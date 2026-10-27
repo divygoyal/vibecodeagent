@@ -70,7 +70,7 @@ test('template extras: TV wallboard settings, client report cover, brand words f
     assert.equal(cr.theme.cover?.title, 'SEO report: {{site}}');
     assert.equal(cr.theme.badge.show, false);
     const bn = buildFromTemplate('brand-vs-nonbrand', { name: 'B', defaultSource: SITE });
-    assert.deepEqual(bn.widgets.w_kb.filters, [{ dimension: 'query', op: 'regex', value: 'acmeanalytics' }]);
+    assert.deepEqual(bn.widgets.w_kb.filters, [{ dimension: 'query', op: 'regex', value: '{{var:brand}}' }]);
 });
 
 test('themes: snapshot on pick, back to TrafficClaw restores a default document', () => {
@@ -185,4 +185,47 @@ test('theme CSS: text pairs pass 4.5:1 in every preset (7:1 in High contrast)', 
         checked++;
     }
     assert.ok(checked >= 13, `checked ${checked} theme blocks`);
+});
+
+const vars = await import('../src/lib/builder/variables.ts');
+const inter = await import('../src/lib/builder/interaction.ts');
+const { compileWidget } = await import('../src/lib/builder/compile.ts');
+const { publicControlsFromQuery } = await import('../src/lib/builder/publicDoc.ts');
+
+test('variables: defaults, viewer values, invalid values fall back, filters filled before compile', () => {
+    const doc = buildFromTemplate('brand-vs-nonbrand', { name: 'b', defaultSource: SITE });
+    const v = doc.controls.find((c) => c.type === 'variable');
+    assert.ok(v, 'brand template defines a brand variable');
+    assert.equal(v.default, 'acmeanalytics');
+    assert.deepEqual(vars.variableValues(doc.controls, { filters: {} }), { brand: 'acmeanalytics' });
+    assert.deepEqual(vars.variableValues(doc.controls, { filters: { brand: ['acme|acme analytics'] } }), { brand: 'acme|acme analytics' });
+    assert.deepEqual(vars.variableValues(doc.controls, { filters: { brand: ['(unclosed'] } }), { brand: 'acmeanalytics' });
+    const ctl = { date: { range: { kind: 'preset', id: '28d' }, compare: { mode: 'previous_period' } }, filters: { brand: ['acme'] } };
+    const q = compileWidget(doc.widgets.w_kb, { controlDefs: doc.controls, controls: ctl });
+    assert.deepEqual(q.queries[0].filters, [{ dimension: 'query', op: 'regex', value: 'acme' }]);
+    const qn = compileWidget(doc.widgets.w_kn, { controlDefs: doc.controls, controls: { ...ctl, filters: {} } });
+    assert.deepEqual(qn.queries[0].filters, [{ dimension: 'query', op: 'not_regex', value: 'acmeanalytics' }]);
+    assert.equal(vars.fillVariables('Brand: {{var:brand}} {{var:nope}}', { brand: 'acme' }), 'Brand: acme {{var:nope}}');
+    assert.equal(validateDoc(doc).ok, true);
+    // public viewers: only when the share allows filters and the control allows it
+    const share = { viewerControls: { date: true, compare: true, filters: true } };
+    assert.deepEqual(publicControlsFromQuery(new URLSearchParams('f.brand=acme'), doc, share).filters.brand, ['acme']);
+    assert.equal(publicControlsFromQuery(new URLSearchParams('f.brand=acme'), doc, { viewerControls: { ...share.viewerControls, filters: false } }).filters.brand, undefined);
+});
+
+test('click to filter: URL round trip, toggling, allowed dimensions, the clicked widget keeps all values', () => {
+    const doc = buildFromTemplate('site-overview', { name: 'x', defaultSource: SITE });
+    doc.widgets.w_devices = { ...doc.widgets.w_devices, interactions: { clickToFilter: true } };
+    const allowed = inter.clickableDims(doc);
+    assert.deepEqual([...allowed], ['device']);
+    assert.deepEqual(inter.interactionFromParam('device:mobile|country:DE', allowed), [{ dimension: 'device', op: 'eq', value: 'mobile' }]);
+    assert.deepEqual(inter.toggleInteraction([{ dimension: 'device', op: 'eq', value: 'mobile' }], 'device', 'mobile'), []);
+    const ctl = { date: { range: { kind: 'preset', id: '28d' }, compare: { mode: 'none' } }, filters: {}, interaction: [{ dimension: 'device', op: 'eq', value: 'mobile' }] };
+    const own = compileWidget(doc.widgets.w_devices, { controlDefs: doc.controls, controls: ctl });
+    assert.deepEqual(own.queries[0].filters, [], 'the clicked widget is not filtered by itself');
+    const other = compileWidget(doc.widgets.w_search, { controlDefs: doc.controls, controls: ctl });
+    assert.deepEqual(other.queries[0].filters, [{ dimension: 'device', op: 'eq', value: 'mobile' }]);
+    const share = { viewerControls: { date: true, compare: true, filters: true } };
+    assert.deepEqual(publicControlsFromQuery(new URLSearchParams('x=device:mobile'), doc, share).interaction, [{ dimension: 'device', op: 'eq', value: 'mobile' }]);
+    assert.equal(publicControlsFromQuery(new URLSearchParams('x=page:%2Fsecret'), doc, share).interaction, undefined);
 });

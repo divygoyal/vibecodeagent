@@ -13,3 +13,22 @@ Shots: /root/projects/tc-redesign-research/round2/candidate/dash/.
 - Demo data is per UTC day: re-shoot the baseline from a pristine worktree if the day changes.
 
 ## Log
+- b5dcd27 gate script. f046e02 16 templates (templates.round2.ts appended; the 8 shipped build as before),
+  theme/brand/cover model (types + schema + publicDoc), themes.ts, brand.ts (deriveBrand), clipboard.ts,
+  cfRules.ts, dashboard-themes.css (scoped [data-dash-theme]), gallery (search, categories, New, themed
+  thumbnails, theme choice on create), previews for the 16 (the 8 old previews kept byte-identical).
+- f3e3f43 theme wiring: owner view = themed panel (shell="panel", app mode), share link/embed = themed page,
+  editor canvas = live theme preview (Light/Dark toggle); cover page; credits; dark logo; branded PDF
+  (lib/builder/reportPdf.ts, browser only); TV mode (TvMode.tsx, ?tv=1, Present); widget filters UI
+  (WidgetFilters.tsx), table rules (RulesEditor.tsx + TableView), scorecard targets, copy/paste.
+- Settings tabs General | Appearance; toolbar Theme button; TV rows fit the screen height.
+
+## How the default look stays identical
+- dashThemeAttrs()/dashRootProps() return null for a doc without a theme (or TrafficClaw + default options,
+  no brand colour): no attributes are spread, no wrapper is added, grid stays 32/16.
+- Card markers are data attributes only (data-dash-widget); conditional-format classes only when rules exist;
+  target bar only when a target exists; cover/credits only when set.
+
+## Dev data (instance r2dash)
+- /root/.trafficclaw-dev/r2dash/dashboards-r2.json: one dashboard per new template (shared) + site overview in
+  each theme. Seeded with the scratch script seed-r2.mjs (POST /api/dashboards with templateId/themeId).

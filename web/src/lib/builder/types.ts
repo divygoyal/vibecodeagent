@@ -96,7 +96,20 @@ export interface MetricControl {
     scope: ControlScope;
 }
 
-export type ControlDef = DateControl | FilterControl | SiteControl | MetricControl;
+/**
+ * Dashboard variable (round 2): a named value used as {{var:id}} in widget filter values and text
+ * widgets. Its current value travels like a filter value (ControlState.filters[id], URL f.<id>).
+ */
+export interface VariableControl {
+    id: ControlId;
+    type: 'variable';
+    label: string;
+    kind: 'text' | 'regex' | 'number';
+    default: string;
+    viewerCanChange: boolean;
+}
+
+export type ControlDef = DateControl | FilterControl | SiteControl | MetricControl | VariableControl;
 
 export type FilterOp = 'eq' | 'neq' | 'in' | 'not_in' | 'contains' | 'not_contains' | 'starts' | 'ends' | 'regex' | 'not_regex';
 export interface FilterClause { dimension: DimId; op: FilterOp; value: string | string[] }

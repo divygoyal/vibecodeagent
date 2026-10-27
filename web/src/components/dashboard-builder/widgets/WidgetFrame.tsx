@@ -26,6 +26,10 @@ export interface WidgetViewProps<W extends WidgetDef = WidgetDef> {
     vars: Record<string, string>;
     onRetry?: () => void;
     onChooseSource?: () => void;
+    /** Click to filter (round 2): the widget allows it and a click on a value calls this. */
+    onFilterClick?: (value: string) => void;
+    /** The value currently selected by click to filter on this widget's dimension. */
+    selectedValue?: string;
 }
 
 /** The ok result when there is one (also the stale copy inside an error). */

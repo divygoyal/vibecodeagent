@@ -53,10 +53,10 @@ export function GeoView(props: WidgetViewProps<GeoWidget>) {
                     <EmptyState variant="inline" title={`No ${metricLabel(id).toLowerCase()} by country in this period`} />
                 ) : (
                     <>
-                        {width > 0 ? <ChoroplethMap values={values} color={metricColor(id)} width={mapW} height={mapH} projection={c.projection} steps={c.scale.steps} format={fmt} label={metricLabel(id)} showLegend={c.showLegend} /> : null}
+                        {width > 0 ? <ChoroplethMap values={values} color={metricColor(id)} width={mapW} height={mapH} projection={c.projection} steps={c.scale.steps} format={fmt} label={metricLabel(id)} showLegend={c.showLegend} onSelect={props.onFilterClick} /> : null}
                         {top.length ? (
                             <div className="min-w-0 flex-1 overflow-hidden" style={side ? { width: listW } : undefined}>
-                                <BarList items={top.map(([code, v]) => ({ key: code, label: countryName(code), text: countryName(code), value: v }))} metric={dsKey(id)} limit={below ? Math.min(top.length, 5) : top.length} formatValue={(v) => fmtMetricValue(id, v, { currency: ok?.flags.currency })} labelHeader="Country" />
+                                <BarList items={top.map(([code, v]) => ({ key: code, label: countryName(code), text: countryName(code), value: v }))} metric={dsKey(id)} limit={below ? Math.min(top.length, 5) : top.length} formatValue={(v) => fmtMetricValue(id, v, { currency: ok?.flags.currency })} labelHeader="Country" onItemClick={props.onFilterClick ? (it) => props.onFilterClick!(String(it.key)) : undefined} />
                             </div>
                         ) : null}
                     </>
@@ -69,7 +69,7 @@ export function GeoView(props: WidgetViewProps<GeoWidget>) {
 // ── Text, section, image ─────────────────────────────────────────────────
 
 export function fillVars(md: string, vars: Record<string, string>): string {
-    return md.replace(/\{\{\s*([a-z_:]+)\s*\}\}/gi, (m, k: string) => vars[k] ?? m);
+    return md.replace(/\{\{\s*([a-z0-9_:]+)\s*\}\}/gi, (m, k: string) => vars[k] ?? vars[k.toLowerCase()] ?? m);
 }
 
 const ROLE: Record<TextWidget['config']['role'], string> = {

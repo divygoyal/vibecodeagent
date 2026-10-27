@@ -176,6 +176,8 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
                 onPage={ctl.setPage}
                 onDate={ctl.setDate}
                 onFilter={ctl.setFilter}
+                onVariable={ctl.setVariable}
+                onInteraction={ctl.setInteraction}
                 allow={{ date: true, compare: true, filters: true }}
                 data={page.data}
                 loading={!page.data && !page.error}

@@ -48,6 +48,7 @@ const controlSchema = z.union([
     z.object({ id, type: z.literal('filter'), label: shortText, dimension: dimId, ui: z.enum(['multiselect', 'select', 'chips', 'search']), default: z.array(z.string().max(500)).max(100).optional(), source: sourceRefSchema.optional(), scope, viewerCanChange: z.boolean() }),
     z.object({ id, type: z.literal('site'), label: shortText, options: z.union([z.literal('all'), z.array(z.string().max(253)).max(500)]), default: z.string().max(253), scope }),
     z.object({ id, type: z.literal('metric'), label: shortText, options: z.array(metricId).max(30), default: metricId, scope }),
+    z.object({ id: z.string().min(1).max(32).regex(/^[a-z0-9_]+$/), type: z.literal('variable'), label: z.string().min(1).max(60), kind: z.enum(['text', 'regex', 'number']), default: z.string().max(300), viewerCanChange: z.boolean() }),
 ]);
 
 const numberFormat = z.object({ kind: z.enum(['auto', 'integer', 'decimal', 'percent', 'duration', 'currency', 'position']).optional(), decimals: z.number().int().min(0).max(6).optional(), compact: z.boolean().optional(), currency: z.string().max(3).optional() });

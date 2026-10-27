@@ -246,14 +246,16 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
     'brand-vs-nonbrand': (ctx) => {
         const w: Rec = {};
         const brand = brandRegex(ctx.defaultSource.type === 'site' ? ctx.defaultSource.siteId : undefined);
-        const isBrand: FilterClause = { dimension: 'query', op: 'regex', value: brand };
-        const notBrand: FilterClause = { dimension: 'query', op: 'not_regex', value: brand };
+        // Round 2: the brand words are a dashboard variable, edited once for every widget (and by viewers).
+        const brandVar: ControlDef = { id: 'brand', type: 'variable', label: 'Brand words', kind: 'regex', default: brand, viewerCanChange: true };
+        const isBrand: FilterClause = { dimension: 'query', op: 'regex', value: '{{var:brand}}' };
+        const notBrand: FilterClause = { dimension: 'query', op: 'not_regex', value: '{{var:brand}}' };
         const three = ['gsc:clicks', 'gsc:impressions', 'gsc:ctr'];
         return {
             widgets: w,
-            controls: [dateControl('28d'), country(), device()],
+            controls: [dateControl('28d'), country(), device(), brandVar],
             pages: [page('p_main', 'Brand and non-brand', [
-                [[text('w_note', `### Brand terms\nBrand searches are queries that match \`${brand}\`. Open a widget's Filters to change the words. Brand clicks show demand you already have; non-brand clicks show how well you win new visitors.`, 'callout'), 12, 3]],
+                [[text('w_note', '### Brand terms\nBrand searches are queries that match `{{var:brand}}`. Change **Brand words** above to edit them for every widget at once. Brand clicks show demand you already have; non-brand clicks show how well you win new visitors.', 'callout'), 12, 3]],
                 [[only(kpi('w_kb', three, 'Brand searches'), [isBrand]), 6, 4], [only(kpi('w_kn', three, 'Non-brand searches'), [notBrand]), 6, 4]],
                 [[only(ts('w_tb', 'Brand clicks', ['gsc:clicks']), [isBrand]), 6, 7], [only(ts('w_tn', 'Non-brand clicks', ['gsc:clicks']), [notBrand]), 6, 7]],
                 [[only(table('w_qb', 'Top brand queries', ['query'], SEARCH_COLS, { bars: ['gsc:clicks'] }), [isBrand]), 6, 9], [only(table('w_qn', 'Top non-brand queries', ['query'], SEARCH_COLS, { bars: ['gsc:clicks'] }), [notBrand]), 6, 9]],

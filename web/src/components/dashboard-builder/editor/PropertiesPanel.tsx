@@ -19,6 +19,7 @@ import { useResolvedTheme } from '@/lib/theme';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { Choice, DimensionPicker, Field, MetricList, MetricPicker, NumberInput, SourcePicker, TextInput, Toggle, type SiteOption } from './Fields';
 import { RulesEditor } from './RulesEditor';
+import { VariablesEditor } from './VariablesEditor';
 import { WidgetFilters } from './WidgetFilters';
 
 type Patch = (w: WidgetDef) => WidgetDef;
@@ -406,6 +407,7 @@ function DashboardSettings({ doc, sites }: { doc: DashboardDocV2; sites: SiteOpt
                 <Toggle label="Show dates under the title" checked={doc.theme.header.showDates} onChange={(v) => set((d) => ({ ...d, theme: { ...d.theme, header: { ...d.theme.header, showDates: v } } }))} />
                 <Field label="Width"><Choice ariaLabel="Width" value={doc.settings.widthMode} onChange={(v) => set((d) => ({ ...d, settings: { ...d.settings, widthMode: v } }))} options={[{ value: 'contained', label: 'Contained' }, { value: 'full', label: 'Full width' }]} /></Field>
                 <Field label="Auto-refresh"><Choice ariaLabel="Auto-refresh" value={String(doc.settings.autoRefreshSec) as '0'} onChange={(v) => set((d) => ({ ...d, settings: { ...d.settings, autoRefreshSec: Number(v) as 0 } }))} options={[{ value: '0', label: 'Off' }, { value: '300', label: 'Every 5 minutes' }, { value: '900', label: 'Every 15 minutes' }, { value: '1800', label: 'Every 30 minutes' }, { value: '3600', label: 'Every hour' }]} /></Field>
+                <div className="border-t border-border-subtle pt-4"><VariablesEditor doc={doc} set={set} /></div>
                 <div className="space-y-3 border-t border-border-subtle pt-4">
                     <p className="text-caption uppercase tracking-[0.04em] text-fg-muted">TV mode</p>
                     <Field label="Change page every" hint={doc.pages.filter((p) => !p.hidden).length > 1 ? 'Open with Present, or add ?tv=1 to the dashboard or share link. Data refreshes at least every 5 minutes.' : 'Add pages to rotate them. Open with Present, or add ?tv=1 to the link.'}>
