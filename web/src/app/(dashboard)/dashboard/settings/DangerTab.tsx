@@ -17,8 +17,8 @@ const CONFIRM_WORD = 'DELETE';
  * Danger zone (DESIGN 5.14): sign out and delete the account.
  *
  * Deleting is a request: it lands in the support inbox, where an admin removes
- * the account, its container data and its tokens (the existing admin delete),
- * and it is finished within 30 days as the privacy policy says. Nothing is
+ * the account and everything stored with it (the admin delete-user cascade).
+ * No fixed number of days is promised (same wording as /security). Nothing is
  * removed from the browser until the user confirms by typing DELETE.
  */
 export function DangerTab() {
@@ -69,7 +69,7 @@ export function DangerTab() {
             <SettingsSection danger title="Delete account" description="This cannot be undone.">
                 {sent ? (
                     <Banner variant="success" title="Deletion requested">
-                        We received your request. Your account and the data stored with it are permanently removed within 30 days, as our privacy policy says. We will answer in your support thread.
+                        We received your request. We will permanently delete your account and the data stored with it, and confirm in your support thread.
                     </Banner>
                 ) : (
                     <SettingsRow

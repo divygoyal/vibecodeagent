@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react';
 
 import { fmtDateRange } from '@/lib/format';
-import { Badge } from '@/components/ui/Badge';
 import { Favicon } from '@/components/ui/Favicon';
 import { DateRangeControl, useDateRange } from '@/components/shell/DateRangeControl';
 import { PageHeader } from '@/components/shell/PageHeader';
@@ -26,7 +25,7 @@ export interface SiteHeaderProps {
     title?: ReactNode;
 }
 
-/** Site page header: favicon + host + source badges, range facts, date range control last. */
+/** Site page header: favicon + host, range facts, date range control last (no source badges: the subtitle names the source). */
 export function SiteHeader({ section, source, search, actions, tabs, noRange, backHref, title }: SiteHeaderProps) {
     const { site, label, gsc } = useSite();
     const dr = useDateRange();
@@ -43,12 +42,6 @@ export function SiteHeader({ section, source, search, actions, tabs, noRange, ba
                     {section ? <span className="font-normal text-fg-muted"> · {section}</span> : null}
                 </>
             )}
-            badges={site ? (
-                <>
-                    {site.gscKind ? <Badge>{site.gscKind === 'domain' ? 'Domain' : 'Prefix'}</Badge> : null}
-                    {site.ga4PropertyId ? <Badge>GA4</Badge> : null}
-                </>
-            ) : undefined}
             subtitle={facts.length ? facts.map((f, i) => <span key={i}>{i > 0 ? ' · ' : ''}{f}</span>) : undefined}
             actions={actions || !noRange ? (
                 <>

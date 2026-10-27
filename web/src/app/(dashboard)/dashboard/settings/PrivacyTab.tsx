@@ -66,7 +66,7 @@ export function PrivacyTab({ goToDanger }: { goToDanger: () => void }) {
             <SettingsSection title="Delete your account" description="Removes your account and the data above.">
                 <SettingsRow
                     title="Ask us to delete everything"
-                    description="You confirm in the Danger zone. Deletion is finished within 30 days."
+                    description="You confirm in the Danger zone. We then delete your account and all its data."
                     control={<Button variant="secondary" icon={ShieldAlert} onClick={goToDanger}>Go to danger zone</Button>}
                 />
             </SettingsSection>

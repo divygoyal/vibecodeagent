@@ -38,10 +38,13 @@ export function LiveCount() {
     return (
         <Link href={`${siteHref(host, 'traffic')}?tab=realtime`} className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-control px-2 text-body-sm text-fg-secondary hover:bg-subtle hover:text-fg">
             <span aria-hidden className="size-2 rounded-full bg-up animate-live-dot" />
-            <span className="tabular-nums">{fmtFull(q.data.activeUsers)}</span>
-            {/* Phones: short label so the header's action row does not squeeze it onto three lines. */}
-            <span className="sm:hidden">live</span>
-            <span className="max-sm:hidden">{q.data.activeUsers === 1 ? 'user' : 'users'} right now</span>
+            {/* One text run with a single space (the flex gap made "20  users" read as a double space).
+                Phones: short label so the header's action row does not squeeze it onto three lines. */}
+            <span>
+                <span className="tabular-nums">{fmtFull(q.data.activeUsers)}</span>{' '}
+                <span className="sm:hidden">live</span>
+                <span className="max-sm:hidden">{q.data.activeUsers === 1 ? 'user' : 'users'} right now</span>
+            </span>
         </Link>
     );
 }

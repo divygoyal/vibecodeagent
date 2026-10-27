@@ -34,7 +34,7 @@ export async function GET() {
         );
     } catch (err) {
         console.error('[connections] lookup failed:', err instanceof Error ? err.message : err);
-        // The client also reads the session's own tokens, so an empty list degrades cleanly (no 5xx in the console).
+        // The client also reads session.user.hasGoogle/hasGithub (flags only, no tokens), so an empty list degrades cleanly (no 5xx in the console).
         return NextResponse.json({ connectedProviders: [], degraded: true }, { headers: { 'Cache-Control': 'private, no-store' } });
     }
 }

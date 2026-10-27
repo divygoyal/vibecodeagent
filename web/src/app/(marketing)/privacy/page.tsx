@@ -70,8 +70,8 @@ export default function PrivacyPage() {
                         <strong>Data retention and deletion:</strong> we retain Google user data only while your account is active and as
                         long as needed to provide the service. You can request deletion at any time by emailing{' '}
                         <a href="mailto:privacy@trafficclaw.com">privacy@trafficclaw.com</a> or by revoking {BRAND_NAME}&apos;s access in your
-                        Google Account security settings. After a deletion request or account closure, all associated Google user data is
-                        permanently removed from our databases within 30 days.
+                        Google Account security settings. After a deletion request or account closure, we permanently remove all associated
+                        Google user data from our databases.
                     </li>
                     <li>
                         <strong>Limited Use:</strong> {BRAND_NAME}&apos;s use and transfer to any other app of information received from Google

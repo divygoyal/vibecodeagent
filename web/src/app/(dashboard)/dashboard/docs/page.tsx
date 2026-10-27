@@ -181,7 +181,7 @@ export default function DocsPage() {
                                 ['A site is missing', 'Only sites your Google account can open show up. Add the site to Search Console or Analytics with that account, then press Reconnect in Settings, Google.'],
                                 ['My numbers differ from Google', 'Search Console is about two days behind and rounds some queries. Analytics may sample large date ranges. Compare the same dates and the same property.'],
                                 ['I changed Google accounts', 'Open Settings, Google and press Reconnect. Sign in with the account that owns your sites.'],
-                                ['How do I delete my account?', 'Settings, Danger zone. We remove your account and data within 30 days.'],
+                                ['How do I delete my account?', 'Settings, Danger zone. On request we remove your account and all the data stored with it.'],
                             ]}
                         />
                         <div className="flex flex-wrap gap-2">

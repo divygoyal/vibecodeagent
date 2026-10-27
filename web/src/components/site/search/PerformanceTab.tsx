@@ -190,7 +190,7 @@ export function PerformanceTab() {
                 <MetricToggles summary={s} loading={summary.state === 'loading'} selected={selected} onToggle={toggle} />
                 <div className="p-4 md:p-5">
                     <ChartCard
-                        className="!border-0 !p-0 !shadow-none"
+                        bare
                         title={`${selected.map((k) => METRICS[k].label).join(', ')}${interval === 'day' ? '' : ` per ${interval}`}`}
                         subtitle={selected.length > 1 && mode === 'overlay' ? 'Lines use separate scales; the axis shows the first one' : selected.includes('position') ? 'Position: lower is better' : compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')}` : undefined}
                         actions={(

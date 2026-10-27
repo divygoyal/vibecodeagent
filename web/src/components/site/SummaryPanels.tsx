@@ -28,7 +28,7 @@ function SectionTitle({ title, source, href, linkLabel }: { title: string; sourc
     return (
         <div className="flex items-end justify-between gap-3">
             <div className="min-w-0">
-                <h2 className="text-title-sm text-fg">{title}</h2>
+                <h2 className="text-title text-fg">{title}</h2>
                 <p className="text-meta text-fg-muted">{source}</p>
             </div>
             {href ? (

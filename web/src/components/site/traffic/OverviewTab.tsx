@@ -65,7 +65,7 @@ export function TrafficOverviewTab() {
                 }))}
             >
                 <ChartCard
-                    className="!border-0 !p-0 !shadow-none"
+                    bare
                     title={`${METRICS[metric].label} per ${interval}`}
                     subtitle={compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')} · today is partial` : 'Today is partial'}
                     actions={<IntervalSwitch days={days} />}
