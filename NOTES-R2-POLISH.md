@@ -40,6 +40,15 @@ Candidate screenshots: /root/projects/tc-redesign-research/round2/candidate/poli
    Settings/Plan/Docs/Support left-aligned with the other pages; skeletons wait 200 ms and stay flat for 1 s;
    no "Pick a site" flash in the sidebar while sites load; ChartCard footnotes align at the bottom.
 
+## Verification
+- Tawk rules checked in the browser against a local stub of the Tawk script (Cloudflare answers 403 to
+  HeadlessChrome, so the real widget cannot load in Playwright): bubble on / and /dashboard/support at 1440,
+  none on /dashboard and on phones; greeting card and badge hidden until "Chat with us"; ring in dark; on a
+  phone "Chat with us" loads and opens it.
+- Candidate screenshots: the r2polish instance runs on a copy of the integrate instance's dev admin.db (the one
+  the baseline shots were taken from: same dashboards, MCP grants, leaderboard), so the pairs show the same data.
+  The instance's own seed is kept at /root/.trafficclaw-dev/r2polish/admin.db.own-seed.
+
 ## Checks
 - tsc, npm test (72), check:rsc: clean (see the end of this file for the last run).
 
