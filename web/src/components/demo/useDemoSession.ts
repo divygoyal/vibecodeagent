@@ -15,5 +15,6 @@ export const DEMO_EXIT_HREF = '/demo/exit';
 
 /** Start a real Google sign-in from inside the demo; middleware ends the demo on the sign-in request. */
 export function connectGoogleFromDemo(): void {
-    void signIn('google', { callbackUrl: '/dashboard' }, { prompt: 'select_account consent' });
+    // The app's normal sign-in (lib/auth.ts asks for consent only when it is needed).
+    void signIn('google', { callbackUrl: '/dashboard' });
 }
