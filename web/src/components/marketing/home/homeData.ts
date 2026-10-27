@@ -74,13 +74,13 @@ export function buildStory(byRange: Record<PortfolioRange, PortfolioResponse>, n
     const alert = byRange['3m'].alerts.find((a) => a.metric === 'clicks' && a.type === 'drop' && typeof a.changePct === 'number');
     if (alert) {
         const site = byRange['3m'].sites.find((s) => s.key === alert.siteKey);
-        drop = { label: site?.label ?? alert.host, host: alert.host, changePct: alert.changePct!, period: 'last 3 months vs previous' };
+        drop = { label: site?.label ?? alert.host, host: alert.host, changePct: alert.changePct!, period: 'last 3 months' };
     } else {
         const worst = p28.sites
             .map((s) => ({ s, pct: s.search ? pctChange(s.search.cur.clicks, s.search.prev?.clicks) : null }))
             .filter((x): x is { s: typeof x.s; pct: number } => x.pct !== null && x.pct < 0 && (x.s.search?.prev?.clicks ?? 0) >= 100)
             .sort((a, b) => a.pct - b.pct)[0];
-        if (worst) drop = { label: worst.s.label, host: worst.s.host, changePct: worst.pct, period: 'last 28 days vs previous' };
+        if (worst) drop = { label: worst.s.label, host: worst.s.host, changePct: worst.pct, period: 'last 28 days' };
     }
 
     let fix: HomeStory['fix'] = null;

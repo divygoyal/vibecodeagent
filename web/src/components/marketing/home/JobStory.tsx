@@ -138,7 +138,7 @@ export function JobStory({ totalSites, sites, drop, fix, fixHref }: StoryProps) 
                                 </p>
                                 <p className="mt-1 text-body-sm font-medium text-fg">{fix.title}</p>
                                 <p className="mt-0.5 text-meta text-fg-muted">
-                                    <span className="font-medium text-up">+{fmtCompact(fix.gain)} clicks a month</span> if it reaches position 5
+                                    <span className="font-medium text-up">+{fmtCompact(fix.gain)} clicks a month</span> at position 5
                                 </p>
                             </div>
                         ) : null}
