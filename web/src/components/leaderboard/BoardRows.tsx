@@ -77,7 +77,7 @@ export function BoardRowItem({ row, focus, range, showNew, cols = ALL_COLUMNS }:
             {cols.trend ? <div className="hidden @3xl:block"><RowSpark spark={row.spark} height={32} /></div> : null}
 
             {cols.openTo ? (
-                <div className={cn('relative z-10 flex flex-wrap items-center gap-x-2 gap-y-1 @3xl:mt-0 @3xl:flex-col @3xl:items-start', hasOffer(row) ? 'mt-2' : 'max-@3xl:hidden')}>
+                <div className={cn('relative z-10 flex flex-wrap items-center gap-x-2 gap-y-1 @3xl:mt-0 @3xl:flex-col @3xl:items-start', hasOffer(row) ? 'mt-2' : '@max-3xl:hidden')}>
                     <OpenToChips items={row.open_to} limit={2} />
                     {row.min_slot_price_cents !== null && row.ad_slot_count > 0 ? (
                         <span className="text-meta text-fg-muted">Ads from {formatCents(row.min_slot_price_cents)}</span>
