@@ -4,7 +4,7 @@
 #   worker1-remote.sh deps  <name>              npm ci once per lockfile hash (cached node_modules) + admin venv
 #   worker1-remote.sh build <name>              production `next build`
 #   worker1-remote.sh up    <name> [N]          N instances (default 4): web 3201.. + admin 8201.., fresh DB, demo users
-#   worker1-remote.sh check <name> [what] [out] crawl|mobile|scenarios|golden|all, results into <out>
+#   worker1-remote.sh check <name> [what] [out] crawl|mobile|scenarios|golden|mcp|all, results into <out> (mcp is not part of all)
 #   worker1-remote.sh down  <name>
 #   worker1-remote.sh status
 #   worker1-remote.sh clean [--all]
@@ -209,13 +209,20 @@ cmd_up() {
     ensure_dev_home; load_dev_env
     cmd_down "$name"
     avail="$(mem_available_mb)"; [ "$avail" -ge "$MIN_MEM_MB" ] || die "only ${avail} MB RAM available (need $MIN_MEM_MB)"
-    for i in $(seq 1 "$n"); do
-        for p in "$(web_port "$i")" "$(admin_port "$i")"; do
-            port_listening "$p" && die "port $p is already in use on worker1 (not ours); refusing to start"
+    # Other sessions can hold the low slots (another worktree's instances): start at the first run of N free slots.
+    local first=1 ok
+    while :; do
+        ok=1
+        for i in $(seq "$first" $((first + n - 1))); do
+            for p in "$(web_port "$i")" "$(admin_port "$i")"; do port_listening "$p" && ok=0; done
         done
+        [ "$ok" = 1 ] && break
+        first=$((first + 1))
+        [ $((first + n - 1)) -le "$MAX_N" ] || die "no $n free instance slot(s) among ports $((PORT_BASE_WEB + 1))-$((PORT_BASE_WEB + MAX_N)) on worker1 (not ours); refusing to start"
     done
+    local last=$((first + n - 1))
     t0="$(now)"
-    for i in $(seq 1 "$n"); do
+    for i in $(seq "$first" "$last"); do
         local d; d="$(inst_dir "$name" "$i")"
         rm -rf "$d"; mkdir -p "$d"; chmod 700 "$d"
         cat > "$d/instance.env" <<EOF
@@ -228,18 +235,18 @@ ADMIN_URL=http://127.0.0.1:$(admin_port "$i")
 EOF
         start_admin "$name" "$i"
     done
-    for i in $(seq 1 "$n"); do
+    for i in $(seq "$first" "$last"); do
         wait_http "http://127.0.0.1:$(admin_port "$i")/health" "admin $i" 90 || { tail -n 20 "$(inst_dir "$name" "$i")/admin.log" >&2; die "admin $i did not start"; }
         start_web "$name" "$i"
     done
-    for i in $(seq 1 "$n"); do
+    for i in $(seq "$first" "$last"); do
         wait_http "http://localhost:$(web_port "$i")/api/auth/providers" "web $i" 120 || { tail -n 30 "$(inst_dir "$name" "$i")/web.log" >&2; die "web $i did not start"; }
     done
     echo "start_secs=$(elapsed "$t0")"
     # Seed the three demo users on every instance (in parallel across instances).
     t0="$(now)"
     local pids=() failed=0
-    for i in $(seq 1 "$n"); do
+    for i in $(seq "$first" "$last"); do
         (
             for u in demo demo2 admin; do
                 env -i PATH="$SAFE_PATH" HOME="$HOME" TMPDIR="$TMPDIR" LANG=C.UTF-8 TZ=UTC TC_DEV_HOME="$DEV_HOME" \
@@ -249,9 +256,9 @@ EOF
         pids+=($!)
     done
     for p in "${pids[@]}"; do wait "$p" || failed=1; done
-    [ "$failed" = 0 ] || { for i in $(seq 1 "$n"); do tail -n 8 "$(inst_dir "$name" "$i")/login.log" >&2; done; die "seeding demo users failed"; }
+    [ "$failed" = 0 ] || { for i in $(seq "$first" "$last"); do tail -n 8 "$(inst_dir "$name" "$i")/login.log" >&2; done; die "seeding demo users failed"; }
     echo "seed_secs=$(elapsed "$t0")"
-    log "$n instance(s) of '$name' ready: web $(web_port 1)..$(web_port "$n"), admin $(admin_port 1)..$(admin_port "$n")"
+    log "$n instance(s) of '$name' ready: web $(web_port "$first")..$(web_port "$last"), admin $(admin_port "$first")..$(admin_port "$last")"
 }
 
 # ─────────────────────────────── check ──────────────────────────────
@@ -286,6 +293,8 @@ job_crawl() {   # k n port
 }
 job_mobile() { chk "$RES/mobile-p$1.log" "$KIT/check-mobile.mjs" "$3" --label "p$1" --out "$RES/mobile" --part "$1/$2" --no-shots $(skip_args); }
 job_scen() { chk "$RES/scen-$1.log" "$KIT/check-scenarios.mjs" "$3" --users "$4" --out "$RES/scenarios/u$1"; }
+# mcp: the real-browser MCP consent test (web/tests/mcp/browser-consent.mjs) on the first instance only.
+job_mcp() { chk "$RES/mcp-browser.log" "$src_web_tests/mcp/browser-consent.mjs" "$1" --out "$RES/mcp-browser"; }
 job_golden() { chk "$RES/golden-capture-$1.log" "$KIT/dash-golden.mjs" capture "$2" "$RES/golden/cand$1"; }
 
 cmd_check() {
@@ -329,6 +338,13 @@ cmd_check() {
             phase_job job_scen "$((idx + 1))" "$n" "$(web_port "${insts[$idx]}")" "$mine"
         done
         phase_end
+    fi
+    if [ "$what" = mcp ]; then
+        src_web_tests="$src/web/tests"
+        phase_start mcp
+        phase_job job_mcp "$(web_port "${insts[0]}")"
+        phase_end
+        cat "$RES/mcp-browser.log" >&2 || true
     fi
     if [ "$all" = 1 ] || [ "$what" = golden ]; then
         # Two captures of the same build in parallel (like base/base2 on the VPS: a stability sample), then

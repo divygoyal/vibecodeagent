@@ -4,7 +4,7 @@
 #   scripts/dev/worker1.sh sync  <worktree> [--name n]   rsync code to worker1, npm ci once per lockfile hash
 #   scripts/dev/worker1.sh build <name>                  production `next build` on worker1
 #   scripts/dev/worker1.sh up    <name> [N]              N instances (default 4): web 3201.., admin 8201.., fresh DB each
-#   scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden] [--golden-base dirA,dirB]
+#   scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden|mcp] [--golden-base dirA,dirB]
 #   scripts/dev/worker1.sh down  <name>
 #   scripts/dev/worker1.sh run   <worktree> [what] [N]   sync + build + up + check + down in one go
 #   scripts/dev/worker1.sh status | clean [--all]
@@ -87,7 +87,7 @@ cmd_check() {
     local name="${1:-}" what="all" gbase=""; validate_name "$name"; shift || true
     while [ $# -gt 0 ]; do
         case "$1" in
-            all|crawl|mobile|scenarios|golden) what="$1"; shift ;;
+            all|crawl|mobile|scenarios|golden|mcp) what="$1"; shift ;;
             --golden-base) gbase="$2"; shift 2 ;;
             *) die "unknown option $1" ;;
         esac

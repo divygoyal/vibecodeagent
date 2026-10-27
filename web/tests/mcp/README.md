@@ -45,6 +45,15 @@ cases from MCP.md 12.2 (bad Origin, GET/DELETE 405, wrong content type, header
 mismatch, unsupported version, unregistered redirect, `plain` PKCE, foreign
 resource, unknown scope, reused code, wrong verifier).
 
+### Real-browser consent test
+
+`flow.test.mjs` posts the consent form with `fetch()`, so it cannot see form bugs that only a browser has (a
+disabled button is left out of the form data, which once gave "Bad request: Unknown action"). `browser-consent.mjs`
+clicks the real buttons in Chromium on a dev instance: signed out "Use demo data instead", signed in "Allow" and
+"Cancel", then checks code + `iss`, the token exchange, `tools/list` and a tool call, and `error=access_denied`.
+On worker1: `scripts/dev/worker1.sh check <name> mcp` (needs `up`; not part of `all`). By hand, with the dev kit's
+`TC_PLAYWRIGHT_DIR`/`TC_CHROME` set and `login.mjs` run: `node web/tests/mcp/browser-consent.mjs <webPort> [--out dir]`.
+
 ## 3. MCP Inspector (CLI)
 
 Use a personal API key (or an OAuth access token from the flow above):
