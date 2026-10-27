@@ -6,6 +6,7 @@ Nothing here talks to production, Google, email, Telegram or payments.
 
 > **RAM rule: bring a server up, take shots, bring it down; never leave it idle.**
 > **Disk rule: delete your worktree's `web/.next` when your session of checks is done** (`rm -rf web/.next`; 0.4–1.4 GB each).
+> **Better: run the checks on worker1 instead (isolated, production build, 4 instances in parallel, nothing on this box): `WORKER1.md`.**
 > (Production runs on this box. Max 2 dev servers at once; `up.sh` refuses below 2.5 GB free RAM
 > or 3 GB free disk; `down.sh` deletes `web/.next` itself when / has under 8 GB free.)
 

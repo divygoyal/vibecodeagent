@@ -274,13 +274,17 @@ chk() {
         nice -n 10 node "$@" > "$logfile" 2>&1
 }
 # The jobs (each runs in its own subshell; they never abort on a failing check, the exit code is collected).
-job_crawl() {   # k n port [last]
+# /dashboard/styleguide is a development-only page: production answers it with notFound() (shown as the error
+# boundary), and in dev its skeleton demo is what made the VPS mobile run report loading=104. Skipped here unless
+# TC_W1_KEEP_STYLEGUIDE=1. (--part splits the route list after --skip, so every other page is still covered once.)
+skip_args() { [ "${TC_W1_KEEP_STYLEGUIDE:-0}" = 1 ] || echo "--skip /dashboard/styleguide"; }
+job_crawl() {   # k n port
     local k="$1" n="$2" port="$3" rc=0
-    chk "$RES/crawl-p$k.log" "$KIT/crawl.mjs" "$port" "$RES/crawl-demo/p$k" --part "$k/$n" --desktop-only || rc=1
+    chk "$RES/crawl-p$k.log" "$KIT/crawl.mjs" "$port" "$RES/crawl-demo/p$k" --part "$k/$n" --desktop-only $(skip_args) || rc=1
     if [ "$k" = "$n" ]; then chk "$RES/crawl-admin.log" "$KIT/crawl.mjs" "$port" "$RES/crawl-admin" --user admin --only /admin,/superadmin --desktop-only || rc=1; fi
     return "$rc"
 }
-job_mobile() { chk "$RES/mobile-p$1.log" "$KIT/check-mobile.mjs" "$3" --label "p$1" --out "$RES/mobile" --part "$1/$2" --no-shots; }
+job_mobile() { chk "$RES/mobile-p$1.log" "$KIT/check-mobile.mjs" "$3" --label "p$1" --out "$RES/mobile" --part "$1/$2" --no-shots $(skip_args); }
 job_scen() { chk "$RES/scen-$1.log" "$KIT/check-scenarios.mjs" "$3" --users "$4" --out "$RES/scenarios/u$1"; }
 job_golden() { chk "$RES/golden-capture-$1.log" "$KIT/dash-golden.mjs" capture "$2" "$RES/golden/cand$1"; }
 
