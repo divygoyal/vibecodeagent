@@ -29,3 +29,15 @@ Owner preview feedback, UI part. Checks run on worker1 (`scripts/dev/worker1.sh`
   `tc-portfolio-trend` = '1'/'0', read/write in try/catch). Picking a tile while collapsed opens the trend on it.
 - `AlertsPanel` moved under the sites (id `portfolio-alerts-panel`, focusable); the header subtitle ends with
   "N alerts ↓" (smooth scroll unless reduced motion). Cards keep their alert chips. Loading skeleton strip 60px.
+
+## 4. Bug: "Users (sum of sites)" skeleton forever
+- Evidence (preview web.log + admin.db, read-only): `[portfolio-sync] reason=page … due=0` every ~2 s, no
+  `[portfolio-users]` line ever, `portfolio_range_totals` empty; 3 GSC assets `siteUnverifiedUser` /
+  `no_access`, sync_started_at ~19 h old.
+- Cause: `needsSync()` counted those sites as due after 30 min (isDue on `no_access`), `runSync()` skips
+  unverified sites, so every poll started an empty sync -> `syncing` always true -> `usersPending` always true
+  and `startRangeUsers` (waits for `!syncing`) never ran -> tile `loading` forever.
+- Fix: one rule `dueAssets()` (isSyncable + isDue) for both. Range-users runs back off 5 min after any failure,
+  also a thrown 401 (it used to restart on every poll). The tile never shows a skeleton any more: summed daily
+  users with "≈" and a hover note until exact users land (`usersTotalTile` in lib/portfolio/view.ts).
+- Test: `tests/portfolioUsersTotal.test.mjs` (3 of 4 fail on the old code).

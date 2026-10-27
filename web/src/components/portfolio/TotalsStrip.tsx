@@ -11,6 +11,7 @@ import { fmtDateRange } from '@/lib/format';
 import { METRICS, type MetricKey } from '@/lib/metrics';
 import { addDays } from '@/lib/portfolio/ranges';
 import type { PortfolioResponse } from '@/lib/portfolio/types';
+import { usersTotalTile } from '@/lib/portfolio/view';
 
 export type TotalsMetric = 'clicks' | 'impressions' | 'position' | 'users' | 'sessions';
 
@@ -50,12 +51,9 @@ export function TotalsStrip({ data, metric, onMetricChange, comparisonLabel, dim
         if (m === 'position') return { metric: m, value: s?.cur.position, previous: s?.prev?.position ?? null };
         if (m === 'users') {
             // Each site's users are exact; across sites they add up (a visitor of two sites counts twice).
-            return {
-                metric: m, value: t?.cur.users, previous: t?.prev?.users ?? null,
-                label: total > 1 ? 'Users (sum of sites)' : 'Users',
-                hint: total > 1 ? 'Summed across sites: a visitor of two sites counts twice' : undefined,
-                loading: Boolean(data.usersPending && t && !t.cur.usersExact),
-            };
+            // Until every site has its exact count the tile shows the summed daily users with "≈", never a skeleton.
+            const tile = usersTotalTile(t, { usersPending: data.usersPending, siteCount: total });
+            return { metric: m, value: t?.cur.users, previous: t?.prev?.users ?? null, label: tile.label, hint: tile.hint, approx: tile.approx };
         }
         return { metric: m, value: t?.cur.sessions, previous: t?.prev?.sessions ?? null };
     });

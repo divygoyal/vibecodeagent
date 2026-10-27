@@ -280,10 +280,26 @@ function isDue(a: StoreAsset, nowS: number, force: boolean): boolean {
     return force || nowS - a.last_synced_at >= STALE_AFTER_S;
 }
 
+/**
+ * Search Console sites the user can see but is not verified for cannot be queried: the sync marks
+ * them "no access" and never fetches them. needsSync() and runSync() must agree on this. They did
+ * not (2026-10 preview): such a site was "due" on every page poll after 30 minutes, every poll
+ * started a sync that found nothing to do (due=0), `syncing` stayed true, and the exact-users job
+ * (which waits for the sync) never ran, so the "Users (sum of sites)" tile loaded forever.
+ */
+function isSyncable(a: StoreAsset): boolean {
+    return !(a.asset_kind === 'gsc' && a.permission_level === 'siteUnverifiedUser');
+}
+
+/** Assets a sync would fetch now (the same rule for the page check and the sync itself). */
+export function dueAssets(assets: StoreAsset[], nowS: number, force = false): StoreAsset[] {
+    return assets.filter((a) => isSyncable(a) && isDue(a, nowS, force));
+}
+
 /** True when some visible asset needs a sync (used on page open). */
 export function needsSync(assets: StoreAsset[], nowS: number = Math.floor(Date.now() / 1000)): boolean {
     if (assets.length === 0) return true;
-    return assets.some((a) => isDue(a, nowS, false));
+    return dueAssets(assets, nowS).length > 0;
 }
 
 function chunksFor(a: StoreAsset, end: string): { chunks: [string, string][]; backfill: boolean; horizon: string } {
@@ -351,7 +367,7 @@ async function runSync(opts: SyncOptions): Promise<SyncResult> {
     })));
     result.noAccess += noAccess.length;
 
-    const due = assets.filter((a) => !(a.asset_kind === 'gsc' && a.permission_level === 'siteUnverifiedUser') && isDue(a, nowS, Boolean(opts.force)));
+    const due = dueAssets(assets, nowS, Boolean(opts.force));
     result.due = due.length;
     await adminStore.updateStatus(identifier, due.map((a) => ({
         kind: a.asset_kind, asset_id: a.asset_id, status: 'syncing', last_error: a.last_error, sync_started_at: nowS,
@@ -491,29 +507,35 @@ async function runRangeUsers(opts: { identifier: string; accessToken: string; ra
     const w = opts.window;
     let failed = 0;
     let stored = 0;
-    await mapLimit(opts.properties, SYNC_CONCURRENCY, async (property) => {
-        try {
-            const report = await googlePost(fetchFn, `${GA_DATA}/${property}:runReport`, opts.accessToken,
-                ga4RangeUsersRequest({ start: w.cur_start, end: w.cur_end }, { start: w.prev_start, end: w.prev_end }));
-            const u = parseGa4RangeUsers(report as never);
-            // Store each property as it lands so cards fill in while the rest load.
-            await adminStore.upsertRangeTotals(opts.identifier, [{
-                kind: 'ga4', asset_id: property, range_key: opts.rangeKey, ...w,
-                active_users_cur: u.activeCur, active_users_prev: u.activePrev, total_users_cur: u.totalCur, total_users_prev: u.totalPrev,
-            }]);
-            stored += 1;
-        } catch (err) {
-            failed += 1;
-            if (err instanceof GoogleError && err.status === 401) throw err;
-        }
-    });
     const key = `${opts.identifier}|${opts.rangeKey}`;
-    if (failed > 0) {
+    // Any failure (also a 401 that ends the run early) backs off, so the page polls do not restart it every 2 s.
+    const backOff = () => {
         rangeFailedAt.set(key, Date.now());
         if (rangeFailedAt.size > 5000) rangeFailedAt.delete(rangeFailedAt.keys().next().value as string);
-    } else {
-        rangeFailedAt.delete(key);
+    };
+    try {
+        await mapLimit(opts.properties, SYNC_CONCURRENCY, async (property) => {
+            try {
+                const report = await googlePost(fetchFn, `${GA_DATA}/${property}:runReport`, opts.accessToken,
+                    ga4RangeUsersRequest({ start: w.cur_start, end: w.cur_end }, { start: w.prev_start, end: w.prev_end }));
+                const u = parseGa4RangeUsers(report as never);
+                // Store each property as it lands so cards fill in while the rest load.
+                await adminStore.upsertRangeTotals(opts.identifier, [{
+                    kind: 'ga4', asset_id: property, range_key: opts.rangeKey, ...w,
+                    active_users_cur: u.activeCur, active_users_prev: u.activePrev, total_users_cur: u.totalCur, total_users_prev: u.totalPrev,
+                }]);
+                stored += 1;
+            } catch (err) {
+                failed += 1;
+                if (err instanceof GoogleError && err.status === 401) throw err;
+            }
+        });
+    } catch (err) {
+        backOff();
+        throw err;
     }
+    if (failed > 0) backOff();
+    else rangeFailedAt.delete(key);
     console.log(
         `[portfolio-users] user=${opts.identifier} range=${opts.rangeKey} properties=${opts.properties.length}` +
         ` stored=${stored} failed=${failed} google_calls ga4=${calls.ga4} in ${Date.now() - started}ms`,
