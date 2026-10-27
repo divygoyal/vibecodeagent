@@ -52,3 +52,12 @@ Data: GA4 Data API + Search Console API only (no tracker). Shots for the blind j
   /api/connections under fempty (shell route, not WS2) (checks/scenarios.md).
 - 20 candidate shots retaken at 10:09-10:14 into round2/candidate/site/ (same names as critique-site-*), ?range=28d&compare=prev.
 - Server down, web/.next removed.
+
+## Judge fixes (e967f7d, verdict 14 W / 2 L / 2 T, ship-with-fixes)
+- Pages/Traffic>Pages: title cells width-capped (46vw on phones) so titles truncate with an ellipsis and Views shows at 390.
+- Trend bars share one scale across the rows on screen (TrendBars `max`); data checked per page (host+path x date).
+- CTR vs position: plain dots get a ring (visible on dark), axis title "Average position" under the ticks, legend has the
+  dotted "70% of usual" line.
+- Overview: Alerts is a full-width compact two-column strip; What to fix next shows its 3 cards side by side (xl).
+- /api/connections: admin failure now answers 200 `{ connectedProviders: [], degraded: true }` instead of 502.
+- Recaptured overview, search and pages (all 4 variants each) at 10:36-10:38.
