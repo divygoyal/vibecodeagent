@@ -4,11 +4,13 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
-import { MetricDelta, SegmentedControl, Select } from '@/components/ui';
+import { Favicon, MetricDelta, SegmentedControl, Select } from '@/components/ui';
+import { Sparkline } from '@/components/charts';
+import { Star } from 'lucide-react';
 import { SiteCard } from '@/components/portfolio/SiteCard';
 import { TotalsStrip, totalsMetrics, type TotalsMetric } from '@/components/portfolio/TotalsStrip';
 import { cn } from '@/lib/cn';
-import { fmtMetric, METRICS } from '@/lib/metrics';
+import { fmtMetric, METRICS, type MetricKey } from '@/lib/metrics';
 import { RANGE_LABEL } from '@/lib/portfolio/ranges';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite } from '@/lib/portfolio/types';
 import { filterSites, SORT_OPTIONS, sortSites, type FilterKey, type SortKey } from '@/lib/portfolio/view';
@@ -118,7 +120,8 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
             <div className="max-md:hidden">
                 <SegmentedControl<FilterKey> variant="neutral" size="sm" ariaLabel="Show" value={filter} onChange={setFilter} options={filterOptions(counts)} />
             </div>
-            <div role="radiogroup" aria-label="Show" className="flex flex-wrap gap-2 md:hidden">
+            {/* One row that scrolls sideways (fade at the edge), never wrapping into a stray chip. */}
+            <div role="radiogroup" aria-label="Show" className="-mx-3 flex gap-2 overflow-x-auto px-3 [mask-image:linear-gradient(to_right,black_85%,transparent)] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
                 {filterOptions(counts).map((o) => (
                     <button
                         key={o.value}
@@ -127,7 +130,7 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
                         aria-checked={filter === o.value}
                         onClick={() => setFilter(o.value)}
                         className={cn(
-                            'tap-area inline-flex h-8 items-center rounded-full border px-3 text-body-sm font-medium',
+                            'tap-area inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-body-sm font-medium whitespace-nowrap',
                             filter === o.value ? 'border-transparent bg-subtle text-fg' : 'border-border-subtle text-fg-secondary',
                         )}
                     >
@@ -137,9 +140,17 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
             </div>
 
             {shown.length ? (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
+                <>
+                {/* Phones: one compact row per site with the same two numbers each, so every row reads alike. */}
+                <ul className="flex flex-col gap-2 md:hidden">
+                    {shown.slice(0, 3).map((s) => (
+                        <li key={s.key}><PhoneSiteRow site={s} dates={data.dates} href={demoHref(`/dashboard/s/${encodeURIComponent(s.slug)}`)} /></li>
+                    ))}
+                </ul>
+                {/* The app's own cards from 768 px; the "GA4 linked" icon is hidden here (it crowds "Details"). */}
+                <div className="grid grid-cols-2 gap-4 max-md:hidden lg:grid-cols-3 [&_span:has(>svg[aria-label='GA4_linked'])]:hidden">
                     {shown.slice(0, SHOWN).map((s, i) => (
-                        <div key={s.key} className={cn('flex min-w-0 [&>article]:flex-1', i >= 2 && 'max-xl:hidden')}>
+                        <div key={s.key} className={cn('flex min-w-0 [&>article]:flex-1', i >= 2 && 'max-lg:hidden')}>
                             <SiteCard
                                 site={s}
                                 windows={data.windows}
@@ -153,6 +164,7 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
                         </div>
                     ))}
                 </div>
+                </>
             ) : (
                 <p className="rounded-card border border-dashed border-border p-8 text-center text-body text-fg-muted">
                     Star a site to pin it here.
@@ -185,14 +197,53 @@ function filterOptions(counts: { all: number; gsc: number; ga4: number; starred:
 function phoneTotals(data: PortfolioResponse) {
     const s = data.totals.search;
     const t = data.totals.traffic;
-    return [
-        { metric: 'clicks' as const, cur: s?.cur.clicks, prev: s?.prev?.clicks },
-        { metric: 'impressions' as const, cur: s?.cur.impressions, prev: s?.prev?.impressions },
-        { metric: 'users' as const, cur: t?.cur.users, prev: t?.prev?.users },
-        { metric: 'sessions' as const, cur: t?.cur.sessions, prev: t?.prev?.sessions },
-    ].filter((x) => x.cur !== undefined);
+    // Six tiles fill the 2-column grid evenly: the desktop strip's five plus CTR.
+    const tiles: Array<{ metric: MetricKey; cur: number | null | undefined; prev: number | null | undefined }> = [
+        { metric: 'clicks', cur: s?.cur.clicks, prev: s?.prev?.clicks },
+        { metric: 'impressions', cur: s?.cur.impressions, prev: s?.prev?.impressions },
+        { metric: 'ctr', cur: s?.cur.ctr, prev: s?.prev?.ctr },
+        { metric: 'position', cur: s?.cur.position, prev: s?.prev?.position },
+        { metric: 'users', cur: t?.cur.users, prev: t?.prev?.users },
+        { metric: 'sessions', cur: t?.cur.sessions, prev: t?.prev?.sessions },
+    ];
+    return tiles.filter((x) => x.cur !== undefined && x.cur !== null);
 }
 
 function Count({ n }: { n: number }) {
     return <span className="ml-1 text-fg-muted tabular-nums">{n}</span>;
+}
+
+/** A phone row: the site, two numbers (search clicks and users, or what the site has) and its trend. */
+function PhoneSiteRow({ site, dates, href }: { site: PortfolioSite; dates: PortfolioResponse['dates']; href: string }) {
+    const sr = site.search;
+    const tr = site.traffic;
+    const stats: Array<{ metric: MetricKey; cur: number; prev: number | null | undefined }> = [];
+    if (sr) stats.push({ metric: 'clicks', cur: sr.cur.clicks, prev: sr.prev?.clicks });
+    if (tr) stats.push({ metric: 'users', cur: tr.cur.users, prev: tr.prev?.users });
+    if (stats.length < 2 && sr) stats.push({ metric: 'impressions', cur: sr.cur.impressions, prev: sr.prev?.impressions });
+    if (stats.length < 2 && tr) stats.push({ metric: 'sessions', cur: tr.cur.sessions, prev: tr.prev?.sessions });
+    const spark = sr
+        ? { s: [{ metric: 'clicks' as const, values: site.series.clicks ?? [] }], d: dates.search }
+        : { s: [{ metric: 'users' as const, values: site.series.users ?? [] }], d: dates.traffic };
+    return (
+        <Link href={href} className="block rounded-card border border-border-subtle bg-surface p-3 shadow-xs">
+            <span className="flex items-center gap-2">
+                <Favicon host={site.host || site.label} size={16} />
+                <span className="min-w-0 flex-1 truncate text-body font-semibold text-fg">{site.label}</span>
+                {site.starred ? <Star aria-label="Starred" size={14} strokeWidth={1.75} className="shrink-0 fill-star text-star" /> : null}
+            </span>
+            <span className="mt-2 grid grid-cols-2 gap-x-3">
+                {stats.slice(0, 2).map((st) => (
+                    <span key={st.metric} className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
+                        <span className="text-body font-semibold text-fg tabular-nums">{fmtMetric(st.metric, st.cur, { compact: true })}</span>
+                        <span className="text-meta text-fg-muted">{METRICS[st.metric].short}</span>
+                        {st.prev !== null && st.prev !== undefined ? <MetricDelta metric={st.metric} current={st.cur} previous={st.prev} /> : null}
+                    </span>
+                ))}
+            </span>
+            <span className="mt-2 block">
+                <Sparkline series={spark.s} dates={spark.d} height={36} interactive={false} />
+            </span>
+        </Link>
+    );
 }

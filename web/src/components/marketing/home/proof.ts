@@ -80,3 +80,17 @@ export function boardRowsFor<T extends { host: string | null }>(rows: T[], testS
     if (!testServer) return { rows: rows.filter((r) => !isSampleHost(r.host)), sample: false };
     return { rows, sample: sampleRows.length > 0 };
 }
+
+/** One leaderboard row as the home page shows it (from the public API, or the demo generator on a test server). */
+export interface BoardPreviewRow {
+    key: string;
+    rank: number;
+    href: string;
+    name: string;
+    host: string | null;
+    category: string | null;
+    visitors: string | null;
+    deltaPct: number | null;
+    spark: number[] | null;
+    verified: boolean;
+}

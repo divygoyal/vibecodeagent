@@ -21,7 +21,7 @@ export function WhyFree() {
                 <div>
                     <p className="mb-2 text-body-sm font-medium text-brand-text">Why free?</p>
                     <h2 id="why-free-title" className="text-balance text-heading text-fg md:text-heading-lg">Most of it costs us very little to run</h2>
-                    <Link href="/pricing" className="tap-area mt-3 inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary hover:text-fg">
+                    <Link href="/pricing" className="tap-area mt-3 inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary hover:text-fg max-lg:hidden">
                         See pricing <ArrowRight aria-hidden size={14} strokeWidth={1.75} />
                     </Link>
                 </div>
@@ -38,6 +38,10 @@ export function WhyFree() {
                         </li>
                     ))}
                 </ul>
+                {/* Phones and tablets: the link after the reasons, not between heading and list. */}
+                <Link href="/pricing" className="tap-area inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary hover:text-fg lg:hidden">
+                    See pricing <ArrowRight aria-hidden size={14} strokeWidth={1.75} />
+                </Link>
             </div>
         </section>
     );

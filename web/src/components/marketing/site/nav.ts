@@ -35,7 +35,7 @@ export const FOOTER_COLUMNS: Array<{ title: string; links: NavLink[] }> = [
     {
         title: 'Resources',
         links: [
-            { label: 'Connect AI (ChatGPT & Claude)', href: '/ai' },
+            { label: 'Connect AI', href: '/ai' },
             { label: 'Free SEO tools', href: '/tools' },
             { label: 'llms.txt', href: '/llms.txt' },
         ],

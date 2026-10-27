@@ -29,7 +29,7 @@ export function FinalCta({
                     <h2 id="final-cta-title" className="mx-auto max-w-[720px] text-balance text-[1.875rem] leading-9 font-semibold tracking-[-0.025em] md:text-display-sm">
                         {title}
                     </h2>
-                    <p className="mx-auto mt-4 max-w-[640px] text-balance text-lead opacity-80">{description}</p>
+                    <p className="mx-auto mt-4 max-w-[640px] text-balance text-lead opacity-80 dark:opacity-100">{description}</p>
                     <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                         <ConnectGoogleButton
                             size="xl"

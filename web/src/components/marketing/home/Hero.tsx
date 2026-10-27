@@ -56,7 +56,7 @@ export function HeroCopy({ demoHref }: { demoHref: string }) {
                     <Link href={demoHref}>{SECONDARY_CTA}</Link>
                 </Button>
             </div>
-            <ul aria-label="The basics" className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-body-sm text-fg-muted">
+            <ul aria-label="The basics" className="mx-auto mt-5 grid w-fit grid-cols-2 gap-x-5 gap-y-1.5 text-left text-body-sm text-fg-muted sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-4">
                 {TRUST.map((t) => (
                     <li key={t} className="inline-flex items-center gap-1.5">
                         <Check aria-hidden size={14} strokeWidth={2.5} className="text-brand-text" />
