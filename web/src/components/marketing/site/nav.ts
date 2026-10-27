@@ -21,6 +21,7 @@ export const FOOTER_COLUMNS: Array<{ title: string; links: NavLink[] }> = [
             { label: 'Dashboards', href: '/#dashboards' },
             { label: 'Live demo', href: '/demo' },
             { label: 'Pricing', href: '/pricing' },
+            { label: 'Changelog', href: '/changelog' },
         ],
     },
     {
@@ -44,6 +45,7 @@ export const FOOTER_COLUMNS: Array<{ title: string; links: NavLink[] }> = [
         links: [
             { label: 'About', href: '/about' },
             { label: 'Contact', href: '/contact' },
+            { label: 'Security & data', href: '/security' },
             { label: 'Privacy', href: '/privacy' },
             { label: 'Terms', href: '/terms' },
         ],

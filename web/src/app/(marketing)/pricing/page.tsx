@@ -30,7 +30,7 @@ type Cell = boolean | string;
 const ROWS: Array<{ label: string; free: Cell; growth: Cell; pro: Cell }> = [
     { label: 'Sites', free: 'No limit', growth: 'No limit', pro: 'No limit' },
     { label: 'Portfolio of all your sites', free: true, growth: true, pro: true },
-    { label: 'Traffic, search, actions and audit pages', free: true, growth: true, pro: true },
+    { label: 'Site pages: Traffic, Search, What to fix next, Audit', free: true, growth: true, pro: true },
     { label: 'Dashboards, public links and embeds', free: true, growth: true, pro: true },
     { label: 'Public leaderboard profile', free: true, growth: true, pro: true },
     { label: 'ChatGPT & Claude connector (MCP)', free: true, growth: true, pro: true },
@@ -51,7 +51,7 @@ const productSchema = PAID_PLANS.map((p) => ({
 function CellView({ value }: { value: Cell }) {
     if (value === true) return <Check aria-label="Included" size={16} strokeWidth={2} className="mx-auto text-up" />;
     if (value === false) return <Minus aria-label="Not applicable" size={16} strokeWidth={1.75} className="mx-auto text-fg-faint" />;
-    return <span className="text-body tabular-nums text-fg">{value}</span>;
+    return <span className="inline-block text-body-sm tabular-nums text-fg sm:text-body">{value}</span>;
 }
 
 export default function PricingPage() {
@@ -75,6 +75,14 @@ export default function PricingPage() {
                     <div className="mt-6">
                         <PricingPlans />
                     </div>
+                    <p className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-meta text-fg-muted">
+                        <span>Every plan:</span>
+                        <Link href="/security" className="tap-area underline decoration-border-strong decoration-dotted underline-offset-4 hover:text-fg hover:decoration-solid">read-only Google access</Link>
+                        <span aria-hidden>·</span>
+                        <span>nothing to install</span>
+                        <span aria-hidden>·</span>
+                        <span>no site limit</span>
+                    </p>
 
                     <div className="mt-6 flex flex-col gap-4 rounded-card border border-border-subtle bg-surface p-5 shadow-card sm:flex-row sm:items-center">
                         <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-control bg-brand-soft text-brand-soft-fg">
@@ -96,23 +104,23 @@ export default function PricingPage() {
             <Section tone="surface" labelledBy="compare-title">
                 <SectionHeading id="compare-title" title="Compare plans" description="The only difference between plans is the number of Ask messages." />
                 <div className="mt-8 overflow-x-auto rounded-card border border-border-subtle bg-surface shadow-card">
-                    <table className="w-full min-w-[560px] text-left">
+                    <table className="w-full text-left sm:min-w-[560px]">
                         <caption className="sr-only">Features by plan</caption>
                         <thead className="sticky top-0 bg-surface-sunken">
                             <tr className="border-b border-border-subtle text-body-sm text-fg-muted">
-                                <th scope="col" className="px-4 py-3 font-medium">Feature</th>
-                                <th scope="col" className="w-[22%] px-4 py-3 text-center font-medium">Free</th>
-                                <th scope="col" className="w-[22%] px-4 py-3 text-center font-medium">{growth.name} · ${growth.priceUsd}</th>
-                                <th scope="col" className="w-[22%] px-4 py-3 text-center font-medium">{pro.name} · ${pro.priceUsd}</th>
+                                <th scope="col" className="px-3 py-3 font-medium sm:px-4">Feature</th>
+                                <th scope="col" className="w-[21%] px-1.5 py-3 text-center font-medium sm:w-[22%] sm:px-4">Free</th>
+                                <th scope="col" className="w-[21%] px-1.5 py-3 text-center font-medium sm:w-[22%] sm:px-4">{growth.name}<span className="hidden sm:inline"> · ${growth.priceUsd}</span></th>
+                                <th scope="col" className="w-[21%] px-1.5 py-3 text-center font-medium sm:w-[22%] sm:px-4">{pro.name}<span className="hidden sm:inline"> · ${pro.priceUsd}</span></th>
                             </tr>
                         </thead>
                         <tbody>
                             {ROWS.map((row) => (
                                 <tr key={row.label} className="border-b border-border-subtle last:border-b-0">
-                                    <th scope="row" className="px-4 py-3 text-body font-normal text-fg">{row.label}</th>
-                                    <td className="px-4 py-3 text-center"><CellView value={row.free} /></td>
-                                    <td className="px-4 py-3 text-center"><CellView value={row.growth} /></td>
-                                    <td className="px-4 py-3 text-center"><CellView value={row.pro} /></td>
+                                    <th scope="row" className="px-3 py-3 text-body-sm font-normal text-fg sm:px-4 sm:text-body">{row.label}</th>
+                                    <td className="px-1.5 py-3 text-center sm:px-4"><CellView value={row.free} /></td>
+                                    <td className="px-1.5 py-3 text-center sm:px-4"><CellView value={row.growth} /></td>
+                                    <td className="px-1.5 py-3 text-center sm:px-4"><CellView value={row.pro} /></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -128,7 +136,7 @@ export default function PricingPage() {
                         <p className="mt-0.5 text-body text-fg-secondary">Sponsor slots on the public leaderboard are always labelled “Sponsored”.</p>
                     </div>
                     <Button asChild variant="secondary" trailingIcon={<ArrowRight aria-hidden size={16} strokeWidth={1.75} />} className="self-start sm:self-auto">
-                        <Link href="/sponsor">See sponsor slots</Link>
+                        <Link href="/leaderboard/advertise">See sponsor slots</Link>
                     </Button>
                 </div>
             </Section>

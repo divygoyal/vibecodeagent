@@ -14,6 +14,7 @@ export function ContentPage({
     meta,
     children,
     footer,
+    wide = false,
 }: {
     title: ReactNode;
     /** Breadcrumb label for this page. */
@@ -22,10 +23,12 @@ export function ContentPage({
     meta?: ReactNode;
     children: ReactNode;
     footer?: ReactNode;
+    /** 880px instead of 720px, for pages with tables (Security and data). */
+    wide?: boolean;
 }) {
     return (
         <div className="bg-canvas">
-            <div className="mx-auto max-w-[720px] px-4 pt-10 pb-16 md:px-6 md:pt-16 md:pb-24">
+            <div className={cn('mx-auto px-4 pt-10 pb-16 md:px-6 md:pt-16 md:pb-24', wide ? 'max-w-[880px]' : 'max-w-[720px]')}>
                 <nav aria-label="Breadcrumb" className="mb-8">
                     <ol className="flex items-center gap-2 text-body-sm text-fg-muted">
                         <li><Link href="/" className="tap-area inline-block hover:text-fg">Home</Link></li>

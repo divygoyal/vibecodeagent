@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
@@ -6,10 +7,13 @@ import { ConnectGoogleButton } from './ConnectGoogleButton';
 /** The only large brand-colour block on the site (DESIGN 5.16). */
 export function FinalCta({
     title = 'See every site you own on one screen.',
-    description = 'Connect Google once. Read-only, no card, no site limit.',
+    description = <>Connect Google once. <span className="whitespace-nowrap">Read-only</span>, nothing to install, no card, no site limit.</>,
+    secondary = { href: '/demo', label: 'See the live demo' },
 }: {
     title?: string;
-    description?: string;
+    description?: ReactNode;
+    /** The outline link next to Connect Google (the demo page points elsewhere). */
+    secondary?: { href: string; label: string };
 }) {
     return (
         <section aria-labelledby="final-cta-title" className="bg-canvas py-16 md:py-24">
@@ -18,7 +22,7 @@ export function FinalCta({
                     <h2 id="final-cta-title" className="mx-auto max-w-[720px] text-balance text-[1.875rem] leading-9 font-semibold tracking-[-0.025em] md:text-display-sm">
                         {title}
                     </h2>
-                    <p className="mx-auto mt-4 max-w-[560px] text-lead opacity-80">{description}</p>
+                    <p className="mx-auto mt-4 max-w-[640px] text-balance text-lead opacity-80">{description}</p>
                     <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                         <ConnectGoogleButton
                             size="xl"
@@ -27,10 +31,10 @@ export function FinalCta({
                             className="w-full border-transparent sm:w-auto"
                         />
                         <Link
-                            href="/demo"
+                            href={secondary.href}
                             className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-body-lg font-medium text-brand-fg ring-1 ring-white/30 transition-colors duration-120 hover:bg-white/10 sm:w-auto"
                         >
-                            See the live demo
+                            {secondary.label}
                             <ArrowRight aria-hidden size={18} strokeWidth={1.75} />
                         </Link>
                     </div>
