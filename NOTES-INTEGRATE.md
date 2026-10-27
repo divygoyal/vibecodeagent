@@ -100,8 +100,7 @@ The worktree is shared with a robustness agent: commit with `git commit -- <path
   embed gating/preview, dd81510 star label/badges/Export CSV, 6cb49b9 pinned sidebar account block + one skip
   link, a9ccd61 /dashboard/site, d6c85af Actions "Show more", 1775eef collapsed preview on phones, 5f4ec28 nav +
   nowrap ranges, de8cbf2 Connect AI URL once, 77ebc56 superadmin wording.
-- Still open: QA-01 (dev-only 500 on `/?callbackUrl=` + "dashboard"/"leaderboard": Next dev; production preview
-  200), QA-18 (dev-only, unreproducible hydration warning), QA-22 (product call), QA-17 (robustness agent).
+- Still open: QA-22 (product call), QA-17 (robustness agent). QA-01 and QA-18: see "QA-01 and QA-18" below.
 - Also: 4438622 /admin shows "Admins only" to non-admins; e9b7746 Select/menus in sheets (z-75) + Tawk hidden
   under sheets; 245b9bd light welcome + Google banner; 154a91d first sync registers the user; a265184 no
   container polling (/api/connections).
@@ -117,10 +116,30 @@ after a Turbopack panic. Admin changes are also covered by the migration-upgrade
   mid-load (ChunkLoadError / connection reset; clean on re-run and on mobile).
 - admin: /admin and /superadmin 0 problems.
 - /dashboard/s/** checked for a GA4+GSC site, a GSC-only site and a GA4-only site (ga4-<id>): all 200, 0 problems.
-- Known dev-only issues: `/?callbackUrl=` with "dashboard"/"leaderboard" in it 500s on next dev (QA-01; the
-  production preview answers 200), and an occasional first-load hydration-attribute warning (QA-18). next dev
-  restarts itself under memory pressure during full crawls (19 times this session), which shows up as
-  connection resets.
+- Known dev-only issues: next dev restarts itself under memory pressure during full crawls (19 times this
+  session), which shows up as connection resets. (QA-01 and QA-18 are resolved, see below.)
+
+## QA-01 and QA-18 (2026-10-27)
+- QA-01, aba2bbe, our bug: `Button`'s renderIcon treated anything that is not a valid element as a component.
+  `trailingIcon={<ArrowRight />}` from a Server Component can arrive as an RSC lazy node (`"$L<id>"` when that
+  row is not ready yet, `"$<id>"` when it is), so `<Icon />` made React resolve the lazy as an element type and
+  get the `<svg>` element ("Lazy element type must resolve to a class or function", 500). RSC timing, which the
+  query length shifts, decides `$L` vs `$`; production prerenders `/`, but any dynamic page could hit it. Found by
+  hooking react-dom's lazy error in Playwright (pendingProps = renderIcon's `{aria-hidden,size:18,strokeWidth}`).
+  Fix: components/ui/iconProp.ts `isIconComponent` (function/forwardRef/memo only), tests/iconProp.test.mjs.
+  Check: `/?callbackUrl=` + /dashboard, /dashboard/analytics, /ask, /dashboards, /s/nope, /leaderboard all 200;
+  `/?foo=/x...` lengths 1-60 all 200; no console errors in the browser.
+- QA-18, not a code bug: a dev race. Reproduced the exact warning on demand (EmptyState className diff) by
+  holding the page's JS chunks, editing a component, letting another request rebuild, then releasing: the HTML
+  came from the old file and the same chunk URLs served the new one. QA hit it at 20:05-20:07 during the
+  tc/sweep merge, the robustness crawl at 20:16 right after the legacy-shell removal. On stable code: 0 warnings
+  in 120+ fresh 390px loads of traffic?tab=realtime, ?tab=journeys and /pages (light, dark, 6x CPU, random
+  chunk/API delays). Crawl while nobody edits the worktree, or re-load once after edits.
+- Found on the way, ccf193f: the server render and first client render of every /dashboard/s/<host> page showed
+  "We couldn't find <host>" until the session loaded (no session on the server => no Google => empty directory
+  "loaded"), and cleared the tc_site cookie in that window. siteDirectoryLoading now stays true until the session
+  and /api/connections say whether Google is connected; unknown hosts and GitHub-only users still get the
+  not-found state after load.
 
 ## Migration upgrade check (019-023)
 `/root/.trafficclaw-dev/venv/bin/python scripts/dev/check_migrations.py` (own throwaway admins on 8130/8131, temp dir,
