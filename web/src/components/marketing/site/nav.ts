@@ -17,8 +17,8 @@ export const FOOTER_COLUMNS: Array<{ title: string; links: NavLink[] }> = [
     {
         title: 'Product',
         links: [
-            { label: 'Portfolio', href: '/#product' },
-            { label: 'Dashboards', href: '/#dashboards' },
+            { label: 'Portfolio', href: '/#tour-portfolio' },
+            { label: 'Dashboards', href: '/#tour-dashboards' },
             { label: 'Live demo', href: '/demo' },
             { label: 'Pricing', href: '/pricing' },
             { label: 'Changelog', href: '/changelog' },

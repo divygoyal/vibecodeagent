@@ -42,6 +42,9 @@ export function JobStory({ totalSites, sites, drop, fix, fixHref }: StoryProps) 
         if (!el || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || typeof IntersectionObserver === 'undefined') return;
         const timers: number[] = [];
         let played = false;
+        // Rewind as soon as the page is interactive (the section is normally still below the fold), so the
+        // beats are hidden before anyone sees them and then play in order.
+        const rewind = window.requestAnimationFrame(() => { if (!played) setStep(0); });
         const play = () => {
             setStep(0);
             [1, 2, 3].forEach((s) => timers.push(window.setTimeout(() => setStep(s), 250 + (s - 1) * STEP_MS)));
@@ -53,10 +56,10 @@ export function JobStory({ totalSites, sites, drop, fix, fixHref }: StoryProps) 
                 io.disconnect();
             }
         }, { threshold: 0.45 });
-        // Above the fold already (short screens): play right away; otherwise wait until it is seen.
         io.observe(el);
         return () => {
             io.disconnect();
+            window.cancelAnimationFrame(rewind);
             timers.forEach((t) => window.clearTimeout(t));
         };
     }, [run]);

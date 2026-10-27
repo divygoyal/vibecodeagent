@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, Check, LayoutGrid, ListChecks, MessagesSquare, PanelsTopLeft, PanelTop, Sparkles, Trophy, type LucideIcon } from 'lucide-react';
@@ -50,6 +50,28 @@ export function FeatureTour({ stops }: { stops: TourStop[] }) {
     const refs = useRef<(HTMLButtonElement | null)[]>([]);
     const stop = stops[active];
 
+    // Deep links such as /#tour-dashboards (footer, other pages) open that tab.
+    useEffect(() => {
+        const open = (hash: string) => {
+            const m = /#tour-([a-z]+)$/.exec(hash);
+            const i = m ? stops.findIndex((s) => s.key === m[1]) : -1;
+            if (i >= 0) setActive(i);
+        };
+        const fromHash = () => open(window.location.hash);
+        // Next's <Link> changes the hash with pushState, which fires no hashchange: watch those clicks too.
+        const onClick = (e: MouseEvent) => {
+            const a = (e.target as Element | null)?.closest?.('a[href*="#tour-"]');
+            if (a) open(a.getAttribute('href') ?? '');
+        };
+        fromHash();
+        window.addEventListener('hashchange', fromHash);
+        document.addEventListener('click', onClick);
+        return () => {
+            window.removeEventListener('hashchange', fromHash);
+            document.removeEventListener('click', onClick);
+        };
+    }, [stops]);
+
     const onKey = (e: KeyboardEvent, i: number) => {
         let next = -1;
         if (e.key === 'ArrowRight') next = (i + 1) % stops.length;
@@ -64,7 +86,8 @@ export function FeatureTour({ stops }: { stops: TourStop[] }) {
     };
 
     return (
-        <div>
+        <div className="relative">
+            {stops.map((s) => <span key={s.key} id={`tour-${s.key}`} aria-hidden className="absolute -top-24" />)}
             <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
                 <div role="tablist" aria-label="Product tour" className="flex w-max gap-2 md:mx-auto md:flex-wrap md:justify-center">
                     {stops.map((s, i) => {
