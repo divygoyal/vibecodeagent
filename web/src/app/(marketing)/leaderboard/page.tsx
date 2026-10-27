@@ -11,7 +11,7 @@ import { CategoryGrid } from '@/components/leaderboard/CategoryGrid';
 import { SITE_ORIGIN, TABS } from '@/lib/leaderboard/constants';
 import { fmtFull } from '@/lib/format';
 import { getBoard, parseRange, parseTab } from '@/lib/leaderboard/server';
-import { timeAgo } from '@/lib/leaderboard/format';
+import { freshness } from '@/lib/leaderboard/format';
 import { jsonLdString } from '@/lib/leaderboard/jsonld';
 
 // Cached 60 s by the data fetch; the page itself renders per request (it reads the URL).
@@ -61,6 +61,8 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
     clearParams.delete('q');
     const clearHref = clearParams.toString() ? `/leaderboard?${clearParams}` : '/leaderboard';
     const blurb = TABS.find((t) => t.value === tab)?.blurb;
+    // Honest freshness: "checked daily" only while the numbers really are from the last day or so.
+    const fresh = freshness(data.updated_at);
 
     const itemList = {
         '@context': 'https://schema.org',
@@ -80,7 +82,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
 
             <header>
                 <span className="inline-flex h-6 items-center gap-1 rounded-full bg-brand-soft px-2.5 text-meta font-semibold text-brand-soft-fg">
-                    <ShieldCheck aria-hidden size={14} strokeWidth={1.75} /> Verified owners, checked daily
+                    <ShieldCheck aria-hidden size={14} strokeWidth={1.75} /> {fresh.level === 'fresh' ? 'Verified owners, checked daily' : 'Verified owners'}
                 </span>
                 <h1 className="mt-3 text-heading-lg text-fg md:text-display-sm">The verified traffic leaderboard</h1>
                 <p className="mt-2 max-w-[640px] text-body-lg text-fg-secondary">
@@ -97,7 +99,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
             <div className="mt-8">
                 <Suspense fallback={null}>
                     <BoardControls tab={tab} range={range} category={category} q={q} categories={data.categories}>
-                        {blurb ? <p className="mb-3 text-body-sm text-fg-muted">{blurb}{data.updated_at ? ` · updated ${timeAgo(data.updated_at)}` : ''}</p> : null}
+                        {blurb || fresh.text ? <p className="mb-3 text-body-sm text-fg-muted">{[blurb, fresh.text].filter(Boolean).join(' · ')}</p> : null}
                         {tab === 'categories' && data.category_cards ? (
                             <CategoryGrid cards={data.category_cards} range={range} />
                         ) : (

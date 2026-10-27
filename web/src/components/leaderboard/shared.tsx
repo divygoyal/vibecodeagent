@@ -72,7 +72,8 @@ export function Ga4Badge({ className }: { className?: string }) {
 
 /** Percent change from a ready-made delta (the API sends percentages, not both periods). */
 export function PctDelta({ pct, size = 'sm', variant = 'text', comparisonLabel }: { pct: number | null | undefined; size?: 'sm' | 'md'; variant?: 'text' | 'chip'; comparisonLabel?: string }) {
-    if (pct === null || pct === undefined) return <span className="text-meta text-fg-faint">new</span>;
+    // No previous period to compare with: show nothing. ("new" read as a claim about the site and was wrong on listings months old.)
+    if (pct === null || pct === undefined) return null;
     return <MetricDelta metric="users" current={100 + pct} previous={100} size={size} variant={variant} comparisonLabel={comparisonLabel} />;
 }
 
@@ -97,7 +98,8 @@ export function CountValue({ m, className, bold = true }: { m: CountMetric | nul
 
 export function RowSpark({ spark, height = 28, className }: { spark: SparkData | null; height?: number; className?: string }) {
     if (!spark || spark.values.filter((v) => v !== null).length < 2) {
-        return <span className="text-meta text-fg-faint">No trend</span>;
+        // Still collecting: one dash, not a sentence repeated on every row. (The board drops the whole column when no row has a trend.)
+        return <span className="text-meta text-fg-faint" title="Not enough daily data yet" aria-label="No trend yet">–</span>;
     }
     const metric: MetricKey = spark.metric === 'clicks' ? 'clicks' : 'users';
     return (
