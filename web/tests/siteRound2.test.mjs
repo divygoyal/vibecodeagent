@@ -8,7 +8,7 @@ import test from 'node:test';
 const { sourceInfo, sourceMediumInfo, deviceLabel, geoLabel } = await import('../src/components/site/lib/sources.ts');
 const { parseFilterParams, filtersToParams, ga4DimensionFilter, andFilters, cleanFilters, hasFilters } = await import('../src/components/site/lib/filters.ts');
 const { bucketStart, isoWeekMonday, gaBucketDate, bucketDates, snapToBucket, bucketGscSeries, effectiveInterval, allowedIntervals } = await import('../src/components/site/lib/intervals.ts');
-const { trendFinding, peakHoursFinding, peakWindow, hourRange, overlayFinding, ctrBenchmarkFinding, geoFinding, topDriver } = await import('../src/components/site/lib/findings.ts');
+const { trendFinding, rateFinding, peakHoursFinding, peakWindow, hourRange, overlayFinding, ctrBenchmarkFinding, geoFinding, topDriver } = await import('../src/components/site/lib/findings.ts');
 const { GOOGLE_UPDATES, googleUpdatesIn, googleUpdateOn } = await import('../src/components/site/lib/googleUpdates.ts');
 
 test('source names and favicon domains', () => {
@@ -122,6 +122,13 @@ test('trend findings name the change and its biggest driver', () => {
     assert.equal(topDriver([{ label: 'a', cur: 5, prev: 10 }], 1), null);
 });
 
+test('CTR and position findings use points and positions', () => {
+    assert.equal(rateFinding({ metric: 'ctr', cur: 0.031, prev: 0.03, compareText: 'previous 28 days' }).text, 'CTR up 0.1 pt to 3.1% vs previous 28 days.');
+    assert.equal(rateFinding({ metric: 'position', cur: 16.8, prev: 17.2 }).text, 'Average position improved from 17.2 to 16.8.');
+    assert.equal(rateFinding({ metric: 'position', cur: 16.8, prev: 15 }).tone, 'bad');
+    assert.equal(rateFinding({ metric: 'position', cur: 0 }), null);
+});
+
 test('peak hours finding', () => {
     const grid = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 1));
     grid[3][14] = 10;
@@ -139,7 +146,8 @@ test('peak hours finding', () => {
 test('overlay, CTR benchmark and geo findings', () => {
     const clicks = [10, 20, 30, 40, 50, 60];
     const sessions = clicks.map((c) => c * 1.3);
-    assert.match(overlayFinding(clicks, sessions).text, /1\.3× Google clicks .*move together/);
+    assert.match(overlayFinding(clicks, sessions).text, /1\.3× as many Google organic sessions as Search Console clicks and they move together/);
+    assert.match(overlayFinding(clicks, clicks.map((c) => c * 0.6)).text, /60% as many/);
     assert.equal(overlayFinding([0, 0], [0, 0]), null);
     assert.match(ctrBenchmarkFinding([{ potential: 600 }, { potential: 640 }], 40).text, /^2 of 40 queries get fewer clicks than usual for their position: about \+1,240 clicks/);
     assert.equal(ctrBenchmarkFinding([], 12).tone, 'good');

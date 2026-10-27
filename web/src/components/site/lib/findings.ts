@@ -101,6 +101,27 @@ export function trendFinding(input: TrendInput): Finding | null {
     return null;
 }
 
+/** CTR (points) and average position (absolute) read better than a percent change. */
+export function rateFinding(input: { metric: 'ctr' | 'position'; cur: number | null | undefined; prev?: number | null; compareText?: string }): Finding | null {
+    const { metric, cur, prev, compareText } = input;
+    if (cur === null || cur === undefined || !Number.isFinite(cur) || cur <= 0 && metric === 'position') return null;
+    const vs = compareText ? ` vs ${compareText}` : '';
+    const now = metric === 'ctr' ? `${(cur * 100).toFixed(1)}%` : cur.toFixed(1);
+    if (prev === undefined || prev === null || !Number.isFinite(prev) || (metric === 'position' && prev <= 0)) {
+        return { text: metric === 'ctr' ? `CTR is ${now} in this period.` : `Average position is ${now} in this period.`, tone: 'info' };
+    }
+    if (metric === 'ctr') {
+        const pts = (cur - prev) * 100;
+        if (Math.abs(pts) < 0.05) return { text: `CTR steady at ${now}${vs}.`, tone: 'flat' };
+        return { text: `CTR ${pts > 0 ? 'up' : 'down'} ${Math.abs(pts).toFixed(1)} pt to ${now}${vs}.`, tone: pts > 0 ? 'good' : 'bad' };
+    }
+    const d = cur - prev;
+    if (Math.abs(d) < 0.1) return { text: `Average position steady at ${now}${vs}.`, tone: 'flat' };
+    return d < 0
+        ? { text: `Average position improved from ${prev.toFixed(1)} to ${now}${vs}.`, tone: 'good' }
+        : { text: `Average position slipped from ${prev.toFixed(1)} to ${now}${vs}.`, tone: 'bad' };
+}
+
 // ─── Peak hours ───────────────────────────────────────────────────────────
 
 const DAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
@@ -189,7 +210,7 @@ export function correlation(a: number[], b: number[]): number | null {
     return num / Math.sqrt(da * db);
 }
 
-/** "Organic sessions are 1.3× Google clicks and move with them." */
+/** "GA4 counts 1.3× as many Google organic sessions as Search Console clicks and they move together." */
 export function overlayFinding(clicks: number[], sessions: number[]): Finding | null {
     const c = clicks.reduce((a, b) => a + b, 0);
     const s = sessions.reduce((a, b) => a + b, 0);
@@ -200,10 +221,10 @@ export function overlayFinding(clicks: number[], sessions: number[]): Finding | 
     const ratio = s / c;
     const together = r === null ? '' : r >= 0.7 ? ' and they move together' : r < 0.3 ? ', but they do not move together: check the GA4 tag and consent banner' : '';
     const ratioText = ratio >= 1.05
-        ? `GA4 organic sessions are ${ratio.toFixed(1)}× Google clicks (other search engines count too)`
+        ? `GA4 counts ${ratio.toFixed(1)}× as many Google organic sessions as Search Console clicks`
         : ratio <= 0.8
-            ? `GA4 counts ${Math.round(ratio * 100)}% as many organic sessions as Google clicks (consent and ad blockers hide some)`
-            : 'GA4 organic sessions roughly match Google clicks';
+            ? `GA4 counts ${Math.round(ratio * 100)}% as many Google organic sessions as Search Console clicks (consent banners and ad blockers hide some visits)`
+            : 'GA4 Google organic sessions closely match Search Console clicks';
     return { text: `${ratioText}${together}.`, tone: r !== null && r < 0.3 ? 'bad' : 'info' };
 }
 

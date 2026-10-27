@@ -5,28 +5,22 @@ import { useMemo } from 'react';
 import { AlertTriangle, ArrowRight, CheckCircle2, Info } from 'lucide-react';
 
 import { fmtFull } from '@/lib/format';
-import { channelColor, deviceColor } from '@/lib/metrics';
 import { useAlerts } from '@/lib/useDashboardData';
-import { BarList } from '@/components/charts/BarList';
-import { Donut } from '@/components/charts/Donut';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Table } from '@/components/ui/Table';
 import { siteHref } from '@/components/shell/nav';
 import { ActionCard } from '../ActionCard';
-import { countryFromIso3, flagForName } from '../lib/geo';
-import { mergePages } from '../lib/pages';
-import type { Ga4BreakdownResponse, Ga4Summary, GscRowsResponse } from '../lib/types';
+import type { Ga4Summary } from '../lib/types';
 import { SiteHeader } from '../SiteHeader';
 import { AskButton, askHref, LoadError } from '../SiteStates';
 import { SearchSummary, SectionCard, TrafficSummary } from '../SummaryPanels';
+import { PagesCard, SearchBreakdownCard, SourcesCard, TechCard } from '../breakdown/Cards';
+import { GeoCard } from '../breakdown/GeoCard';
+import { PageRows } from '../pages/PageRows';
+import { SearchVsTrafficCard } from './SearchVsTrafficCard';
 import { useSiteActions } from '../useSiteActions';
-import { useGa4, useGsc, useSite, useSiteRange } from '../useSiteData';
-
-function Flag({ children }: { children: string }) {
-    return children ? <span aria-hidden className="text-[14px] leading-none">{children}</span> : null;
-}
+import { useGa4, useSite, useSiteRange } from '../useSiteData';
 
 /** Site overview (DESIGN 5.4): GA4 and Search Console side by side for one site. */
 export function SiteOverview() {
@@ -54,17 +48,16 @@ export function SiteOverview() {
                     </>
                 )}
             </div>
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                <TopPagesCard className="xl:col-span-2" />
-                {hasGa4 ? <ChannelsCard /> : <GscDevicesCard />}
+            {hasGa4 && hasGsc ? <SearchVsTrafficCard /> : null}
+            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+                {hasGa4 ? <PagesCard className="xl:col-span-2" action="open" withSearch={hasGsc} /> : <GscTopPagesCard className="xl:col-span-2" />}
+                {hasGa4 ? <SourcesCard /> : <SearchBreakdownCard />}
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {hasGsc ? <TopQueriesCard /> : <SourcesCard />}
-                <CountriesCard />
-                {hasGa4 ? <DevicesCard /> : null}
-                {!hasGa4 && hasGsc ? <AppearanceHint /> : null}
+            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+                <GeoCard className="xl:col-span-2" />
+                {hasGa4 && hasGsc ? <SearchBreakdownCard /> : hasGa4 ? <TechCard /> : <AppearanceHint />}
             </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
                 <AlertsCard />
                 <NextActionsCard />
             </div>
@@ -72,148 +65,16 @@ export function SiteOverview() {
     );
 }
 
-function TopPagesCard({ className }: { className?: string }) {
+/** Search Console-only sites: top pages by clicks. */
+function GscTopPagesCard({ className }: { className?: string }) {
     const site = useSite();
-    const ga = useGa4<Ga4BreakdownResponse>(site.hasGa4 ? 'pages' : null);
-    const sc = useGsc<GscRowsResponse>(site.hasGsc ? 'pages' : null);
-    const loading = (site.hasGa4 && ga.state === 'loading') || (site.hasGsc && sc.state === 'loading');
-    const rows = useMemo(() => {
-        const merged = mergePages(ga.data?.rows, sc.data?.rows, site.siteHost);
-        return merged.sort((a, b) => (site.hasGa4 ? (b.views ?? 0) - (a.views ?? 0) : (b.clicks ?? 0) - (a.clicks ?? 0))).slice(0, 8);
-    }, [ga.data, sc.data, site.siteHost, site.hasGa4]);
-    const err = ga.state === 'error' ? ga : sc.state === 'error' ? sc : null;
     return (
         <SectionCard
             className={className}
             title="Top pages"
-            description={site.hasGa4 && site.hasGsc ? 'Analytics and Search Console joined by page' : site.hasGa4 ? 'By pageviews' : 'By search clicks'}
             actions={<Button asChild size="sm" variant="ghost" trailingIcon={ArrowRight}><Link href={siteHref(site.host, 'pages')}>All pages</Link></Button>}
         >
-            {err ? <LoadError error={err.error} onRetry={err.mutate} className="mb-3" /> : null}
-            <div className="-mx-5 -mb-5">
-                <Table
-                    card={false}
-                    density="compact"
-                    loading={loading}
-                    rows={rows}
-                    rowKey={(r) => r.key}
-                    empty={<EmptyState variant="inline" title="No page data in this period" />}
-                    columns={[
-                        {
-                            key: 'page', header: 'Page', width: '46%',
-                            cell: (r) => <Link href={`${siteHref(site.host, 'pages')}?page=${encodeURIComponent(r.key)}`} className="tap-inline hover:underline" title={r.label}>{r.label}</Link>,
-                            heat: site.hasGa4 ? { metric: 'pageviews', value: (r) => r.views } : { metric: 'clicks', value: (r) => r.clicks },
-                        },
-                        ...(site.hasGa4 ? [
-                            { key: 'views', header: 'Views', align: 'right' as const, cell: (r: (typeof rows)[number]) => fmtFull(r.views) },
-                            { key: 'users', header: 'Users', align: 'right' as const, cell: (r: (typeof rows)[number]) => fmtFull(r.users) },
-                        ] : []),
-                        ...(site.hasGsc ? [
-                            { key: 'clicks', header: 'Clicks', align: 'right' as const, cell: (r: (typeof rows)[number]) => fmtFull(r.clicks) },
-                            { key: 'pos', header: 'Pos', align: 'right' as const, cell: (r: (typeof rows)[number]) => (r.position ? r.position.toFixed(1) : '–') },
-                        ] : []),
-                    ]}
-                />
-            </div>
-        </SectionCard>
-    );
-}
-
-function ChannelsCard() {
-    const q = useGa4<Ga4BreakdownResponse>('channels');
-    const site = useSite();
-    const items = (q.data?.rows ?? []).map((r) => ({ key: r.key, label: r.dims.sessionDefaultChannelGroup, value: r.cur.sessions ?? 0, color: channelColor(r.dims.sessionDefaultChannelGroup) }));
-    return (
-        <SectionCard
-            title="Channels"
-            description="Sessions by default channel group"
-            actions={<Button asChild size="sm" variant="ghost" trailingIcon={ArrowRight}><Link href={`${siteHref(site.host, 'traffic')}?tab=sources`}>Sources</Link></Button>}
-        >
-            {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : q.state === 'loading' ? (
-                <div className="flex items-center gap-5"><Skeleton className="size-36 rounded-full" /><div className="flex-1 space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-4" />)}</div></div>
-            ) : items.length === 0 ? <EmptyState variant="inline" title="No sessions in this period" /> : (
-                <Donut items={items} centerLabel="Sessions" size={144} legend="bottom" />
-            )}
-        </SectionCard>
-    );
-}
-
-function DevicesCard() {
-    const q = useGa4<Ga4BreakdownResponse>('devices');
-    const items = (q.data?.rows ?? []).map((r) => {
-        const name = r.dims.deviceCategory;
-        const labelText = name ? name[0].toUpperCase() + name.slice(1) : '(not set)';
-        return { key: r.key, label: labelText, value: r.cur.activeUsers ?? 0, color: deviceColor(name) };
-    });
-    return (
-        <SectionCard title="Devices" description="Users by device">
-            {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : q.state === 'loading' ? <Skeleton className="mx-auto size-32 rounded-full" /> : items.length === 0 ? (
-                <EmptyState variant="inline" title="No users in this period" />
-            ) : <Donut items={items} centerLabel="Users" size={128} legend="bottom" />}
-        </SectionCard>
-    );
-}
-
-function GscDevicesCard() {
-    const q = useGsc<GscRowsResponse>('devices');
-    const items = (q.data?.rows ?? []).map((r) => {
-        const name = r.key.toLowerCase();
-        return { key: r.key, label: name ? name[0].toUpperCase() + name.slice(1) : r.key, value: r.clicks, color: deviceColor(name) };
-    });
-    return (
-        <SectionCard title="Search devices" description="Clicks by device">
-            {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : q.state === 'loading' ? <Skeleton className="mx-auto size-32 rounded-full" /> : items.length === 0 ? (
-                <EmptyState variant="inline" title="No clicks in this period" />
-            ) : <Donut items={items} centerLabel="Clicks" size={128} legend="bottom" />}
-        </SectionCard>
-    );
-}
-
-function TopQueriesCard() {
-    const site = useSite();
-    const q = useGsc<GscRowsResponse>('queries');
-    const items = (q.data?.rows ?? []).slice(0, 50).map((r) => ({ key: r.key, label: r.key, text: r.key, value: r.clicks }));
-    return (
-        <SectionCard
-            title="Top queries"
-            description="Search clicks"
-            actions={<Button asChild size="sm" variant="ghost" trailingIcon={ArrowRight}><Link href={siteHref(site.host, 'search')}>All queries</Link></Button>}
-        >
-            {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : (
-                <BarList items={items} metric="clicks" limit={6} loading={q.state === 'loading'} labelHeader="Query" viewAllTitle="Top queries" empty={<EmptyState variant="inline" title="No search clicks in this period" />} />
-            )}
-        </SectionCard>
-    );
-}
-
-function SourcesCard() {
-    const q = useGa4<Ga4BreakdownResponse>('referrers');
-    const items = (q.data?.rows ?? []).map((r) => ({ key: r.key, label: r.dims.sessionSource, text: r.dims.sessionSource, value: r.cur.sessions ?? 0 }));
-    return (
-        <SectionCard title="Top sources" description="Sessions by source">
-            {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : (
-                <BarList items={items} metric="sessions" limit={6} loading={q.state === 'loading'} labelHeader="Source" viewAllTitle="Sources" empty={<EmptyState variant="inline" title="No sessions in this period" />} />
-            )}
-        </SectionCard>
-    );
-}
-
-function CountriesCard() {
-    const site = useSite();
-    const ga = useGa4<Ga4BreakdownResponse>(site.hasGa4 ? 'countries' : null);
-    const sc = useGsc<GscRowsResponse>(!site.hasGa4 && site.hasGsc ? 'countries' : null);
-    const q = site.hasGa4 ? ga : sc;
-    const items = site.hasGa4
-        ? (ga.data?.rows ?? []).map((r) => ({ key: r.key, label: r.dims.country, text: r.dims.country, value: r.cur.activeUsers ?? 0, icon: <Flag>{flagForName(r.dims.country)}</Flag> }))
-        : (sc.data?.rows ?? []).map((r) => {
-            const c = countryFromIso3(r.key);
-            return { key: r.key, label: c.name, text: c.name, value: r.clicks, icon: <Flag>{c.flag}</Flag> };
-        });
-    return (
-        <SectionCard title="Countries" description={site.hasGa4 ? 'Users by country' : 'Search clicks by country'}>
-            {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : (
-                <BarList items={items} metric={site.hasGa4 ? 'users' : 'clicks'} limit={6} loading={q.state === 'loading'} showShare labelHeader="Country" viewAllTitle="Countries" empty={<EmptyState variant="inline" title="No data in this period" />} />
-            )}
+            <PageRows limit={8} />
         </SectionCard>
     );
 }
