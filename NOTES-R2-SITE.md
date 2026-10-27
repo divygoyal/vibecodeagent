@@ -36,3 +36,12 @@ Data: GA4 Data API + Search Console API only (no tracker). Shots for the blind j
 - Overlay chart compares GSC clicks with GA4 google / organic sessions (not all Organic Search) over the GSC days.
 - Notes are scoped to the GA4 property id (else the GSC site URL); Google updates are drawn at their rollout start.
 - Interval is one `?interval=` per page; week needs 14+ days, month 60+.
+
+## Status at PAUSE (2026-10-27 ~08:00 UTC)
+- Done: all 12 WS2 items built and committed; tsc, eslint (changed files), npm test (71 + siteRound2), check:rsc pass.
+- Screens taken once into round2/candidate/site/ (20 files, same names as critique-site-*); they predate b7c624b
+  (phone header fixes, eager favicons) and the heatmap hour-label fix -> RETAKE all 20 after resume.
+- Mobile check (partial, checks/mobile-r2site.md): 0 overflow/offscreen/clipped; heatmap hour labels spilled (fixed in WIP
+  commit, re-check); "loading" hits were slow dev server under low RAM (re-check Traffic > Pages alone).
+- Next: up.sh r2site 3112 8112 -> login -> check-mobile for the 12 site paths (in parts) -> check-scenarios for
+  ga4only,gsconly,f403,f429,f500,fempty on /dashboard/s/** -> retake 20 shots (scratchpad shots.sh) -> down.sh -> report.

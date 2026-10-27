@@ -82,11 +82,14 @@ export function WeekHourHeatmap({ grid, color, format, unit, highlight, classNam
                     </div>
                 ))}
                 <span aria-hidden />
-                {Array.from({ length: 24 }, (_, h) => (
-                    <span key={h} aria-hidden className="overflow-visible text-left text-caption whitespace-nowrap text-fg-muted">
-                        {h % 6 === 0 ? hourText(h).replace(' ', ' ') : ''}
-                    </span>
-                ))}
+                {/* Hour labels sit on one positioned row so they can be wider than a cell without spilling. */}
+                <span aria-hidden className="relative h-4" style={{ gridColumn: '2 / -1' }}>
+                    {[0, 6, 12, 18].map((h) => (
+                        <span key={h} className="absolute top-0 text-caption whitespace-nowrap text-fg-muted" style={{ left: `${(h / 24) * 100}%` }}>
+                            {hourText(h)}
+                        </span>
+                    ))}
+                </span>
             </div>
             <p className="mt-2 h-4 text-meta text-fg-muted tabular-nums" aria-live="polite">
                 {hover ? (
