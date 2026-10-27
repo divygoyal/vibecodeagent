@@ -25,13 +25,14 @@ export function DemoAsk() {
     const { data, error } = useSWR<{ samples: DemoAskSample[] }>('/api/demo/ask', fetcher, { revalidateOnFocus: false });
     const [asked, setAsked] = useState<string[]>([]);
     const [typing, setTyping] = useState<string | null>(null);
-    const endRef = useRef<HTMLDivElement>(null);
+    const lastRef = useRef<HTMLDivElement>(null);
     const samples = data?.samples ?? [];
     const remaining = samples.filter((s) => !asked.includes(s.id));
 
+    // Bring the new question to the top so its answer reads from the start.
     useEffect(() => {
-        if (asked.length) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }, [asked, typing]);
+        if (asked.length) lastRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [asked.length]);
 
     const pick = (id: string) => {
         if (typing || asked.includes(id)) return;
@@ -58,11 +59,11 @@ export function DemoAsk() {
                     </div>
                 ) : (
                     <div role="log" aria-label="Conversation" aria-live="polite" className="flex-1 pt-2 pb-6">
-                        {asked.map((id) => {
+                        {asked.map((id, i) => {
                             const s = samples.find((x) => x.id === id);
                             if (!s) return null;
                             return (
-                                <div key={id}>
+                                <div key={id} ref={i === asked.length - 1 ? lastRef : undefined} className="scroll-mt-20">
                                     <div className="mb-6 flex justify-end">
                                         <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-card bg-subtle px-4 py-2.5 text-body-lg text-fg">{s.question}</p>
                                     </div>
@@ -80,8 +81,7 @@ export function DemoAsk() {
                                 </div>
                             );
                         })}
-                        <div ref={endRef} />
-                    </div>
+                     </div>
                 )}
 
                 {error ? <p className="py-4 text-center text-body-sm text-fg-muted">The sample questions could not be loaded. Reload the page to try again.</p> : null}
@@ -112,8 +112,8 @@ export function DemoAsk() {
                 ) : null}
             </div>
 
-            {/* Composer, off in the demo */}
-            <div className="sticky bottom-0 z-10 -mx-4 mt-2 bg-canvas px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:-mx-6 md:px-6 md:pb-0">
+            {/* Composer, off in the demo (not sticky: nothing to type, and it would cover the questions) */}
+            <div className="mt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
                 <div className="mx-auto w-full max-w-[760px]">
                     <div className="tc-card rounded-card border border-border bg-surface-sunken p-3">
                         <label htmlFor="ask-composer" className="sr-only">Ask about your traffic</label>

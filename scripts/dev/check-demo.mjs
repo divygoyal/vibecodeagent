@@ -2,7 +2,7 @@
 /**
  * End-to-end check of the public live demo (/demo -> the real app, read-only) on a dev / worker1 instance.
  *
- *   node scripts/dev/check-demo.mjs <webPort> [--out dir] [--shots dir] [--quick]
+ *   node scripts/dev/check-demo.mjs <webPort> [--out dir] [--shots dir] [--quick] [--no-walk]
  *
  * 1. HTTP: /demo sets only the httpOnly tc_demo cookie and lands in /dashboard; ?to= accepts /dashboard paths only;
  *    /demo/<slug>; ?static=1 and link-preview bots get the marketing page; /api/auth/session answers the demo
@@ -23,11 +23,12 @@ import { launchBrowser, newContext } from './pw.mjs';
 import { findInstance } from './routes.mjs';
 
 const argv = process.argv.slice(2);
-const opts = { port: null, out: '/root/projects/tc-redesign-research/round3/demo/check', shots: null, quick: false };
+const opts = { port: null, out: '/root/projects/tc-redesign-research/round3/demo/check', shots: null, quick: false, walk: true };
 for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--out') opts.out = argv[++i];
     else if (argv[i] === '--shots') opts.shots = argv[++i];
     else if (argv[i] === '--quick') opts.quick = true;
+    else if (argv[i] === '--no-walk') opts.walk = false;
     else if (/^\d+$/.test(argv[i])) opts.port = Number(argv[i]);
     else { console.error(`check-demo: unknown argument ${argv[i]}`); process.exit(2); }
 }
@@ -88,6 +89,10 @@ async function httpChecks() {
     check('/demo/acme -> the Acme site page', r.headers.get('location') === `/dashboard/s/${SITE}`, r.headers.get('location'));
     r = await http('GET', '/demo/creativeprints');
     check('/demo/creativeprints -> its GA4-only site page', r.headers.get('location') === '/dashboard/s/ga4-412300108', r.headers.get('location'));
+    r = await http('GET', '/demo', { headers: { rsc: '1', 'next-router-prefetch': '1' } });
+    check('a router prefetch of /demo starts nothing (204, no cookie)', r.status === 204 && r.setCookies.length === 0, `${r.status} ${r.setCookies.join()}`);
+    r = await http('GET', '/demo/exit', { headers: { rsc: '1' }, cookie: 'tc_demo=x' });
+    check('a router fetch of /demo/exit ends nothing (204, no cookie)', r.status === 204 && r.setCookies.length === 0, `${r.status} ${r.setCookies.join()}`);
     r = await http('GET', '/demo?static=1');
     check('/demo?static=1 -> the marketing demo page (200)', r.status === 200 && /<html/i.test(r.text), r.status);
     r = await http('GET', '/demo', { headers: { 'User-Agent': 'Twitterbot/1.0' } });
@@ -292,12 +297,24 @@ async function ownerFlow(browser) {
     const context = await newContext(browser, { stateFile });
     const page = await context.newPage();
     const sessionCookie = async () => (await context.cookies(base)).find((c) => /session-token$/.test(c.name));
-    const before = await sessionCookie();
     const sessionId = async () => page.evaluate(async () => (await (await fetch('/api/auth/session')).json())?.user?.id ?? null);
+    // Every Set-Cookie that names a session cookie while the demo is on (there must be none).
+    let inDemo = false;
+    const demoSessionSetCookies = [];
+    page.on('response', async (res) => {
+        if (!inDemo) return;
+        const sc = (await res.allHeaders().catch(() => ({})))['set-cookie'] || '';
+        if (/session-token/.test(sc)) demoSessionSetCookies.push(`${res.request().method()} ${res.url()}`);
+    });
     await page.goto(`${base}/dashboard`, { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
     const realId = await sessionId();
     check('owner: signed in as the dev user', Boolean(realId) && realId !== DEMO_ID, realId);
+    // NextAuth rolls the cookie on its own session calls; take the value once the real dashboard has settled.
+    await page.waitForTimeout(500);
+    const before = await sessionCookie();
 
+    inDemo = true;
     await page.goto(`${base}/demo`, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
     check('owner: /demo shows the demo (demo cookie wins)', (await sessionId()) === DEMO_ID);
@@ -305,18 +322,22 @@ async function ownerFlow(browser) {
     await back.waitFor({ timeout: 20_000 }).catch(() => {});
     check('owner: the demo bar offers "Back to your sites"', (await back.count()) === 1);
     await page.screenshot({ path: path.join(opts.shots, '1440-light-owner-in-demo.png') });
-    const during = await sessionCookie();
-    check('owner: session cookie untouched during the demo', during?.value === before?.value && during?.expires === before?.expires);
-    // A few app API calls during the demo must not re-issue the session cookie either.
-    await page.evaluate(async () => { await fetch('/api/portfolio'); await fetch('/api/auth/session'); await fetch('/api/dashboards'); });
-    check('owner: still untouched after API calls', (await sessionCookie())?.value === before?.value);
-
-    await back.click();
-    await page.waitForURL((u) => new URL(u).pathname === '/dashboard', { timeout: 30_000 }).catch(() => {});
+    // A few app pages and API calls during the demo must not re-issue the session cookie either.
+    await page.goto(`${base}/dashboard/s/${SITE}`, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
-    const after = await sessionCookie();
+    await page.evaluate(async () => { await fetch('/api/portfolio'); await fetch('/api/auth/session'); await fetch('/api/dashboards'); await fetch('/api/auth/csrf'); });
+    const during = await sessionCookie();
+    check('owner: no response during the demo set a session cookie', demoSessionSetCookies.length === 0, demoSessionSetCookies.join('; '));
+    check('owner: session cookie byte-for-byte unchanged during the demo', during?.value === before?.value && during?.expires === before?.expires,
+        `before ${before?.value?.slice(-12)} ${before?.expires} / during ${during?.value?.slice(-12)} ${during?.expires}`);
+    inDemo = false;
+
+    await page.goto(`${base}/dashboard`, { waitUntil: 'domcontentloaded' });
+    await back.waitFor({ timeout: 20_000 }).catch(() => {});
+    await Promise.all([page.waitForResponse((r) => r.url().includes('/demo/exit'), { timeout: 30_000 }).catch(() => null), back.click()]);
+    await page.waitForLoadState('load', { timeout: 30_000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
     check('owner: back on /dashboard as themselves', (await sessionId()) === realId, page.url());
-    check('owner: session cookie identical after the demo', after?.value === before?.value);
     check('owner: demo cookie gone', !(await context.cookies(base)).some((c) => c.name === 'tc_demo' && c.value));
     const bar = await page.getByRole('region', { name: 'Live demo' }).count();
     check('owner: no demo bar on the real dashboard', bar === 0);
@@ -331,7 +352,7 @@ try {
     const variants = opts.quick
         ? [{ mobile: false, dark: false, full: true }]
         : [{ mobile: false, dark: false, full: true }, { mobile: false, dark: true, full: false }, { mobile: true, dark: false, full: true }, { mobile: true, dark: true, full: false }];
-    for (const v of variants) await walk(browser, { ...v, dashboards });
+    if (opts.walk) for (const v of variants) await walk(browser, { ...v, dashboards });
     await ownerFlow(browser);
 } finally {
     await browser.close();

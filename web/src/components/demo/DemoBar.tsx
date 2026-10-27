@@ -94,7 +94,7 @@ export function DemoBar() {
                         <span className="sm:hidden">Connect Google</span>
                         <span className="max-sm:hidden">Connect Google — it&apos;s free</span>
                     </Button>
-                    <Button asChild size="sm" variant="ghost" className="shrink-0"><a href={DEMO_EXIT_HREF}>Exit<span className="max-sm:hidden">&nbsp;demo</span></a></Button>
+                    <Button asChild size="sm" variant="ghost" className="shrink-0"><a href={DEMO_EXIT_HREF}><span className="sm:hidden">Exit</span><span className="max-sm:hidden">Exit demo</span></a></Button>
                 </>
             )}
         </div>
