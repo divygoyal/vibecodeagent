@@ -21,6 +21,7 @@ import { mergePages, type MergedPage } from '../lib/pages';
 import { isDecaying, pageRef } from '../lib/rules';
 import type { DecayRow, Ga4BreakdownResponse, Ga4PageTrends, GscDetailResponse, GscRowsResponse } from '../lib/types';
 import { SiteHeader } from '../SiteHeader';
+import { sourceParts } from '../SourceIcon';
 import { AskButton, LoadError } from '../SiteStates';
 import { downloadCsv, useGa4, useGsc, useSite, useSiteRange } from '../useSiteData';
 import { useStringParam } from '../useTabParam';
@@ -255,7 +256,7 @@ function PageDrawer({ row, pageKey, loading, onClose }: { row: Row | null; pageK
                         <div>
                             <p className="mb-2 text-body-sm font-medium text-fg">Where viewers came from</p>
                             {gaPage.state === 'error' ? null : (
-                                <BarList items={(gaPage.data?.sources ?? []).map((s) => ({ key: s.name, label: s.name, text: s.name, value: s.views }))} metric="pageviews" limit={6} loading={!gaPage.data} labelHeader="Source"
+                                <BarList items={(gaPage.data?.sources ?? []).map((s) => ({ key: s.name, ...sourceParts(s.name), value: s.views }))} metric="pageviews" limit={6} loading={!gaPage.data} labelHeader="Source"
                                     empty={<EmptyState variant="inline" title="No views in this period" />} />
                             )}
                         </div>
