@@ -70,14 +70,12 @@ Candidate screenshots: /root/projects/tc-redesign-research/round2/candidate/poli
 - **WS4 (marketing)**: the Tawk bubble now shows on marketing pages at desktop width (it did not before); Badge is
   sentence case everywhere.
 
-## Status at PAUSE (2026-10-27 ~08:10 UTC)
-- Committed: everything above. Candidate shots: desktop light + dark (26/26) are final in
-  round2/candidate/polish/. The 390 shots there are from an earlier run (before the one-decimal delta commit
-  9ef666e and a dev-server self-restart) and must be retaken.
-- Next: (1) up.sh r2polish 3111 8111 (the instance already runs on the integrate DB copy; dashboard id
-  0f718155-64ed-48b9-adf2-05b6084928e3), then `node <scratch>/ws1/batchshot.mjs <scratch>/ws1/appB.json` for the
-  390 light/dark set (job files: /tmp/claude-0/-root/b497b626-1524-45cc-9ce3-b9467df6997d/scratchpad/ws1/app{A,B}.json);
-  (2) check-mobile.mjs 3111 --only on the key routes; (3) review shots, final report; down.sh + rm -rf web/.next.
-- Open question noted while reviewing: the dashboard Devices donut now lays its legend to the right at 1440 dark
-  (baseline: below). That choice is the builder's width rule in dashboard-builder/widgets/Charts.tsx, not a WS1
-  change; confirm the width it measured did not change because of a shared component before the final report.
+## Final status (2026-10-27 10:02 UTC)
+- Candidate shots: all 52 (13 routes x 1440/390 x light/dark) in round2/candidate/polish/, same names as
+  round2/shots/critique-*. Taken on a copy of the integrate dev DB (the baseline's data).
+- check-mobile at 390 (light) on the portfolio, site pages, settings, ask, connect-ai, support, plan and the
+  legacy /dashboard/analytics/* redirects: error 0, overflow 0, offscreen 0, clipped 0, smallTargets 0, badText 0.
+  tabbar=2 / loading=12 come from the traffic tabs reached through the legacy /dashboard/analytics/sessions and
+  /performance redirects (WS2 area). Report: round2/candidate/polish-mobile/mobile-r2polish.md.
+- The Devices donut legend on the dashboard view follows the builder's own width rule (WS3); WS1 did not change Donut layout.
+- Server down, web/.next removed.
