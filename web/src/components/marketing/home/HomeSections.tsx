@@ -17,7 +17,7 @@ export function WhyFree() {
         },
     ];
     return (
-        <Section id="why-free" labelledBy="why-free-title">
+        <Section id="why-free" tone="surface" labelledBy="why-free-title">
             <div className="flex flex-wrap items-end justify-between gap-4">
                 <SectionHeading id="why-free-title" eyebrow="Why free?" title="Free, because it is cheap to run" />
                 <Link href="/pricing" className="tap-area inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary hover:text-fg">

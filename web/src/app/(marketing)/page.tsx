@@ -183,7 +183,7 @@ export default function HomePage() {
 
             <WhyFree />
 
-            <Section id="faq" tone="surface" labelledBy="faq-title">
+            <Section id="faq" labelledBy="faq-title">
                 <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
                     <SectionHeading
                         id="faq-title"

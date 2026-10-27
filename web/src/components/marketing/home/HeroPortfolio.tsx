@@ -28,7 +28,11 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
     const [filter, setFilter] = useState<FilterKey>('all');
     const [metric, setMetric] = useState<TotalsMetric | null>(null);
     const [trendOpen, setTrendOpen] = useState(false);
-    const [starred, setStarred] = useState<Record<string, boolean>>({});
+    // Same stars as the app's demo, minus duplicate variants of a host (the old http:// property), which
+    // would otherwise sit among the first cards with its near-empty chart.
+    const [starred, setStarred] = useState<Record<string, boolean>>(() =>
+        Object.fromEntries(byRange['28d'].sites.filter((s) => s.variant).map((s) => [s.key, false])),
+    );
 
     const data = byRange[range];
     const sites = useMemo(
@@ -85,7 +89,7 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
                 onTrendOpenChange={setTrendOpen}
             />
 
-            <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+            <div className="-mx-3 flex overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
                 <SegmentedControl<FilterKey>
                     variant="neutral"
                     size="sm"
@@ -104,7 +108,7 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
             {shown.length ? (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
                     {shown.slice(0, SHOWN).map((s, i) => (
-                        <div key={s.key} className={cn('flex min-w-0 [&>article]:flex-1', i >= 3 && 'max-md:hidden', i >= 4 && 'md:max-xl:hidden')}>
+                        <div key={s.key} className={cn('flex min-w-0 [&>article]:flex-1', i >= 2 && 'max-md:hidden', i >= 4 && 'md:max-xl:hidden')}>
                             <SiteCard
                                 site={s}
                                 windows={data.windows}
