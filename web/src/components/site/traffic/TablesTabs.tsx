@@ -8,7 +8,11 @@ import { channelColor } from '@/lib/metrics';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { siteHref } from '@/components/shell/nav';
 import { BreakdownTable } from '../BreakdownTable';
+import { GeoCard } from '../breakdown/GeoCard';
+import { useFilterClick } from '../filters/SiteFilters';
 import { flagForName } from '../lib/geo';
+import { sourceMediumInfo } from '../lib/sources';
+import { sourceMediumParts } from '../SourceIcon';
 import { displayPage, isAiSource, pageRef } from '../lib/rules';
 import type { Ga4BreakdownResponse, Ga4Row } from '../lib/types';
 import { LoadError } from '../SiteStates';
@@ -98,6 +102,12 @@ function ChannelDot({ name }: { name: string }) {
 /** Traffic > Sources: channels, then source / medium (and AI assistants). */
 export function TrafficSourcesTab() {
     const { compareOn } = useSiteRange();
+    const click = useFilterClick();
+    const filterSource = (r: Ga4Row) => {
+        const v = r.dims.sessionSourceMedium ?? '';
+        const i = v.lastIndexOf(' / ');
+        click('source', i >= 0 ? v.slice(0, i) : v);
+    };
     const channels = useBreakdown('channels');
     const sources = useBreakdown('sources');
     const [onlyAi, setOnlyAi] = useState<'all' | 'ai'>('all');
@@ -126,6 +136,7 @@ export function TrafficSourcesTab() {
                             exportName="channels"
                             pageSize={12}
                             searchPlaceholder="Search channels"
+                            onRowClick={(r) => click('channel', r.dims.sessionDefaultChannelGroup)}
                             columns={trafficCols}
                         />
                     )}
@@ -137,7 +148,15 @@ export function TrafficSourcesTab() {
                     rows={srcRows}
                     rowKey={(r) => r.key}
                     loading={sources.state === 'loading'}
-                    label={{ header: 'Source / medium', text: (r) => r.dims.sessionSourceMedium }}
+                    label={{
+                        header: 'Source / medium',
+                        text: (r) => `${sourceMediumInfo(r.dims.sessionSourceMedium).text} ${r.dims.sessionSourceMedium}`,
+                        cell: (r) => {
+                            const parts = sourceMediumParts(r.dims.sessionSourceMedium);
+                            return <span className="flex min-w-0 items-center gap-2" title={r.dims.sessionSourceMedium}><span className="flex size-4 shrink-0 items-center justify-center">{parts.icon}</span><span className="truncate">{parts.label}</span></span>;
+                        },
+                    }}
+                    onRowClick={filterSource}
                     heat={{ metric: onlyAi === 'ai' ? 'ai' : 'sessions', value: (r) => v(r, 'sessions') }}
                     defaultSort="sessions"
                     exportName="sources"
@@ -156,6 +175,7 @@ export function TrafficSourcesTab() {
 /** Traffic > Audience: geography, devices, technology, language, new vs returning. */
 export function TrafficAudienceTab() {
     const { compareOn } = useSiteRange();
+    const click = useFilterClick();
     const [geo, setGeo] = useState<'countries' | 'cities'>('countries');
     const countries = useBreakdown(geo);
     const nvr = useBreakdown('newReturning');
@@ -163,6 +183,7 @@ export function TrafficAudienceTab() {
     const totalUsers = nvrRows.reduce((a, r) => a + v(r, 'activeUsers'), 0);
     return (
         <div className="flex flex-col gap-4">
+            <GeoCard />
             {countries.state === 'error' ? <LoadError error={countries.error} onRetry={countries.mutate} /> : (
                 <BreakdownTable
                     caption={geo === 'countries' ? 'Countries' : 'Cities'}
@@ -176,6 +197,7 @@ export function TrafficAudienceTab() {
                     defaultSort="users"
                     exportName={geo}
                     searchPlaceholder={geo === 'countries' ? 'Search countries' : 'Search cities'}
+                    onRowClick={(r) => (geo === 'countries' ? click('country', r.dims.country) : click('city', r.dims.city))}
                     toolbarExtra={(
                         <SegmentedControl ariaLabel="Geography" size="sm" variant="neutral" value={geo} onChange={setGeo}
                             options={[{ value: 'countries', label: 'Countries' }, { value: 'cities', label: 'Cities' }]} />

@@ -17,12 +17,17 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Table, type TableColumn } from '@/components/ui/Table';
 import { Tabs } from '@/components/ui/Tabs';
+import { ChartMarkers, IntervalSwitch, toAnnotations, useChartMarkers, useInterval } from '../chart/ChartExtras';
+import { useSearchFinding } from '../chart/useFindings';
+import { FindingLine } from '../Finding';
 import { countryFromIso3 } from '../lib/geo';
+import { bucketGscSeries } from '../lib/intervals';
 import { displayPage, isLowCtr, isNewRow, isStriking, median, pageRef } from '../lib/rules';
 import type { GscDimensionReport, GscRow, GscRowsResponse, GscSeriesPoint, GscSummary } from '../lib/types';
 import { LoadError } from '../SiteStates';
 import { downloadCsv, useGsc, useSite, useSiteRange } from '../useSiteData';
 import { useStringParam, useTabParam } from '../useTabParam';
+import { CtrBenchmarkCard } from './CtrBenchmarkCard';
 import { SearchDetailDrawer } from './SearchDetailDrawer';
 
 type SearchMetric = 'clicks' | 'impressions' | 'ctr' | 'position';
@@ -93,7 +98,8 @@ function rowLabel(dim: SearchDim, key: string, siteHost: string | null): { text:
 /** Search > Performance: metric toggles + chart, opportunity presets, dimension tables, query/page drawer. */
 export function PerformanceTab() {
     const site = useSite();
-    const { compareOn, dr } = useSiteRange();
+    const { compareOn, dr, searchDays } = useSiteRange();
+    const { interval } = useInterval(searchDays);
     const summary = useGsc<GscSummary>('summary');
     const [selected, setSelected] = useState<SearchMetric[]>(['clicks', 'impressions']);
     const [mode, setMode] = useState<'overlay' | 'split'>('overlay');
@@ -170,6 +176,11 @@ export function PerformanceTab() {
 
     const s = summary.data;
     const chartSeries = selected.map((k) => ({ metric: k, key: k, compareKey: compareOn && selected.length === 1 ? `prev_${k}` : undefined }));
+    const bucketed = useMemo(() => bucketGscSeries(s?.series ?? [], interval), [s, interval]);
+    const bucketDates = useMemo(() => bucketed.map((p) => p.date), [bucketed]);
+    const finding = useSearchFinding(selected[0], s, { daily: interval === 'day' });
+    const lastDate = s?.lastDate ?? dr.resolvedSearch.end;
+    const marks = useChartMarkers(bucketDates, dr.resolvedSearch.start, lastDate);
     const tableLoading = dim === 'dates' ? summary.state === 'loading' : rowsQ.state === 'loading';
     const tableError = dim === 'dates' ? summary : rowsQ;
 
@@ -180,28 +191,38 @@ export function PerformanceTab() {
                 <div className="p-4 md:p-5">
                     <ChartCard
                         className="!border-0 !p-0 !shadow-none"
-                        title={selected.map((k) => METRICS[k].label).join(', ')}
+                        title={`${selected.map((k) => METRICS[k].label).join(', ')}${interval === 'day' ? '' : ` per ${interval}`}`}
                         subtitle={selected.length > 1 && mode === 'overlay' ? 'Lines use separate scales; the axis shows the first one' : selected.includes('position') ? 'Position: lower is better' : compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')}` : undefined}
-                        actions={selected.length > 1 ? (
-                            <SegmentedControl ariaLabel="Chart mode" size="sm" variant="neutral" value={mode} onChange={setMode} options={[{ value: 'overlay', label: 'Overlay' }, { value: 'split', label: 'Split' }]} />
-                        ) : undefined}
+                        actions={(
+                            <>
+                                {selected.length > 1 ? (
+                                    <SegmentedControl ariaLabel="Chart mode" size="sm" variant="neutral" value={mode} onChange={setMode} options={[{ value: 'overlay', label: 'Overlay' }, { value: 'split', label: 'Split' }]} />
+                                ) : null}
+                                <IntervalSwitch days={searchDays} />
+                            </>
+                        )}
                         state={summary.state === 'error' ? 'error' : s && s.totals.impressions === 0 ? 'empty' : summary.state}
                         error={{ message: summary.error?.message, onRetry: summary.mutate }}
                         empty={{ title: 'No impressions in this period', description: 'New sites can take a few weeks to show up in Google.' }}
                         height={selected.length > 1 && mode === 'split' ? selected.length * 160 : 300}
                         footer={s?.lastDate ? `Data through ${fmtDateRange(s.lastDate, s.lastDate)} · Search Console is about 2 days behind` : undefined}
                     >
+                        <FindingLine finding={finding} />
                         <TimeSeriesChart
-                            data={(s?.series ?? []) as unknown as Record<string, number | string | null>[]}
+                            data={bucketed as unknown as Record<string, number | string | null>[]}
                             series={chartSeries}
                             mode={selected.length > 1 ? mode : 'single'}
                             compareDateKey="prevDate"
+                            annotations={toAnnotations(marks.markers)}
                             height={selected.length > 1 && mode === 'split' ? selected.length * 160 : 300}
-                            ariaLabel={`${selected.map((k) => METRICS[k].label).join(', ')} per day`}
+                            ariaLabel={`${selected.map((k) => METRICS[k].label).join(', ')} per ${interval}`}
                         />
+                        <ChartMarkers markers={marks.markers} start={dr.resolvedSearch.start} end={lastDate} notesKey={marks.notesKey} scope={marks.scope} onChanged={marks.mutateNotes} notesFailed={marks.notesFailed} />
                     </ChartCard>
                 </div>
             </Card>
+
+            <CtrBenchmarkCard onOpenQuery={(query) => void setDetail(`q:${query}`)} />
 
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Opportunity filters">
                 <span className="text-meta text-fg-muted">Opportunities:</span>
