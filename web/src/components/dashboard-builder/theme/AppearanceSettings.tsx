@@ -6,7 +6,7 @@
  * Used by the editor's Dashboard settings and the Share dialog. Every change calls onChange
  * with a new ThemeV2; the dashboard behind re-renders at once (live preview).
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Check, Palette, RotateCcw, Sparkles } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -38,7 +38,9 @@ function Text({ value, onChange, placeholder, label, max = 120 }: { value: strin
 /** Keeps a local draft while typing, commits valid https URLs (or empty). */
 function UrlInput({ value, onCommit, label }: { value: string | undefined; onCommit: (v: string | undefined) => void; label: string }) {
     const [draft, setDraft] = useState(value ?? '');
-    useEffect(() => setDraft(value ?? ''), [value]);
+    // Follow outside changes (undo, preset) without an effect: adjust state while rendering.
+    const [synced, setSynced] = useState(value);
+    if (value !== synced) { setSynced(value); setDraft(value ?? ''); }
     const bad = Boolean(draft) && !/^https:\/\/\S+$/i.test(draft);
     return (
         <div className="space-y-1">
@@ -73,7 +75,8 @@ export function ThemeGallery({ value, mode, onPick, brand, compact }: { value: T
 
 export function BrandColorInput({ value, onChange }: { value: string | undefined; onChange: (v: string | undefined) => void }) {
     const [draft, setDraft] = useState(value ?? '');
-    useEffect(() => setDraft(value ?? ''), [value]);
+    const [synced, setSynced] = useState(value);
+    if (value !== synced) { setSynced(value); setDraft(value ?? ''); }
     const ok = isHexColor(draft);
     const onWhite = ok ? contrast(draft, '#ffffff') : 0;
     return (

@@ -146,8 +146,10 @@ export function DashboardView({
     const dc = dateControlOf(doc);
     const filters = doc.controls.filter((c): c is FilterControl => c.type === 'filter');
     const variables = variableControls(doc.controls);
-    const baseVars = textVars(siteLabel, data?.resolved, page?.title ?? '');
-    const vars = variables.length ? { ...baseVars, ...Object.fromEntries(Object.entries(variableValues(doc.controls, state)).map(([k, v]) => [`var:${k}`, v])) } : baseVars;
+    const resolved = data?.resolved;
+    const pageTitle = page?.title ?? '';
+    const baseVars = textVars(siteLabel, resolved, pageTitle);
+    const vars = variables.length ? { ...baseVars, ...Object.fromEntries(Object.entries(variableValues(variables, state)).map(([k, v]) => [`var:${k}`, v])) } : baseVars;
     const editableVars = variables.filter((v) => onVariable && (mode === 'view' || (v.viewerCanChange && allow.filters)));
     const contained = doc.settings.widthMode !== 'full' && !tv;
     const root = shell === 'panel' ? dashRootProps(doc.theme, appMode ?? 'light') : null;
@@ -162,7 +164,8 @@ export function DashboardView({
     ].filter(Boolean).join(' · ') : '';
 
     const interaction = state.interaction;
-    const render = useCallback((widget: WidgetDef, heightPx: number, b: Bp) => {
+    // Not memoised: vars and the data change every render anyway (as before round 2).
+    const render = (widget: WidgetDef, heightPx: number, b: Bp) => {
         const dim = onInteraction ? clickDimension(widget) : null;
         return (
         <WidgetRenderer
@@ -182,7 +185,7 @@ export function DashboardView({
             onChooseSource={onChooseSource}
         />
         );
-    }, [data, loading, refetching, state.date.compare.mode, mode, vars, onRetry, onChooseSource, onInteraction, interaction]);
+    };
 
     return (
         <div ref={exportRef} {...root?.attrs} {...(root ? { 'data-dash-panel': '' } : {})} style={root?.style} className={cn('flex flex-col gap-4', contained && 'mx-auto w-full max-w-[1440px]', root?.className)}>
