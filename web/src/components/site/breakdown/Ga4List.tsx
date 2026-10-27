@@ -30,6 +30,8 @@ export interface Ga4ListProps {
     viewAllTitle: string;
     emptyTitle?: string;
     emptyDescription?: string;
+    /** Grow to the card's height, "View all" at the bottom (cards in an equal-height row). */
+    fill?: boolean;
 }
 
 /**
@@ -38,7 +40,7 @@ export interface Ga4ListProps {
  * list, so a page has at most two tints (Analytics, Search Console).
  */
 export function Ga4List({
-    report, dim, metric, filterKey, render, include, limit = 7, showShare, labelHeader, viewAllTitle, emptyTitle = 'No data in this period', emptyDescription,
+    report, dim, metric, filterKey, render, include, limit = 7, showShare, labelHeader, viewAllTitle, emptyTitle = 'No data in this period', emptyDescription, fill,
 }: Ga4ListProps) {
     const q = useGa4<Ga4BreakdownResponse>(report);
     const click = useFilterClick();
@@ -66,6 +68,7 @@ export function Ga4List({
             loading={q.state === 'loading'}
             labelHeader={labelHeader}
             viewAllTitle={viewAllTitle}
+            fill={fill}
             onItemClick={active ? undefined : (item) => click(filterKey, raw.get(item.key) ?? '')}
             empty={<EmptyState variant="inline" title={emptyTitle} description={emptyDescription} />}
         />

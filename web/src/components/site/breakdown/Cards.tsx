@@ -24,6 +24,13 @@ import { gscToAlpha2 } from '@/lib/builder/countries';
 import { Ga4List, listMeta } from './Ga4List';
 import { TabbedCard } from './TabbedCard';
 
+/**
+ * Rows in a side card (Sources, Devices, Search) so it is about as tall as the
+ * Pages card next to it (8 rows of 40px vs 32px here); cards in a row stretch to
+ * one height and "View all" sits at the bottom.
+ */
+const SIDE_ROWS = 9;
+
 const channelRender = (r: Ga4Row) => ({
     label: r.dims.sessionDefaultChannelGroup || 'Unassigned',
     text: r.dims.sessionDefaultChannelGroup || 'Unassigned',
@@ -49,16 +56,16 @@ export function SourcesCard({ className }: { className?: string }) {
             tabs={[
                 {
                     value: 'sources', label: 'Sources', meta: listMeta('sessions'),
-                    content: <Ga4List report="referrers" dim="sessionSource" metric="sessions" filterKey="source" render={sourceRender} labelHeader="Source" viewAllTitle="Sources" emptyTitle="No sessions in this period" />,
+                    content: <Ga4List report="referrers" dim="sessionSource" metric="sessions" filterKey="source" render={sourceRender} limit={SIDE_ROWS} fill labelHeader="Source" viewAllTitle="Sources" emptyTitle="No sessions in this period" />,
                 },
                 {
                     value: 'channels', label: 'Channels', meta: listMeta('sessions', true),
-                    content: <Ga4List report="channels" dim="sessionDefaultChannelGroup" metric="sessions" filterKey="channel" render={channelRender} showShare labelHeader="Channel" viewAllTitle="Channels" emptyTitle="No sessions in this period" />,
+                    content: <Ga4List report="channels" dim="sessionDefaultChannelGroup" metric="sessions" filterKey="channel" render={channelRender} showShare limit={SIDE_ROWS} fill labelHeader="Channel" viewAllTitle="Channels" emptyTitle="No sessions in this period" />,
                 },
                 {
                     value: 'ai', label: 'AI', count: <AiCount />, meta: listMeta('sessions'),
                     content: (
-                        <Ga4List report="referrers" dim="sessionSource" metric="sessions" filterKey="source" render={sourceRender} include={aiOnly} labelHeader="Assistant" viewAllTitle="AI assistants"
+                        <Ga4List report="referrers" dim="sessionSource" metric="sessions" filterKey="source" render={sourceRender} include={aiOnly} limit={SIDE_ROWS} fill labelHeader="Assistant" viewAllTitle="AI assistants"
                             emptyTitle="No AI referrals yet" emptyDescription="Visits from ChatGPT, Perplexity, Claude and Gemini show up here." />
                     ),
                 },
@@ -75,7 +82,7 @@ function LandingList() {
     }, [siteHost]);
     return (
         <Ga4List report="landing" dim="landingPage" metric="sessions" filterKey="landing" render={render} include={(r) => Boolean(r.dims.landingPage) && r.dims.landingPage !== '(not set)'}
-            limit={8} labelHeader="Landing page" viewAllTitle="Landing pages" emptyTitle="No sessions in this period" />
+            limit={8} fill labelHeader="Landing page" viewAllTitle="Landing pages" emptyTitle="No sessions in this period" />
     );
 }
 
@@ -106,10 +113,10 @@ export function TechCard({ className }: { className?: string }) {
             title="Devices"
             className={className}
             tabs={[
-                { value: 'devices', label: 'Devices', meta: listMeta('users', true), content: <Ga4List report="devices" dim="deviceCategory" metric="users" filterKey="device" render={deviceRender} showShare labelHeader="Device" viewAllTitle="Devices" /> },
-                { value: 'browsers', label: 'Browsers', meta: listMeta('users', true), content: <Ga4List report="browsers" dim="browser" metric="users" filterKey="browser" showShare labelHeader="Browser" viewAllTitle="Browsers" /> },
-                { value: 'os', label: 'OS', meta: listMeta('users', true), content: <Ga4List report="os" dim="operatingSystem" metric="users" filterKey="os" showShare labelHeader="Operating system" viewAllTitle="Operating systems" /> },
-                { value: 'languages', label: 'Languages', meta: listMeta('users', true), content: <Ga4List report="languages" dim="language" metric="users" filterKey="language" showShare labelHeader="Language" viewAllTitle="Languages" /> },
+                { value: 'devices', label: 'Devices', meta: listMeta('users', true), content: <Ga4List report="devices" limit={SIDE_ROWS} fill dim="deviceCategory" metric="users" filterKey="device" render={deviceRender} showShare labelHeader="Device" viewAllTitle="Devices" /> },
+                { value: 'browsers', label: 'Browsers', meta: listMeta('users', true), content: <Ga4List report="browsers" limit={SIDE_ROWS} fill dim="browser" metric="users" filterKey="browser" showShare labelHeader="Browser" viewAllTitle="Browsers" /> },
+                { value: 'os', label: 'OS', meta: listMeta('users', true), content: <Ga4List report="os" limit={SIDE_ROWS} fill dim="operatingSystem" metric="users" filterKey="os" showShare labelHeader="Operating system" viewAllTitle="Operating systems" /> },
+                { value: 'languages', label: 'Languages', meta: listMeta('users', true), content: <Ga4List report="languages" limit={SIDE_ROWS} fill dim="language" metric="users" filterKey="language" showShare labelHeader="Language" viewAllTitle="Languages" /> },
             ]}
         />
     );
@@ -130,7 +137,7 @@ function GscList({ report, header }: { report: 'queries' | 'countries' | 'device
     }), [q.data, report, site.host]);
     if (q.state === 'error') return <LoadError error={q.error} onRetry={q.mutate} />;
     return (
-        <BarList items={items} metric="clicks" limit={7} showShare={report !== 'queries'} loading={q.state === 'loading'} labelHeader={header} viewAllTitle={`Search ${header.toLowerCase()}`}
+        <BarList items={items} metric="clicks" limit={SIDE_ROWS} fill showShare={report !== 'queries'} loading={q.state === 'loading'} labelHeader={header} viewAllTitle={`Search ${header.toLowerCase()}`}
             empty={<EmptyState variant="inline" title="No search clicks in this period" description="New sites can take a few weeks to appear in Google." />} />
     );
 }

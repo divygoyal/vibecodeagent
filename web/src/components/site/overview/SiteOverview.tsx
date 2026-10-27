@@ -49,11 +49,12 @@ export function SiteOverview() {
                 )}
             </div>
             {hasGa4 && hasGsc ? <SearchVsTrafficCard /> : null}
-            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+            {/* Cards in a row share one height (the shorter one's list grows, "View all" at the bottom). */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                 {hasGa4 ? <PagesCard className="xl:col-span-2" action="open" withSearch={hasGsc} /> : <GscTopPagesCard className="xl:col-span-2" />}
                 {hasGa4 ? <SourcesCard /> : <SearchBreakdownCard />}
             </div>
-            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                 <GeoCard className="xl:col-span-2" />
                 {hasGa4 && hasGsc ? <SearchBreakdownCard /> : hasGa4 ? <TechCard /> : <AppearanceHint />}
             </div>
