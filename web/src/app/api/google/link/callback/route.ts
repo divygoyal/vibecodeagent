@@ -7,6 +7,8 @@ import {
     GOOGLE_TOKEN_URL, LINK_COOKIE, LINK_COOKIE_PATH, LinkError, appOrigin, flowExpired, linkRedirectUri, missingDataScopes,
     parseIdToken, resultUrl, stateMatches, type LinkFlowState, type LinkResultCode,
 } from '@/lib/googleLink';
+import { googleAccessFor } from '@/lib/portfolio/auth';
+import { startSync } from '@/lib/portfolio/sync';
 import { getServerAuthUser } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
@@ -111,6 +113,18 @@ export async function GET(req: NextRequest) {
             return done('failed');
         }
         const body = await res.json().catch(() => null) as { created?: boolean } | null;
+        // List the new account's sites in the portfolio now, not at the next scheduled sync
+        // (in the background: the redirect does not wait; a sync already running is joined).
+        const identifier = user.id;
+        void startSync({
+            identifier,
+            accessToken: async () => {
+                const access = await googleAccessFor(identifier);
+                return access.ok ? access.token : null;
+            },
+            reason: 'manual',
+            refreshInventory: true,
+        });
         return done(body?.created ? 'added' : 'updated');
     } catch (err) {
         if (err instanceof LinkError) console.warn(`[google-link] ${err.code}: ${err.message}`);
