@@ -26,6 +26,10 @@ export interface WidgetViewProps<W extends WidgetDef = WidgetDef> {
     vars: Record<string, string>;
     onRetry?: () => void;
     onChooseSource?: () => void;
+    /** Click to filter (round 2): the widget allows it and a click on a value calls this. */
+    onFilterClick?: (value: string) => void;
+    /** The value currently selected by click to filter on this widget's dimension. */
+    selectedValue?: string;
 }
 
 /** The ok result when there is one (also the stale copy inside an error). */
@@ -107,8 +111,11 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
     const showTitle = widget.showTitle !== false;
     const padding = widget.style?.padding === 'none' ? 'p-0' : widget.style?.padding === 'sm' ? 'p-3' : 'p-4';
     const transparent = widget.style?.background === 'transparent';
+    const card = !(widget.style?.border === false || transparent);
     return (
         <div
+            // Themes restyle cards through this marker (dashboard-themes.css); no visual effect alone.
+            data-dash-widget={card ? (widget.style?.padding ?? 'md') : undefined}
             className={cn(
                 'group/frame relative flex h-full min-h-0 flex-col overflow-hidden',
                 transparent ? 'bg-transparent' : 'bg-surface',

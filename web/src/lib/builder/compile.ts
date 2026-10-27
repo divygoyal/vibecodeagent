@@ -4,7 +4,9 @@
  * calls. Dates stay relative here; the server resolves them.
  */
 import { getMetric } from './catalog';
+import { clickDimension } from './interaction';
 import { widgetMetrics } from './registry';
+import { substituteFilters, variableValues } from './variables';
 import type {
     ControlDef,
     ControlState,
@@ -50,9 +52,13 @@ export function widgetFilters(widget: WidgetDef, ctx: CompileCtx): Array<{ claus
                 clause: c.ui === 'search' ? { dimension: c.dimension, op: 'contains', value: values[0] } : { dimension: c.dimension, op: values.length === 1 ? 'eq' : 'in', value: values.length === 1 ? values[0] : values },
             });
         }
-        for (const clause of ctx.controls.interaction ?? []) out.push({ clause, controlId: 'interaction' });
+        // Click to filter: the widget that was clicked keeps showing all of its values.
+        const own = clickDimension(widget);
+        for (const clause of ctx.controls.interaction ?? []) if (clause.dimension !== own) out.push({ clause, controlId: 'interaction' });
     }
-    for (const clause of widget.filters ?? []) out.push({ clause });
+    // Widget filters, with dashboard variables ({{var:name}}) filled in.
+    const widgetOwn = widget.filters?.length ? substituteFilters(widget.filters, variableValues(ctx.controlDefs, ctx.controls)) : widget.filters;
+    for (const clause of widgetOwn ?? []) out.push({ clause });
     return out;
 }
 
@@ -125,7 +131,7 @@ export function compileWidget(widget: WidgetDef, ctx: CompileCtx): CompiledWidge
             const metrics = widgetMetrics(widget);
             if (!metrics.length || !c.dimensions.length) break;
             const sortRef = c.sort.by.replace(/^[dm]:/, '');
-            const wantsCompare = compareOn && (c.sortByChange || c.columns.some((col) => col.kind === 'metric' && !col.hidden && (col.showDelta || col.visual === 'delta')));
+            const wantsCompare = compareOn && (c.sortByChange || c.columns.some((col) => col.kind === 'metric' && !col.hidden && (col.showDelta || col.visual === 'delta')) || Boolean(c.rules?.some((r) => r.on === 'change')));
             queries.push({
                 ...base, part: 'rows', metrics, dimensions: c.dimensions.slice(0, 3),
                 sort: { by: metrics.includes(sortRef) || c.dimensions.includes(sortRef) ? sortRef : metrics[0], dir: c.sort.dir },

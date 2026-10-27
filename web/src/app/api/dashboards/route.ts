@@ -56,6 +56,8 @@ export async function GET() {
                 createdAt: rec.createdAt,
                 preview: preview(rec.doc),
                 theme: rec.doc.theme.mode,
+                // Round 2: the dashboard's look, so list thumbnails show its theme (absent = today's look).
+                ...(rec.doc.theme.id ? { look: { id: rec.doc.theme.id, density: rec.doc.theme.density, card: rec.doc.theme.card, pattern: rec.doc.theme.pattern, font: rec.doc.theme.font, palette: rec.doc.theme.palette, brand: rec.doc.theme.brand?.color ? { color: rec.doc.theme.brand.color } : undefined } } : {}),
             };
         });
         return NextResponse.json({ dashboards }, { headers: { 'Cache-Control': 'no-store' } });
@@ -67,7 +69,7 @@ export async function GET() {
 
 /**
  * POST /api/dashboards: create.
- * Body: { name, templateId?, siteId?, portfolio?, doc? } (v2) or the v1 shape
+ * Body: { name, templateId?, siteId?, portfolio?, themeId?, doc? } (v2) or the v1 shape
  * { name, propertyId, siteUrl?, widgets, gridLayouts, theme } (migrated on the way in).
  */
 export async function POST(req: Request) {
@@ -114,7 +116,7 @@ export async function POST(req: Request) {
             // Pin the assets so the dashboard keeps reading the same property and site.
             defaultSource = { type: 'site', siteId: site.siteId, ga4: site.ga4, gsc: site.gsc };
         }
-        doc = buildFromTemplate(templateId, { name, defaultSource });
+        doc = buildFromTemplate(templateId, { name, defaultSource, themeId: typeof body.themeId === 'string' ? body.themeId : undefined });
     }
     try {
         const ids = propertyIdFor(doc);

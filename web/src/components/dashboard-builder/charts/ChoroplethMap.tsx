@@ -42,9 +42,11 @@ export interface ChoroplethMapProps {
     format: (v: number) => string;
     label: string;
     showLegend: boolean;
+    /** Click to filter (round 2): a click on a country with data calls this with its code. */
+    onSelect?: (code: string) => void;
 }
 
-export function ChoroplethMap({ values, color, width, height, projection, steps, format, label, showLegend }: ChoroplethMapProps) {
+export function ChoroplethMap({ values, color, width, height, projection, steps, format, label, showLegend, onSelect }: ChoroplethMapProps) {
     const [features, setFeatures] = useState<CountryFeature[] | null>(null);
     const [failed, setFailed] = useState(false);
     const [hover, setHover] = useState<{ x: number; y: number; code: string } | null>(null);
@@ -93,6 +95,8 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
                             fill={fillFor(v)}
                             stroke="var(--color-surface)"
                             strokeWidth={0.5}
+                            onClick={onSelect && code && v ? () => onSelect(code) : undefined}
+                            style={onSelect && code && v ? { cursor: 'pointer' } : undefined}
                             onMouseMove={(e) => {
                                 const box = ref.current?.getBoundingClientRect();
                                 if (box && code) setHover({ x: e.clientX - box.left, y: e.clientY - box.top, code });

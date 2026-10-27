@@ -9,7 +9,7 @@
  */
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { GridLayout, verticalCompactor, type Layout, type LayoutItem as RglItem } from 'react-grid-layout';
-import { Copy, GripVertical, MoreHorizontal, MoveRight, Trash2, Settings2 } from 'lucide-react';
+import { ClipboardCopy, Copy, GripVertical, MoreHorizontal, MoveRight, Trash2, Settings2 } from 'lucide-react';
 
 import 'react-grid-layout/css/styles.css';
 
@@ -17,6 +17,7 @@ import { cn } from '@/lib/cn';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui';
 import { layoutFor } from '@/lib/builder/docOps';
 import { widgetMeta, widgetTitle } from '@/lib/builder/registry';
+import { densityPx, isDefaultLook, themeOptions } from '@/lib/builder/themes';
 import type { DashboardDocV2, LayoutItem, PageDef, WidgetDef, WidgetType } from '@/lib/builder/types';
 
 export const ROW_H = 32;
@@ -24,8 +25,15 @@ export const MARGIN = 16;
 export const COLS = { lg: 12, md: 6, sm: 1 } as const;
 export type Bp = keyof typeof COLS;
 
-export function pxHeight(h: number): number {
-    return h * (ROW_H + MARGIN) - MARGIN;
+export function pxHeight(h: number, rowH = ROW_H, gap = MARGIN): number {
+    return h * (rowH + gap) - gap;
+}
+
+/** Row height and gap for a dashboard: today's 32/16 unless a theme picks another density. */
+export function gridMetrics(doc: Pick<DashboardDocV2, 'theme'>): { rowH: number; gap: number } {
+    if (isDefaultLook(doc.theme)) return { rowH: ROW_H, gap: MARGIN };
+    const d = densityPx(themeOptions(doc.theme).density);
+    return { rowH: d.row, gap: d.gap };
 }
 
 /**
@@ -50,6 +58,8 @@ export interface CanvasEditProps {
     onCommitLayout: (bp: Bp, items: LayoutItem[]) => void;
     onDropNew: (type: WidgetType, at: { x: number; y: number; w: number; h: number }) => void;
     onDuplicate: (id: string) => void;
+    /** Copy to the clipboard (paste here or in another dashboard). */
+    onCopy?: (id: string) => void;
     onDelete: (id: string) => void;
     onMoveToPage: (id: string, pageId: string) => void;
     pages: PageDef[];
@@ -64,6 +74,8 @@ export interface DashboardCanvasProps {
     renderWidget: (widget: WidgetDef, heightPx: number, bp: Bp) => ReactNode;
     edit?: CanvasEditProps;
     empty?: ReactNode;
+    /** TV mode: stretch or shrink the rows so the page fits this many CSS px of height. */
+    fitHeight?: number;
 }
 
 function toRgl(items: LayoutItem[], doc: DashboardDocV2, bp: Bp, editing: boolean): RglItem[] {
@@ -78,9 +90,13 @@ function toRgl(items: LayoutItem[], doc: DashboardDocV2, bp: Bp, editing: boolea
     });
 }
 
-export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit, empty }: DashboardCanvasProps) {
+export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit, empty, fitHeight }: DashboardCanvasProps) {
     const editing = mode === 'edit' && Boolean(edit);
+    const metrics = gridMetrics(doc);
     const items = useMemo(() => layoutFor(doc, page, bp), [doc, page, bp]);
+    const gap = metrics.gap;
+    const rows = items.reduce((m, l) => Math.max(m, l.y + l.h), 0);
+    const rowH = fitHeight && rows && bp !== 'sm' ? Math.max(14, Math.min(96, Math.floor((fitHeight + gap) / rows - gap))) : metrics.rowH;
     const layout = useMemo(() => toRgl(items, doc, bp, editing), [items, doc, bp, editing]);
 
     const commit = useCallback((l: Layout) => {
@@ -92,11 +108,11 @@ export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit
     // Phones in view mode: plain stacked list (no drag library, no transforms).
     if (bp === 'sm' && !editing) {
         return (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4" style={gap !== MARGIN ? { gap } : undefined}>
                 {items.map((l) => {
                     const w = doc.widgets[l.i];
                     if (!w) return null;
-                    const h = Math.max(pxHeight(l.h), w.mobile?.minHeight ?? 0);
+                    const h = Math.max(pxHeight(l.h, rowH, gap), w.mobile?.minHeight ?? 0);
                     return <div key={l.i} style={{ height: h }} className="min-w-0">{renderWidget(w, h, bp)}</div>;
                 })}
             </div>
@@ -116,7 +132,7 @@ export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit
                 <GridLayout
                     width={width}
                     layout={layout}
-                    gridConfig={{ cols: COLS[bp], rowHeight: ROW_H, margin: [MARGIN, MARGIN], containerPadding: [0, 0] }}
+                    gridConfig={{ cols: COLS[bp], rowHeight: rowH, margin: [gap, gap], containerPadding: [0, 0] }}
                     dragConfig={{ enabled: editing, handle: '.tc-drag-handle', bounded: false, threshold: 3 }}
                     resizeConfig={{ enabled: editing, handles: ['s', 'e', 'w', 'n', 'se', 'sw', 'ne', 'nw'] }}
                     dropConfig={{
@@ -146,7 +162,7 @@ export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit
                                 onClick={editing ? (e) => { e.stopPropagation(); edit!.onSelect(w.id); } : undefined}
                             >
                                 {editing ? <EditTools widget={w} edit={edit!} selected={selected} /> : null}
-                                <div className={cn('h-full', editing && 'pointer-events-auto')}>{renderWidget(w, pxHeight(l.h), bp)}</div>
+                                <div className={cn('h-full', editing && 'pointer-events-auto')}>{renderWidget(w, pxHeight(l.h, rowH, gap), bp)}</div>
                             </div>
                         );
                     })}
@@ -176,6 +192,7 @@ function EditTools({ widget, edit, selected }: { widget: WidgetDef; edit: Canvas
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenuItem icon={Settings2} onSelect={() => edit.onSelect(widget.id)}>Configure</DropdownMenuItem>
                     <DropdownMenuItem icon={Copy} shortcut="⌘D" onSelect={() => edit.onDuplicate(widget.id)}>Duplicate</DropdownMenuItem>
+                    {edit.onCopy ? <DropdownMenuItem icon={ClipboardCopy} shortcut="⌘C" onSelect={() => edit.onCopy!(widget.id)}>Copy</DropdownMenuItem> : null}
                     {others.length ? (
                         <DropdownMenuSub>
                             <DropdownMenuSubTrigger icon={MoveRight}>Move to page</DropdownMenuSubTrigger>

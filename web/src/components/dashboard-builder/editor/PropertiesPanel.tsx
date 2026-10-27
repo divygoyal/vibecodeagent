@@ -5,19 +5,32 @@
  * widget, filter-control settings for a selected control, Dashboard settings when nothing is
  * selected. Every change goes through the editor store (undoable, coalesced while typing).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Copy, Lock, Trash2 } from 'lucide-react';
 
 import { Banner, Button, Tabs } from '@/components/ui';
-import { dimLabel, metricLabel } from '@/lib/builder/catalog';
+import { dimLabel, getMetric, metricLabel } from '@/lib/builder/catalog';
 import { tableColumns, widgetMeta, widgetMetrics } from '@/lib/builder/registry';
 import { removeWidget, duplicateWidget, updateWidget } from '@/lib/builder/docOps';
 import { MENU_PRESETS, PRESETS } from '@/lib/builder/dates';
 import type { ControlDef, DashboardDocV2, FilterControl, MetricRef, SourceRef, TableColumn, WidgetDef } from '@/lib/builder/types';
 import { useEditorStore } from '@/stores/dashboardEditorStore';
+import { useResolvedTheme } from '@/lib/theme';
+import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { Choice, DimensionPicker, Field, MetricList, MetricPicker, NumberInput, SourcePicker, TextInput, Toggle, type SiteOption } from './Fields';
+import { RulesEditor } from './RulesEditor';
+import { VariablesEditor } from './VariablesEditor';
+import { WidgetFilters } from './WidgetFilters';
 
 type Patch = (w: WidgetDef) => WidgetDef;
+
+/** Window event that opens Dashboard settings on the Appearance tab. */
+export const APPEARANCE_EVENT = 'tc:dash-appearance';
+export function openAppearance() {
+    (window as { __tcDashTab?: string }).__tcDashTab = 'appearance';
+    window.dispatchEvent(new Event(APPEARANCE_EVENT));
+    setTimeout(() => { (window as { __tcDashTab?: string }).__tcDashTab = undefined; }, 500);
+}
 
 function useWidgetEdit(widget: WidgetDef) {
     const apply = useEditorStore((s) => s.apply);
@@ -66,7 +79,12 @@ function WidgetProps({ widget, doc, sites, defaultLabel }: { widget: WidgetDef; 
                 <Tabs variant="pills" ariaLabel="Widget settings" value={tab} onValueChange={(v) => setTab(v as 'setup' | 'style')} items={[{ value: 'setup', label: 'Setup' }, { value: 'style', label: 'Style' }]} className="mt-2" />
             </div>
             <div id="tc-setup" className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-                {tab === 'setup' ? <Setup widget={widget} edit={edit} sites={sites} defaultLabel={defaultLabel} doc={doc} /> : <Style widget={widget} edit={edit} />}
+                {tab === 'setup' ? (
+                    <>
+                        <Setup widget={widget} edit={edit} sites={sites} defaultLabel={defaultLabel} doc={doc} />
+                        {!meta.static ? <div className="border-t border-border-subtle pt-4"><WidgetFilters widget={widget} doc={doc} edit={edit} /></div> : null}
+                    </>
+                ) : <Style widget={widget} edit={edit} />}
             </div>
             <div className="flex gap-2 border-t border-border-subtle p-3">
                 <Button size="sm" variant="secondary" icon={Copy} onClick={() => { let id = ''; apply((d) => { const r = duplicateWidget(d, widget.id); id = r.id; return r.doc; }, { announce: 'Widget duplicated' }); if (id) select(id); }}>Duplicate</Button>
@@ -92,6 +110,7 @@ function Setup({ widget, edit, sites, defaultLabel, doc }: { widget: WidgetDef; 
                     <Field label="Metric"><MetricPicker value={widget.config.metric.id} onChange={(id) => edit((w) => cfg(w as typeof widget, { metric: { ...widget.config.metric, id } }))} /></Field>
                     <Toggle label="Show comparison" checked={widget.config.comparison.show} onChange={(v) => edit((w) => cfg(w as typeof widget, { comparison: { ...widget.config.comparison, show: v } }))} />
                     <Toggle label="Sparkline" checked={widget.config.sparkline.show} onChange={(v) => edit((w) => cfg(w as typeof widget, { sparkline: { ...widget.config.sparkline, show: v } }))} />
+                    <ScorecardTarget widget={widget} edit={edit} />
                 </>
             );
         case 'kpi-strip':
@@ -265,7 +284,28 @@ function TableSetup({ widget, edit, source, portfolio }: { widget: Extract<Widge
             <Toggle label="Pagination" checked={c.pagination} onChange={(v) => edit((w) => cfg(w as typeof widget, { pagination: v }))} />
             <Toggle label="Search box" checked={c.search} onChange={(v) => edit((w) => cfg(w as typeof widget, { search: v }))} />
             <Toggle label="Totals row" checked={c.totalsRow} onChange={(v) => edit((w) => cfg(w as typeof widget, { totalsRow: v }))} />
+            <div className="border-t border-border-subtle pt-4"><RulesEditor widget={widget} edit={edit} /></div>
         </>
+    );
+}
+
+/** Goal for the period on a scorecard (round 2): progress bar and colour under the number. */
+function ScorecardTarget({ widget, edit }: { widget: Extract<WidgetDef, { type: 'scorecard' }>; edit: (fn: Patch, key?: string) => void }) {
+    const t = widget.config.target;
+    const [draft, setDraft] = useState(t ? String(t.value) : '');
+    const pct = getMetric(widget.config.metric.id)?.format === 'percent';
+    const commit = (raw: string) => {
+        setDraft(raw);
+        const n = Number(raw.replace(/[,\s%]/g, ''));
+        edit((w) => cfg(w as typeof widget, { target: raw.trim() && Number.isFinite(n) && n > 0 ? { value: pct ? n / 100 : n, label: t?.label } : undefined }), 'target');
+    };
+    return (
+        <Field label="Target for the period" hint={pct ? 'In %. Shows progress and turns green when met.' : 'Shows progress and turns green when met. For position, lower is better.'}>
+            <div className="flex items-center gap-2">
+                <input aria-label="Target" inputMode="decimal" value={draft} placeholder={pct ? 'e.g. 3' : 'e.g. 5000'} onChange={(e) => commit(e.target.value)} className="h-9 w-28 rounded-control border border-border bg-surface px-3 text-body tabular-nums text-fg" />
+                {t ? <input aria-label="Target label" value={t.label ?? ''} placeholder="Label (Goal)" maxLength={40} onChange={(e) => edit((w) => cfg(w as typeof widget, { target: { value: t.value, label: e.target.value || undefined } }), 'target-label')} className="h-9 min-w-0 flex-1 rounded-control border border-border bg-surface px-3 text-body text-fg" /> : null}
+            </div>
+        </Field>
     );
 }
 
@@ -324,12 +364,28 @@ function ControlProps({ control, doc }: { control: FilterControl; doc: Dashboard
 
 function DashboardSettings({ doc, sites }: { doc: DashboardDocV2; sites: SiteOption[] }) {
     const apply = useEditorStore((s) => s.apply);
+    const appMode = useResolvedTheme();
+    const [tab, setTab] = useState<'general' | 'appearance'>(() => (typeof window !== 'undefined' && (window as { __tcDashTab?: string }).__tcDashTab === 'appearance' ? 'appearance' : 'general'));
+    useEffect(() => {
+        // The editor toolbar's Theme button opens this tab (see APPEARANCE_EVENT).
+        const open = () => setTab('appearance');
+        window.addEventListener(APPEARANCE_EVENT, open);
+        return () => window.removeEventListener(APPEARANCE_EVENT, open);
+    }, []);
     const dc = doc.controls.find((c) => c.type === 'date');
     const set = (fn: (d: DashboardDocV2) => DashboardDocV2, key?: string) => apply(fn, { coalesce: key ? `doc:${key}` : undefined });
     const setDate = (patch: Record<string, unknown>) => set((d) => ({ ...d, controls: d.controls.map((c) => (c.type === 'date' ? ({ ...c, ...patch } as ControlDef) : c)) }));
     return (
         <>
-            <div className="border-b border-border-subtle px-4 py-3"><p className="text-caption uppercase tracking-[0.04em] text-fg-muted">Dashboard settings</p></div>
+            <div className="border-b border-border-subtle px-4 pb-2 pt-3">
+                <p className="text-caption uppercase tracking-[0.04em] text-fg-muted">Dashboard settings</p>
+                <Tabs variant="pills" ariaLabel="Dashboard settings" value={tab} onValueChange={(v) => setTab(v as 'general' | 'appearance')} items={[{ value: 'general', label: 'General' }, { value: 'appearance', label: 'Appearance' }]} className="mt-2" />
+            </div>
+            {tab === 'appearance' ? (
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                    <AppearanceSettings theme={doc.theme} mode={appMode} pages={doc.pages.filter((p) => !p.hidden).length} onChange={(t) => set((d) => ({ ...d, theme: t }), 'theme')} />
+                </div>
+            ) : (
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
                 <Field label="Name"><TextInput value={doc.name} onChange={(v) => set((d) => ({ ...d, name: v.slice(0, 200) || d.name }), 'name')} /></Field>
                 <Field label="Description"><TextInput multiline rows={2} value={doc.description ?? ''} onChange={(v) => set((d) => ({ ...d, description: v.slice(0, 2000) || undefined }), 'desc')} /></Field>
@@ -348,18 +404,20 @@ function DashboardSettings({ doc, sites }: { doc: DashboardDocV2; sites: SiteOpt
                     </>
                 ) : null}
                 <Field label="Appearance for shared links"><Choice ariaLabel="Appearance" value={doc.theme.mode} onChange={(v) => set((d) => ({ ...d, theme: { ...d.theme, mode: v } }))} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'auto', label: 'Match viewer' }]} /></Field>
-                <Toggle label="Header with logo and company name" checked={doc.theme.header.show} onChange={(v) => set((d) => ({ ...d, theme: { ...d.theme, header: { ...d.theme.header, show: v } } }))} />
-                {doc.theme.header.show ? (
-                    <>
-                        <Field label="Company name"><TextInput value={doc.theme.header.companyName ?? ''} onChange={(v) => set((d) => ({ ...d, theme: { ...d.theme, header: { ...d.theme.header, companyName: v.slice(0, 120) || undefined } } }), 'company')} /></Field>
-                        <Field label="Logo URL" hint="https only."><TextInput value={doc.theme.header.logoUrl ?? ''} placeholder="https://…" onChange={(v) => set((d) => ({ ...d, theme: { ...d.theme, header: { ...d.theme.header, logoUrl: /^https:\/\//i.test(v.trim()) ? v.trim() : undefined } } }), 'logo')} /></Field>
-                    </>
-                ) : null}
                 <Toggle label="Show dates under the title" checked={doc.theme.header.showDates} onChange={(v) => set((d) => ({ ...d, theme: { ...d.theme, header: { ...d.theme.header, showDates: v } } }))} />
-                <Toggle label="Show “Made with TrafficClaw”" checked={doc.theme.badge.show} onChange={(v) => set((d) => ({ ...d, theme: { ...d.theme, badge: { show: v } } }))} />
                 <Field label="Width"><Choice ariaLabel="Width" value={doc.settings.widthMode} onChange={(v) => set((d) => ({ ...d, settings: { ...d.settings, widthMode: v } }))} options={[{ value: 'contained', label: 'Contained' }, { value: 'full', label: 'Full width' }]} /></Field>
                 <Field label="Auto-refresh"><Choice ariaLabel="Auto-refresh" value={String(doc.settings.autoRefreshSec) as '0'} onChange={(v) => set((d) => ({ ...d, settings: { ...d.settings, autoRefreshSec: Number(v) as 0 } }))} options={[{ value: '0', label: 'Off' }, { value: '300', label: 'Every 5 minutes' }, { value: '900', label: 'Every 15 minutes' }, { value: '1800', label: 'Every 30 minutes' }, { value: '3600', label: 'Every hour' }]} /></Field>
+                <div className="border-t border-border-subtle pt-4"><VariablesEditor doc={doc} set={set} /></div>
+                <div className="space-y-3 border-t border-border-subtle pt-4">
+                    <p className="text-caption uppercase tracking-[0.04em] text-fg-muted">TV mode</p>
+                    <Field label="Change page every" hint={doc.pages.filter((p) => !p.hidden).length > 1 ? 'Open with Present, or add ?tv=1 to the dashboard or share link. Data refreshes at least every 5 minutes.' : 'Add pages to rotate them. Open with Present, or add ?tv=1 to the link.'}>
+                        <Choice ariaLabel="Rotate pages" value={String(doc.settings.tv?.rotateSec ?? 30) as '30'} onChange={(v) => set((d) => ({ ...d, settings: { ...d.settings, tv: { rotateSec: Number(v) as 30, hideControls: d.settings.tv?.hideControls ?? true } } }))}
+                            options={[{ value: '0', label: 'Do not rotate' }, { value: '15', label: '15 seconds' }, { value: '30', label: '30 seconds' }, { value: '60', label: '1 minute' }, { value: '120', label: '2 minutes' }]} />
+                    </Field>
+                    <Toggle label="Hide filters in TV mode" checked={doc.settings.tv?.hideControls ?? true} onChange={(v) => set((d) => ({ ...d, settings: { ...d.settings, tv: { rotateSec: d.settings.tv?.rotateSec ?? 30, hideControls: v } } }))} />
+                </div>
             </div>
+            )}
         </>
     );
 }
