@@ -45,3 +45,17 @@ Shots: /root/projects/tc-redesign-research/round2/candidate/dash/.
 ## Left / not done
 - chartTint (brand colour on single-series charts) and per-series point markers (only dash patterns).
 - Calculated metrics, scheduled email, server PDF (owner: no headless browser), annotations, widget library.
+
+## PAUSED 2026-10-27 ~08:10 UTC (coordinator: usage limit)
+Done: everything above is committed (gate, 16 templates + gallery, 8 themes + picker + live preview, brand kit,
+cover, branded PDF, TV mode, widget filters UI, table rules, scorecard targets, copy/paste, variables,
+click to filter). Last full gate (cand1, before the variables/lint commits): 28/28 identical after
+re-shooting 2 known-flaky shots (donut sizing race, also seen in the baseline samples).
+Next on resume:
+1. up.sh r2dash 3113 8113 (slots are often full: loop until free), login.mjs.
+2. Re-run the full gate: dash-golden.mjs capture 3113 golden/cand2, compare base,base2,base3 cand2; re-shoot
+   flaky shots with --only.
+3. seed-tour.mjs (scratchpad) for the feature tour; screenshots via scratchpad mkjobs.py (templates, themes,
+   baseline, features) + bshot.mjs into round2/candidate/dash/; sheet.py contact sheets.
+4. check-mobile.mjs on dashboard routes (--paths list, gallery, themed views, public client report); down.sh.
+5. Report.
