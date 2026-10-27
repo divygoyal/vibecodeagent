@@ -79,3 +79,14 @@ Candidate screenshots: /root/projects/tc-redesign-research/round2/candidate/poli
   /performance redirects (WS2 area). Report: round2/candidate/polish-mobile/mobile-r2polish.md.
 - The Devices donut legend on the dashboard view follows the builder's own width rule (WS3); WS1 did not change Donut layout.
 - Server down, web/.next removed.
+
+## Judge fixes (2026-10-27, VERDICT 36 W / 6 L / 10 T, ship-with-fixes)
+- Re-captured app-leaderboard-1440-dark, site-traffic-390-light, site-pages-390-light: the preview, the traffic
+  data and the 46-page list all render; the losses were capture timing, not app bugs.
+- Phone dashboard table widget: `Table mobileList="compact"` (one meta line, same row height) and TableView sizes
+  the page to the cell and always paginates on phones, so no row is cut and the pager shows.
+- PageHeader `keepBadgesOnPhone` (Connect AI "4 connected" back on phones).
+- Portfolio: GA4 badge back on Analytics-only cards (also on phones); "Users (sum of sites)" label back.
+- Sort arrows faint on every sortable column again; Settings centred again with tab icons at md+ (`Tabs showIcons`).
+- Re-shot: leaderboard 1440, traffic/pages 390 light, dashboard-view 390, dashboard-edit 1440, connect-ai 390,
+  portfolio and settings (all 4 variants).

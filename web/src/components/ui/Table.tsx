@@ -91,9 +91,11 @@ export interface TableProps<T> {
     /**
      * Phones show each row as a two-line list item (title + main number, then
      * the other numbers) instead of a table that scrolls its numbers off
-     * screen (default true). false keeps the scrolling table.
+     * screen (default true). false keeps the scrolling table. 'compact' keeps
+     * every row the same height (one meta line, faded at the edge) for
+     * fixed-height boxes such as dashboard widgets.
      */
-    mobileList?: boolean;
+    mobileList?: boolean | 'compact';
     className?: string;
 }
 
@@ -220,12 +222,12 @@ export function Table<T>({
                                             className={cn('group/sort relative inline-flex items-center gap-1 rounded hover:text-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-x-2.5 pointer-coarse:after:-inset-y-2.5', active && 'text-fg', c.align === 'right' && 'flex-row-reverse')}
                                         >
                                             {c.header}
-                                            {/* The arrow shows on the sorted column only, and on hover/focus (critique 2.2). */}
+                                            {/* Faint arrows on every sortable column, solid on the sorted one. */}
                                             <SortIcon
                                                 aria-hidden
                                                 size={12}
                                                 strokeWidth={1.75}
-                                                className={active ? 'text-fg' : 'text-fg-faint opacity-0 transition-opacity duration-120 group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100'}
+                                                className={active ? 'text-fg' : 'text-fg-faint transition-colors duration-120 group-hover/sort:text-fg-muted'}
                                             />
                                         </button>
                                     ) : c.header}
@@ -367,9 +369,14 @@ export function Table<T>({
                                     {trailingCols.map((c) => <span key={c.key} className="shrink-0" onClick={(e) => e.stopPropagation()}>{c.cell(row, r)}</span>)}
                                 </div>
                                 {meta.length ? (
-                                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-meta tabular-nums">
+                                    <div
+                                        className={cn(
+                                            'flex min-w-0 items-center gap-x-3 gap-y-0.5 text-meta tabular-nums',
+                                            mobileList === 'compact' ? 'overflow-hidden [mask-image:linear-gradient(to_right,#000_85%,transparent)]' : 'flex-wrap',
+                                        )}
+                                    >
                                         {meta.map(({ c, label }) => (
-                                            <span key={c.key} className="inline-flex min-w-0 items-center gap-1 whitespace-nowrap">
+                                            <span key={c.key} className={cn('inline-flex items-center gap-1 whitespace-nowrap', mobileList === 'compact' ? 'shrink-0' : 'min-w-0')}>
                                                 {label ? <span className="text-fg-muted">{label}</span> : null}
                                                 <span className="text-fg-secondary">{c.cell(row, r)}</span>
                                             </span>

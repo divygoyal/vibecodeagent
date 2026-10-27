@@ -27,6 +27,8 @@ export interface TabsProps<T extends string = string> {
     variant?: 'underline' | 'pills';
     ariaLabel: string;
     className?: string;
+    /** Underline tabs: show item icons from md up (phones stay text-only so more tabs fit). */
+    showIcons?: boolean;
     /** id prefix of the panels, for aria-controls on in-page tabs. */
     panelIdPrefix?: string;
 }
@@ -62,7 +64,7 @@ function useMoreToTheRight() {
  * (underline) tabs are text only, like Linear and Vercel (critique 2.8): an
  * item's icon shows in pills only.
  */
-export function Tabs<T extends string = string>({ items, value, onValueChange, variant = 'underline', ariaLabel, className, panelIdPrefix }: TabsProps<T>) {
+export function Tabs<T extends string = string>({ items, value, onValueChange, variant = 'underline', ariaLabel, className, panelIdPrefix, showIcons }: TabsProps<T>) {
     const id = useId();
     const reduce = useReducedMotion();
     const refs = useRef<(HTMLElement | null)[]>([]);
@@ -113,7 +115,7 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
                 );
                 const inner = (
                     <>
-                        {Icon && !underline ? <Icon aria-hidden size={16} strokeWidth={1.75} /> : null}
+                        {Icon && (!underline || showIcons) ? <Icon aria-hidden size={16} strokeWidth={1.75} className={underline ? 'max-md:hidden' : undefined} /> : null}
                         <span>{t.label}</span>
                         {t.count !== undefined && t.count !== null ? <span className="text-meta text-fg-muted tabular-nums">{t.count}</span> : null}
                         {underline && active ? (

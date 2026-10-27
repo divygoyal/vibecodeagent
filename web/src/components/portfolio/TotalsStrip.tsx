@@ -48,7 +48,7 @@ export function TotalsStrip({ data, metric, onMetricChange, comparisonLabel, dim
             // Each site's users are exact; across sites they add up (a visitor of two sites counts twice).
             return {
                 metric: m, value: t?.cur.users, previous: t?.prev?.users ?? null,
-                label: 'Users',
+                label: total > 1 ? 'Users (sum of sites)' : 'Users',
                 hint: total > 1 ? 'Summed across sites: a visitor of two sites counts twice' : undefined,
                 loading: Boolean(data.usersPending && t && !t.cur.usersExact),
             };

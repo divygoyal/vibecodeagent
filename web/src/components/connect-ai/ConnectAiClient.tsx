@@ -162,6 +162,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
             <PageHeader
                 title="Connect AI"
                 subtitle="Ask ChatGPT, Claude and other MCP apps about your Analytics and Search Console data. Read-only, free, and you choose which sites each app sees."
+                keepBadgesOnPhone
                 badges={data ? <Pill tone={grants.length ? 'brand' : 'neutral'} icon={<Plug aria-hidden size={12} strokeWidth={1.75} />}>{grants.length ? `${grants.length} connected` : 'Nothing connected yet'}</Pill> : null}
             />
 

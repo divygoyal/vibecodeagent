@@ -202,7 +202,10 @@ export const SiteCard = memo(function SiteCard({
                     tooltip. No GA4 badge: the users row already says the site has Analytics. */}
                 {site.gsc ? (
                     <Badge className="hidden @xs:inline-flex max-sm:hidden">{site.gsc.propertyType === 'domain' ? 'Domain' : 'Prefix'}</Badge>
-                ) : null}
+                ) : (
+                    // Analytics-only site: the one badge that carries meaning here, kept on phones too.
+                    <Badge title="Google Analytics only, no Search Console property">GA4</Badge>
+                )}
                 <span className="flex-1" />
                 {readOnly ? (
                     site.starred ? <Star aria-label="Starred" size={16} strokeWidth={1.75} className="shrink-0 fill-star text-star" /> : null

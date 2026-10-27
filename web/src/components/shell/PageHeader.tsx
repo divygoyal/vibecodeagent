@@ -36,6 +36,8 @@ export interface PageHeaderProps {
     secondaryActions?: ReactNode;
     /** Tabs row under the header (<Tabs variant="underline" />). */
     tabs?: ReactNode;
+    /** Keep the badges on phones (short status pills such as "4 connected"); default hides them under 640px. */
+    keepBadgesOnPhone?: boolean;
     /** Shows a back arrow link before the title. */
     backHref?: string;
     /** Italic demo note: "Illustrative portfolio". */
@@ -48,7 +50,7 @@ export interface PageHeaderProps {
  * shell provides the sidebar, topbar and breadcrumb. On mobile the title
  * shrinks and the actions become one horizontally scrolling row.
  */
-export function PageHeader({ title, subtitle, icon, badges, actions, secondaryActions, tabs, backHref, note, className }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, icon, badges, keepBadgesOnPhone, actions, secondaryActions, tabs, backHref, note, className }: PageHeaderProps) {
     // One Ask AI per screen (critique #7): a header with its own Ask hides the topbar's.
     const shell = useOptionalShell();
     const setPageAsk = shell?.setPageAsk;
@@ -71,7 +73,7 @@ export function PageHeader({ title, subtitle, icon, badges, actions, secondaryAc
                         {icon ? <span className="flex shrink-0">{icon}</span> : null}
                         <h1 className="min-w-0 truncate text-title text-fg md:text-heading" title={typeof title === 'string' ? title : undefined}>{title}</h1>
                         {/* Phones: no badges, so they never squeeze the title (critique #8). */}
-                        {badges ? <div className="flex shrink-0 flex-wrap items-center gap-1.5 max-sm:hidden">{badges}</div> : null}
+                        {badges ? <div className={cn('flex shrink-0 flex-wrap items-center gap-1.5', !keepBadgesOnPhone && 'max-sm:hidden')}>{badges}</div> : null}
                     </div>
                     {subtitle ? <p className="mt-1 text-body-sm text-pretty text-fg-muted">{subtitle}</p> : null}
                     {note ? <p className="mt-0.5 text-meta text-fg-faint italic">{note}</p> : null}
