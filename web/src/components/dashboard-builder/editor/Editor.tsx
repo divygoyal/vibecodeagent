@@ -14,7 +14,7 @@ import useSWR from 'swr';
 import { toast } from 'sonner';
 import {
     ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, LayoutTemplate, Loader2, Monitor, MoreHorizontal, Pencil,
-    Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson, ClipboardPaste, MonitorPlay, Palette,
+    Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson, ClipboardCopy, ClipboardPaste, MonitorPlay, Palette,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -387,7 +387,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                                 <DropdownMenuContent>
                                                     <DropdownMenuItem icon={Pencil} onSelect={() => setRenaming(p.id)}>Rename</DropdownMenuItem>
                                                     <DropdownMenuItem icon={Copy} onSelect={() => { let nid = ''; s.apply((d) => { const r = duplicatePage(d, p.id); nid = r.id; return r.doc; }); if (nid) s.setPage(nid); }}>Duplicate</DropdownMenuItem>
-                                                    <DropdownMenuItem icon={ClipboardPaste} onSelect={() => copyText(copyPage(doc, p.id), `Page “${p.title}”`)}>Copy page</DropdownMenuItem>
+                                                    <DropdownMenuItem icon={ClipboardCopy} onSelect={() => copyText(copyPage(doc, p.id), `Page “${p.title}”`)}>Copy page</DropdownMenuItem>
                                                     <DropdownMenuItem icon={ChevronLeft} disabled={i === 0} onSelect={() => s.apply((d) => movePage(d, p.id, -1))}>Move left</DropdownMenuItem>
                                                     <DropdownMenuItem icon={ChevronRight} disabled={i === doc.pages.length - 1} onSelect={() => s.apply((d) => movePage(d, p.id, 1))}>Move right</DropdownMenuItem>
                                                     <DropdownMenuItem icon={p.hidden ? Eye : EyeOff} onSelect={() => s.apply((d) => updatePage(d, p.id, (x) => ({ ...x, hidden: !x.hidden })))}>{p.hidden ? 'Show to viewers' : 'Hide from viewers'}</DropdownMenuItem>

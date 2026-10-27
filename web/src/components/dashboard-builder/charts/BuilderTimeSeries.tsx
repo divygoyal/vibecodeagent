@@ -210,9 +210,9 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     ? breakdown.keys.map((k, i) => {
                         const color = breakdownColor(breakdown.dimension, k, i);
                         return breakdown.stacked ? (
-                            <Area key={k} yAxisId="b" dataKey={k} stackId="b" type="monotone" stroke={color} strokeWidth={1.5} fill={color} fillOpacity={0.18} isAnimationActive={anim} animationDuration={400} name={breakdownLabel(breakdown.dimension, k, breakdown.labels)} activeDot={false} />
+                            <Area key={k} className={`tc-series-${i}`} yAxisId="b" dataKey={k} stackId="b" type="monotone" stroke={color} strokeWidth={1.5} fill={color} fillOpacity={0.18} isAnimationActive={anim} animationDuration={400} name={breakdownLabel(breakdown.dimension, k, breakdown.labels)} activeDot={false} />
                         ) : (
-                            <Line key={k} yAxisId="b" dataKey={k} type="monotone" stroke={color} strokeWidth={2} dot={false} isAnimationActive={anim} animationDuration={400} name={breakdownLabel(breakdown.dimension, k, breakdown.labels)} />
+                            <Line key={k} className={`tc-series-${i}`} yAxisId="b" dataKey={k} type="monotone" stroke={color} strokeWidth={2} dot={false} isAnimationActive={anim} animationDuration={400} name={breakdownLabel(breakdown.dimension, k, breakdown.labels)} />
                         );
                     })
                     : null}
@@ -225,7 +225,7 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     <Area yAxisId={first.metric} dataKey={`m:${first.metric}`} type="monotone" stroke="none" fill={`url(#bts-${uid})`} connectNulls={false} isAnimationActive={anim} animationDuration={400} activeDot={false} tooltipType="none" />
                 ) : null}
 
-                {!breakdown ? series.map((s) => {
+                {!breakdown ? series.map((s, si) => {
                     const color = metricColor(s.metric);
                     const k = `m:${s.metric}`;
                     if (s.kind === 'bar') {
@@ -234,10 +234,10 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     const common = { yAxisId: s.metric, type: 'monotone' as const, stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, connectNulls: false, isAnimationActive: anim, animationDuration: 400 };
                     const isGsc = s.metric.startsWith('gsc:');
                     if (!hasPartial || !isGsc) {
-                        return <Line key={k} {...common} dataKey={k} dot={rows.length === 1 ? { r: 3, fill: color, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: color, stroke: 'var(--color-surface)', strokeWidth: 2 }} name={s.label ?? metricLabel(s.metric)} />;
+                        return <Line key={k} className={`tc-series-${si}`} {...common} dataKey={k} dot={rows.length === 1 ? { r: 3, fill: color, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: color, stroke: 'var(--color-surface)', strokeWidth: 2 }} name={s.label ?? metricLabel(s.metric)} />;
                     }
                     return [
-                        <Line key={`${k}-solid`} {...common} dataKey={`${k}__solid`} dot={false} activeDot={{ r: 4, fill: color, stroke: 'var(--color-surface)', strokeWidth: 2 }} name={s.label ?? metricLabel(s.metric)} />,
+                        <Line key={`${k}-solid`} className={`tc-series-${si}`} {...common} dataKey={`${k}__solid`} dot={false} activeDot={{ r: 4, fill: color, stroke: 'var(--color-surface)', strokeWidth: 2 }} name={s.label ?? metricLabel(s.metric)} />,
                         <Line key={`${k}-partial`} {...common} dataKey={`${k}__partial`} strokeDasharray="2 3" dot={false} activeDot={false} tooltipType="none" />,
                     ];
                 }) : null}
