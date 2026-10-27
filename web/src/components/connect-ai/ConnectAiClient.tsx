@@ -113,7 +113,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
         return (
             <>
                 <PageHeader title="Connect AI" />
-                <Card padding="none"><EmptyState variant="page" icon={Plug} title="Connect AI is not enabled" description="This server does not have the MCP connector turned on (TC_MCP_ENABLED)." /></Card>
+                <Card padding="none"><EmptyState variant="page" icon={Plug} title="Connect AI is not enabled" description="This server has the MCP connector turned off (TC_MCP_ENABLED=0)." /></Card>
             </>
         );
     }

@@ -24,8 +24,9 @@ export const REFRESH_FAMILY_TTL_S = 180 * 86400;
 export const SERVER_NAME = 'trafficclaw';
 export const SERVER_VERSION = '1.0.0';
 
+/** The hosted MCP server and Connect AI. On unless TC_MCP_ENABLED=0. */
 export function mcpEnabled(): boolean {
-    return process.env.TC_MCP_ENABLED === '1';
+    return process.env.TC_MCP_ENABLED !== '0';
 }
 
 /** Anonymous "Use demo data" grants (reviewer path). On unless TC_MCP_DEMO=0. */
