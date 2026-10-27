@@ -84,9 +84,10 @@ entries for /security and /changelog, the footer.
 ## Verification (2026-10-27)
 - `npx tsc --noEmit` clean; `npm test` 66/66 (new tests/marketingHome.test.mjs: proof thresholds, Actions preview rules,
   changelog entries); `npm run check:rsc` 0 errors; eslint clean on every changed file.
-- Mobile check (scripts/dev/check-mobile.mjs, 360/390/414, light, label `r2home-marketing`, run in small batches because box RAM
-  kept dropping under the 1.8 GB floor): /, /about, /changelog, /pricing, /security, /demo → 0 overflow, 0 offscreen, 0 errors,
-  0 small targets after fixes. Fixed on the way: trust-line link targets, /security scope URLs on 360px, /demo/[slug] back link.
+- Mobile check (scripts/dev/check-mobile.mjs, 360/390/414, light, label `r2home-marketing`): all 11 marketing routes I touch or
+  wrap (/, /pricing, /demo, /demo/acme, /security, /changelog, /about, /contact, /privacy, /terms, /tools) → 0 in every category
+  (overflow, offscreen, clipped, text, small targets, errors). Fixed on the way: trust-line link targets, /security scope URLs on
+  360px, the /demo/[slug] back link (a pre-existing 18px target). Report: scratchpad mobile/mobile-r2home-marketing.md.
 - Routes 200: /, /pricing, /demo, /demo/acme, /security, /changelog, /sitemap.xml (lists both new pages), /llms.txt (both new
   pages), OG images for both.
 - Screenshots for the blind judge: /root/projects/tc-redesign-research/round2/candidate/home/cand_{home,pricing,demo}-{1440,390}.png
