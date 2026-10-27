@@ -305,7 +305,7 @@ export function buildFromTemplate(id: string, opts: { name: string; defaultSourc
     let theme: ThemeV2 = b.theme ?? defaultTheme('light');
     const wanted = opts.themeId && isThemeId(opts.themeId) ? opts.themeId : b.themeId;
     if (wanted && isThemeId(wanted) && (wanted !== 'trafficclaw' || opts.themeId)) theme = applyThemePreset(theme, wanted as ThemeId);
-    if (b.cover) theme = { ...theme, cover: { enabled: true, layout: 'left', title: b.cover.title, subtitle: b.cover.subtitle } };
+    if (b.cover) theme = { ...theme, cover: { enabled: true, layout: b.cover.layout ?? 'left', title: b.cover.title, subtitle: b.cover.subtitle } };
     const settings: DashboardDocV2['settings'] = { widthMode: b.widthMode ?? 'contained', autoRefreshSec: b.autoRefreshSec ?? 0 };
     if (b.tv) settings.tv = { rotateSec: ([0, 15, 30, 60, 120].includes(b.tv.rotateSec) ? b.tv.rotateSec : 30) as 0 | 15 | 30 | 60 | 120, hideControls: b.tv.hideControls };
     return {

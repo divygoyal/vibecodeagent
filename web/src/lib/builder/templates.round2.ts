@@ -115,13 +115,30 @@ export const gridCompact = (id: string): PortfolioGridWidget => ({
 type Cell = [WidgetDef, number, number];
 type Rec = Record<string, WidgetDef>;
 
+/**
+ * Narrow tables keep only what fits: at half width the first three metric columns (the rest are
+ * hidden, still exportable) and a change chip on the first one only; at a third or less, two.
+ */
+function fitTable(w: WidgetDef, cw: number): WidgetDef {
+    if (w.type !== 'table' || cw > 6) return w;
+    const max = cw <= 4 ? 2 : 3;
+    let n = 0;
+    const columns = w.config.columns.map((col) => {
+        if (col.kind !== 'metric') return col;
+        n++;
+        return { ...col, hidden: n > max ? true : col.hidden, showDelta: n === 1 };
+    });
+    return { ...w, config: { ...w.config, columns } };
+}
+
 function page(id: string, title: string, rows: Cell[][], into: Rec): PageDef {
     const lg: LayoutItem[] = [];
     let y = 0;
     for (const row of rows) {
         let x = 0;
         let h = 0;
-        for (const [w, cw, ch] of row) {
+        for (const [w0, cw, ch] of row) {
+            const w = fitTable(w0, cw);
             into[w.id] = w;
             lg.push({ i: w.id, x, y, w: cw, h: ch });
             x += cw;
@@ -168,7 +185,7 @@ export interface BuiltR2 {
     /** Round 2 additions, ignored until the theme and TV features exist. */
     themeId?: string;
     tv?: { rotateSec: number; hideControls: boolean };
-    cover?: { title: string; subtitle: string };
+    cover?: { title: string; subtitle: string; layout?: 'left' | 'center' | 'split' };
     autoRefreshSec?: 0 | 300 | 900 | 1800 | 3600;
     widthMode?: 'contained' | 'full';
 }
@@ -181,7 +198,7 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
             widgets: w, themeId: 'executive',
             controls: [dateControl('28d')],
             pages: [page('p_main', 'Summary', [
-                [[text('w_intro', '## {{site}} at a glance\n{{date_range}}, {{compare_range}}.', 'heading'), 12, 3]],
+                [[text('w_intro', '## {{site}} at a glance\n{{date_range}}, {{compare_range}}.', 'heading'), 12, 2]],
                 [[kpi('w_kpis', ['gsc:clicks', 'gsc:impressions', 'ga4:activeUsers', 'ga4:sessions', 'ga4:keyEvents', 'ga4:engagementRate']), 12, 3]],
                 [[ts('w_search', 'Search clicks', ['gsc:clicks']), 6, 7], [ts('w_users', 'Users', ['ga4:activeUsers']), 6, 7]],
                 [[breakdownTs('w_channels', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 8], [pie('w_devices', 'Devices', 'device', 'ga4:sessions'), 4, 8]],
@@ -354,8 +371,8 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                     [[ts('w_search', 'Search', ['gsc:clicks', 'gsc:impressions']), 6, 7], [ts('w_visits', 'Visits', ['ga4:activeUsers', 'ga4:sessions']), 6, 7]],
                     [[table('w_cities', 'Cities your visitors are in', ['city'], ['ga4:activeUsers', 'ga4:sessions', 'ga4:engagementRate', 'ga4:keyEvents'], { bars: ['ga4:activeUsers'], search: true }), 6, 9],
                         [only(table('w_near', 'Near me and local searches', ['query'], SEARCH_COLS, { bars: ['gsc:clicks'] }), [{ dimension: 'query', op: 'regex', value: 'near me|nearby|open now|closest|in my area' }]), 6, 9]],
-                    [[pie('w_sdev', 'Search clicks by device', 'device', 'gsc:clicks'), 4, 7], [pie('w_vdev', 'Visits by device', 'device', 'ga4:sessions'), 4, 7],
-                        [only(table('w_actions', 'Calls, directions and forms', ['eventName'], ['ga4:eventCount', 'ga4:keyEvents'], { bars: ['ga4:eventCount'] }), [{ dimension: 'eventName', op: 'regex', value: 'call|phone|direction|map|form|contact|book|quote|lead' }]), 4, 7]],
+                    [[only(table('w_actions', 'Calls, directions and forms', ['eventName'], ['ga4:eventCount', 'ga4:keyEvents'], { bars: ['ga4:eventCount'], pageSize: 5 }), [{ dimension: 'eventName', op: 'regex', value: 'call|phone|direction|map|form|contact|book|quote|lead|sign_up|generate_lead|submit' }]), 6, 6],
+                        [pie('w_sdev', 'Search clicks by device', 'device', 'gsc:clicks'), 3, 6], [pie('w_vdev', 'Visits by device', 'device', 'ga4:sessions'), 3, 6]],
                 ], w),
                 page('p_pages', 'Location pages', [
                     [[only(table('w_loc', 'Location and service-area pages', ['page'], ['gsc:clicks', 'gsc:impressions', 'gsc:position', 'ga4:sessions', 'ga4:keyEvents'], { bars: ['gsc:clicks', 'ga4:keyEvents'] }), [{ dimension: 'page', op: 'regex', value: '/(locations?|service-areas?|areas?|stores?|branches?)/' }]), 12, 10]],
@@ -371,14 +388,13 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
         const theme: ThemeV2 = { mode: 'light', header: { show: true, companyName: 'Your company', logoPosition: 'left', showDates: true }, badge: { show: false } };
         return {
             widgets: w, theme, themeId: 'studio',
-            cover: { title: 'SEO report: {{site}}', subtitle: '{{date_range}}' },
+            cover: { title: 'SEO report: {{site}}', subtitle: '{{date_range}}', layout: 'split' },
             controls: [dateControl('last_month', { mode: 'previous_period' }, true)],
             pages: [
                 page('p_sum', 'Summary', [
-                    [[text('w_intro', '## SEO report for {{site}}\nResults for {{date_range}}, {{compare_range}}.', 'heading'), 12, 3]],
-                    [[kpi('w_kpis', ['gsc:clicks', 'gsc:impressions', 'gsc:position', 'ga4:activeUsers', 'ga4:sessions', 'ga4:keyEvents']), 12, 3]],
+                        [[kpi('w_kpis', ['gsc:clicks', 'gsc:impressions', 'gsc:position', 'ga4:activeUsers', 'ga4:sessions', 'ga4:keyEvents']), 12, 3]],
                     [[ts('w_trend', 'Search clicks and impressions', ['gsc:clicks', 'gsc:impressions']), 8, 8], [pie('w_dev', 'Search clicks by device', 'device', 'gsc:clicks'), 4, 8]],
-                    [[text('w_high', '### Highlights\n- \n- \n- ', 'callout'), 12, 4]],
+                    [[text('w_high', '### Highlights\n- The one result worth celebrating this month\n- What changed, and why, in one sentence\n- What we will do about it next month', 'callout'), 12, 4]],
                 ], w),
                 page('p_rank', 'Rankings', [
                     [[kpi('w_rk', ['gsc:position', 'gsc:ctr', 'gsc:impressions']), 12, 3]],
@@ -396,8 +412,8 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                     [[table('w_ken', 'Key events by name', ['eventName'], ['ga4:keyEvents', 'ga4:eventCount'], { rowFilters: [{ metric: 'ga4:keyEvents', op: 'gt', value: 0 }], bars: ['ga4:keyEvents'] }), 12, 8]],
                 ], w),
                 page('p_next', 'Work done and next steps', [
-                    [[text('w_done', '### Work completed this month\n- \n- ', 'body'), 6, 8], [text('w_next', '### Planned for next month\n- \n- ', 'body'), 6, 8]],
-                    [[text('w_quest', '### Questions for you\n- ', 'note'), 12, 4]],
+                    [[text('w_done', '### Work completed this month\n- Pages improved, with the change made\n- Technical fixes shipped', 'body'), 6, 8], [text('w_next', '### Planned for next month\n- The next pages to improve\n- Content to publish', 'body'), 6, 8]],
+                    [[text('w_quest', '### Questions for you\n- Anything we need from you to move faster', 'note'), 12, 4]],
                 ], w),
             ],
         };
@@ -505,7 +521,7 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                     [[barList('w_pages', 'Top pages', 'page', 'gsc:clicks', { top: 6 }), 4, 10], [barList('w_queries', 'Top queries', 'query', 'gsc:clicks', { top: 6 }), 4, 10], [pie('w_channels', 'Channels', 'channel', 'ga4:sessions'), 4, 10]],
                 ], w),
                 page('p_where', 'Where', [
-                    [[geo('w_geo', 'Users by country', 'ga4:activeUsers'), 8, 13], [barList('w_countries', 'Top countries', 'country', 'ga4:activeUsers', { top: 8 }), 4, 13]],
+                    [[{ ...geo('w_geo', 'Users by country', 'ga4:activeUsers'), config: { ...geo('w_geo', '', 'ga4:activeUsers').config, topList: 0 } }, 8, 13], [barList('w_countries', 'Top countries', 'country', 'ga4:activeUsers', { top: 8 }), 4, 13]],
                 ], w),
                 page('p_movers', 'Movers', [
                     [[table('w_up', 'Pages rising', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, pageSize: 10, pagination: false }), 6, 13],

@@ -51,7 +51,8 @@ export function ThemeSwatch({ id, mode, brand, className }: { id: ThemeId; mode:
     return (
         <div aria-hidden {...r.attrs} style={r.style} className={cn('pointer-events-none flex h-full w-full flex-col gap-1.5 overflow-hidden p-2', r.className, className)}>
             <div className="flex items-center gap-1.5" style={{ borderBottom: o.id === 'executive' || o.id === 'studio' ? '2px solid var(--tc-brand)' : o.id === 'paper' ? '1px solid var(--tc-fg)' : undefined, paddingBottom: 3 }}>
-                <span className="h-1.5 w-8 rounded-full" style={{ background: 'var(--tc-fg)' }} />
+                <span className="text-[12px] font-semibold leading-none" style={{ color: 'var(--tc-fg)', fontFamily: 'var(--tc-dash-font-heading, inherit)' }}>Aa</span>
+                <span className="h-1 w-6 rounded-full" style={{ background: 'var(--tc-fg-muted)' }} />
                 <span className="ml-auto h-1.5 w-4 rounded-full" style={{ background: 'var(--tc-brand)' }} />
             </div>
             <div className="grid flex-1 grid-cols-3 gap-1.5">

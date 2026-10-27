@@ -178,8 +178,8 @@ export default function DashboardsListPage() {
                             </Link>
                             <div className="mt-auto flex items-center gap-2 px-4 pb-4">
                                 {d.isTemplate ? <Pill tone="info">Template</Pill> : d.share.enabled ? <Pill tone="brand" dot>{d.share.embed ? 'Embedded' : 'Public link'}</Pill> : <Pill>Private</Pill>}
-                                {d.share.enabled ? <span className="text-meta text-fg-muted">{d.views} views</span> : null}
-                                <span className="min-w-0 truncate text-meta text-fg-faint">{d.widgetCount} widgets{d.pageCount > 1 ? ` · ${d.pageCount} pages` : ''}{d.look?.id ? ` · ${themePreset(d.look.id).name}` : ''}</span>
+                                {d.share.enabled ? <span className="shrink-0 whitespace-nowrap text-meta text-fg-muted">{d.views} {d.views === 1 ? 'view' : 'views'}</span> : null}
+                                <span className="min-w-0 truncate whitespace-nowrap text-meta text-fg-faint" title={d.look?.id ? `${themePreset(d.look.id).name} theme` : undefined}>{d.widgetCount} widgets{d.pageCount > 1 ? ` · ${d.pageCount} pages` : ''}</span>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" iconOnly icon={MoreHorizontal} aria-label={`Actions for ${d.name}`} className="ml-auto" /></DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">

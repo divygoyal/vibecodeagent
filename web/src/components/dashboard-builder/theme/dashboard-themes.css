@@ -88,7 +88,8 @@
 /* Widget cards (WidgetFrame, scorecard, KPI strip, card-style text) carry data-dash-widget. */
 [data-dash-theme] [data-dash-widget] { border-radius: var(--radius-card); }
 [data-dash-theme] [data-dash-widget] h3 { font-size: var(--tc-dash-title-size); font-weight: var(--tc-dash-title-weight); }
-[data-dash-theme] [data-dash-widget="md"] { padding: var(--tc-dash-card-pad); }
+/* Card padding stays 16 px in every density: chart heights are computed for it (a larger padding
+   pushed footnotes onto the x-axis labels). Density changes the grid row height and gap only. */
 
 /* Header rule under the dashboard title (Executive, Paper, Studio). */
 [data-dash-theme] [data-dash-header] { border-bottom: var(--tc-dash-header-rule); }
@@ -186,7 +187,7 @@
 }
 
 /* midnight (dark first; the light variant is "Daylight") */
-[data-dash-theme="midnight"] { --tc-dash-radius: 14px; --tc-dash-stat-scale: 1.5; --tc-dash-title-weight: 500; }
+[data-dash-theme="midnight"] { --tc-dash-radius: 14px; --tc-dash-stat-scale: 1.3; --tc-dash-title-weight: 500; }
 [data-dash-theme="midnight"][data-theme="dark"] {
   --tc-canvas:#05070b; --tc-surface:#0d1117; --tc-surface-raised:#151b24; --tc-surface-sunken:#090c11; --tc-subtle:#131923; --tc-subtle-strong:#1b2330;
   --tc-border-subtle:#1b2330; --tc-border:#263041; --tc-border-strong:#35435a;
@@ -277,6 +278,31 @@
   --tc-m-users:#7d4cdb; --tc-m-sessions:#0d8dbf; --tc-m-pageviews:#893d61; --tc-m-conversions:#df3f10; --tc-m-ai:#508536;
   --tc-cat-1:#6487ce; --tc-cat-2:#a24e3a; --tc-cat-3:#2ba277; --tc-cat-4:#916a00; --tc-cat-5:#a54461; --tc-cat-6:#3c812e; --tc-cat-7:#6c5aa8; --tc-cat-8:#c43514; --tc-cat-other:#5b6573;
 }
+
+/* =====================================================================
+   6b. Identity per theme (beyond colour): type, surfaces and chart style.
+   ===================================================================== */
+
+/* Executive: a boardroom report. Serif headings and serif key numbers, a navy accent bar on top of
+   every card, no chart grid lines, generous space. */
+[data-dash-theme="executive"] [data-dash-widget] { border-top: 3px solid var(--tc-brand); }
+[data-dash-theme="executive"] :is(.text-stat, .text-stat-lg) { font-family: var(--font-source-serif), Georgia, serif; font-weight: 600; letter-spacing: -0.01em; }
+[data-dash-theme="executive"] .recharts-cartesian-grid-horizontal line { stroke-opacity: 0; }
+[data-dash-theme="executive"] [data-dash-widget] h3 { letter-spacing: 0; }
+
+/* Paper: print. No fills, hairline rules, small-caps card titles, everything on white. */
+[data-dash-theme="paper"] [data-dash-widget] h3 { font-family: var(--tc-dash-font-body, inherit); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tc-fg-secondary); }
+[data-dash-theme="paper"] .recharts-area-area { fill-opacity: 0; }
+[data-dash-theme="paper"] .recharts-line .recharts-curve:not([stroke-dasharray]) { stroke-width: 1.5px; }
+[data-dash-theme="paper"] [data-dash-header] h1 { font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.02em; }
+[data-dash-theme="paper"] [data-dash-widget="strip"] { border-bottom: 1px solid var(--tc-border-strong); }
+
+/* High contrast: heavy black outlines, bold titles, solid change chips, strong bars. */
+[data-dash-theme="contrast"] [data-dash-widget] { border-width: 2px; border-color: var(--tc-fg); }
+[data-dash-theme="contrast"] [data-dash-widget] h3 { font-weight: 700; }
+[data-dash-theme="contrast"][data-theme] { --tc-heatbar: 38%; }
+[data-dash-theme="contrast"][data-theme="light"] { --tc-up: #0b5d2a; --tc-up-soft: #b9ebc9; --tc-down: #9b1c1c; --tc-down-soft: #fbc9c9; }
+[data-dash-theme="contrast"][data-theme="dark"] { --tc-up: #7ee2a0; --tc-up-soft: #0f3d22; --tc-down: #ff9a9a; --tc-down-soft: #4a1414; }
 
 /* =====================================================================
    7. Conditional formatting and targets (any theme, including the default look: these only

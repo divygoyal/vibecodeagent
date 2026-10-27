@@ -102,13 +102,13 @@ export function ScorecardView(props: WidgetViewProps<ScorecardWidget>) {
                     <Tile
                         m={{ ...c.metric, label: c.metric.label || (widget.showTitle !== false ? widget.title : undefined) }}
                         total={ok?.parts.total} spark={ok?.parts.spark}
-                        showDelta={c.comparison.show && props.compare !== 'none'} showSpark={c.sparkline.show}
-                        sparkHeight={Math.max(28, Math.min(72, height - (target ? 150 : 120)))} big={height >= 220} mode={props.compare} currency={ok?.flags.currency} missing={missing}
+                        showDelta={c.comparison.show && props.compare !== 'none'}
+                        sparkHeight={Math.max(28, Math.min(72, height - (target ? 176 : 120)))} showSpark={c.sparkline.show && (!target || height >= 200)} big={height >= 220} mode={props.compare} currency={ok?.flags.currency} missing={missing}
                     />
                     {target ? <TargetBar metricId={c.metric.id} value={typeof totalRaw === 'number' ? totalRaw : null} target={target.value} label={target.label} currency={ok?.flags.currency} /> : null}
                 </div>
             )}
-            {notes.length && height >= 200 ? <p className="mt-1 truncate text-caption text-fg-muted" title={notes.join(' · ')}>{notes.join(' · ')}</p> : null}
+            {notes.length && height >= (target ? 260 : 200) ? <p className="mt-1 truncate text-caption text-fg-muted" title={notes.join(' · ')}>{notes.join(' · ')}</p> : null}
         </div>
     );
 }

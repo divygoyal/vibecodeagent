@@ -50,7 +50,7 @@ export function DashboardCover({ theme, name, vars, pages, currentPageId, onPage
             ) : null}
             {brand.preparedFor ? <p className="text-caption font-semibold uppercase tracking-[0.08em] text-brand-text">Prepared for {brand.preparedFor}</p> : null}
             <div className="space-y-2">
-                <h2 data-dash-cover-title="" className="text-[2rem] font-semibold leading-[1.15] tracking-[-0.02em] text-fg md:text-[2.5rem]">{title}</h2>
+                <h2 data-dash-cover-title="" className="text-[1.625rem] font-semibold leading-[1.15] tracking-[-0.02em] text-fg [overflow-wrap:anywhere] sm:text-[2rem] md:text-[2.5rem]">{title}</h2>
                 {subtitle ? <p className="text-title font-normal text-fg-secondary">{subtitle}</p> : null}
             </div>
             {brand.preparedBy ? <p className="text-body-sm text-fg-muted">Prepared by <span className="font-medium text-fg-secondary">{brand.preparedBy}</span></p> : null}

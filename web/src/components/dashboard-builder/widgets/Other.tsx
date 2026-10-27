@@ -80,9 +80,15 @@ const ROLE: Record<TextWidget['config']['role'], string> = {
     callout: 'text-body text-fg-secondary',
 };
 
-export function TextView({ widget, vars }: WidgetViewProps<TextWidget>) {
+/** Viewers never see empty bullet points left for the author to fill in (round 2). */
+export function stripEmptyBullets(md: string): string {
+    return /^[ \t]*[-*+][ \t]*$/m.test(md) ? md.split('\n').filter((l) => !/^[ \t]*[-*+][ \t]*$/.test(l)).join('\n') : md;
+}
+
+export function TextView({ widget, vars, mode }: WidgetViewProps<TextWidget>) {
     const c = widget.config;
-    const md = c.variables ? fillVars(c.markdown, vars) : c.markdown;
+    const filled = c.variables ? fillVars(c.markdown, vars) : c.markdown;
+    const md = mode === 'edit' ? filled : stripEmptyBullets(filled);
     return (
         <div data-dash-widget={c.role !== 'callout' && widget.style?.background === 'surface' ? 'md' : undefined} className={cn(
             'h-full overflow-auto',

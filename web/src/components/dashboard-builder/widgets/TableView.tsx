@@ -111,7 +111,9 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                             density={c.density === 'comfortable' ? 'default' : 'compact'}
                             pagination={c.pagination ? { pageSize } : undefined}
                             footer={footer}
-                            empty={<EmptyState variant="inline" title="No rows in this period" />}
+                            empty={widget.filters?.length || c.rowFilters?.length
+                                ? <EmptyState variant="inline" title="Nothing matches yet" description={widget.filters?.length ? 'No rows match this widget’s filter in this period. Rows appear here as soon as they do.' : 'No rows pass this table’s thresholds in this period.'} />
+                                : <EmptyState variant="inline" title="No rows in this period" />}
                             caption={widget.title}
                         />
                     </div>
