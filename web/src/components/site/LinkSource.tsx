@@ -73,7 +73,7 @@ export function LinkSource({ source, variant = 'card' }: { source: 'ga4' | 'gsc'
                     value: s.siteUrl,
                     textValue: s.siteUrl,
                     disabled: unverified,
-                    label: <span className="flex min-w-0 items-baseline gap-1.5"><span className="truncate">{s.siteUrl}</span><span className="shrink-0 text-meta text-fg-muted">{kind}{note ? ` · ${note}` : ''}</span></span>,
+                    label: <span className="flex min-w-0 items-baseline gap-1.5"><span className="max-w-full shrink-0 truncate">{s.siteUrl}</span><span className="min-w-0 truncate text-meta text-fg-muted">{kind}{note ? ` · ${note}` : ''}</span></span>,
                 };
             });
             const top = ranked[0];
@@ -88,8 +88,8 @@ export function LinkSource({ source, variant = 'card' }: { source: 'ga4' | 'gsc'
                 textValue: p.displayName,
                 label: (
                     <span className="flex min-w-0 items-baseline gap-1.5">
-                        <span className="truncate">{p.displayName}</span>
-                        <span className="shrink-0 text-meta text-fg-muted">{p.property.replace('properties/', '')}{paired ? ` · linked to ${paired.replace(/^sc-domain:/, '')}` : ''}</span>
+                        <span className="max-w-full shrink-0 truncate">{p.displayName}</span>
+                        <span className="min-w-0 truncate text-meta text-fg-muted">{p.property.replace('properties/', '')}{paired ? ` · linked to ${paired.replace(/^sc-domain:/, '')}` : ''}</span>
                     </span>
                 ),
             };

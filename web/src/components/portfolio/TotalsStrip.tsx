@@ -97,7 +97,9 @@ export function TotalsStrip({ data, metric, onMetricChange, comparisonLabel, dim
                     aria-controls="portfolio-trend"
                     onClick={() => onTrendOpenChange(!trendOpen)}
                 >
-                    {trendOpen ? 'Hide trend' : 'Show trend'}
+                    {/* Phones keep the room for the tiles. */}
+                    <span className="sm:hidden">Trend</span>
+                    <span className="max-sm:hidden">{trendOpen ? 'Hide trend' : 'Show trend'}</span>
                 </Button>
             )}
         >
