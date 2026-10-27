@@ -57,10 +57,9 @@ export function SiteOverview() {
                 <GeoCard className="xl:col-span-2" />
                 {hasGa4 && hasGsc ? <SearchBreakdownCard /> : hasGa4 ? <TechCard /> : <AppearanceHint />}
             </div>
-            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-                <AlertsCard />
-                <NextActionsCard />
-            </div>
+            {/* Alerts are a compact strip sized to their content; the task cards get the full width. */}
+            <AlertsCard />
+            <NextActionsCard />
         </div>
     );
 }
@@ -132,12 +131,12 @@ function AlertsCard() {
             ) : list.length === 0 ? (
                 <EmptyState variant="inline" icon={CheckCircle2} title="No alerts right now" description="Big drops and spikes show up here." />
             ) : (
-                <ul className="flex flex-col divide-y divide-border-subtle">
+                <ul className="grid grid-cols-1 gap-x-8 gap-y-3 md:grid-cols-2">
                     {list.map((a) => {
                         const Icon = a.severity === 'critical' || a.severity === 'warning' ? AlertTriangle : a.severity === 'success' ? CheckCircle2 : Info;
                         const tone = a.severity === 'critical' ? 'text-down' : a.severity === 'warning' ? 'text-warn' : a.severity === 'success' ? 'text-up' : 'text-info';
                         return (
-                            <li key={a.id} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+                            <li key={a.id} className="flex items-start gap-3">
                                 <Icon aria-hidden size={16} className={`mt-0.5 shrink-0 ${tone}`} />
                                 <div className="min-w-0 flex-1">
                                     <p className="text-body-sm font-medium text-fg">{a.title}</p>
@@ -174,7 +173,7 @@ function NextActionsCard() {
             ) : top.length === 0 ? (
                 <EmptyState variant="inline" icon={CheckCircle2} title="Nothing urgent to fix" description="We look for decaying pages, near-page-one queries, low CTR, cannibalization and traffic drops." />
             ) : (
-                <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-3">
                     {top.map((a) => (
                         <ActionCard
                             key={a.id}

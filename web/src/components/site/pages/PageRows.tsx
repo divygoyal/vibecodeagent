@@ -77,6 +77,8 @@ export function PageRows({ limit = 8, action = 'open', withSearch = true }: { li
     if (q.state === 'error') return <LoadError error={q.error} onRetry={q.mutate} />;
     const loading = q.state === 'loading';
     const bars = ga.data?.bars ?? 0;
+    // One scale for every row: a big page has tall bars, a small one short bars, and dips show where they really are.
+    const trendMax = Math.max(0, ...rows.flatMap((r) => r.trend ?? []));
     const cols = cn(
         'grid items-center gap-x-3',
         site.hasGa4
@@ -115,7 +117,7 @@ export function PageRows({ limit = 8, action = 'open', withSearch = true }: { li
                             {site.hasGa4 ? (
                                 <span className="flex flex-col items-end gap-0.5 sm:items-start">
                                     {r.trend && bars ? (
-                                        <TrendBars values={r.trend} color={METRICS.pageviews.color} partialLast className="max-sm:hidden" />
+                                        <TrendBars values={r.trend} max={trendMax} color={METRICS.pageviews.color} partialLast className="max-sm:hidden" />
                                     ) : <span className="max-sm:hidden" />}
                                     {/* Phones: the value column is hidden; show value + chip here. */}
                                     <span className="flex items-center gap-1.5 sm:hidden">

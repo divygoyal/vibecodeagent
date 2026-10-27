@@ -53,7 +53,7 @@ export function PagesPage() {
     const decay = useGsc<{ rows: DecayRow[] }>(site.hasGsc ? 'decay' : null);
     // Titles for the top pages and trend bars for the top 25 (one extra GA4 call pair, cached).
     const trends = useGa4<Ga4PageTrends>(site.hasGa4 ? 'pageTrends' : null, { extra: { limit: '30' } });
-    const { titleBy, trendBy } = useMemo(() => {
+    const { titleBy, trendBy, trendMax } = useMemo(() => {
         const t = new Map<string, string>();
         const tr = new Map<string, number[]>();
         for (const x of trends.data?.titles ?? []) t.set(pageRef(x.path, x.host || site.siteHost).key, x.title);
@@ -62,7 +62,7 @@ export function PagesPage() {
             if (x.title) t.set(k, x.title);
             if (x.trend) tr.set(k, x.trend);
         }
-        return { titleBy: t, trendBy: tr };
+        return { titleBy: t, trendBy: tr, trendMax: Math.max(0, ...[...tr.values()].flat()) };
     }, [trends.data, site.siteHost]);
     const [segRaw, setSeg] = useStringParam('segment');
     const segment = (SEGMENTS.some((s) => s.value === segRaw) ? segRaw : 'all') as Segment;
@@ -100,11 +100,11 @@ export function PagesPage() {
             cell: (r) => {
                 const title = titleBy.get(r.key);
                 return title ? (
-                    <span className="block min-w-0" title={r.url ?? r.label}>
+                    <span className="block w-[46vw] min-w-0 max-w-[30rem] md:w-auto" title={r.url ?? r.label}>
                         <span className="block truncate font-medium text-fg">{title}</span>
                         <span className="block truncate text-meta text-fg-muted">{r.label}</span>
                     </span>
-                ) : <span title={r.url ?? r.label}>{r.label}</span>;
+                ) : <span className="block w-[46vw] min-w-0 max-w-[30rem] truncate md:w-auto" title={r.url ?? r.label}>{r.label}</span>;
             },
             // Rows with a title and trend bars read better without a heat bar; keep it for GSC-only sites.
             heat: site.hasGa4 ? undefined : { metric: 'clicks', value: (r) => r.clicks },
@@ -113,7 +113,7 @@ export function PagesPage() {
             key: 'trend', header: 'Trend', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
             cell: (r: Row) => {
                 const t = trendBy.get(r.key);
-                return t ? <TrendBars values={t} color={METRICS.pageviews.color} partialLast ariaLabel={`Views trend for ${r.label}`} /> : <span className="text-meta text-fg-faint" title="Trend bars show for the top 30 pages by views">–</span>;
+                return t ? <TrendBars values={t} max={trendMax} color={METRICS.pageviews.color} partialLast ariaLabel={`Views trend for ${r.label}`} /> : <span className="text-meta text-fg-faint" title="Trend bars show for the top 30 pages by views">–</span>;
             },
         }] : []),
         ...(site.hasGa4 ? [

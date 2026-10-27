@@ -62,11 +62,11 @@ export function TrafficPagesTab() {
                     cell: (x) => {
                         const title = titleBy.get(x.ref.key);
                         return title ? (
-                            <span className="block min-w-0" title={x.label}>
+                            <span className="block w-[46vw] min-w-0 max-w-[30rem] md:w-auto" title={x.label}>
                                 <span className="block truncate font-medium text-fg">{title}</span>
                                 <span className="block truncate text-meta text-fg-muted">{x.label}</span>
                             </span>
-                        ) : <span title={x.label}>{x.label}</span>;
+                        ) : <span className="block w-[46vw] min-w-0 max-w-[30rem] truncate md:w-auto" title={x.label}>{x.label}</span>;
                     },
                 }}
                 heat={{ metric: 'pageviews', value: (x) => v(x.r, 'screenPageViews') }}

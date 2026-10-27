@@ -39,7 +39,7 @@ export interface CtrPositionChartProps {
     className?: string;
 }
 
-const M = { top: 10, right: 12, bottom: 26, left: 44 };
+const M = { top: 10, right: 12, bottom: 40, left: 44 };
 
 export function CtrPositionChart({ points, curve, maxPosition = 20, height = 300, color, onPointClick, className }: CtrPositionChartProps) {
     const [ref, width] = useElementWidth<HTMLDivElement>();
@@ -109,9 +109,9 @@ export function CtrPositionChart({ points, curve, maxPosition = 20, height = 300
                         </g>
                     ))}
                     {xTicks.map((t) => (
-                        <text key={t} x={scales.x(t)} y={h - 6} textAnchor="middle" fontSize={11} fill="var(--color-chart-tick)">{t}</text>
+                        <text key={t} x={scales.x(t)} y={h - 22} textAnchor="middle" fontSize={11} fill="var(--color-chart-tick)">{t}</text>
                     ))}
-                    <text x={width - M.right} y={h - 6} textAnchor="end" fontSize={11} fill="var(--color-chart-tick)" className="max-sm:hidden">position →</text>
+                    <text x={M.left + scales.iw / 2} y={h - 4} textAnchor="middle" fontSize={11} fill="var(--color-fg-muted)">Average position</text>
                     {scales.x(10.5) < width - M.right ? (
                         <line x1={scales.x(10.5)} x2={scales.x(10.5)} y1={M.top} y2={M.top + scales.ih} stroke="var(--color-chart-axis)" strokeDasharray="2 3" />
                     ) : null}
@@ -125,9 +125,11 @@ export function CtrPositionChart({ points, curve, maxPosition = 20, height = 300
                             cy={scales.y(p.ctr)}
                             r={scales.r(p.impressions)}
                             fill={p.under ? 'var(--color-down)' : color}
-                            fillOpacity={p.under ? 0.7 : 0.28}
-                            stroke={hover?.key === p.key ? 'var(--color-fg)' : p.under ? 'var(--color-down)' : 'none'}
-                            strokeWidth={hover?.key === p.key ? 1.5 : 0.75}
+                            fillOpacity={p.under ? 0.7 : 0.35}
+                            // A ring in the dot colour keeps the plain dots visible on the dark card too.
+                            stroke={hover?.key === p.key ? 'var(--color-fg)' : p.under ? 'var(--color-down)' : `color-mix(in oklab, ${color} 70%, var(--color-fg))`}
+                            strokeOpacity={p.under || hover?.key === p.key ? 1 : 0.75}
+                            strokeWidth={hover?.key === p.key ? 1.5 : 1}
                         />
                     ))}
                 </svg>

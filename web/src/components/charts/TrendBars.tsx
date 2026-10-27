@@ -12,6 +12,8 @@ export interface TrendBarsProps {
     values: number[];
     /** Metric colour (CSS var). */
     color: string;
+    /** Shared top of the scale (e.g. the biggest bar across all rows), so rows compare by size; default: this row's max. */
+    max?: number;
     /** Draw the last bar lighter (incomplete period). */
     partialLast?: boolean;
     height?: number;
@@ -20,8 +22,8 @@ export interface TrendBarsProps {
     ariaLabel?: string;
 }
 
-export function TrendBars({ values, color, partialLast, height = 20, barWidth = 4, className, ariaLabel }: TrendBarsProps) {
-    const max = Math.max(0, ...values);
+export function TrendBars({ values, color, max: shared, partialLast, height = 20, barWidth = 4, className, ariaLabel }: TrendBarsProps) {
+    const max = Math.max(shared ?? 0, ...values);
     const gap = 2;
     const w = values.length * (barWidth + gap) - gap;
     return (

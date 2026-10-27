@@ -48,8 +48,9 @@ export function CtrBenchmarkCard({ onOpenQuery }: { onOpenQuery: (query: string)
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-fg-secondary" aria-hidden>
                     <span className="inline-flex items-center gap-1.5"><svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke="var(--color-fg-muted)" strokeWidth="1.5" strokeDasharray="5 4" /></svg>Usual CTR</span>
-                    <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-down opacity-80" />Below 70% of usual</span>
-                    <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full opacity-40" style={{ background: METRICS.clicks.color }} />Other queries</span>
+                    <span className="inline-flex items-center gap-1.5"><svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke="var(--color-down)" strokeOpacity="0.6" strokeWidth="1.5" strokeDasharray="2 3" /></svg>70% of usual</span>
+                    <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-down opacity-80" />Below that line</span>
+                    <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full border" style={{ background: `color-mix(in oklab, ${METRICS.clicks.color} 45%, transparent)`, borderColor: METRICS.clicks.color }} />Other queries</span>
                 </div>
             </div>
             {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : q.state === 'loading' ? (
