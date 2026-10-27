@@ -3,6 +3,16 @@ import GithubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import { isEmailAllowed, parseAllowedEmails, PREVIEW_PRIVATE_PATH } from "@/lib/accessAllowlist";
 import { sessionCallback } from "@/lib/authSession";
+import { cookies } from "next/headers";
+import {
+    GOOGLE_CONSENT_COOKIE,
+    GOOGLE_SIGNIN_PARAMS,
+    consentRedirectUrl,
+    nonEmptyToken,
+    planGoogleSignIn,
+    refreshTokenToKeep,
+    type GoogleTokenDecision,
+} from "@/lib/googleConsent";
 
 export type { PublicSessionUser, ServerAuthUser } from "@/lib/authSession";
 
@@ -20,6 +30,32 @@ type GitHubProfile = UserProfile & {
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+
+/** The first of these cookies on the NextAuth callback request (undefined outside a request). */
+async function requestCookie(...names: string[]): Promise<string | undefined> {
+    try {
+        const jar = await cookies();
+        for (const name of names) {
+            const v = jar.get(name)?.value;
+            if (v) return v;
+        }
+    } catch { /* not in a request */ }
+    return undefined;
+}
+
+const consentAttempted = async () => Boolean(await requestCookie(GOOGLE_CONSENT_COOKIE));
+
+// The Google sign-in decision made in signIn(), reused by jwt() for the same `account` object
+// (NextAuth passes the same object to both), so the stored token is looked up once per sign-in.
+const googlePlans = new WeakMap<object, GoogleTokenDecision>();
+
+async function googlePlanFor(account: { providerAccountId?: string; refresh_token?: string | null; scope?: string | null }): Promise<GoogleTokenDecision> {
+    const cached = googlePlans.get(account);
+    if (cached) return cached;
+    const plan = await planGoogleSignIn(account, await consentAttempted());
+    googlePlans.set(account, plan);
+    return plan;
+}
 
 async function fetchWorkspaceSetupCompleted(userIdentifier: string): Promise<boolean> {
     if (!ADMIN_API_KEY || !userIdentifier) return false;
@@ -54,12 +90,11 @@ export const authOptions: NextAuthOptions = {
         GoogleProvider({
             clientId: process.env.GOOGLE_CLIENT_ID ?? "",
             clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+            // select_account, not consent: a consent sign-in makes Google issue a new refresh token
+            // and revoke the oldest past ~100. Consent is asked only when needed (lib/googleConsent.ts);
+            // Reconnect buttons pass prompt 'select_account consent' per call.
             authorization: {
-                params: {
-                    scope: "openid email profile https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly",
-                    access_type: "offline",
-                    prompt: "consent",
-                }
+                params: { ...GOOGLE_SIGNIN_PARAMS }
             }
         }),
     ],
@@ -80,6 +115,20 @@ export const authOptions: NextAuthOptions = {
                     console.log(`[Auth] Sign-in refused by TC_ALLOWED_EMAILS (${account?.provider ?? 'unknown'})`);
                     const base = (process.env.NEXTAUTH_URL ?? '').replace(/\/+$/, '');
                     return `${base}${PREVIEW_PRIVATE_PATH}`;
+                }
+            }
+            // A select_account sign-in that brought no refresh token while none usable is stored
+            // (or the grant lacks a data scope): redirect once to a consent sign-in.
+            if (account?.provider === 'google') {
+                const plan = await googlePlanFor(account);
+                if (plan.action === 'ask_consent') {
+                    console.log(`[Auth] Google sign-in needs consent (${plan.reason})`);
+                    const base = (process.env.NEXTAUTH_URL ?? '').replace(/\/+$/, '');
+                    const callbackUrl = await requestCookie('__Secure-next-auth.callback-url', 'next-auth.callback-url');
+                    return consentRedirectUrl(base, callbackUrl, plan.reason);
+                }
+                if (plan.action === 'reconnect') {
+                    console.log(`[Auth] Google sign-in without a refresh token after consent (${plan.reason}); Reconnect will be offered`);
                 }
             }
             return true;
@@ -103,9 +152,11 @@ export const authOptions: NextAuthOptions = {
                 }
 
                 // Always store provider-specific tokens (so chatbot can use both).
+                // Never store an empty refresh token: keep what is there (see googleRefresh below).
                 token.accessToken = account.access_token;
-                if (account.refresh_token) {
-                    token.refreshToken = account.refresh_token;
+                const returnedRefresh = nonEmptyToken(account.refresh_token);
+                if (returnedRefresh) {
+                    token.refreshToken = returnedRefresh;
                 }
 
                 if (account.provider === "github") {
@@ -115,8 +166,12 @@ export const authOptions: NextAuthOptions = {
                 } else if (account.provider === "google") {
                     token.googleAccountId = account.providerAccountId;
                     token.googleAccessToken = account.access_token;
-                    if (account.refresh_token) {
-                        token.googleRefreshToken = account.refresh_token;
+                    // New token from a consent sign-in, else the stored one (admin DB) a select_account
+                    // sign-in keeps. Nothing usable: leave it unset; the app's Reconnect state handles it.
+                    const googleRefresh = refreshTokenToKeep(await googlePlanFor(account));
+                    if (googleRefresh) {
+                        token.googleRefreshToken = googleRefresh;
+                        token.refreshToken = googleRefresh;
                     }
                 }
 

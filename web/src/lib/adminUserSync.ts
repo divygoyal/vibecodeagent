@@ -1,5 +1,6 @@
 import { authOptions } from '@/lib/auth';
 import type { ServerAuthUser } from '@/lib/authSession';
+import { nonEmptyToken } from '@/lib/googleConsent';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -35,7 +36,7 @@ type ProviderCredentialOverrides = {
  * Admin's get_user_by_identifier() resolves the row by github_id OR google account id OR email,
  * so passing email lets it find the existing primary user.
  */
-function buildAdminUserSyncPayload(
+export function buildAdminUserSyncPayload(
     session: AdminSyncSession,
     targetProvider?: 'github' | 'google',
     credentialOverrides: ProviderCredentialOverrides = {},
@@ -66,15 +67,16 @@ function buildAdminUserSyncPayload(
     if (provider === 'google') {
         const providerId = u.googleAccountId || (u.provider === 'google' ? u.id : undefined);
         const accessToken = u.googleAccessToken || (u.provider === 'google' ? u.accessToken : undefined);
-        const refreshToken = credentialOverrides.googleRefreshToken
-            || u.googleRefreshToken
-            || (u.provider === 'google' ? u.refreshToken : undefined);
+        const refreshToken = nonEmptyToken(credentialOverrides.googleRefreshToken)
+            || nonEmptyToken(u.googleRefreshToken)
+            || (u.provider === 'google' ? nonEmptyToken(u.refreshToken) : undefined);
         if (!providerId || !accessToken) return null;
         return {
             provider: 'google',
             provider_id: String(providerId),
             access_token: accessToken,
-            refresh_token: refreshToken,
+            // Omitted (not empty) when the session has none: the admin keeps the stored one.
+            ...(refreshToken ? { refresh_token: refreshToken } : {}),
             email,
             plan: 'free',
         };

@@ -1592,9 +1592,10 @@ async def sync_user_container(
     oauth = result.scalars().first()
     
     if oauth:
-        if sync_data.access_token:
+        # Never replace a stored token with an empty one (a sign-in without consent returns no refresh token).
+        if has_non_empty_token(sync_data.access_token):
             oauth.access_token = sync_data.access_token
-        if sync_data.refresh_token:
+        if has_non_empty_token(sync_data.refresh_token):
             oauth.refresh_token = sync_data.refresh_token
         oauth.updated_at = datetime.utcnow()
     else:
@@ -1683,9 +1684,10 @@ async def update_user(
         conn = result.scalars().first()
         
         if conn:
-            if user_update.access_token:
+            # Never replace a stored token with an empty one.
+            if has_non_empty_token(user_update.access_token):
                 conn.access_token = user_update.access_token
-            if user_update.refresh_token:
+            if has_non_empty_token(user_update.refresh_token):
                 conn.refresh_token = user_update.refresh_token
             conn.updated_at = datetime.utcnow()
         else:

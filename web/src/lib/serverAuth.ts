@@ -85,9 +85,11 @@ export async function getGoogleCredentialsForRequest(req: RequestLike | null | u
             refreshToken = user.googleRefreshToken;
         }
     }
-    if (!accessToken && !refreshToken && userId) {
+    // No refresh token in the JWT (a sign-in that kept the stored one while the admin DB was
+    // unreachable, or an older session): the admin DB's stored token fills the gap.
+    if (!refreshToken && userId) {
         const db = await fetchGoogleTokensFromDb(String(userId)).catch(() => null);
-        accessToken = db?.accessToken || undefined;
+        accessToken = accessToken || db?.accessToken || undefined;
         refreshToken = db?.refreshToken || undefined;
     }
     return { accessToken, refreshToken };
