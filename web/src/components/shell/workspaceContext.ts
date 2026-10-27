@@ -58,6 +58,8 @@ export interface WorkspaceContextType {
     siteDirectory: SiteEntry[];
     /** True until both inventories answered at least once. */
     siteDirectoryLoading: boolean;
+    /** Google refused our stored token (revoked / expired): the owner has to sign in with Google again. */
+    googleReauth: boolean;
     /** Server flag: the one-time welcome (credits) popup was seen. */
     welcomeSeen: boolean;
     markWelcomeSeen: () => void;
@@ -94,6 +96,7 @@ export const WorkspaceContext = createContext<WorkspaceContextType>({
     hasGoogleConnection: false,
     siteDirectory: [],
     siteDirectoryLoading: true,
+    googleReauth: false,
     welcomeSeen: true,
     markWelcomeSeen: noop,
 });

@@ -26,6 +26,13 @@ function movedSitePath(pathname: string, host: string): { path: string; tab?: st
 export async function middleware(request: NextRequest) {
     const { pathname, search } = request.nextUrl;
 
+    // The styleguide is dev-only. Its page calls notFound(), but the app shell's Suspense boundary streams
+    // before the page renders, so the status was already 200 ("Page not found" body, HTTP 200). Answer the 404
+    // here instead, before anything renders, for every visitor (signed in or not).
+    if (process.env.NODE_ENV === 'production' && (pathname === '/dashboard/styleguide' || pathname.startsWith('/dashboard/styleguide/'))) {
+        return NextResponse.rewrite(new URL('/_tc-not-found', request.url), { status: 404 });
+    }
+
     // Auth gate for dashboard / admin / superadmin
     if (pathname.startsWith('/dashboard') || pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) {
         const token = await getToken({ req: request });

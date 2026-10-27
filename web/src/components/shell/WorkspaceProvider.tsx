@@ -321,6 +321,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                 hasGoogleConnection: false,
                 siteDirectory: [],
                 siteDirectoryLoading: true,
+                googleReauth: false,
                 welcomeSeen,
                 markWelcomeSeen,
             }}
@@ -436,6 +437,8 @@ function InventoryLayer({ children, user, pathname, isSetupRoute, router, getUse
         pairs: fastData.pairs,
     }) : []), [fastData]);
     const googleListedNothing = Boolean(liveData?.errors?.sites) && Boolean(liveData?.errors?.properties);
+    // Revoked / expired Google token: the directory says so with the code lib/googleErrors emits (google_reauth).
+    const googleReauth = liveData?.errors?.sites?.code === 'google_reauth' || liveData?.errors?.properties?.code === 'google_reauth';
     const siteDirectory = liveData && !googleListedNothing ? liveDirectory : fastDirectory;
     // Loading until Google has answered (or failed): a host the portfolio store has not seen yet must not first
     // paint "We couldn't find <host>", and the tc_site cookie must not be cleared on every page load.
@@ -507,6 +510,7 @@ function InventoryLayer({ children, user, pathname, isSetupRoute, router, getUse
                 hasGoogleConnection,
                 siteDirectory,
                 siteDirectoryLoading,
+                googleReauth,
             }}
         >
             {children}
