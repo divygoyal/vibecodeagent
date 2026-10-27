@@ -43,7 +43,8 @@ import leaderboard_v3 as lb_v3
 from models import LeaderboardProfile, LeaderboardDaily, LeaderboardRangeStat, LeaderboardInquiry
 from security.github_app_jwt import is_configured as github_app_is_configured
 from docker_manager import docker_manager
-from mcp_api import build_mcp_router, ensure_mcp_schema, delete_user_mcp_rows
+from mcp_api import build_mcp_router, ensure_mcp_schema
+from user_delete import delete_user_rows
 
 
 # ============= Database Setup =============
@@ -676,8 +677,8 @@ def get_user_runtime_identifier(user: User) -> str:
 
 
 # Portfolio snapshot store (app home): /api/portfolio/*. See portfolio_api.py.
-from portfolio_api import build_portfolio_router, ensure_portfolio_schema, delete_user_portfolio_rows  # noqa: E402
-from site_actions_api import build_site_actions_router, ensure_site_actions_schema, delete_user_site_action_rows  # noqa: E402
+from portfolio_api import build_portfolio_router, ensure_portfolio_schema  # noqa: E402
+from site_actions_api import build_site_actions_router, ensure_site_actions_schema  # noqa: E402
 app.include_router(build_portfolio_router(get_db, verify_admin_key, get_user_by_identifier))
 
 
@@ -2750,16 +2751,12 @@ async def delete_user(
     except Exception as e:
         print(f"[WARN] Container cleanup failed for {user.github_id}: {e}")
 
-    # 2. Delete OAuth connections and MCP grants, tokens, keys and audit rows
-    await delete_user_mcp_rows(db, user.id)
-    from models import OAuthConnection
-    await db.execute(
-        OAuthConnection.__table__.delete().where(OAuthConnection.user_id == user.id)
-    )
+    # 2. Delete every row of the user: OAuth connections, dashboards (+ versions, shares,
+    #    embed tokens), chat, leaderboard (+ profiles, daily, range stats, inquiries,
+    #    audience, ad slots), digests, alerts, MCP, portfolio, site action states...
+    await delete_user_rows(db, user.id)
 
-    # 3. Delete user record (and the portfolio snapshot rows and site action states)
-    await delete_user_portfolio_rows(db, user.id)
-    await delete_user_site_action_rows(db, user.id)
+    # 3. Delete the user record
     await db.delete(user)
     await db.commit()
 

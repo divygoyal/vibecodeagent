@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { cachedFetch } from '@/lib/apiCache';
-import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
+import { getValidAccessToken } from '@/lib/googleApi';
+import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
 import { DEMO_PROPERTY_ID, isDemoRequest } from '@/lib/demoWorkspace';
 import { parseOverviewRequest, SHARE_OVERVIEW_CACHE_TTL } from '@/lib/shareOverviewServer';
 
@@ -55,10 +55,6 @@ export async function getAnalyticsOverviewContext(req: Request): Promise<{
         };
     }
 
-    type GoogleJwt = Awaited<ReturnType<typeof getToken>> & {
-        googleAccessToken?: string;
-        googleRefreshToken?: string;
-    };
 
     const cookieHeader = req.headers.get('cookie') || 'no-cookie';
 
@@ -66,10 +62,7 @@ export async function getAnalyticsOverviewContext(req: Request): Promise<{
         `analytics-overview:context:${demoMode ? DEMO_PROPERTY_ID : propertyId}:${cookieHeader}`,
         ANALYTICS_OVERVIEW_CONTEXT_TTL,
         async () => {
-            const [session, jwt] = await Promise.all([
-                getServerSession(authOptions),
-                getToken({ req: req as unknown as Parameters<typeof getToken>[0]['req'] }) as Promise<GoogleJwt>,
-            ]);
+            const session = await getServerSession(authOptions);
 
             const userId = (session?.user as { id?: string } | undefined)?.id || null;
             if (!userId) {
@@ -91,16 +84,8 @@ export async function getAnalyticsOverviewContext(req: Request): Promise<{
                 };
             }
 
-            let googleAccess = jwt?.googleAccessToken as string | undefined;
-            let googleRefresh = jwt?.googleRefreshToken as string | undefined;
-
-            if (!googleAccess && !googleRefresh) {
-                const dbTokens = await fetchGoogleTokensFromDb(userId);
-                if (dbTokens) {
-                    googleAccess = dbTokens.accessToken;
-                    googleRefresh = dbTokens.refreshToken;
-                }
-            }
+            // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
+            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId));
 
             if (!googleAccess && !googleRefresh) {
                 return {

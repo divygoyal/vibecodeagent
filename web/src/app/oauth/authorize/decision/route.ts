@@ -88,7 +88,7 @@ export async function POST(req: Request) {
             } catch (err) {
                 if (!(err instanceof AdminStoreError && err.status === 404)) throw err;
                 // First visit: the admin row for this user does not exist yet.
-                await ensureAdminUserSynced(signedIn.session as Parameters<typeof ensureAdminUserSynced>[0], 'google');
+                await ensureAdminUserSynced(signedIn.session, 'google');
                 grant = await adminStore.upsertGrant(payload);
             }
         }

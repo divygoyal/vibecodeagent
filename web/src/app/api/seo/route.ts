@@ -1,21 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
-import { getToken } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
 import { googleErrorResponse } from '@/lib/googleErrors'
 import { isDemoRequest } from '@/lib/demoWorkspace'
 import { getDemoSeoDashboard } from '@/lib/demoWorkspaceData'
-import { getValidAccessToken, listSearchConsoleSites, fetchSeoDashboard, fetchGoogleTokensFromDb } from '@/lib/googleApi'
+import { getValidAccessToken, listSearchConsoleSites, fetchSeoDashboard } from '@/lib/googleApi'
+import { getGoogleCredentialsForRequest } from '@/lib/serverAuth'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 const SEARCH_CONSOLE_SITE_LIST_TIMEOUT_MS = 10000
 const SEARCH_CONSOLE_DASHBOARD_TIMEOUT_MS = 20000
 
-type GoogleJwt = {
-    googleAccessToken?: string
-    googleRefreshToken?: string
-}
 
 type SearchConsoleSiteOption = {
     siteUrl: string
@@ -178,19 +174,8 @@ export async function GET(req: Request) {
             // @ts-expect-error - id added in callbacks
             const userId = session.user.id
 
-            // Get Google tokens from JWT first, fall back to admin DB
-            const jwt = await getToken({ req: req as never }) as GoogleJwt | null
-            let googleAccess = jwt?.googleAccessToken
-            let googleRefresh = jwt?.googleRefreshToken
-
-            // Fallback: fetch from admin DB (handles case where user signed in with GitHub)
-            if (!googleAccess && !googleRefresh) {
-                const dbTokens = await fetchGoogleTokensFromDb(userId)
-                if (dbTokens) {
-                    googleAccess = dbTokens.accessToken
-                    googleRefresh = dbTokens.refreshToken
-                }
-            }
+            // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
+            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId))
 
             if (!googleAccess && !googleRefresh) {
                 return NextResponse.json({ error: "Google not connected", code: "GOOGLE_NOT_CONNECTED" }, { status: 400 })

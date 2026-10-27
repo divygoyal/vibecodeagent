@@ -5,7 +5,7 @@
  * web/src/app/api/github/route.ts pattern) — no Octokit dependency.
  *
  * Token resolution strategy:
- *   1. JWT (session.user.githubAccessToken) — present whenever the user signed in
+ *   1. Session JWT (lib/serverAuth.ts, server-only) — present whenever the user signed in
  *      via GitHub or has clicked Connect GitHub.
  *   2. Admin DB fallback (oauth_connections row, provider='github') — used when
  *      the user signed in with Google but had previously connected GitHub.

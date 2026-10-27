@@ -1,5 +1,4 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { getServerAuthSession } from '@/lib/serverAuth';
 
 export interface SessionUser {
     /** Primary provider sub: the identifier the admin service resolves. */
@@ -12,20 +11,26 @@ export interface SessionUser {
     googleRefreshToken: string | null;
 }
 
-export async function getSessionUser(): Promise<{ user: SessionUser; session: unknown } | null> {
-    const session = await getServerSession(authOptions);
-    const u = session?.user as Record<string, unknown> | undefined;
-    if (!u || typeof u.id !== 'string' || !u.id) return null;
+/**
+ * The signed-in user with their Google tokens. Server-only: the tokens come from
+ * the session JWT (lib/serverAuth.ts), not the browser session. `session` is the
+ * server auth session for lib/adminUserSync ensureAdminUserSynced(); never
+ * return it or the user from a route.
+ */
+export async function getSessionUser(): Promise<{ user: SessionUser; session: Awaited<ReturnType<typeof getServerAuthSession>> } | null> {
+    const session = await getServerAuthSession();
+    const u = session?.user;
+    if (!u || !u.id) return null;
     return {
         session,
         user: {
             id: u.id,
-            name: (u.name as string | null) ?? null,
-            email: (u.email as string | null) ?? null,
-            image: (u.image as string | null) ?? null,
-            provider: (u.provider as string | null) ?? null,
-            googleAccessToken: (u.googleAccessToken as string | null) || null,
-            googleRefreshToken: (u.googleRefreshToken as string | null) || null,
+            name: u.name ?? null,
+            email: u.email ?? null,
+            image: u.image ?? null,
+            provider: u.provider ?? null,
+            googleAccessToken: u.googleAccessToken || null,
+            googleRefreshToken: u.googleRefreshToken || null,
         },
     };
 }

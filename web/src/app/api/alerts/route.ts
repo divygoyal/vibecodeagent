@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
-import { getValidAccessToken, fetchGoogleTokensFromDb } from '@/lib/googleApi';
+import { getValidAccessToken } from '@/lib/googleApi';
+import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
 import { computeAlerts } from '@/lib/alertEngine';
 
 export const dynamic = 'force-dynamic';
@@ -108,17 +108,8 @@ export async function GET(req: NextRequest) {
         }
 
         // Get Google token
-        const jwt = await getToken({ req: req as any }) as any;
-        let accessToken = jwt?.googleAccessToken as string | undefined;
-        let refreshToken = jwt?.googleRefreshToken as string | undefined;
-
-        if (!accessToken && !refreshToken) {
-            const dbTokens = await fetchGoogleTokensFromDb(userId);
-            if (dbTokens) {
-                accessToken = dbTokens.accessToken;
-                refreshToken = dbTokens.refreshToken;
-            }
-        }
+        // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
+        const { accessToken: accessToken, refreshToken: refreshToken } = await getGoogleCredentialsForRequest(req, String(userId));
 
         if (!accessToken && !refreshToken) {
             return NextResponse.json({ alerts: [], alertCount: 0, error: 'No Google connection' });

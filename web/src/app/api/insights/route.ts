@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
-import { getToken } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
-import { getValidAccessToken, listSearchConsoleSites, listAnalyticsProperties, fetchGoogleTokensFromDb } from '@/lib/googleApi'
+import { getValidAccessToken, listSearchConsoleSites, listAnalyticsProperties } from '@/lib/googleApi'
+import { getGoogleCredentialsForRequest } from '@/lib/serverAuth'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
@@ -231,18 +231,8 @@ export async function GET(req: Request) {
         // @ts-expect-error - id added in callbacks
         const userId = session!.user.id;
 
-        // Get Google tokens from JWT first, fall back to admin DB
-        const jwt = await getToken({ req: req as any }) as any;
-        let googleAccess = jwt?.googleAccessToken as string | undefined;
-        let googleRefresh = jwt?.googleRefreshToken as string | undefined;
-
-        if (!googleAccess && !googleRefresh) {
-            const dbTokens = await fetchGoogleTokensFromDb(userId);
-            if (dbTokens) {
-                googleAccess = dbTokens.accessToken;
-                googleRefresh = dbTokens.refreshToken;
-            }
-        }
+        // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
+        const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId));
 
         if (!googleAccess && !googleRefresh) {
             return NextResponse.json({ insights: [], message: "Connect Google to get SEO & analytics insights" });

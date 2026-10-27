@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from "next-auth/next"
-import { getToken } from "next-auth/jwt"
-import { ensureAdminUserSynced, authOptions } from "@/lib/adminUserSync"
+import { ensureAdminUserSynced } from "@/lib/adminUserSync"
+import { getServerAuthSession } from "@/lib/serverAuth"
 
 /**
  * Register the current session's provider tokens with the admin backend.
@@ -13,7 +12,8 @@ import { ensureAdminUserSynced, authOptions } from "@/lib/adminUserSync"
  * session never replaces the user's display identity).
  */
 export async function POST(req: NextRequest) {
-    const session = await getServerSession(authOptions)
+    // Server-only session with the JWT's tokens (the browser session has none).
+    const session = await getServerAuthSession(req)
 
     if (!session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -28,10 +28,7 @@ export async function POST(req: NextRequest) {
     } catch { /* no body, fall back to primary */ }
 
     try {
-        const jwt = await getToken({ req: req as never }) as { googleRefreshToken?: string } | null
-        const sync = await ensureAdminUserSynced(session, targetProvider, {
-            googleRefreshToken: jwt?.googleRefreshToken,
-        })
+        const sync = await ensureAdminUserSynced(session, targetProvider)
 
         if (!sync.synced) {
             console.warn("Register provider degraded:", sync.reason)
