@@ -39,8 +39,14 @@ export function ConsentForm(p: ConsentFormProps) {
     return (
         <form method="post" action="/oauth/authorize/decision" className="space-y-5" onSubmit={(e) => {
             const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-            setSubmitting(submitter?.value ?? 'allow');
+            const action = submitter?.value ?? 'allow';
+            // Disabling the buttons below drops the clicked button from the submitted
+            // form data, so the choice travels in this hidden field (read first).
+            const field = e.currentTarget.elements.namedItem('action_choice') as HTMLInputElement | null;
+            if (field) field.value = action;
+            setSubmitting(action);
         }}>
+            <input type="hidden" name="action_choice" defaultValue="" />
             <input type="hidden" name="txn" value={p.txn} />
             <input type="hidden" name="csrf" value={p.csrf} />
             <input type="hidden" name="sites" value={mode} />

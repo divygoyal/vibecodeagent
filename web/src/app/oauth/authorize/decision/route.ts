@@ -46,7 +46,7 @@ export async function POST(req: Request) {
         return errorPage('Redirect address not allowed', 'The app changed its registered addresses. Start again from your AI app.');
     }
 
-    const action = String(form.get('action') || '');
+    const action = String(form.get('action_choice') || form.get('action') || '');
     if (action === 'deny') {
         return seeOther(clientRedirect(txn.r, { error: 'access_denied', error_description: 'The user declined the connection', state: txn.st }));
     }
