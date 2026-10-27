@@ -62,11 +62,11 @@ export default function HomePage() {
         {
             key: 'portfolio',
             tab: 'Portfolio',
-            title: 'Hundreds of sites, one table',
-            bullets: ['Sort by clicks, users or change', 'Trend line for every site', 'Export to CSV'],
+            title: 'Your whole portfolio at a glance',
+            bullets: ['Sort by clicks, users or change', 'Combined trend for all sites', 'Table view and CSV export'],
             href: tour.portfolio,
             cta: 'Open the portfolio',
-            alt: 'Portfolio in table view: every site with clicks, impressions, position, users, sessions and a trend line',
+            alt: 'Portfolio: every site with clicks, impressions, position, users, sessions and a trend line, and the combined trend',
         },
         {
             key: 'site',
