@@ -2,7 +2,7 @@
  * Tool registration wrapper: annotations, cost-unit rate limit, concurrency,
  * deadline, error mapping, demo banner and audit. MCP.md 7.1 and 8.
  */
-import { fromJsonSchema, type McpServer } from '@modelcontextprotocol/server';
+import type { McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod';
 import { recordAudit } from './audit';
 import type { McpPrincipal } from './auth';
@@ -27,16 +27,6 @@ export const dateRangeArg = z.object({
 
 export const formatArg = z.enum(['table', 'json']).default('table').describe('table is compact TSV; json returns columns and rows.');
 
-/** Result envelope (structuredContent): small, open-ended, never the rows. */
-export const Envelope = fromJsonSchema<Record<string, unknown>>({
-    type: 'object',
-    properties: {
-        truncated: { type: 'boolean' },
-        warnings: { type: 'array', items: { type: 'string' } },
-    },
-    additionalProperties: true,
-});
-
 // ───────────── context ─────────────
 
 export interface ToolContext {
@@ -57,7 +47,6 @@ export interface ToolContext {
 
 export interface ToolResult {
     text: string;
-    structured: Record<string, unknown>;
     rows: number;
 }
 
@@ -128,7 +117,6 @@ export function registerTool<S extends z.ZodObject>(server: McpServer, principal
         title: def.title,
         description: def.description,
         inputSchema: def.input,
-        outputSchema: Envelope,
         annotations: { title: def.title, readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         _meta: {
             securitySchemes: [{ type: 'oauth2', scopes: ['mcp:read'] }],
@@ -167,15 +155,12 @@ export function registerTool<S extends z.ZodObject>(server: McpServer, principal
                 clearTimeout(timer);
             }
             rows = result.rows;
-            const warnings = Array.from(new Set([...(result.structured.warnings as string[] | undefined ?? []), ...ctx.stats.warnings]));
-            const structured: Record<string, unknown> = { ...result.structured, warnings };
-            if (ctx.san.flagged) structured.flagged_cells = ctx.san.flagged;
-            if (principal.demo) structured.demo = true;
             let text = result.text;
             if (ctx.san.flagged) text += `\n# ${ctx.san.flagged} cell(s) were replaced because they looked like instructions.`;
             const extraWarnings = ctx.stats.warnings.filter((w) => !text.includes(w));
             if (extraWarnings.length) text += `\n${extraWarnings.map((w) => `# warning: ${w}`).join('\n')}`;
-            return { content: [{ type: 'text' as const, text }], structuredContent: structured };
+            // Text only: clients that support structuredContent show it instead of the text, so an envelope without the rows hides the data.
+            return { content: [{ type: 'text' as const, text }] };
         } catch (err) {
             const te = err instanceof ToolError ? err : new ToolError('upstream_error', 'The request failed unexpectedly');
             if (!(err instanceof ToolError)) console.error(`[mcp] ${def.name} failed:`, err instanceof Error ? err.message : err);

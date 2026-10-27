@@ -268,7 +268,6 @@ export const siteHealth = defineTool({
         return {
             text: out.text,
             rows: out.rowsReturned,
-            structured: { sites_checked: targets.length, findings_total: findings.length, returned: top.length, checked, skipped: Object.fromEntries(skipped), truncated: out.truncated || findings.length > top.length },
         };
     },
 });

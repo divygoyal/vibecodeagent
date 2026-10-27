@@ -53,7 +53,7 @@ export const listSites = defineTool({
         ];
         const out = render(header, [{ columns: ['site_id', 'ga4_property', 'ga4_name', 'gsc_property', 'gsc_permission', 'paired_by'], rows }],
             [sites.length > capped.length ? `# showing ${capped.length} of ${sites.length}; pass query to narrow` : '', rows.length ? ctx.note() : '']);
-        return { text: out.text, rows: out.rowsReturned, structured: { counts, returned: out.rowsReturned, truncated: out.truncated || sites.length > capped.length } };
+        return { text: out.text, rows: out.rowsReturned };
     },
 });
 
@@ -202,7 +202,7 @@ export const portfolioSummary = defineTool({
         };
         if (args.format === 'json') {
             const j = renderJson([{ columns, rows }], envelope);
-            return { text: j.text, rows: j.rowsReturned, structured: { ...envelope, truncated: j.truncated || rowsData.length > shown.length } };
+            return { text: j.text, rows: j.rowsReturned };
         }
         const header = [...ctx.banner(), headerLine([
             'portfolio_summary',
@@ -217,6 +217,6 @@ export const portfolioSummary = defineTool({
             '# TOTAL sums sessions, key events, clicks and impressions across all compared sites; CTR and position are impression-weighted.',
         ];
         const out = render(header, [{ columns, rows }], footer);
-        return { text: out.text, rows: out.rowsReturned, structured: { ...envelope, truncated: out.truncated || rowsData.length > shown.length } };
+        return { text: out.text, rows: out.rowsReturned };
     },
 });

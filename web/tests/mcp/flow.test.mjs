@@ -323,7 +323,7 @@ describe('OAuth with a DCR client', () => {
         assert.ok(!sites.isError, sites.content[0].text);
         assert.match(sites.content[0].text, /^# list_sites \| \d+ sites/m);
         assert.match(sites.content[0].text, /acmeanalytics\.example/);
-        assert.equal(typeof sites.structuredContent.counts.total, 'number');
+        assert.equal(sites.structuredContent, undefined, 'rows live in the text; a structured part would hide them');
         const site = 'acmeanalytics.example';
         const calls = [
             ['portfolio_summary', {}],
@@ -353,7 +353,7 @@ describe('OAuth with a DCR client', () => {
             const text = res.content?.[0]?.text ?? '';
             assert.ok(!res.isError, `${name} ${JSON.stringify(args)} -> ${text.slice(0, 400)}`);
             assert.ok(text.length > 20 && text.length < 22_000, `${name}: ${text.length} chars`);
-            assert.ok(res.structuredContent, `${name}: structuredContent`);
+            assert.equal(res.structuredContent, undefined, `${name}: no structuredContent`);
             assert.ok(!/tcat_|tcrt_|ya29\./.test(text), `${name}: no tokens in output`);
         }
     });
@@ -382,6 +382,7 @@ describe('OAuth with a DCR client', () => {
         assert.equal(init.headers.get('mcp-session-id'), null);
         const list = await mcp(tokens.access_token, 'tools/list', {}, { era: 'legacy', headers: { 'mcp-protocol-version': '2025-11-25' } });
         assert.equal(list.json.result.tools.length, 13);
+        assert.ok(list.json.result.tools.every((t) => !t.outputSchema), 'no tool advertises an outputSchema');
         const res = await call(tokens.access_token, 'list_sites', {}, 'legacy');
         assert.ok(!res.isError, res.content?.[0]?.text);
         const prompts = await mcp(tokens.access_token, 'prompts/list', {}, { era: 'legacy', headers: { 'mcp-protocol-version': '2025-11-25' } });
@@ -443,7 +444,6 @@ describe('demo grant without sign-in', () => {
         const t = await connect({ clientId: c.client_id, redirectUri: 'http://127.0.0.1:9999/cb', action: 'demo', signedIn: false });
         const res = await call(t.access_token, 'list_sites');
         assert.match(res.content[0].text, /^# DEMO DATA/);
-        assert.equal(res.structuredContent.demo, true);
         const health = await call(t.access_token, 'site_health', { site: 'acmeanalytics.example' });
         assert.ok(!health.isError, health.content[0].text);
     });

@@ -185,7 +185,7 @@ export function renderGaReport(ctx: ToolContext, report: GaReport, o: { tool: st
     const allRows = [...rows, ...totalRows];
     if (o.format === 'json') {
         const j = renderJson([{ columns, rows: allRows }], envelope);
-        return { text: j.text, rows: j.rowsReturned, structured: { ...envelope, truncated: j.truncated } };
+        return { text: j.text, rows: j.rowsReturned };
     }
     const header = [...ctx.banner(), headerLine([o.tool, o.site, o.property, o.ranges.map(fmtPeriod).join(' vs '), md.timeZone ? `tz ${md.timeZone}` : null, md.currencyCode ? `currency ${md.currencyCode}` : null, `${rows.length} of ${rowCount} rows`, ...(o.headerExtra || [])])];
     const footer = [
@@ -194,7 +194,7 @@ export function renderGaReport(ctx: ToolContext, report: GaReport, o: { tool: st
         rows.length && o.dims.length ? ctx.note() : '',
     ];
     const out = render(header, [{ columns, rows: allRows }], footer);
-    return { text: out.text, rows: out.rowsReturned, structured: { ...envelope, truncated: out.truncated } };
+    return { text: out.text, rows: out.rowsReturned };
 }
 
 export const ga4Realtime = defineTool({
@@ -244,7 +244,7 @@ export const ga4Realtime = defineTool({
         const header = [...ctx.banner(), headerLine(['ga4_realtime', site.site_id, property, `last ${args.minutes} minutes`, totalActive !== undefined && metrics.includes('activeUsers') ? `activeUsers ${Math.round(totalActive)}` : null])];
         if (totals) rows.push([...dims.map((_, j) => (j === 0 ? 'TOTAL' : '')), ...totals.map((v, i) => gaMetricCell(v, types[i]))]);
         const out = render(header, [{ columns: [...dims, ...metrics], rows }], ['# realtime data is cached for 30 seconds', rows.length > 1 ? ctx.note() : '']);
-        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, property, minutes: args.minutes, active_users: totalActive ?? null, truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned };
     },
 });
 
@@ -283,6 +283,6 @@ export const ga4Metadata = defineTool({
         const rows: Cell[][] = fields.slice(0, args.limit).map((f) => [f.kind, f.apiName, ctx.san.text(f.uiName, 60), (f.type || '').replace(/^TYPE_/, '').toLowerCase(), ctx.san.text(f.category, 40), f.customDefinition ? 'yes' : '', ctx.san.text(f.description, 100)]);
         const header = [...ctx.banner(), headerLine(['ga4_metadata', site.site_id, property, `${rows.length} of ${total} fields`])];
         const out = render(header, [{ columns: ['kind', 'api_name', 'label', 'type', 'category', 'custom', 'description'], rows }], [total > rows.length ? '# more fields match; narrow with search, kind or category' : '']);
-        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, property, matched: total, returned: rows.length, truncated: out.truncated || total > rows.length } };
+        return { text: out.text, rows: out.rowsReturned };
     },
 });

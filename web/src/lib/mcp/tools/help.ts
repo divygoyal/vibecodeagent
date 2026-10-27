@@ -81,6 +81,6 @@ export const trafficclawHelp = defineTool({
     invoked: 'Help ready',
     async run(args, ctx) {
         const text = [...ctx.banner(), helpText(args.topic)].join('\n');
-        return { text, rows: 0, structured: { topic: args.topic } };
+        return { text, rows: 0 };
     },
 });

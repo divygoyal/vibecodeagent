@@ -146,7 +146,7 @@ export const seoOpportunities = defineTool({
         const header = [...ctx.banner(), headerLine(['seo_opportunities', site.site_id, `GSC ${fmtPeriod(period)}`, `min_impressions ${minImp}`, args.exclude_branded && !noQueries ? `branded excluded (${brand.slice(0, 5).join(', ')})` : null])];
         const footer = ['# est_extra_clicks_28d is a rough range from typical CTR by position, not a forecast.', ctx.note()];
         const out = render(header, sections, footer);
-        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, period: { start: period.start, end: period.end }, counts, estimate: true, truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned };
     },
 });
 
@@ -213,7 +213,7 @@ export const gscSearchAnalytics = defineTool({
         const envelope = { site: site.site_id, period: { start: period.start, end: period.end }, search_type: args.search_type, rows_returned: tableRows.length, next_offset: more ? args.offset + tableRows.length : null, data_through: period.end };
         if (args.format === 'json') {
             const j = renderJson([{ columns, rows: tableRows }], envelope);
-            return { text: j.text, rows: j.rowsReturned, structured: { ...envelope, truncated: j.truncated } };
+            return { text: j.text, rows: j.rowsReturned };
         }
         const header = [...ctx.banner(), headerLine(['gsc_search_analytics', site.site_id, siteUrl, `${fmtPeriod(period)}${args.fresh ? ' (includes incomplete days)' : ''}`, `type ${args.search_type}`, `sorted by ${args.sort_by}`])];
         const footer = [
@@ -224,7 +224,7 @@ export const gscSearchAnalytics = defineTool({
             tableRows.length && (dims.includes('query') || dims.includes('page')) ? ctx.note() : '',
         ];
         const out = render(header, [{ columns, rows: tableRows }], footer);
-        return { text: out.text, rows: out.rowsReturned, structured: { ...envelope, truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned };
     },
 });
 
@@ -281,6 +281,6 @@ export const gscInspectUrl = defineTool({
         });
         const header = [...ctx.banner(), headerLine(['gsc_inspect_url', site.site_id, siteUrl, `${urls.length} URL(s)`])];
         const out = render(header, [{ columns: ['url', 'verdict', 'coverage_state', 'indexing_state', 'robots_txt_state', 'page_fetch_state', 'last_crawl', 'crawled_as', 'google_canonical', 'user_canonical', 'mobile_usability', 'rich_results'], rows }], [ctx.note()]);
-        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, inspected: urls.length, truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned };
     },
 });
