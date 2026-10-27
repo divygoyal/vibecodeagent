@@ -82,8 +82,8 @@ export function Donut({ items, centerLabel, format = 'count', size = 160, maxSli
                     {slices.length ? <RTooltip content={renderTooltip} isAnimationActive={false} /> : null}
                 </PieChart>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-stat-sm text-fg">{format === 'count' ? fmtCompact(total) : fmtValue(format, total)}</span>
-                    {centerLabel ? <span className="text-meta text-fg-muted">{centerLabel}</span> : null}
+                    <span className={size < 120 ? 'text-body-sm font-semibold tabular-nums text-fg' : 'text-stat-sm text-fg'}>{format === 'count' ? fmtCompact(total) : fmtValue(format, total)}</span>
+                    {centerLabel && size >= 120 ? <span className="text-meta text-fg-muted">{centerLabel}</span> : null}
                 </div>
             </div>
             <ul className="flex w-full min-w-0 flex-col gap-1">

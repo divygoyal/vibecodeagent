@@ -43,12 +43,12 @@ export function GeoView(props: WidgetViewProps<GeoWidget>) {
     const below = c.topList > 0 && !side;
     const listW = side ? Math.min(240, Math.floor(width * 0.34)) : 0;
     const mapW = Math.max(120, width - listW - (side ? 16 : 0));
-    const mapH = below ? Math.max(100, h - Math.min(c.topList, 5) * 36 - 8) : h;
+    const mapH = below ? Math.max(100, h - Math.min(c.topList, 5) * 36 - 12) : h;
     const top = [...values.entries()].sort((a, b) => b[1] - a[1]).slice(0, c.topList || 0);
     const fmt = (v: number) => fmtMetricValue(id, v, { compact: true, currency: ok?.flags.currency });
     return (
         <WidgetFrame props={props}>
-            <div ref={ref} className={cn('flex h-full min-w-0', side ? 'flex-row gap-4' : 'flex-col gap-2')}>
+            <div ref={ref} className={cn('flex h-full min-w-0', side ? 'flex-row gap-4' : 'flex-col gap-3')}>
                 {!frame ? null : !values.size ? (
                     <EmptyState variant="inline" title={`No ${metricLabel(id).toLowerCase()} by country in this period`} />
                 ) : (

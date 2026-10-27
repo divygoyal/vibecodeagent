@@ -80,7 +80,7 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
 
     return (
         <div className="relative" style={{ width, height }}>
-            <svg ref={ref} width={width} height={mapH} role="img" aria-label={`${label} by country`} onMouseLeave={() => setHover(null)}>
+            <svg ref={ref} width={width} height={mapH} className="block" role="img" aria-label={`${label} by country`} onMouseLeave={() => setHover(null)}>
                 {features.map((f, i) => {
                     const code = f.id !== undefined ? numericToAlpha2(f.id) : null;
                     const v = code ? values.get(code) : undefined;
@@ -108,7 +108,7 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
                 </div>
             ) : null}
             {showLegend ? (
-                <div className="mt-1 flex items-center gap-2 text-caption text-fg-muted">
+                <div className="mt-1 flex h-[18px] items-center gap-2 overflow-hidden whitespace-nowrap text-caption leading-none text-fg-muted">
                     <span className="tabular-nums">{format(0)}</span>
                     <span className="flex h-2 w-28 overflow-hidden rounded-full">
                         {Array.from({ length: steps }, (_, i) => (

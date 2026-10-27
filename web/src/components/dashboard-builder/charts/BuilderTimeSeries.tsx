@@ -24,11 +24,12 @@ import {
 import { cn } from '@/lib/cn';
 import { fmtAxis, fmtDayLong, fmtDuration, fmtMonthYear, fmtPercent, makeDateTickFormatter } from '@/lib/format';
 import { CATEGORICAL, CATEGORICAL_OTHER, channelColor, deviceColor } from '@/lib/metrics';
-import { ChartTooltipCard, type ChartTooltipRow } from '@/components/charts';
+import { AXIS_LINE, AXIS_TICK, CURSOR, ChartTooltipCard, GRID_STROKE, dateAxisTick, dateTicks as evenDateTicks, maxOf, niceAxis, type AxisFormat, type ChartTooltipRow, type NiceAxis } from '@/components/charts';
 import { MetricDelta } from '@/components/ui';
 import { fmtMetricValue, getMetric, metricColor, metricLabel } from '@/lib/builder/catalog';
 import { countryName } from '@/lib/builder/countries';
 import type { CellValue } from '@/lib/builder/types';
+import { useElementWidth } from '../useElementWidth';
 import { dsFormat, metricBetter } from '../widgets/metricUi';
 
 export interface TsSeries {
@@ -81,11 +82,16 @@ export function breakdownLabel(dimension: string, key: string, labels?: Record<s
     return v || '(not set)';
 }
 
-function dateTicks(rows: Array<Record<string, CellValue>>, g: 'day' | 'week' | 'month') {
-    const dates = rows.map((r) => String(r['d:date'] ?? ''));
+function dateTickFormat(dates: string[], g: 'day' | 'week' | 'month'): (v: string, i: number) => string {
     if (g === 'month') return (v: string) => fmtMonthYear(v);
     const f = makeDateTickFormatter(dates);
     return (v: string, i: number) => f(v, i);
+}
+
+/** Round Y steps (axis.ts niceAxis: 0 / 5K / 10K, positions from 1) for a catalogue metric. */
+function axisKind(metricId: string): AxisFormat {
+    const f = getMetric(metricId)?.format;
+    return f === 'percent' || f === 'position' || f === 'duration' ? f : f === 'integer' ? 'count' : 'number';
 }
 
 export function BuilderTimeSeries(props: BuilderTimeSeriesProps) {
@@ -115,7 +121,12 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
     const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
     const reduce = useReducedMotion();
     const showY = height > 200;
-    const tick = useMemo(() => dateTicks(rows, granularity), [rows, granularity]);
+    // Evenly spaced dates anchored on the last day and round Y steps (components/charts/axis.ts, round 2 critique #2).
+    const [figRef, figW] = useElementWidth<HTMLElement>();
+    const dates = useMemo(() => rows.map((r) => String(r['d:date'] ?? '')), [rows]);
+    const tick = useMemo(() => dateTickFormat(dates, granularity), [dates, granularity]);
+    const xTicks = useMemo(() => evenDateTicks(dates, { width: (figW || 640) - (showY ? 52 : 16) }), [dates, figW, showY]);
+    const xTick = useMemo(() => dateAxisTick({ first: dates[0], last: dates[dates.length - 1], ticks: xTicks, format: tick }), [dates, xTicks, tick]);
     const hasPartial = typeof partialFrom === 'number' && partialFrom > 0 && partialFrom < rows.length;
     const first = series[0];
 
@@ -163,11 +174,31 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
         return <ChartTooltipCard title={row['d:date'] ? fmtDate(String(row['d:date'])) : undefined} subtitle={compare && pd ? `vs ${fmtDate(String(pd))}` : undefined} rows={out} partial={hasPartial && idx >= (partialFrom as number)} />;
     };
 
+    const yAxes = useMemo(() => {
+        const out: Record<string, NiceAxis> = {};
+        if (breakdown) {
+            let max = 0;
+            for (const r of data) {
+                if (breakdown.stacked) {
+                    let sum = 0;
+                    for (const k of breakdown.keys) { const v = r[k]; if (typeof v === 'number' && Number.isFinite(v)) sum += v; }
+                    if (sum > max) max = sum;
+                } else {
+                    max = Math.max(max, maxOf([r], breakdown.keys));
+                }
+            }
+            out.b = niceAxis(max, { format: axisKind(breakdown.metric) });
+        } else {
+            for (const s of series) out[s.metric] = niceAxis(maxOf(data, [`m:${s.metric}`, compare ? `m:${s.metric}:prev` : undefined]), { format: axisKind(s.metric) });
+        }
+        return out;
+    }, [data, breakdown, series, compare]);
+
     const allZero = !breakdown && first ? rows.every((r) => !r[`m:${first.metric}`]) : false;
     const anim = !reduce;
 
     return (
-        <figure className={cn('relative m-0', className)} style={{ height }} aria-label={breakdown ? `${metricLabel(breakdown.metric)} by ${breakdown.dimension}` : series.map((s) => s.label ?? metricLabel(s.metric)).join(', ')}>
+        <figure ref={figRef} className={cn('relative m-0', className)} style={{ height }} aria-label={breakdown ? `${metricLabel(breakdown.metric)} by ${breakdown.dimension}` : series.map((s) => s.label ?? metricLabel(s.metric)).join(', ')}>
             {showLegend && (breakdown || series.length > 1) ? (
                 <div className="mb-1 flex h-5 flex-wrap gap-x-3 gap-y-1 overflow-hidden text-meta text-fg-secondary">
                     {breakdown
@@ -188,23 +219,23 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                         </linearGradient>
                     ) : null}
                 </defs>
-                <CartesianGrid vertical={false} stroke="var(--color-chart-grid)" />
-                <XAxis dataKey="d:date" tickFormatter={(v, i) => tick(String(v), i)} tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }} tickLine={false} axisLine={{ stroke: 'var(--color-chart-axis)' }} tickMargin={8} minTickGap={32} interval="preserveStartEnd" />
+                <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+                <XAxis dataKey="d:date" ticks={xTicks} interval={0} tick={xTick} tickLine={false} axisLine={AXIS_LINE} tickMargin={8} />
                 {breakdown ? (
-                    <YAxis yAxisId="b" hide={!showY} width={showY ? 44 : 0} domain={[0, 'auto']} allowDecimals={false} tickFormatter={axisFmt(breakdown.metric, currency)} tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }} tickLine={false} axisLine={false} tickCount={5} />
+                    <YAxis yAxisId="b" hide={!showY} width={showY ? 44 : 0} domain={yAxes.b.domain} ticks={yAxes.b.ticks} interval={0} tickFormatter={axisFmt(breakdown.metric, currency)} tick={AXIS_TICK} tickLine={false} axisLine={false} />
                 ) : series.map((s, i) => {
                     const isPos = getMetric(s.metric)?.format === 'position';
                     const visible = showY && (i === 0 || s.axis === 'right');
                     return (
                         <YAxis
                             key={s.metric} yAxisId={s.metric} hide={!visible} width={visible ? 44 : 0} orientation={s.axis === 'right' ? 'right' : 'left'}
-                            reversed={isPos} domain={isPos ? [1, (max: number) => Math.ceil(max) + 1] : [0, 'auto']}
-                            allowDecimals={getMetric(s.metric)?.format !== 'integer'} tickFormatter={axisFmt(s.metric, currency)}
-                            tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }} tickLine={false} axisLine={false} tickCount={5}
+                            reversed={isPos} domain={yAxes[s.metric].domain} ticks={yAxes[s.metric].ticks} interval={0}
+                            tickFormatter={axisFmt(s.metric, currency)}
+                            tick={AXIS_TICK} tickLine={false} axisLine={false}
                         />
                     );
                 })}
-                <RTooltip content={renderTooltip} cursor={{ stroke: 'var(--color-chart-cursor)', strokeWidth: 1 }} isAnimationActive={false} offset={12} />
+                <RTooltip content={renderTooltip} cursor={CURSOR} isAnimationActive={false} offset={12} />
 
                 {breakdown
                     ? breakdown.keys.map((k, i) => {

@@ -4,10 +4,10 @@ import { use, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
-import { ArrowLeft, Copy, FileDown, LayoutTemplate, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, FileDown, Globe, LayoutTemplate, Lock, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Pill, Skeleton } from '@/components/ui';
+import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Skeleton } from '@/components/ui';
 import { DashboardView, useUrlControls } from '@/components/dashboard-builder/DashboardView';
 import { DashboardBrandHeader } from '@/components/dashboard-builder/DashboardBrandHeader';
 import { ShareDialog } from '@/components/dashboard-builder/ShareDialog';
@@ -16,6 +16,17 @@ import { canonicalJson } from '@/lib/builder/compile';
 import { presetLabel } from '@/lib/builder/dates';
 import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
 import type { DashboardDocV2, DashboardRecord, FilterControl, ShareState } from '@/lib/builder/types';
+
+/** One-time note for dashboards made before the new builder (was a permanent header pill). */
+function noteOlderDashboard(rec: DashboardRecord) {
+    if (rec.schemaVersion !== 1) return;
+    const k = `tc-v1-note-${rec.id}`;
+    try {
+        if (localStorage.getItem(k)) return;
+        localStorage.setItem(k, '1');
+    } catch { /* storage blocked: show it anyway */ }
+    toast.info('This dashboard was made with the older builder. It opens in the new editor; nothing is lost.');
+}
 
 function timeAgo(iso?: string | null): string {
     if (!iso) return '';
@@ -112,14 +123,15 @@ function Loaded({ rec, onRecord, openShare, router }: { rec: DashboardRecord; on
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-body-sm text-fg-muted">
                         <span>{siteLabel}</span>
                         {updatedAt ? <span>· Updated {timeAgo(updatedAt)}</span> : null}
-                        {rec.share.enabled ? <Pill tone="brand" dot>Public link</Pill> : <Pill>Private</Pill>}
-                        {rec.schemaVersion === 1 ? <Pill tone="info">Older dashboard: opens in the new editor</Pill> : null}
+                        {rec.share.enabled
+                            ? <span className="inline-flex items-center gap-1"><Globe aria-hidden size={14} />Public</span>
+                            : <span className="inline-flex items-center gap-1"><Lock aria-hidden size={14} />Private</span>}
                     </p>
                     {doc.description ? <p className="mt-1 max-w-[720px] text-body text-fg-secondary">{doc.description}</p> : null}
                 </div>
                 <div className="flex items-center gap-2" data-pdf-ignore="true">
                     <Button variant="ghost" size="md" icon={RefreshCw} iconOnly aria-label="Refresh data" onClick={() => { setFresh(true); void page.mutate().finally(() => setFresh(false)); }} />
-                    {wide ? <Button asChild variant="secondary" icon={Pencil}><Link href={`/dashboard/dashboards/${rec.id}/edit`}>Edit</Link></Button> : null}
+                    {wide ? <Button asChild variant="secondary" icon={Pencil}><Link href={`/dashboard/dashboards/${rec.id}/edit`} onClick={() => noteOlderDashboard(rec)}>Edit</Link></Button> : null}
                     <Button variant="primary" icon={Share2} onClick={() => setShare(true)}>Share</Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" iconOnly icon={MoreHorizontal} aria-label="More actions" /></DropdownMenuTrigger>
