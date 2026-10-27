@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
-import { FeatureTour, type TourStop } from '@/components/marketing/home/FeatureTour';
+import { FeatureRows, type FeatureRow } from '@/components/marketing/home/FeatureRows';
 import { HOME_FAQ } from '@/components/marketing/home/content';
 import { HeroCopy, SECONDARY_CTA } from '@/components/marketing/home/Hero';
 import { HeroPortfolio } from '@/components/marketing/home/HeroPortfolio';
@@ -55,72 +55,54 @@ const appSchema = {
 const HOME_FAQ_PICK = [0, 1, 2, 3, 5, 7, 8, 9, 11];
 
 export default function HomePage() {
-    const { byRange, story, tour } = buildHomeData();
+    const { byRange, story, tour, boardSample } = buildHomeData();
     const p28 = byRange['28d'];
 
-    const stops: TourStop[] = [
-        {
-            key: 'portfolio',
-            tab: 'Portfolio',
-            title: 'Your whole portfolio at a glance',
-            bullets: ['Sort by clicks, users or change', 'Combined trend for all sites', 'Table view and CSV export'],
-            href: tour.portfolio,
-            cta: 'Open the portfolio',
-            alt: 'Portfolio: every site with clicks, impressions, position, users, sessions and a trend line, and the combined trend',
-        },
+    const features: FeatureRow[] = [
         {
             key: 'site',
-            tab: 'Site page',
-            title: 'Analytics and Search, side by side',
-            bullets: ['GA4 and Search Console together', 'One-line summary on every chart', 'Notes and Google updates on charts'],
+            label: 'Site page',
+            title: 'Every number for one site',
+            bullets: ['Users, sessions, pageviews, conversions', 'A trend line on every tile', 'Search Console on the same page'],
             href: tour.site,
             cta: 'Open a site page',
-            alt: `Site overview for ${tour.host}: users, sessions, clicks and impressions with daily charts`,
-        },
-        {
-            key: 'fixes',
-            tab: 'Search fixes',
-            title: 'A to-do list ranked by clicks',
-            bullets: ['Queries close to page one', 'Clicks each fix could bring', 'Suggested fix, step by step'],
-            href: tour.fixes,
-            cta: 'See what to fix',
-            alt: 'Actions page: tasks ranked by impact, each with the evidence and a suggested fix',
+            alt: `Site overview for ${tour.host}: users, sessions, pageviews and conversions with trend lines`,
         },
         {
             key: 'traffic',
-            tab: 'Traffic & AI',
+            label: 'Traffic & AI',
             title: 'See what ChatGPT sends you',
-            bullets: ['AI assistants as their own channel', 'Sources, pages, countries, devices', 'Realtime, funnels, journeys, retention'],
+            bullets: ['AI assistants as their own number', 'Daily chart against the period before', 'Notes and Google updates on the chart'],
             href: tour.traffic,
             cta: 'Open Traffic',
-            alt: 'Traffic page with AI traffic per day and the key Analytics numbers',
+            alt: 'Traffic page: AI traffic per day against the previous period, with notes on the chart',
+        },
+        {
+            key: 'fixes',
+            label: 'Search fixes',
+            title: 'A to-do list ranked by clicks',
+            bullets: ['Ranked by the clicks it could bring', 'The numbers behind every task', 'A suggested fix, step by step'],
+            href: tour.fixes,
+            cta: 'See what to fix',
+            alt: 'Actions page: a high-impact task with its numbers and a suggested fix',
         },
         {
             key: 'dashboards',
-            tab: 'Dashboards',
+            label: 'Dashboards',
             title: 'Client dashboards in minutes',
-            bullets: ['Templates, themes and dark mode', 'Public links, embeds, passwords', 'TV mode for the office screen'],
+            bullets: ['Scorecards and charts from any site', 'Share a read-only link or embed', 'Templates, themes and dark mode'],
             href: tour.dashboards,
-            cta: 'Open dashboards',
-            alt: 'A shared dashboard with scorecards, a users chart, a devices donut and a top pages table',
-        },
-        {
-            key: 'leaderboard',
-            tab: 'Leaderboard',
-            title: 'Show traffic Google has verified',
-            bullets: ['Numbers straight from Google', 'Only verified owners rank', 'You choose what is public'],
-            href: '/leaderboard',
-            cta: 'See the leaderboard',
-            alt: 'The public leaderboard: sites ranked by visitors, with verified-owner badges and trends',
+            cta: 'Open a dashboard',
+            alt: 'A sample dashboard: scorecards for clicks, impressions, position, users and sessions, and two charts',
         },
         {
             key: 'ask',
-            tab: 'Ask AI',
+            label: 'Ask AI',
             title: 'Ask in plain English, get numbers',
-            bullets: ['Answers from your own data', 'Tables you can check', 'Or ask from ChatGPT and Claude'],
+            bullets: ['Answers with tables you can check', 'Suggested questions to start', 'Or ask from ChatGPT and Claude'],
             href: tour.ask,
             cta: 'Try Ask in the demo',
-            alt: 'Ask: the question "Which of my sites grew the most this month?" answered with growing and falling sites',
+            alt: 'Ask: "Which of my sites grew the most this month?" answered with growing and falling sites',
         },
     ];
 
@@ -133,7 +115,7 @@ export default function HomePage() {
 
             <section aria-label="Introduction" className="bg-canvas">
                 <HeroCopy demoHref={tour.portfolio} />
-                <div className="mx-auto mt-10 max-w-[1200px] px-3 pb-16 sm:px-4 md:mt-14 md:px-6 md:pb-24">
+                <div id="tour-portfolio" className="mx-auto mt-10 max-w-[1200px] scroll-mt-20 px-3 pb-16 sm:px-4 md:mt-14 md:px-6 md:pb-24">
                     <BrowserFrame url="trafficclaw.com/dashboard" className="shadow-[0_24px_64px_-24px_rgb(0_0_0/0.25)]">
                         <HeroPortfolio byRange={byRange} />
                     </BrowserFrame>
@@ -159,18 +141,19 @@ export default function HomePage() {
                     id="tour-title"
                     eyebrow="Product tour"
                     title="One sign-in. Everything you need."
-                    description="Real screens on sample data. Every one opens in the live demo."
+                    description="Real screens on sample data. Each one opens in the live demo."
                     align="center"
                 />
-                <div className="mt-10">
-                    <FeatureTour stops={stops} />
+                <div className="mt-12 md:mt-16">
+                    <FeatureRows rows={features} />
                 </div>
                 <CtaRow note="All of it, free, on your own sites." />
             </Section>
 
             <McpSection portfolio={p28} />
 
-            <LeaderboardPreview />
+            <span id="tour-leaderboard" aria-hidden className="block scroll-mt-20" />
+            <LeaderboardPreview sampleRows={boardSample} />
 
             <WhyFree />
 

@@ -11,6 +11,8 @@ import { buildDemoPortfolio } from '@/lib/portfolio/demo';
 import type { PortfolioRange, PortfolioResponse } from '@/lib/portfolio/types';
 import { buildMarketingDemoActions } from '../demo/data';
 import { demoHref } from './demoLinks';
+import type { BoardPreviewRow } from './proof';
+import { fmtCompact } from '@/lib/format';
 
 export const HOME_RANGES: PortfolioRange[] = ['7d', '28d', '3m', '12m'];
 
@@ -41,6 +43,35 @@ export interface HomeData {
     byRange: Record<PortfolioRange, PortfolioResponse>;
     story: HomeStory;
     tour: HomeTourLinks;
+    /** Leaderboard rows for a test server (whose board holds seed listings): the generator's own sites. */
+    boardSample: BoardPreviewRow[];
+}
+
+/**
+ * The top 5 sample sites by 28-day users, shaped as leaderboard rows: the same sites and numbers the hero shows,
+ * so a test server never shows a board that contradicts the portfolio. Never used on a real server.
+ */
+export function buildBoardSample(portfolio: PortfolioResponse): BoardPreviewRow[] {
+    return portfolio.sites
+        .filter((s) => s.traffic && s.traffic.cur.users > 0)
+        .sort((a, b) => b.traffic!.cur.users - a.traffic!.cur.users)
+        .slice(0, 5)
+        .map((s, i) => {
+            const cur = s.traffic!.cur.users;
+            const prev = s.traffic!.prev?.users ?? null;
+            return {
+                key: `sample:${s.key}`,
+                rank: i + 1,
+                href: '/leaderboard',
+                name: (s.name || s.label).split(' – ')[0],
+                host: s.host,
+                category: null,
+                visitors: fmtCompact(cur),
+                deltaPct: prev && prev > 0 ? ((cur - prev) / prev) * 100 : null,
+                spark: s.series.users && s.series.users.length > 1 ? s.series.users : null,
+                verified: true,
+            };
+        });
 }
 
 const bareHost = (h: string) => h.replace(/^www\./, '').toLowerCase();
@@ -116,5 +147,5 @@ export function buildTourLinks(portfolio: PortfolioResponse): HomeTourLinks {
 export function buildHomeData(now: number = Date.now()): HomeData {
     // buildDemoPortfolio memoises per range and UTC day, so the live page pays the generator once per 10 minutes.
     const byRange = Object.fromEntries(HOME_RANGES.map((range) => [range, buildDemoPortfolio({ range, now })])) as Record<PortfolioRange, PortfolioResponse>;
-    return { byRange, story: buildStory(byRange, now), tour: buildTourLinks(byRange['28d']) };
+    return { byRange, story: buildStory(byRange, now), tour: buildTourLinks(byRange['28d']), boardSample: buildBoardSample(byRange['28d']) };
 }

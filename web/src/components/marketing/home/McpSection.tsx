@@ -3,9 +3,8 @@ import { ArrowRight, Wrench } from 'lucide-react';
 
 import { Button, Favicon, MetricDelta } from '@/components/ui';
 import { SITE_URL } from '@/lib/brand';
-import { fmtFull } from '@/lib/format';
+import { fmtCompact, fmtFull } from '@/lib/format';
 import type { PortfolioResponse } from '@/lib/portfolio/types';
-import { ConnectGoogleButton } from '../site/ConnectGoogleButton';
 import { CopyField } from '../site/CopyField';
 import { Section, SectionHeading } from '../site/Section';
 import { ChatGptMark, ClaudeMark } from './BrandMarks';
@@ -44,9 +43,9 @@ export function McpSection({ portfolio }: { portfolio: PortfolioResponse }) {
                         </ul>
                     </div>
                     <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <ConnectGoogleButton size="lg" mark callbackUrl="/dashboard/connect-ai" />
-                        <Button asChild variant="ghost" size="lg" trailingIcon={<ArrowRight aria-hidden size={18} strokeWidth={1.75} />}>
-                            <Link href="/ai">Setup guide</Link>
+                        {/* No Google button here: the tour's call to action sits right above (one per ~2 phone screens). */}
+                        <Button asChild variant="secondary" size="lg" trailingIcon={<ArrowRight aria-hidden size={18} strokeWidth={1.75} />}>
+                            <Link href="/ai">Set it up in ChatGPT or Claude</Link>
                         </Button>
                     </div>
                 </div>
@@ -78,8 +77,8 @@ export function McpSection({ portfolio }: { portfolio: PortfolioResponse }) {
                                             <li key={site.key} className="flex items-center gap-3 px-3 py-2.5">
                                                 <Favicon host={site.host} size={16} />
                                                 <span className="min-w-0 flex-1 truncate text-body-sm text-fg">{site.label}</span>
-                                                <span className="text-body-sm tabular-nums text-fg">{fmtFull(site.search!.cur.clicks)}</span>
-                                                <MetricDelta metric="clicks" current={site.search!.cur.clicks} previous={site.search!.prev?.clicks} className="w-16 justify-end" />
+                                                <span className="text-body-sm tabular-nums text-fg"><span className="sm:hidden">{fmtCompact(site.search!.cur.clicks)}</span><span className="max-sm:hidden">{fmtFull(site.search!.cur.clicks)}</span></span>
+                                                <MetricDelta metric="clicks" current={site.search!.cur.clicks} previous={site.search!.prev?.clicks} className="w-14 justify-end sm:w-16" />
                                             </li>
                                         ))}
                                     </ul>

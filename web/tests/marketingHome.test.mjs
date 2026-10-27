@@ -118,3 +118,17 @@ test('the home leaderboard never shows test-domain rows on a real server', async
     assert.deepEqual(boardRowsFor(rows, true), { rows, sample: true });
     assert.deepEqual(boardRowsFor([{ host: 'real.com' }], true).sample, false);
 });
+
+test('test-server leaderboard rows come from the same generator as the hero', async () => {
+    const { buildHomeData } = await import('../src/components/marketing/home/homeData.ts');
+    const { byRange, boardSample } = buildHomeData(Date.UTC(2026, 9, 27, 12));
+    assert.equal(boardSample.length, 5);
+    for (let i = 0; i < boardSample.length; i++) {
+        const row = boardSample[i];
+        assert.equal(row.rank, i + 1);
+        const site = byRange['28d'].sites.find((s) => `sample:${s.key}` === row.key);
+        assert.ok(site && site.traffic, 'a real portfolio site');
+        assert.ok(row.visitors && !/[–-]/.test(row.visitors), 'exact numbers, no ranges');
+        assert.ok(!row.name.includes(' – '), 'short name');
+    }
+});

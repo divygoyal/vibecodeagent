@@ -5,10 +5,10 @@
  *
  *   node scripts/dev/marketing-shots.mjs <webPort> <outDir> [--only site,fixes] [--keep-png]
  *
- * Each shot is a crop of the part that matters (the fix list, the dashboard, the AI traffic chart, the Ask answer...),
- * not the whole window: desktop = the content column of a 1280x900 viewport at 2x (about 1030 css px wide, so text is
- * full size on the home page), saved 1800 px wide; mobile = the top of the 390 px phone layout at 2x, saved 720 px
- * wide. Both themes. Output: <outDir>/<name>-<desktop|mobile>-<light|dark>.<hash>.webp, tourImages.json (the
+ * Each shot is a crop of the part that matters (site overview, fix list, AI traffic, a dashboard, an Ask answer), not
+ * the whole window: desktop = the content column of a 1024x900 viewport at 2x (~760 css px, the width the home page's
+ * feature rows show it at, so text stays at its own size), mobile = the 390 px phone layout at 2x; both kept at 2x.
+ * The bottom of every crop snaps to the last whole card, so no card edge is cut. Both themes. Output: <outDir>/<name>-<desktop|mobile>-<light|dark>.<hash>.webp, tourImages.json (the
  * manifest the home page imports: names + pixel sizes; run the whole set, not --only, before copying it) and shots.json.
  *
  * Run it where Playwright and an instance are (worker1, production build). From the main VPS:
@@ -66,24 +66,19 @@ const SITE = 'acmeanalytics.example';
  * `prepare(page, mobile, report)` runs after the page settles (clicks); `crop` picks the rectangle (cropRect).
  */
 const SHOTS = [
-    {
-        // The table layout (the hero already shows the cards): every site in one sortable list.
-        name: 'portfolio',
-        path: '/dashboard',
-        // Desktop: the table (the hero already shows the cards); phones: the combined trend of all sites (the hero
-        // shows the cards there too, and the app's KPI strip scrolls sideways on phones, which looks cut in a still).
-        storage: { desktop: { 'tc-portfolio-trend': '0', 'tc-portfolio-layout': 'table' }, mobile: { 'tc-portfolio-trend': '1', 'tc-portfolio-layout': 'grid' } },
-        crop: { from: { desktop: 'main', mobile: '#portfolio-trend' }, offset: -14, height: { desktop: 700, mobile: 262 } },
-    },
-    { name: 'site', path: `/dashboard/s/${SITE}`, crop: { from: 'main', height: { desktop: 700, mobile: 760 } } },
+    // Each crop shows what its feature row on the home page says (see the bullets in app/(marketing)/page.tsx).
+    // `height` is the most a crop may take; the bottom then snaps to the last whole card, so no card edge is cut.
+    { name: 'site', path: `/dashboard/s/${SITE}`, crop: { from: 'main', height: { desktop: 560, mobile: 660 } } },
     {
         name: 'fixes',
         path: `/dashboard/s/${SITE}/actions`,
-        prepare: async (page) => {
+        prepare: async (page, mobile) => {
+            // Desktop: the first task with its suggested fix open; phones: the task card as it opens.
             const btn = page.getByRole('button', { name: 'Suggested fix' }).first();
-            if (await btn.count()) await btn.click();
+            if (!mobile && (await btn.count())) await btn.click();
         },
-        crop: { from: 'main', height: { desktop: 700, mobile: 760 } },
+        // Phones: exactly the first task card.
+        crop: { from: { desktop: 'main', mobile: 'card:High impact' }, offset: -12, whole: { mobile: true }, height: { desktop: 640, mobile: 900 } },
     },
     {
         name: 'traffic',
@@ -95,10 +90,15 @@ const SHOTS = [
                 await page.waitForTimeout(900);
             }
         },
-        crop: { from: 'main', height: { desktop: 700, mobile: 760 } },
+        // Wider window so all five KPI tiles fit (at 1024 the strip scrolls); shown full width on the home page.
+        viewport: { desktop: { width: 1280, height: 900 } },
+        // The KPI card: the AI traffic tile selected and its daily chart.
+        crop: { from: 'card:AI traffic per day', offset: -12, height: { desktop: 620, mobile: 640 } },
     },
     {
         name: 'dashboards',
+        // Wider window: the dashboard's scorecard row needs ~1000 px; the home page shows this one full width.
+        viewport: { desktop: { width: 1280, height: 900 } },
         path: '/dashboard/dashboards',
         prepare: async (page, mobile, report) => {
             // The first sample dashboard (not a template link).
@@ -110,38 +110,36 @@ const SHOTS = [
                 await page.waitForTimeout(1200);
             }
         },
-        crop: { from: 'main', height: { desktop: 700, mobile: 760 } },
-    },
-    {
-        name: 'leaderboard',
-        path: '/leaderboard',
-        public: true,
-        crop: { from: 'text=Ranked by', offset: -10, height: { desktop: 600, mobile: 760 }, container: 'main' },
+        // Phones: from the first chart (the scorecard row scrolls sideways on phones and would look cut).
+        crop: { from: { desktop: 'main', mobile: 'text=Search' }, offset: -14, height: { desktop: 860, mobile: 720 } },
     },
     {
         name: 'ask',
         path: '/dashboard/ask',
         prepare: async (page, mobile, report) => {
+            // Desktop: a question and its sample answer; phones: the start screen with its question cards (the
+            // answer's tables scroll sideways on a phone).
             const q = page.getByRole('button', { name: /grew the most/i }).first();
-            if (await q.count()) {
+            if (!mobile && (await q.count())) {
                 await q.click();
                 await settle(page, report);
                 await page.waitForTimeout(1500);
             }
         },
-        crop: { from: 'text=Which of my sites grew the most', offset: -28, height: { desktop: 640, mobile: 760 } },
+        crop: { from: { desktop: 'text=Which of my sites grew the most', mobile: 'text=Ask anything about' }, offset: -20, height: { desktop: 560, mobile: 640 } },
     },
 ];
 
 const VIEWPORTS = {
-    desktop: { viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2, outWidth: 1800 },
+    // 1024 px: the app with its sidebar, content column ~730 css px, the width the home page shows it at.
+    desktop: { viewport: { width: 1024, height: 900 }, deviceScaleFactor: 2, outWidth: null },
     mobile: {
-        viewport: { width: 390, height: 844 },
+        viewport: { width: 390, height: 1000 },
         deviceScaleFactor: 2,
         isMobile: true,
         hasTouch: true,
         userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1',
-        outWidth: 720,
+        outWidth: null,
     },
 };
 
@@ -151,10 +149,25 @@ const VIEWPORTS = {
  */
 async function cropRect(page, crop, form) {
     return page.evaluate(({ crop, form }) => {
+        const visible = (n) => { const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
         const pick = (sel) => {
+            if (sel.startsWith('card:')) {
+                // The outermost card (bordered, rounded box, under 1000 px tall) that holds this text.
+                let n = pick(`text=${sel.slice(5)}`);
+                let card = null;
+                while (n && n !== document.body) {
+                    const cs = getComputedStyle(n);
+                    const card_ = (parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0) && parseFloat(cs.borderBottomLeftRadius) > 0;
+                    if (card_ && n.getBoundingClientRect().height < 1000) card = n;
+                    n = n.parentElement;
+                }
+                return card;
+            }
             if (sel.startsWith('text=')) {
                 const t = sel.slice(5);
-                return [...document.querySelectorAll('p,span,div,h1,h2,h3')].find((n) => n.childElementCount === 0 && n.textContent?.trim().startsWith(t)) ?? null;
+                // The innermost element whose text starts with it (an icon inside the line is fine).
+                const hits = [...document.querySelectorAll('p,span,div,h1,h2,h3,li')].filter((n) => visible(n) && n.textContent?.trim().startsWith(t));
+                return hits.find((n) => !hits.some((m) => m !== n && n.contains(m))) ?? null;
             }
             return document.querySelector(sel === 'main' ? '#main-content' : sel);
         };
@@ -167,9 +180,26 @@ async function cropRect(page, crop, form) {
         const pad = form === 'mobile' ? 12 : 16;
         let top = start.getBoundingClientRect().top + window.scrollY + (crop.offset ?? 0);
         if (from === 'main') top = (inner?.getBoundingClientRect().top ?? 0) + window.scrollY - pad;
-        const height = crop.height[form];
+        top = Math.max(0, top);
+        // Snap the bottom to the end of the last card that fits whole, so no card edge is cut. A bordered,
+        // rounded box is a card; a bottom is only usable if no other card straddles it.
+        const limit = top + crop.height[form];
+        const cards = [...(main ?? document.body).querySelectorAll('*')].map((el) => {
+            const cs = getComputedStyle(el);
+            const r = el.getBoundingClientRect();
+            const bordered = parseFloat(cs.borderBottomWidth) > 0 && parseFloat(cs.borderBottomLeftRadius) > 0;
+            return bordered && r.height > 24 && r.width > 80 ? { t: r.top + window.scrollY, b: r.bottom + window.scrollY } : null;
+        }).filter(Boolean);
+        const straddles = (y) => cards.some((c) => c.t < y - 1 && c.b > y + 1);
+        const bottoms = cards.filter((c) => c.t >= top - 1 && c.b <= limit).map((c) => c.b).sort((a, b) => b - a);
+        let bottom = bottoms.find((b) => !straddles(b + 1)) ?? limit;
+        if (crop.whole?.[form]) bottom = start.getBoundingClientRect().bottom + window.scrollY;
+        // Air under it, but never into the next card.
+        const nextTop = Math.min(...cards.filter((c) => c.t > bottom).map((c) => c.t), Infinity);
+        const end = Math.min(limit, bottom + pad, (bottom + nextTop) / 2);
+        const height = Math.round(end - top);
         const x = Math.max(0, box.left - pad);
-        return { x, y: Math.max(0, top), width: Math.min(document.documentElement.clientWidth - x, box.width + pad * 2), height };
+        return { x, y: top, width: Math.min(document.documentElement.clientWidth - x, box.width + pad * 2), height };
     }, { crop, form });
 }
 
@@ -190,6 +220,11 @@ async function cleanDevText(page, origin) {
         for (const input of document.querySelectorAll('input')) {
             if (input.value.includes(origin)) input.value = input.value.split(origin).join('https://trafficclaw.com');
         }
+        // Sticky and fixed top bars (app top bar, demo bar) would cover the top of a scrolled crop.
+        for (const el of document.querySelectorAll('body *')) {
+            const cs = getComputedStyle(el);
+            if ((cs.position === 'sticky' || cs.position === 'fixed') && parseFloat(cs.top) === 0 && el.getBoundingClientRect().height < 140) el.style.visibility = 'hidden';
+        }
         // Fixed bars (the phone tab bar) would sit on top of the crop.
         for (const el of document.querySelectorAll('body *')) {
             const cs = getComputedStyle(el);
@@ -202,10 +237,11 @@ async function cleanDevText(page, origin) {
     }, origin);
 }
 
-async function newContext(browser, form, theme, { storage }) {
+async function newContext(browser, form, theme, { storage, viewport }) {
     const { outWidth: _w, ...ctxOpts } = VIEWPORTS[form];
     const context = await browser.newContext({
         ...ctxOpts,
+        ...(viewport ? { viewport } : {}),
         colorScheme: theme,
         reducedMotion: 'reduce',
         timezoneId: 'UTC',
@@ -232,7 +268,7 @@ try {
             for (const theme of ['light', 'dark']) {
                 const file = `${shot.name}-${form}-${theme}`;
                 const storage = shot.storage && (shot.storage.desktop || shot.storage.mobile) ? shot.storage[form] : shot.storage;
-                const context = await newContext(browser, form, theme, { storage });
+                const context = await newContext(browser, form, theme, { storage, viewport: shot.viewport?.[form] });
                 const page = await context.newPage();
                 const report = watchPage(page, BASE);
                 try {
@@ -250,12 +286,19 @@ try {
                     await cleanDevText(page, BASE);
                     await page.waitForTimeout(300);
                     const png = path.join(opts.out, `${file}.png`);
-                    const clip = await cropRect(page, shot.crop, form);
-                    if (!clip) throw new Error('crop target not found');
-                    await page.screenshot({ path: png, clip, fullPage: true });
-                    const { data, info } = await sharp(png)
-                        .resize({ width: VIEWPORTS[form].outWidth })
-                        .webp({ quality: 76, effort: 6, smartSubsample: true })
+                    const rect = await cropRect(page, shot.crop, form);
+                    if (!rect) throw new Error('crop target not found');
+                    // Scroll the crop to the top of the window and shoot the window: Chromium's full-page capture
+                    // re-lays out phone pages and shifts them against the measured rectangle.
+                    const scrolled = await page.evaluate((y) => { window.scrollTo(0, y); return window.scrollY; }, rect.y);
+                    await page.waitForTimeout(400);
+                    const vh = page.viewportSize().height;
+                    const clip = { x: rect.x, y: rect.y - scrolled, width: rect.width, height: Math.min(rect.height, vh - (rect.y - scrolled)) };
+                    await page.screenshot({ path: png, clip });
+                    let img = sharp(png);
+                    if (VIEWPORTS[form].outWidth) img = img.resize({ width: VIEWPORTS[form].outWidth });
+                    const { data, info } = await img
+                        .webp({ quality: 80, effort: 6, smartSubsample: true })
                         .toBuffer({ resolveWithObject: true });
                     // Content hash in the name: a new picture is a new URL, so no image cache can serve the old one.
                     const name = `${file}.${createHash('sha1').update(data).digest('hex').slice(0, 8)}.webp`;

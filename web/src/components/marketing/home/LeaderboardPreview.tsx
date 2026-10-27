@@ -10,21 +10,9 @@ import { fmtCompact } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { Section, SectionHeading } from '../site/Section';
 import { SiteIcon } from '../site/SiteIcon';
-import { boardRowsFor, fetchProofCounts, isTestServer, proofItems, type ProofItem } from './proof';
+import { boardRowsFor, fetchProofCounts, isTestServer, proofItems, type BoardPreviewRow, type ProofItem } from './proof';
 
-/** One row, normalised from either the v3 board (`rows`) or the legacy list (`entries`). */
-interface PreviewRow {
-    key: string;
-    rank: number;
-    href: string;
-    name: string;
-    host: string | null;
-    category: string | null;
-    visitors: string | null;
-    deltaPct: number | null;
-    spark: number[] | null;
-    verified: boolean;
-}
+type PreviewRow = BoardPreviewRow;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function hostOf(url: unknown): string | null {
@@ -92,7 +80,7 @@ function Delta({ pct }: { pct: number | null }) {
  * Social proof (round 2): live counts of listed and owner-verified sites from
  * the same API, each shown only above its threshold (proof.ts), never invented.
  */
-export function LeaderboardPreview() {
+export function LeaderboardPreview({ sampleRows = [] }: { sampleRows?: BoardPreviewRow[] }) {
     const [rows, setRows] = useState<PreviewRow[] | null>(null);
     const [sample, setSample] = useState(false);
     const [proof, setProof] = useState<ProofItem[]>([]);
@@ -103,7 +91,9 @@ export function LeaderboardPreview() {
             .then((res) => (res.ok ? res.json() : null))
             .then((data) => {
                 const board = boardRowsFor(data ? normalise(data).filter((r) => r.name) : [], isTestServer(window.location.hostname));
-                setRows(board.rows);
+                // Test server with seeded listings: show the demo generator's own sites instead, so the numbers
+                // match the portfolio above (same sites, same 28-day users), clearly tagged as sample rows.
+                setRows(board.sample && sampleRows.length ? sampleRows : board.rows);
                 setSample(board.sample);
             })
             .catch(() => { /* aborted or offline: stay hidden */ });
@@ -111,7 +101,7 @@ export function LeaderboardPreview() {
             .then((counts) => setProof(proofItems(counts)))
             .catch(() => { /* aborted or offline: no proof row */ });
         return () => ctrl.abort();
-    }, []);
+    }, [sampleRows]);
 
     if (!rows || rows.length === 0) return null;
 
@@ -160,32 +150,35 @@ export function LeaderboardPreview() {
                     <ol>
                         {rows.map((row) => (
                             <li key={row.key} className="border-b border-border-subtle last:border-b-0">
-                                <Link href={row.href} className="flex items-center gap-3 px-4 py-3 transition-colors duration-120 hover:bg-subtle/60">
-                                    <span className="w-6 shrink-0 text-center text-body-sm font-medium tabular-nums text-fg-muted">{row.rank}</span>
-                                    <SiteIcon host={row.host ?? row.name} size={32} />
+                                <Link href={row.href} className="flex items-center gap-2.5 px-3 py-3 transition-colors duration-120 hover:bg-subtle/60 sm:gap-3 sm:px-4">
+                                    <span className="w-5 shrink-0 text-center text-body-sm font-medium tabular-nums text-fg-muted sm:w-6">{row.rank}</span>
+                                    <SiteIcon host={row.host ?? row.name} size={24} />
                                     <span className="min-w-0 flex-1">
-                                        <span className="flex items-center gap-1.5">
-                                            <span className="truncate text-body font-semibold text-fg">{row.name}</span>
-                                            {row.verified ? <ShieldCheck aria-label="Verified" size={14} strokeWidth={1.75} className="shrink-0 text-brand-text" /> : null}
+                                        <span className="flex items-start gap-1.5">
+                                            <span className="line-clamp-2 text-body font-semibold leading-5 text-fg sm:truncate">{row.name}</span>
+                                            {row.verified ? <ShieldCheck aria-label="Verified" size={14} strokeWidth={1.75} className="mt-0.5 shrink-0 text-brand-text" /> : null}
                                         </span>
                                         <span className="flex items-center gap-2 text-body-sm text-fg-muted max-sm:hidden">
                                             {row.host ? <span className="truncate">{row.host}</span> : null}
-                                            {row.category ? <Badge variant="neutral" className="hidden sm:inline-flex">{row.category}</Badge> : null}
+                                            {row.category ? <Badge variant="neutral">{row.category}</Badge> : null}
                                         </span>
                                     </span>
                                     {row.spark && row.spark.length > 1 ? (
-                                        <span className="hidden w-24 shrink-0 sm:block">
+                                        <span className="w-14 shrink-0 sm:w-24">
                                             <Sparkline height={28} series={[{ metric: 'users', values: row.spark, label: 'Visitors' }]} interactive={false} />
                                         </span>
-                                    ) : null}
-                                    <span className="min-w-20 shrink-0 text-right">
-                                        {row.visitors ? <span className="block whitespace-nowrap text-stat-sm tabular-nums text-fg">{row.visitors}</span> : null}
+                                    ) : <span className="w-14 shrink-0 sm:w-24" aria-hidden />}
+                                    <span className="w-[4.5rem] shrink-0 text-right sm:w-24">
+                                        {row.visitors ? <span className="block whitespace-nowrap text-body font-semibold tabular-nums text-fg sm:text-stat-sm">{row.visitors}</span> : null}
                                         <Delta pct={row.deltaPct} />
                                     </span>
                                 </Link>
                             </li>
                         ))}
                     </ol>
+                    <p className="border-t border-border-subtle px-4 py-2.5 text-meta text-fg-muted">
+                        Visitors, last 28 days{rows.some((r) => r.visitors && /[–-]/.test(r.visitors)) ? ' · a range means the owner chose to show a range' : ''}
+                    </p>
                 </div>
             </div>
         </Section>
