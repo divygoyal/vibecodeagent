@@ -116,17 +116,20 @@ type Cell = [WidgetDef, number, number];
 type Rec = Record<string, WidgetDef>;
 
 /**
- * Narrow tables keep only what fits: at half width the first three metric columns (the rest are
- * hidden, still exportable) and a change chip on the first one only; at a third or less, two.
+ * Tables in the new templates must fit their tile: the first (dimension) column gets a width so
+ * long URLs truncate, and change chips stay on the first metric only (first two on wide tables
+ * with more than five metrics). Columns are never hidden: row thresholds may need them.
  */
 function fitTable(w: WidgetDef, cw: number): WidgetDef {
-    if (w.type !== 'table' || cw > 6) return w;
-    const max = cw <= 4 ? 2 : 3;
+    if (w.type !== 'table') return w;
+    const metrics = w.config.columns.filter((c) => c.kind === 'metric').length;
+    if (cw > 6 && metrics <= 5) return w;
+    const keep = cw > 6 ? 2 : 1;
     let n = 0;
-    const columns = w.config.columns.map((col) => {
-        if (col.kind !== 'metric') return col;
+    const columns = w.config.columns.map((col, i) => {
+        if (col.kind !== 'metric') return i === 0 && cw <= 6 ? { ...col, width: cw <= 4 ? 140 : 200 } : col;
         n++;
-        return { ...col, hidden: n > max ? true : col.hidden, showDelta: n === 1 };
+        return { ...col, showDelta: n <= keep };
     });
     return { ...w, config: { ...w.config, columns } };
 }
@@ -471,7 +474,7 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
             pages: [
                 page('p_world', 'Countries', [
                     [[kpi('w_kpis', SEARCH_COLS), 12, 3]],
-                    [[geo('w_geo', 'Clicks by country', 'gsc:clicks'), 8, 10], [barList('w_top', 'Top countries', 'country', 'gsc:clicks', { showShare: true, top: 10 }), 4, 10]],
+                    [[{ ...geo('w_geo', 'Clicks by country', 'gsc:clicks'), config: { ...geo('w_geo', '', 'gsc:clicks').config, topList: 0 } }, 8, 10], [barList('w_top', 'Top countries', 'country', 'gsc:clicks', { showShare: true, top: 10 }), 4, 10]],
                     [[breakdownTs('w_bycountry', 'Clicks by country', 'gsc:clicks', 'country'), 6, 8], [table('w_countries', 'Countries', ['country'], SEARCH_COLS, { bars: ['gsc:clicks'], sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, maxRows: 300 }), 6, 8]],
                 ], w),
                 page('p_detail', 'Pages and queries by country', [

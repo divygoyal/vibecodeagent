@@ -41,7 +41,8 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                 sortable: true,
                 firstSortDir: 'asc',
                 sortValue: (r) => dimText(dim, r[`d:${dim}`], frame?.labels),
-                className: cn('max-w-[340px]', i === 0 && 'min-w-[160px]'),
+                // Round 2: narrow template tables set a width so long URLs truncate instead of pushing columns out.
+                className: cn(typeof col.width === 'number' && col.width <= 200 ? 'max-w-[200px]' : 'max-w-[340px]', i === 0 && (typeof col.width === 'number' && col.width <= 200 ? 'min-w-[120px]' : 'min-w-[160px]')),
                 cell: (r) => {
                     const text = dimText(dim, r[`d:${dim}`], frame?.labels);
                     const raw = String(r[`d:${dim}`] ?? '');

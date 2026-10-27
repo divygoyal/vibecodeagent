@@ -65,3 +65,15 @@ Next on resume:
 - Mobile (390, light+dark, 7 dashboard routes): overflow 0, error 0; textSpill 2 (client report), smallTargets 4 (executive view).
 - Shots in round2/candidate/dash/: critique-* (judge equivalents; 390 list shots missing), templates/, themes/, features/, sheet-*.png.
   themes/site-overview-studio-1440-light.png caught a loading frame (re-shoot next session).
+
+## Judge round 1 fixes (2026-10-27 ~11:00 UTC)
+- AI traffic and Studio light were capture-timing blanks (both render; shots now wait for the grid). bshot waits for readiness.
+- Collisions: card padding fixed at 16 px in every density (footnotes no longer overprint x labels); goal bar spacing.
+- Client report: no empty bullets for viewers, prompts in the template, no repeated intro title, split cover, cover title wraps at 390.
+- Template tables: narrow dimension column + one change chip at half width (wide tables with >5 metrics: two); columns never hidden
+  (hiding broke row thresholds). Local SEO relaid out, filtered/thresholded empty tables explain themselves.
+- Themes: Executive (serif numbers, navy card tops, no grid), Paper (small caps, no fills), High contrast (2 px black, solid chips).
+- TV page 2 and International: map without its duplicate list. List card: "1 view", single-line meta.
+- All 16 templates re-rendered (templates/*-1440-light.png + 4 at 390). Gate cand3: 28/28 identical (re-shot 2 known donut/blank races).
+- Still pre-existing (cannot change without breaking the gate): "– –" for missing values, geo legend over the list in narrow maps,
+  donut sizing race.
