@@ -1,7 +1,10 @@
-import { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import { isEmailAllowed, parseAllowedEmails, PREVIEW_PRIVATE_PATH } from "@/lib/accessAllowlist";
+import { sessionCallback } from "@/lib/authSession";
+
+export type { PublicSessionUser, ServerAuthUser } from "@/lib/authSession";
 
 // Generic profile type
 interface UserProfile {
@@ -14,28 +17,6 @@ interface UserProfile {
 type GitHubProfile = UserProfile & {
     login?: string;
 };
-
-// Extended session user type
-interface ExtendedUser {
-    id?: string;
-    username?: string;
-    accessToken?: string; // Legacy/General
-    githubAccessToken?: string; // Specific
-    googleAccessToken?: string; // Specific
-    googleRefreshToken?: string; // Specific
-    provider?: string;            // PRIMARY provider (the one that owns the displayed identity)
-    primaryProvider?: string;     // Alias of provider — explicit naming
-    githubAccountId?: string;     // GitHub user id (from OAuth) — for register-provider, NOT for display
-    googleAccountId?: string;     // Google sub — for register-provider, NOT for display
-    githubLogin?: string;         // GitHub username (e.g. "divygoyal")
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-    refreshToken?: string;
-    // Read by middleware to gate /dashboard/* before /dashboard/setup is done.
-    // Refreshed via NextAuth's update() trigger after the setup PATCH.
-    workspaceSetupCompleted?: boolean;
-}
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -104,37 +85,9 @@ export const authOptions: NextAuthOptions = {
             return true;
         },
 
-        async session({ session, token }) {
-            if (token && session.user) {
-                const user = session.user as ExtendedUser;
-
-                // Display identity comes from the PRIMARY provider only.
-                // Connecting a secondary provider (e.g. GitHub on a Google session)
-                // must NOT change the displayed name/email/avatar.
-                user.id = (token.primarySub as string) ?? (token.sub as string);
-                if (token.primaryName !== undefined) user.name = token.primaryName as string | null;
-                if (token.primaryEmail !== undefined) user.email = token.primaryEmail as string | null;
-                if (token.primaryImage !== undefined) user.image = token.primaryImage as string | null;
-                user.provider = (token.primaryProvider as string) ?? (token.provider as string);
-                user.primaryProvider = user.provider;
-
-                user.username = (token.githubLogin as string) || (token.name as string);
-                user.accessToken = token.accessToken as string;
-                user.refreshToken = token.refreshToken as string;
-
-                // Per-provider tokens + ids — needed by chatbot tools and register-provider sync
-                user.githubAccessToken = token.githubAccessToken as string;
-                user.googleAccessToken = token.googleAccessToken as string;
-                user.googleRefreshToken = token.googleRefreshToken as string;
-                user.githubAccountId = token.githubAccountId as string;
-                user.googleAccountId = token.googleAccountId as string;
-                user.githubLogin = token.githubLogin as string;
-                // Workspace setup gate — read by client-side guards. Middleware
-                // reads the same value off the JWT directly.
-                user.workspaceSetupCompleted = Boolean(token.workspaceSetupCompleted);
-            }
-            return session;
-        },
+        // Browser-visible session.user: identity + flags only, no OAuth tokens.
+        // See lib/authSession.ts; server code reads tokens via lib/serverAuth.ts.
+        session: sessionCallback,
 
         async jwt({ token, profile, account, user, trigger, session }) {
             if (account) {

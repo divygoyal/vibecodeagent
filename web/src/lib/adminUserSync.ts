@@ -1,26 +1,16 @@
 import { authOptions } from '@/lib/auth';
+import type { ServerAuthUser } from '@/lib/authSession';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const ADMIN_USER_SYNC_TIMEOUT_MS = 8000;
 
-export type AdminSyncSession = {
-    user?: {
-        id?: string;
-        email?: string | null;
-        accessToken?: string;
-        provider?: string;             // PRIMARY provider (display identity)
-        refreshToken?: string;
-        // Per-provider data kept in the JWT so we can sync EITHER provider's tokens
-        // without flipping the primary identity.
-        githubAccessToken?: string;
-        googleAccessToken?: string;
-        githubAccountId?: string;
-        googleAccountId?: string;
-        githubLogin?: string;
-        googleRefreshToken?: string;
-    };
-} | null;
+/**
+ * The signed-in user WITH their OAuth tokens: lib/serverAuth.ts
+ * getServerAuthSession(req). The browser session (getServerSession) has no
+ * tokens, so passing it here would sync nothing.
+ */
+export type AdminSyncSession = { user: ServerAuthUser } | null;
 
 type AdminUserSyncPayload = {
     provider: string;

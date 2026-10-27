@@ -16,9 +16,10 @@ type FetcherError = Error & {
     status?: number;
 };
 
+// session.user carries flags only, never OAuth tokens (lib/authSession.ts).
 type SessionUser = {
-    googleAccessToken?: string;
-    githubAccessToken?: string;
+    hasGoogle?: boolean;
+    hasGithub?: boolean;
 };
 
 const fetcher = async (url: string) => {
@@ -85,7 +86,7 @@ function useImmediateSWR<T = any>(url: string | null, options = {}) {
 
 /**
  * Which providers the user has connected (admin OAuth rows via /api/connections,
- * plus the tokens in the current session, which covers the first seconds after
+ * plus the hasGoogle/hasGithub flags of the current session, which cover the first seconds after
  * sign-in before the admin row exists). No container or bot status: those
  * features are gone.
  */
@@ -97,8 +98,8 @@ export function useConnections() {
     const sessionUser = session?.user as SessionUser | undefined;
 
     return {
-        hasGoogleConnection: has('google') || !!sessionUser?.googleAccessToken,
-        hasGithubConnection: has('github') || !!sessionUser?.githubAccessToken,
+        hasGoogleConnection: has('google') || !!sessionUser?.hasGoogle,
+        hasGithubConnection: has('github') || !!sessionUser?.hasGithub,
         isLoading,
         isError: error,
         refresh: () => { void mutate(); },

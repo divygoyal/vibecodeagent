@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
 import { randomBytes } from 'crypto';
-import { authOptions, ensureAdminUserSynced } from '@/lib/adminUserSync';
+import { ensureAdminUserSynced } from '@/lib/adminUserSync';
+import { getServerAuthSession } from '@/lib/serverAuth';
 import { ensureUmamiWebsiteProvisioned } from '@/lib/umamiClient';
 import {
     normalizeShareConfig,
@@ -17,8 +17,6 @@ const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const ALLOW_IN_MEMORY_SHARES = !ADMIN_API_KEY && process.env.NODE_ENV !== 'production';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Session = { user?: { id: string; [key: string]: any } } | null;
 
 /* ─── In-memory fallback store (used when ADMIN_API_KEY is not set, i.e. dev mode) ─── */
 const inMemoryShares = new Map<string, ShareData>();
@@ -136,9 +134,10 @@ async function updateAdminShareConfig(input: {
  * GET /api/share — List the current user's active shares
  * Authenticated endpoint.
  */
-export async function GET() {
+export async function GET(req: Request) {
     try {
-        const session = await getServerSession(authOptions) as Session;
+        // Server-only session (with tokens for the admin user sync below).
+        const session = await getServerAuthSession(req);
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -188,7 +187,7 @@ export async function GET() {
  */
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions) as Session;
+        const session = await getServerAuthSession(req);
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -306,7 +305,7 @@ export async function POST(req: Request) {
  */
 export async function PATCH(req: Request) {
     try {
-        const session = await getServerSession(authOptions) as Session;
+        const session = await getServerAuthSession(req);
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -388,7 +387,7 @@ export async function PATCH(req: Request) {
  */
 export async function DELETE(req: Request) {
     try {
-        const session = await getServerSession(authOptions) as Session;
+        const session = await getServerAuthSession(req);
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }

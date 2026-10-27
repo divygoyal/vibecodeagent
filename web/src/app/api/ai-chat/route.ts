@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { getToken } from 'next-auth/jwt';
+import { getServerAuthUser } from '@/lib/serverAuth';
 import type { GoogleGenAI } from '@google/genai';
 import { authOptions } from '@/lib/auth';
 import { AI_CHAT_TOOL_DECLARATIONS, executeAiChatTool } from '@/services/aiChatTools';
@@ -592,9 +592,10 @@ export async function POST(req: NextRequest) {
         const userId = session.user.id;
 
         // ── Parallel pre-flight: credits + JWT token + DB tokens (Google + GitHub OAuth + GitHub App) ──
-        const [creditResult, jwt, dbTokens, dbGithubToken, dbGithubAppToken] = await Promise.all([
+        // authUser is server-only (lib/serverAuth.ts): the session JWT's tokens, never sent to the browser.
+        const [creditResult, authUser, dbTokens, dbGithubToken, dbGithubAppToken] = await Promise.all([
             (ADMIN_API_KEY && userId) ? getUserCredits(String(userId)) : Promise.resolve(null),
-            getToken({ req: req as any }),
+            getServerAuthUser(req),
             fetchGoogleTokensFromDb(String(userId)).catch(() => null),
             userId ? fetchGithubTokenFromDb(String(userId)).catch(() => null) : Promise.resolve(null),
             userId ? fetchGithubAppToken(String(userId)).catch(() => null) : Promise.resolve(null),
@@ -635,8 +636,10 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Get User's Google Tokens (JWT first, DB fallback already fetched in parallel) ──
-        let googleAccessToken = (jwt as any)?.googleAccessToken as string | undefined;
-        let googleRefreshToken = (jwt as any)?.googleRefreshToken as string | undefined;
+        // Only trust the JWT's tokens when they belong to this session's user.
+        const jwtUser = authUser && authUser.id === String(userId) ? authUser : null;
+        let googleAccessToken = jwtUser?.googleAccessToken;
+        let googleRefreshToken = jwtUser?.googleRefreshToken;
 
         if (!googleAccessToken && !googleRefreshToken && dbTokens) {
             googleAccessToken = dbTokens.accessToken;
@@ -651,7 +654,7 @@ export async function POST(req: NextRequest) {
         // as [GitHub:not_connected] and the LLM refuses to engage GitHub tools.
         const githubAccessToken =
             dbGithubAppToken ||
-            ((jwt as any)?.githubAccessToken as string | undefined) ||
+            jwtUser?.githubAccessToken ||
             dbGithubToken ||
             undefined;
         const githubConnected = !!githubAccessToken;

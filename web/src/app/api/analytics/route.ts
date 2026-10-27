@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
-import { getToken } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
 import { googleErrorResponse } from '@/lib/googleErrors'
 import { isDemoRequest } from '@/lib/demoWorkspace'
 import { getDemoAnalyticsDashboard } from '@/lib/demoWorkspaceData'
-import { getValidAccessToken, listAnalyticsProperties, fetchAnalyticsDashboard, fetchGoogleTokensFromDb } from '@/lib/googleApi'
+import { getValidAccessToken, listAnalyticsProperties, fetchAnalyticsDashboard } from '@/lib/googleApi'
+import { getGoogleCredentialsForRequest } from '@/lib/serverAuth'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 const ANALYTICS_PROPERTY_LIST_TIMEOUT_MS = 10000
@@ -17,10 +17,6 @@ type AnalyticsPropertyOption = {
     parent?: string
 }
 
-type GoogleJwt = {
-    googleAccessToken?: string
-    googleRefreshToken?: string
-}
 
 type CachedErrorResult = {
     __isError: true
@@ -246,10 +242,7 @@ export async function GET(req: Request) {
     const isProduction = !!ADMIN_API_KEY
 
     // Parallelize session and JWT token lookups — they're independent
-    const [session, jwt] = await Promise.all([
-        getServerSession(authOptions),
-        getToken({ req: req as never }) as Promise<GoogleJwt | null>,
-    ]);
+    const session = await getServerSession(authOptions);
 
     if (isProduction && !session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -265,17 +258,8 @@ export async function GET(req: Request) {
         if (isProduction && session?.user) {
             // @ts-expect-error - id added in callbacks
             const userId = session.user.id
-            let googleAccess = jwt?.googleAccessToken as string | undefined
-            let googleRefresh = jwt?.googleRefreshToken as string | undefined
-
-            // Fallback: fetch from admin DB (handles case where user signed in with GitHub)
-            if (!googleAccess && !googleRefresh) {
-                const dbTokens = await fetchGoogleTokensFromDb(userId)
-                if (dbTokens) {
-                    googleAccess = dbTokens.accessToken
-                    googleRefresh = dbTokens.refreshToken
-                }
-            }
+            // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
+            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId))
 
             if (!googleAccess && !googleRefresh) {
                 return NextResponse.json({ error: "Google not connected", code: "GOOGLE_NOT_CONNECTED" }, { status: 400 })

@@ -1,26 +1,25 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
+import { getServerAuthUser } from "@/lib/serverAuth"
 
 // Admin API configuration  
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
+  const user = await getServerAuthUser(req)
 
-  if (!session?.user) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   try {
     const { plan, geminiApiKey, githubToken } = await req.json()
 
-    // @ts-expect-error - id added in callbacks
-    const githubId = session.user.id
-    // @ts-expect-error - username added in callbacks  
-    const githubUsername = session.user.username
-    const email = session.user.email
+    const githubId = user.id
+    const githubUsername = user.username
+    const email = user.email
 
     if (!githubId) {
       return NextResponse.json({ error: 'GitHub ID not found' }, { status: 400 })

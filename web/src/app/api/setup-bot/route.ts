@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from "next-auth/next"
-import { authOptions, ensureAdminUserSynced } from "@/lib/adminUserSync"
+import { ensureAdminUserSynced } from "@/lib/adminUserSync"
+import { getServerAuthSession, type ServerAuthUser } from "@/lib/serverAuth"
 
 // Admin API configuration
 const ADMIN_API_URL = process.env.ADMIN_API_URL || "http://admin-api:8000"
@@ -10,20 +10,6 @@ type SetupBotRequest = {
   token?: string
   plan?: string
   bot_engine?: string
-}
-
-type SetupBotSessionUser = {
-  id?: string
-  username?: string
-  email?: string | null
-  accessToken?: string
-  provider?: string
-  refreshToken?: string
-  githubAccessToken?: string
-  googleAccessToken?: string
-  googleRefreshToken?: string
-  githubAccountId?: string
-  googleAccountId?: string
 }
 
 type AdminUserPayload = {
@@ -53,7 +39,8 @@ function isValidTelegramToken(token: string): boolean {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
+  // Server-only session with the JWT's tokens (the browser session has none).
+  const session = await getServerAuthSession(req)
 
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -69,7 +56,7 @@ export async function POST(req: Request) {
       }, { status: 400 })
     }
 
-    const sessionUser = session.user as SetupBotSessionUser
+    const sessionUser: ServerAuthUser = session.user
     const userId = sessionUser.id
     const username = sessionUser.username
     const accessToken = sessionUser.accessToken

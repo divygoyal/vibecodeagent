@@ -41,7 +41,7 @@ export async function POST(req: Request) {
             created = await adminStore.createKey(auth.user.id, payload);
         } catch (err) {
             if (!(err instanceof AdminStoreError && err.status === 404)) throw err;
-            await ensureAdminUserSynced(auth.session as Parameters<typeof ensureAdminUserSynced>[0]);
+            await ensureAdminUserSynced(auth.session);
             created = await adminStore.createKey(auth.user.id, payload);
         }
         return json({ id: created.id, key: raw, prefix: payload.prefix, name: payload.name, expires_at: created.expires_at }, 201);

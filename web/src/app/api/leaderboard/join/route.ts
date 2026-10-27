@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
+import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
 import { authOptions } from '@/lib/auth';
 import { checkOwnership, type OwnershipCheck } from '@/lib/leaderboardVerify';
 import { refreshEntry, storeVerification } from '@/lib/leaderboard/refresh';
@@ -191,14 +192,12 @@ export async function POST(req: Request) {
 
     // @ts-expect-error - id added in callbacks
     const userId = session.user.id;
-    // @ts-expect-error - googleAccessToken added in callbacks
-    const googleAccessToken: string | undefined = session.user.googleAccessToken;
-    // @ts-expect-error - refreshToken added in callbacks
-    const googleRefreshToken: string | undefined = session.user.refreshToken;
 
     if (!userId) {
         return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
     }
+    // Server-only: Google tokens from the session JWT, then the admin DB.
+    const { accessToken: googleAccessToken, refreshToken: googleRefreshToken } = await getGoogleCredentialsForRequest(req, String(userId));
 
     const rate = checkJoinRate(String(userId));
     if (!rate.allowed) {
@@ -377,10 +376,6 @@ export async function PUT(req: Request) {
 
     // @ts-expect-error - id added in callbacks
     const userId = session.user.id;
-    // @ts-expect-error - googleAccessToken added in callbacks
-    const googleAccessToken: string | undefined = session.user.googleAccessToken;
-    // @ts-expect-error - refreshToken added in callbacks
-    const googleRefreshToken: string | undefined = session.user.refreshToken;
     if (!userId) {
         return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
     }
@@ -397,6 +392,8 @@ export async function PUT(req: Request) {
         return NextResponse.json({ error: 'entry_id is required' }, { status: 400 });
     }
 
+    // Server-only: Google tokens from the session JWT, then the admin DB.
+    const { accessToken: googleAccessToken, refreshToken: googleRefreshToken } = await getGoogleCredentialsForRequest(req, String(userId));
     const prepared = await preparePayload(rawBody, googleAccessToken, googleRefreshToken);
     if (!prepared.ok) return prepared.response;
 

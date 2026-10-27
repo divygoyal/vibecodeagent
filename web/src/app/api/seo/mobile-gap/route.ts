@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
-import { getValidAccessToken, fetchGoogleTokensFromDb } from '@/lib/googleApi';
+import { getValidAccessToken } from '@/lib/googleApi';
+import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,19 +21,8 @@ export async function GET(req: NextRequest) {
     // @ts-expect-error - id added in callbacks
     const userId = session.user.id;
 
-    // Get Google tokens from JWT first, fall back to admin DB
-    const jwt = await getToken({ req: req as any }) as any;
-    let googleAccess = jwt?.googleAccessToken as string | undefined;
-    let googleRefresh = jwt?.googleRefreshToken as string | undefined;
-
-    // Fallback: fetch from admin DB (handles case where user signed in with GitHub)
-    if (!googleAccess && !googleRefresh) {
-      const dbTokens = await fetchGoogleTokensFromDb(userId);
-      if (dbTokens) {
-        googleAccess = dbTokens.accessToken;
-        googleRefresh = dbTokens.refreshToken;
-      }
-    }
+    // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
+    const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId));
 
     if (!googleAccess && !googleRefresh) {
       return NextResponse.json({ error: 'Google not connected', code: 'GOOGLE_NOT_CONNECTED' }, { status: 400 });

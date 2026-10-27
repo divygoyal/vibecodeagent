@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
+import { getServerAuthUser } from "@/lib/serverAuth"
 import { BRAND_NAME } from '@/lib/brand';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
@@ -59,27 +58,25 @@ function generateMockHeatmap() {
 
 // ============= Route handler =============
 
-export async function GET() {
+export async function GET(req: Request) {
   const isProduction = !!ADMIN_API_KEY
 
   if (isProduction) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
+    // Server-only: the GitHub token comes from the session JWT, never the browser session.
+    const sessionUser = await getServerAuthUser(req)
+    if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     try {
-      // @ts-expect-error - accessToken added in callbacks
-      let accessToken = session.user.githubAccessToken
-      // @ts-expect-error - username added in callbacks
-      let username = session.user.username
+      let accessToken = sessionUser.githubAccessToken
+      const username = sessionUser.username
 
       // If session doesn't have GitHub token (e.g. signed in with Google),
       // fetch the stored token from admin DB and use it directly
       if (!accessToken) {
         try {
-          // @ts-expect-error - id added in callbacks
-          const userId = session.user.id
+          const userId = sessionUser.id
           const tokenRes = await fetch(`${ADMIN_API_URL}/api/users/${encodeURIComponent(String(userId))}/oauth/github`, {
             headers: { "X-API-Key": ADMIN_API_KEY }
           })

@@ -1,6 +1,4 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { fetchGoogleTokensFromDb } from '@/lib/googleApi';
+import { getServerAuthUser, getGoogleCredentialsForRequest } from '@/lib/serverAuth';
 
 export interface LeaderboardUser {
     /** OAuth provider id string (what the admin API calls `user_identifier`). */
@@ -11,20 +9,20 @@ export interface LeaderboardUser {
     refreshToken: string | undefined;
 }
 
-/** The signed-in user plus their Google tokens, or null. */
-export async function getLeaderboardUser(): Promise<LeaderboardUser | null> {
-    const session = await getServerSession(authOptions);
-    const user = session?.user as
-        | { id?: string | number; name?: string | null; email?: string | null; googleAccessToken?: string; refreshToken?: string }
-        | undefined;
-    if (!user?.id) return null;
-    const userId = String(user.id);
+/**
+ * The signed-in user plus their Google tokens, or null. Server-only: the tokens
+ * come from the session JWT (lib/serverAuth.ts), then the admin DB.
+ */
+export async function getLeaderboardUser(req?: Request): Promise<LeaderboardUser | null> {
+    const user = await getServerAuthUser(req);
+    if (!user) return null;
+    const userId = user.id;
     let accessToken = user.googleAccessToken;
-    let refreshToken = user.refreshToken;
+    let refreshToken = user.googleRefreshToken;
     if (!accessToken && !refreshToken) {
-        const stored = await fetchGoogleTokensFromDb(userId);
-        accessToken = stored?.accessToken;
-        refreshToken = stored?.refreshToken;
+        const stored = await getGoogleCredentialsForRequest(null, userId);
+        accessToken = stored.accessToken;
+        refreshToken = stored.refreshToken;
     }
     return { userId, name: user.name ?? null, email: user.email ?? null, accessToken, refreshToken };
 }

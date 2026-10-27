@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { fetchGithubTokenFromDb, getValidGithubToken, listUserRepos } from '@/lib/githubApi';
+import { getServerAuthUser } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 /** GET /api/github/repos → list the current user's GitHub repos (lightweight, for the picker). */
 export async function GET(req: NextRequest) {
     try {
-        const jwt = await getToken({ req: req as any });
-        if (!jwt) {
+        // Server-only: the GitHub token comes from the session JWT (lib/serverAuth.ts).
+        const user = await getServerAuthUser(req);
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-        const userId = (jwt.sub as string) || '';
-        const jwtGithubToken = (jwt as any)?.githubAccessToken as string | undefined;
+        const userId = user.id;
+        const jwtGithubToken = user.githubAccessToken;
         const dbGithubToken = userId ? await fetchGithubTokenFromDb(userId).catch(() => null) : null;
         const token = await getValidGithubToken(jwtGithubToken, userId || undefined) || dbGithubToken;
         if (!token) {

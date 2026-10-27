@@ -3,13 +3,13 @@
  * session required, mutations must be same-origin JSON (CSRF-safe).
  */
 import { issuer, mcpEnabled, requestOrigin } from './config';
-import { getSessionUser, type SessionUser } from './session';
+import { getSessionUser } from './session';
 
 export function json(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 }
 
-export async function requireUser(req: Request, opts: { mutation?: boolean } = {}): Promise<{ user: SessionUser; session: unknown } | Response> {
+export async function requireUser(req: Request, opts: { mutation?: boolean } = {}): Promise<NonNullable<Awaited<ReturnType<typeof getSessionUser>>> | Response> {
     if (!mcpEnabled()) return json({ error: 'not_found' }, 404);
     if (opts.mutation) {
         const site = req.headers.get('sec-fetch-site');

@@ -9,13 +9,12 @@
  */
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { getToken } from 'next-auth/jwt';
 
 import { authOptions } from '@/lib/auth';
 import { cachedFetch } from '@/lib/apiCache';
-import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
+import { getValidAccessToken } from '@/lib/googleApi';
+import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
 
-type GoogleJwt = { googleAccessToken?: string; googleRefreshToken?: string };
 
 export interface SiteContext {
     userId: string;
@@ -36,21 +35,11 @@ export async function getSiteContext(req: Request): Promise<SiteContext | NextRe
         `site-ctx:${cookie}`,
         CONTEXT_TTL_MS,
         async () => {
-            const [session, jwt] = await Promise.all([
-                getServerSession(authOptions),
-                getToken({ req: req as unknown as Parameters<typeof getToken>[0]['req'] }) as Promise<GoogleJwt | null>,
-            ]);
+            const session = await getServerSession(authOptions);
             const userId = (session?.user as { id?: string } | undefined)?.id;
             if (!userId) return { error: 'Unauthorized', status: 401 };
-            let access = jwt?.googleAccessToken;
-            let refresh = jwt?.googleRefreshToken;
-            if (!access && !refresh) {
-                const db = await fetchGoogleTokensFromDb(userId);
-                if (db) {
-                    access = db.accessToken;
-                    refresh = db.refreshToken;
-                }
-            }
+            // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
+            const { accessToken: access, refreshToken: refresh } = await getGoogleCredentialsForRequest(req, String(userId));
             if (!access && !refresh) return { error: 'Google not connected', status: 400, code: 'GOOGLE_NOT_CONNECTED' };
             try {
                 const token = await getValidAccessToken(access, refresh);
