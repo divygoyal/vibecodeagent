@@ -12,16 +12,19 @@
  * <spec> is a comma (or +) separated list of [scope:]fault[:ms]
  *   faults  403 (no access) · 429 (quota) · 500 · timeout[:ms] (default 30000; honours the
  *           caller's AbortSignal, then 504) · latency[:ms] (default 1500; waits, then answers
- *           normally: a slow Google, to time page loads) · empty (no rows) · revoked (refresh →
- *           invalid_grant, data calls → 401) · huge (counts × 10,000,000)
+ *           normally: a slow Google, to time page loads) · 502 (Google's front end answering
+ *           "Bad Gateway" in HTML, always) · flaky[:n] (the same 502, but only for the first n
+ *           (default 2) times each distinct request is made, so a retry gets through) · empty (no
+ *           rows) · revoked (refresh → invalid_grant, data calls → 401) · huge (counts × 10,000,000)
  *   scopes  ga4 · gsc · psi · list (GA4 account summaries, Search Console site list, admin
  *           list commands) · all. Without a scope a fault hits ga4 + gsc + psi data calls,
  *           so the user still sees their sites and every report fails.
  * Examples: `429`, `gsc:403`, `ga4:timeout:8000,gsc:empty`, `all:500`, `revoked`, `huge`,
- * `all:latency:2000` (every Google call takes 2 s), `list:latency:6000` (only the site lists are slow).
+ * `all:latency:2000` (every Google call takes 2 s), `list:latency:6000` (only the site lists are slow),
+ * `flaky` / `all:flaky:3` (transient 502s that clear on retry: the first sync must not show them).
  */
 
-export type DemoFaultKind = '403' | '429' | '500' | 'timeout' | 'latency' | 'empty' | 'revoked' | 'huge';
+export type DemoFaultKind = '403' | '429' | '500' | '502' | 'timeout' | 'latency' | 'flaky' | 'empty' | 'revoked' | 'huge';
 export type DemoFaultScope = 'ga4' | 'gsc' | 'psi' | 'list' | 'all' | 'data';
 export type DemoCallScope = 'ga4' | 'gsc' | 'psi' | 'list' | 'token';
 
@@ -34,12 +37,26 @@ export interface DemoFault {
 export const DEMO_FAULT_COOKIE = 'tc_demo_faults';
 export const DEMO_FAULT_TIMEOUT_MS = 30_000;
 export const DEMO_FAULT_LATENCY_MS = 1_500;
+export const DEMO_FAULT_FLAKY_FAILURES = 2;
+
+/** Times each distinct request has been failed by a `flaky` fault (per process). */
+const flakySeen = new Map<string, number>();
+
+/** What Google's front end sends on a transient 502: HTML, not the usual JSON error. */
+function badGateway(): Response {
+    return new Response('<!DOCTYPE html><html lang=en><title>Error 502 (Server Error)!!1</title><p>502. That\u2019s an error. The server encountered a temporary error and could not complete your request.', {
+        status: 502,
+        headers: { 'content-type': 'text/html; charset=UTF-8', 'x-tc-demo-data': '1', 'x-tc-demo-fault': 'BAD_GATEWAY' },
+    });
+}
 const HUGE_FACTOR = 10_000_000;
 
 const KINDS: Record<string, DemoFaultKind> = {
     '403': '403', forbidden: '403', noaccess: '403', denied: '403',
     '429': '429', quota: '429', ratelimit: '429',
     '500': '500', error: '500', internal: '500',
+    '502': '502', badgateway: '502',
+    flaky: 'flaky', transient: 'flaky',
     timeout: 'timeout', slow: 'timeout', hang: 'timeout',
     latency: 'latency', delay: 'latency',
     empty: 'empty', norows: 'empty',
@@ -106,7 +123,7 @@ function sleep(ms: number, signal?: AbortSignal | null): Promise<void> {
  * The error a fault produces before the call is answered, or null to answer
  * normally. A timeout waits (rejecting when the caller aborts) and then 504s.
  */
-export async function demoFaultBefore(faults: DemoFault[], call: DemoCallScope, signal?: AbortSignal | null): Promise<Response | null> {
+export async function demoFaultBefore(faults: DemoFault[], call: DemoCallScope, signal?: AbortSignal | null, requestKey?: string): Promise<Response | null> {
     for (const f of faultsFor(faults, call)) {
         switch (f.kind) {
             case 'revoked':
@@ -130,6 +147,18 @@ export async function demoFaultBefore(faults: DemoFault[], call: DemoCallScope, 
             case 'timeout':
                 await sleep(f.ms ?? DEMO_FAULT_TIMEOUT_MS, signal);
                 return googleError(504, 'DEADLINE_EXCEEDED', 'The request was not answered in time.');
+            case '502':
+                return badGateway();
+            case 'flaky': {
+                // Fails the first n times each distinct request is seen in this process, then lets it through.
+                if (!requestKey) break;
+                const k = `${call}|${f.scope}|${requestKey}`;
+                const seen = flakySeen.get(k) ?? 0;
+                if (seen >= (f.ms ?? DEMO_FAULT_FLAKY_FAILURES)) break;
+                flakySeen.set(k, seen + 1);
+                if (flakySeen.size > 5000) flakySeen.delete(flakySeen.keys().next().value as string);
+                return badGateway();
+            }
             case 'latency':
                 // A slow but working Google: wait, then fall through to the normal answer.
                 await sleep(f.ms ?? DEMO_FAULT_LATENCY_MS, signal);

@@ -103,19 +103,23 @@ class GoogleHttpError extends Error {
     }
 }
 
-async function getJson(fetchFn: FetchLike, url: string, token: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+/** Waits (ms) before each retry of a listing request that failed transiently. Mutable for tests. */
+export const inventoryRetry = { delays: [500, 1500] };
+
+async function getJsonOnce(fetchFn: FetchLike, url: string, token: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
     const res = await fetchFn(url, {
         headers: { Authorization: `Bearer ${token}` },
         signal: signal ?? AbortSignal.timeout(15_000),
     });
     const text = await res.text();
     if (!res.ok) {
-        let message = `HTTP ${res.status}`;
+        // A 5xx is usually Google's front end answering in HTML ("502 Bad Gateway"): say that, not "HTTP 502".
+        let message = res.status >= 500 ? 'Google had a temporary problem' : `HTTP ${res.status}`;
         try {
             const parsed = JSON.parse(text) as { error?: { message?: string } };
             if (parsed?.error?.message) message = parsed.error.message.slice(0, 300);
         } catch {
-            /* keep status text */
+            /* keep the status text */
         }
         throw new GoogleHttpError(res.status, message);
     }
@@ -123,6 +127,19 @@ async function getJson(fetchFn: FetchLike, url: string, token: string, signal?: 
         return JSON.parse(text) as Record<string, unknown>;
     } catch {
         throw new GoogleHttpError(502, 'Google returned a non-JSON response');
+    }
+}
+
+/** GET one listing page; a transient failure (5xx, dropped connection, timeout) is retried silently. */
+async function getJson(fetchFn: FetchLike, url: string, token: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            return await getJsonOnce(fetchFn, url, token, signal);
+        } catch (err) {
+            const transient = err instanceof GoogleHttpError ? err.status >= 500 : err instanceof Error && (err.name === 'TimeoutError' || err instanceof TypeError);
+            if (!transient || attempt >= inventoryRetry.delays.length || signal?.aborted) throw err;
+            await new Promise((resolve) => setTimeout(resolve, inventoryRetry.delays[attempt]));
+        }
     }
 }
 

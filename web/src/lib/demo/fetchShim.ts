@@ -16,7 +16,7 @@
  * non-demo bearer token are refused, so a real token can never leave the box
  * from a demo server.
  *
- * Faults (403, 429, 500, timeout, latency, empty, revoked, huge) can be injected with
+ * Faults (403, 429, 500, 502, timeout, latency, flaky, empty, revoked, huge) can be injected with
  * TC_DEMO_FAULTS, the tc_demo_faults cookie or a `~spec` suffix on a demo
  * token; see faults.ts.
  */
@@ -235,7 +235,7 @@ export async function demoGoogleFetch(input: RequestInfo | URL, init: RequestIni
         const tokenSpec = splitFaultToken(presented).spec;
         if (tokenSpec) faults.push(...parseDemoFaults(tokenSpec));
         if (faults.length) {
-            const failed = await demoFaultBefore(faults, call, req.signal);
+            const failed = await demoFaultBefore(faults, call, req.signal, `${req.method} ${host}${path}${req.url.search}|${req.body.slice(0, 600)}`);
             if (failed) return failed;
             return demoFaultAfter(faults, call, await answer(req, host, path));
         }

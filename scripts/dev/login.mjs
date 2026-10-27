@@ -28,9 +28,10 @@
  *   ga4only   GA4 properties, no Search Console  gsconly   Search Console sites, no GA4
  *   many      200 sites (long names, mixed)      nogoogle  signed in with GitHub, no Google
  *   nocredits free plan with 0 Ask credits
- *   f403 f429 f500 ftimeout fempty frevoked fhuge
+ *   f403 f429 f500 f502 ftimeout fempty frevoked fhuge fflaky fflakyall fslow
  *             the demo account's 18 sites with that Google failure injected on every call
- *             (token suffix, see web/src/lib/demo/faults.ts)
+ *             (token suffix, see web/src/lib/demo/faults.ts). fflaky: transient 502s on the data calls that
+ *             clear on retry; fflakyall: the same on the site lists too; fslow: every call takes 1.5 s.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,7 +60,7 @@ const USERS = {
     many: { sub: '100000000000000000015', name: 'Two Hundred Sites User', email: 'many@trafficclaw.example', account: 'many', plan: 'pro', property: 'properties/412400001', site: 'https://site-001.example/', label: 'Site 001', scenario: true },
     nogoogle: { sub: '100000000000000000016', name: 'GitHub Only User', email: 'nogoogle@trafficclaw.example', account: null, provider: 'github', plan: 'free', property: null, site: null, label: null, scenario: true },
     nocredits: { sub: '100000000000000000017', name: 'No Credits User', email: 'nocredits@trafficclaw.example', account: 'main', plan: 'free', credits: 0, property: 'properties/412300101', site: 'sc-domain:acmeanalytics.example', label: 'Acme Analytics', scenario: true },
-    ...Object.fromEntries([['f403', '403', 21], ['f429', '429', 22], ['f500', '500', 23], ['ftimeout', 'timeout:15000', 24], ['fempty', 'empty', 25], ['frevoked', 'revoked', 26], ['fhuge', 'huge', 27]].map(([key, faults, n]) => [key, {
+    ...Object.fromEntries([['f403', '403', 21], ['f429', '429', 22], ['f500', '500', 23], ['ftimeout', 'timeout:15000', 24], ['fempty', 'empty', 25], ['frevoked', 'revoked', 26], ['fhuge', 'huge', 27], ['f502', '502', 28], ['fflaky', 'flaky:2', 29], ['fflakyall', 'all:flaky:2', 30], ['fslow', 'all:latency:1500', 31]].map(([key, faults, n]) => [key, {
         sub: `1000000000000000000${n}`, name: `Fault ${faults} User`, email: `${key}@trafficclaw.example`, account: 'main', faults, plan: 'pro',
         property: 'properties/412300101', site: 'sc-domain:acmeanalytics.example', label: 'Acme Analytics', scenario: true,
     }])),

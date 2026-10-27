@@ -14,6 +14,11 @@
  * before the last stored day (GA4 revises ~3 days, GSC ~5).
  *
  * One sync per user at a time per process; concurrent callers share it.
+ *
+ * Transient Google failures (5xx such as a 502 Bad Gateway, network errors, timeouts) are retried
+ * silently: each request up to 3 more times with a short back-off, then the assets that still
+ * failed get two more rounds a few seconds apart (they stay "syncing" meanwhile). Only a failure
+ * that survives all of that is stored as an error, and then with a plain message, never "HTTP 502".
  */
 import { fetchInventory, type FetchLike, type Inventory } from '@/lib/sites/fetchInventory';
 import { normalizeHost, pairSites } from '@/lib/sites/pairing';
@@ -57,7 +62,12 @@ export interface SyncResult {
 
 export interface SyncOptions {
     identifier: string;
-    accessToken: string;
+    /**
+     * A Google access token, or a function that gets one. The function runs inside the sync, after it is
+     * registered as running, so a caller (the sync route) can answer at once while a token refresh is
+     * still in flight. Returning null or throwing ends the sync with "Google access expired".
+     */
+    accessToken: string | (() => Promise<string | null>);
     reason: SyncReason;
     /** Refetch fresh assets too (manual "Sync now"). */
     force?: boolean;
@@ -77,6 +87,32 @@ class GoogleError extends Error {
         super(message);
         this.status = status;
     }
+}
+
+/** Waits (ms) before each retry of one Google request, and before each extra round for assets that still failed. Mutable for tests. */
+export const retryTuning = { call: [700, 2000, 5000], /** per-request retries in the extra rounds (a Google that is still down is not hammered) */ later: [1000], rounds: [5000, 15000] };
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** A failure that is likely gone in a few seconds: Google 5xx, no answer, dropped connection. Not 4xx and not 429 (quota lasts). */
+export function isTransientGoogleError(err: unknown): boolean {
+    if (err instanceof GoogleError) return err.status >= 500 || err.status === 0;
+    if (err instanceof Error) {
+        if (err.name === 'TimeoutError' || err.name === 'AbortError') return true;
+        if (err instanceof TypeError) return true; // undici "fetch failed"
+    }
+    return false;
+}
+
+/** What the card tooltip and the banners say for a failure that survived every retry. */
+export function plainGoogleMessage(err: unknown): string {
+    const status = err instanceof GoogleError ? err.status : 0;
+    if (status === 401) return 'Google access expired. Reconnect Google.';
+    if (status === 403) return 'No access to this property';
+    if (status === 429) return 'Google quota reached; will retry later';
+    if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) return 'Google did not answer in time. Will retry shortly.';
+    if (isTransientGoogleError(err)) return 'Google had a temporary problem. Will retry shortly.';
+    return err instanceof Error ? err.message.slice(0, 300) : 'Sync failed';
 }
 
 const running = new Map<string, Promise<SyncResult>>();
@@ -133,7 +169,7 @@ function countingFetch(calls: SyncCalls, tag: string): FetchLike {
     };
 }
 
-async function googlePost(fetchFn: FetchLike, url: string, token: string, body: unknown): Promise<unknown> {
+async function googlePostOnce(fetchFn: FetchLike, url: string, token: string, body: unknown): Promise<unknown> {
     const res = await fetchFn(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -151,24 +187,40 @@ async function googlePost(fetchFn: FetchLike, url: string, token: string, body: 
         }
         throw new GoogleError(res.status, message);
     }
-    return JSON.parse(text);
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new GoogleError(502, 'Google returned a page that is not JSON');
+    }
 }
 
-async function fetchDaily(fetchFn: FetchLike, token: string, kind: AssetKind, assetId: string, start: string, end: string): Promise<DailyRow[]> {
+/** One Google request; a transient failure is retried silently after 0.7 s, 2 s and 5 s (`delays`). */
+async function googlePost(fetchFn: FetchLike, url: string, token: string, body: unknown, delays: number[] = retryTuning.call): Promise<unknown> {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            return await googlePostOnce(fetchFn, url, token, body);
+        } catch (err) {
+            if (attempt >= delays.length || !isTransientGoogleError(err)) throw err;
+            await sleep(delays[attempt]);
+        }
+    }
+}
+
+async function fetchDaily(fetchFn: FetchLike, token: string, kind: AssetKind, assetId: string, start: string, end: string, delays?: number[]): Promise<DailyRow[]> {
     if (kind === 'ga4') {
         const url = `${GA_DATA}/${assetId}:runReport`;
         try {
-            return parseGa4Daily(assetId, await googlePost(fetchFn, url, token, ga4DailyRequest(start, end)) as never);
+            return parseGa4Daily(assetId, await googlePost(fetchFn, url, token, ga4DailyRequest(start, end), delays) as never);
         } catch (err) {
             // Properties that predate key events: retry once with conversions.
             if (err instanceof GoogleError && err.status === 400 && /keyEvents/i.test(err.message)) {
-                return parseGa4Daily(assetId, await googlePost(fetchFn, url, token, ga4DailyRequest(start, end, true)) as never);
+                return parseGa4Daily(assetId, await googlePost(fetchFn, url, token, ga4DailyRequest(start, end, true), delays) as never);
             }
             throw err;
         }
     }
     const url = `${GSC}/sites/${encodeURIComponent(assetId)}/searchAnalytics/query`;
-    return parseGscDaily(assetId, await googlePost(fetchFn, url, token, gscDailyRequest(start, end)) as never);
+    return parseGscDaily(assetId, await googlePost(fetchFn, url, token, gscDailyRequest(start, end), delays) as never);
 }
 
 async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
@@ -251,11 +303,24 @@ function chunksFor(a: StoreAsset, end: string): { chunks: [string, string][]; ba
 async function runSync(opts: SyncOptions): Promise<SyncResult> {
     const startedAt = Date.now();
     const nowS = Math.floor(startedAt / 1000);
-    const { identifier, accessToken } = opts;
+    const { identifier } = opts;
     const calls: SyncCalls = { inventory: 0, ga4: 0, gsc: 0 };
     const fetchFn = countingFetch(calls, `user=${identifier}`);
     const result = emptyResult(opts, startedAt);
     result.calls = calls;
+
+    let resolved: string | null;
+    try {
+        resolved = typeof opts.accessToken === 'function' ? await opts.accessToken() : opts.accessToken;
+    } catch {
+        resolved = null;
+    }
+    if (!resolved) {
+        result.googleError = { status: 401, message: 'Google access expired. Reconnect Google.' };
+        result.ms = Date.now() - startedAt;
+        return result;
+    }
+    const accessToken: string = resolved;
 
     let current: StoreAsset[];
     try {
@@ -296,48 +361,72 @@ async function runSync(opts: SyncOptions): Promise<SyncResult> {
     // Assets marked "syncing" above that have not reached a final status. If this run dies on the way
     // (a throw inside mapLimit), they are put back to an error below instead of staying "syncing".
     const unfinished = new Set<StoreAsset>(due);
-    try {
-        await mapLimit(due, SYNC_CONCURRENCY, async (a) => {
-            if (authFailed) {
-                await adminStore.updateStatus(identifier, [{ kind: a.asset_kind, asset_id: a.asset_id, status: 'error', last_error: 'Google access expired. Reconnect Google.' }]);
-                unfinished.delete(a);
-                result.failed += 1;
-                return;
-            }
-            const { chunks, backfill } = chunksFor(a, end);
-            try {
-                for (let i = 0; i < chunks.length; i++) {
-                    const [s, e] = chunks[i];
-                    const rows = await fetchDaily(fetchFn, accessToken, a.asset_kind, a.asset_id, s, e);
-                    await adminStore.upsertMetrics(identifier, rows);
-                    const last = i === chunks.length - 1;
-                    const upd: StatusUpdate = {
-                        kind: a.asset_kind, asset_id: a.asset_id, status: last ? 'synced' : 'syncing', last_error: null,
-                        data_end: end, backfill_done: backfill ? last : true,
-                    };
-                    // Chunks run newest first, so each backfill chunk start is the oldest day stored so far.
-                    if (backfill) upd.data_start = s;
-                    if (last) upd.last_synced_at = Math.floor(Date.now() / 1000);
-                    else upd.sync_started_at = Math.floor(Date.now() / 1000); // heartbeat: this sync is alive
-                    await adminStore.updateStatus(identifier, [upd]);
-                }
-                result.synced += 1;
-            } catch (err) {
-                const status = err instanceof GoogleError ? err.status : 0;
-                if (status === 401) authFailed = true;
-                const message = status === 401 ? 'Google access expired. Reconnect Google.'
-                    : status === 403 ? 'No access to this property'
-                    : status === 429 ? 'Google quota reached; will retry later'
-                    : err instanceof Error ? err.message.slice(0, 300) : 'Sync failed';
-                if (status === 403) result.noAccess += 1;
-                else result.failed += 1;
-                if (status === 401) result.googleError = { status, message };
-                await adminStore.updateStatus(identifier, [{
-                    kind: a.asset_kind, asset_id: a.asset_id, status: status === 403 ? 'no_access' : 'error', last_error: message,
-                }]).catch(() => undefined);
-            }
+    // Chunks already stored per asset, so a retry round continues instead of starting over.
+    const stored = new Map<StoreAsset, number>();
+
+    /** 'retry' = a transient Google failure that may still clear: the asset stays "syncing" for another round. */
+    const processAsset = async (a: StoreAsset, round: number, finalRound: boolean): Promise<'done' | 'retry'> => {
+        if (authFailed) {
+            await adminStore.updateStatus(identifier, [{ kind: a.asset_kind, asset_id: a.asset_id, status: 'error', last_error: 'Google access expired. Reconnect Google.' }]);
             unfinished.delete(a);
-        });
+            result.failed += 1;
+            return 'done';
+        }
+        const { chunks, backfill } = chunksFor(a, end);
+        try {
+            for (let i = stored.get(a) ?? 0; i < chunks.length; i++) {
+                const [s, e] = chunks[i];
+                const rows = await fetchDaily(fetchFn, accessToken, a.asset_kind, a.asset_id, s, e, round === 0 ? retryTuning.call : retryTuning.later);
+                await adminStore.upsertMetrics(identifier, rows);
+                stored.set(a, i + 1);
+                const last = i === chunks.length - 1;
+                const upd: StatusUpdate = {
+                    kind: a.asset_kind, asset_id: a.asset_id, status: last ? 'synced' : 'syncing', last_error: null,
+                    data_end: end, backfill_done: backfill ? last : true,
+                };
+                // Chunks run newest first, so each backfill chunk start is the oldest day stored so far.
+                if (backfill) upd.data_start = s;
+                if (last) upd.last_synced_at = Math.floor(Date.now() / 1000);
+                else upd.sync_started_at = Math.floor(Date.now() / 1000); // heartbeat: this sync is alive
+                await adminStore.updateStatus(identifier, [upd]);
+            }
+            result.synced += 1;
+        } catch (err) {
+            if (!finalRound && isTransientGoogleError(err)) return 'retry';
+            const status = err instanceof GoogleError ? err.status : 0;
+            if (status === 401) authFailed = true;
+            const message = plainGoogleMessage(err);
+            if (status === 403) result.noAccess += 1;
+            else result.failed += 1;
+            if (status === 401) result.googleError = { status, message };
+            await adminStore.updateStatus(identifier, [{
+                kind: a.asset_kind, asset_id: a.asset_id, status: status === 403 ? 'no_access' : 'error', last_error: message,
+            }]).catch(() => undefined);
+        }
+        unfinished.delete(a);
+        return 'done';
+    };
+
+    try {
+        // Round 0 is the normal pass. Assets that hit a transient Google failure (after the per-request
+        // retries) get up to two more rounds a few seconds apart, still showing "syncing"; only a failure
+        // that survives them is stored as an error.
+        let pending = due;
+        for (let round = 0; pending.length > 0; round++) {
+            const finalRound = round >= retryTuning.rounds.length;
+            if (round > 0) {
+                await sleep(retryTuning.rounds[round - 1]);
+                const beat = Math.floor(Date.now() / 1000);
+                await adminStore.updateStatus(identifier, pending.map((a) => ({
+                    kind: a.asset_kind, asset_id: a.asset_id, status: 'syncing' as const, last_error: null, sync_started_at: beat,
+                }))).catch(() => undefined);
+            }
+            const again: StoreAsset[] = [];
+            await mapLimit(pending, SYNC_CONCURRENCY, async (a) => {
+                if ((await processAsset(a, round, finalRound)) === 'retry') again.push(a);
+            });
+            pending = again;
+        }
     } finally {
         if (unfinished.size > 0) {
             const nowDone = Math.floor(Date.now() / 1000);
