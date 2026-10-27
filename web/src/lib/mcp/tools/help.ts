@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { issuer } from '../config';
-import { defineTool } from '../toolkit';
+import { defineTool, J } from '../toolkit';
 
 const TOPICS = ['overview', 'dates', 'metrics', 'limits', 'troubleshooting', 'privacy', 'health_checks'] as const;
 
@@ -79,8 +79,9 @@ export const trafficclawHelp = defineTool({
     cost: 0.2,
     invoking: 'Reading the help…',
     invoked: 'Help ready',
+    output: { data: 'text', props: { topic: J.str } },
     async run(args, ctx) {
         const text = [...ctx.banner(), helpText(args.topic)].join('\n');
-        return { text, rows: 0, structured: { topic: args.topic } };
+        return { text, rows: 0, structured: { topic: args.topic, text } };
     },
 });

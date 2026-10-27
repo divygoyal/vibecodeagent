@@ -45,6 +45,15 @@ cases from MCP.md 12.2 (bad Origin, GET/DELETE 405, wrong content type, header
 mismatch, unsupported version, unregistered redirect, `plain` PKCE, foreign
 resource, unknown scope, reused code, wrong verifier).
 
+Every tool declares an `outputSchema`, and clients such as Claude then read
+`structuredContent` and ignore the text content. So `structuredContent` carries
+the data itself: `table` (the same compact TSV as the text) for table output,
+`columns` + `rows` for `format: "json"`, `text` for `trafficclaw_help`, with the
+metadata (period, counts, warnings, truncated) beside it. The test
+"structuredContent carries the data" reads every tool's result the way Claude
+does (structuredContent first) and fails if it holds only metadata; the unit
+test checks the output schemas and the sanitiser on the structured rows.
+
 ### Real-browser consent test
 
 `flow.test.mjs` posts the consent form with `fetch()`, so it cannot see form bugs that only a browser has (a

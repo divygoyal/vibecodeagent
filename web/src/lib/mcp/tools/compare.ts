@@ -4,7 +4,7 @@ import { ToolError } from '../errors';
 import { fmtDelta, fmtInt, fmtNum, headerLine, render, renderJson, type Cell, type Section } from '../format';
 import { gaRows, type GscRow } from '../google';
 import { requireGa4, requireGsc, type SiteRecord } from '../siteResolver';
-import { dateRangeArg, defineTool, formatArg, siteArg, type ToolContext } from '../toolkit';
+import { dateRangeArg, defineTool, formatArg, J, siteArg, type ToolContext } from '../toolkit';
 import { ensureQueriesAllowed, ga4Totals, gaRange, gscBody, gscTotals, re2Escape, sumGsc } from './common';
 import { gaDimCell, gaMetricCell, validateGa4Fields } from './ga4';
 
@@ -45,6 +45,7 @@ export const topMovers = defineTool({
     cost: 4,
     invoking: 'Finding what changed…',
     invoked: 'Changes ranked',
+    output: { data: 'table', props: { site: J.str, period: J.range, compare: J.range, counts: J.obj({ gainers: J.int, losers: J.int, new: J.int, lost: J.int }) } },
     async run(args, ctx) {
         const site = await ctx.site(args.site);
         const g = await ctx.google();
@@ -140,7 +141,7 @@ export const topMovers = defineTool({
             metric !== 'position' ? `total ${fmtVal(curTotal)} vs ${fmtVal(prevTotal)} (${fmtDelta(curTotal, prevTotal)}) over the top rows` : `min impressions ${minBase} in both periods`])];
         const footer = [metric === 'position' ? '# position: lower is better; delta is current minus previous' : '# share_of_change_pct = item change / sum of absolute changes', ctx.note()];
         const out = render(header, sections, footer);
-        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, period: { start: period.start, end: period.end }, compare: { start: prev.start, end: prev.end }, counts: { gainers: gainers.length, losers: losers.length, new: fresh.length, lost: lost.length }, truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, period: { start: period.start, end: period.end }, compare: { start: prev.start, end: prev.end }, counts: { gainers: gainers.length, losers: losers.length, new: fresh.length, lost: lost.length }, table: out.text, truncated: out.truncated } };
     },
 });
 
@@ -166,6 +167,7 @@ export const comparePeriods = defineTool({
     cost: 4,
     invoking: 'Comparing periods…',
     invoked: 'Periods compared',
+    output: { data: 'format', props: { site: J.str, periods: { type: 'object', additionalProperties: J.obj({ a: J.range, b: J.range }) } } },
     async run(args, ctx) {
         const site = await ctx.site(args.site);
         if (args.compare_to === 'custom' && !args.period_b) throw new ToolError('invalid_argument', 'period_b is required when compare_to is custom');
@@ -272,12 +274,12 @@ export const comparePeriods = defineTool({
         const env = { site: site.site_id, periods: Object.fromEntries(Object.entries(periodsUsed).map(([k, v]) => [k, { a: { start: v.a.start, end: v.a.end, days: v.a.days }, b: { start: v.b.start, end: v.b.end, days: v.b.days } }])) };
         if (args.format === 'json') {
             const j = renderJson([{ columns, rows }], env);
-            return { text: j.text, rows: j.rowsReturned, structured: { ...env, truncated: j.truncated } };
+            return { text: j.text, rows: j.rowsReturned, structured: { ...env, ...j.data, truncated: j.truncated } };
         }
         const desc = Object.entries(periodsUsed).map(([k, v]) => `${k.toUpperCase()} A ${fmtPeriod(v.a)} (${v.a.days}d) vs B ${fmtPeriod(v.b)} (${v.b.days}d)`);
         const header = [...ctx.banner(), headerLine(['compare_periods', site.site_id, ...desc, by ? `by ${by}` : null])];
         const out = render(header, [{ columns, rows }], [...notes, '# delta = A - B; low_base marks values under 30, where percentages swing a lot', by ? ctx.note() : '']);
-        return { text: out.text, rows: out.rowsReturned, structured: { ...env, truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned, structured: { ...env, table: out.text, truncated: out.truncated } };
     },
 });
 
@@ -312,6 +314,7 @@ export const pageDetail = defineTool({
     cost: 5,
     invoking: 'Reading the page\'s numbers…',
     invoked: 'Page detail ready',
+    output: { data: 'table', props: { site: J.str, page: J.str, sources: J.strs } },
     async run(args, ctx) {
         const site = await ctx.site(args.site);
         if (!site.ga4 && !site.gsc) throw new ToolError('invalid_argument', 'This site has neither GA4 nor Search Console connected');
@@ -409,7 +412,7 @@ export const pageDetail = defineTool({
         for (const e of errors) ctx.warn(`one source failed: ${e instanceof ToolError ? `${e.code}: ${e.message}` : 'error'}`);
         header.push(headerLine(['page_detail', site.site_id, path, ...desc]));
         const out = render(header, [...gaSections, ...gscSections], [ctx.note()]);
-        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, page: path, sources: [site.ga4 ? 'ga4' : null, site.gsc ? 'gsc' : null].filter(Boolean), truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, page: path, sources: [site.ga4 ? 'ga4' : null, site.gsc ? 'gsc' : null].filter(Boolean), table: out.text, truncated: out.truncated } };
     },
 });
 

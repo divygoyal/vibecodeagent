@@ -4,7 +4,7 @@ import { ToolError } from '../errors';
 import { fmtNum, headerLine, render, renderJson, type Cell } from '../format';
 import { gaRows, gaTotals, type GaReport, type GoogleClient } from '../google';
 import { requireGa4, suggestions } from '../siteResolver';
-import { dateRangeArg, defineTool, formatArg, siteArg, type ToolContext } from '../toolkit';
+import { dateRangeArg, defineTool, formatArg, J, siteArg, type ToolContext } from '../toolkit';
 import { gaDate } from './common';
 
 // ───────────── field validation and formatting ─────────────
@@ -86,6 +86,19 @@ function rangeName(raw: string | undefined, i: number): string {
     return cleaned || (i === 0 ? 'a' : 'b');
 }
 
+/** Metadata beside the rows of ga4_run_report (renderGaReport's envelope). */
+const GA_REPORT_PROPS = {
+    site: J.str,
+    property: J.str,
+    date_ranges: { type: 'array', items: J.range },
+    rows_returned: J.int,
+    row_count: J.int,
+    next_offset: J.orNull(J.int),
+    time_zone: J.orNull(J.str),
+    currency: J.orNull(J.str),
+    flags: J.strs,
+};
+
 export const ga4RunReport = defineTool({
     name: 'ga4_run_report',
     title: 'GA4 report',
@@ -116,6 +129,7 @@ export const ga4RunReport = defineTool({
     cost: 2,
     invoking: 'Running the GA4 report…',
     invoked: 'GA4 report ready',
+    output: { data: 'format', props: GA_REPORT_PROPS },
     async run(args, ctx) {
         const site = await ctx.site(args.site);
         const { property } = requireGa4(site);
@@ -185,7 +199,7 @@ export function renderGaReport(ctx: ToolContext, report: GaReport, o: { tool: st
     const allRows = [...rows, ...totalRows];
     if (o.format === 'json') {
         const j = renderJson([{ columns, rows: allRows }], envelope);
-        return { text: j.text, rows: j.rowsReturned, structured: { ...envelope, truncated: j.truncated } };
+        return { text: j.text, rows: j.rowsReturned, structured: { ...envelope, ...j.data, truncated: j.truncated } };
     }
     const header = [...ctx.banner(), headerLine([o.tool, o.site, o.property, o.ranges.map(fmtPeriod).join(' vs '), md.timeZone ? `tz ${md.timeZone}` : null, md.currencyCode ? `currency ${md.currencyCode}` : null, `${rows.length} of ${rowCount} rows`, ...(o.headerExtra || [])])];
     const footer = [
@@ -194,7 +208,7 @@ export function renderGaReport(ctx: ToolContext, report: GaReport, o: { tool: st
         rows.length && o.dims.length ? ctx.note() : '',
     ];
     const out = render(header, [{ columns, rows: allRows }], footer);
-    return { text: out.text, rows: out.rowsReturned, structured: { ...envelope, truncated: out.truncated } };
+    return { text: out.text, rows: out.rowsReturned, structured: { ...envelope, table: out.text, truncated: out.truncated } };
 }
 
 export const ga4Realtime = defineTool({
@@ -217,6 +231,7 @@ export const ga4Realtime = defineTool({
     cost: 2,
     invoking: 'Checking who is on the site…',
     invoked: 'Realtime checked',
+    output: { data: 'table', props: { site: J.str, property: J.str, minutes: J.int, active_users: J.orNull(J.num) } },
     async run(args, ctx) {
         const site = await ctx.site(args.site);
         const { property } = requireGa4(site);
@@ -244,7 +259,7 @@ export const ga4Realtime = defineTool({
         const header = [...ctx.banner(), headerLine(['ga4_realtime', site.site_id, property, `last ${args.minutes} minutes`, totalActive !== undefined && metrics.includes('activeUsers') ? `activeUsers ${Math.round(totalActive)}` : null])];
         if (totals) rows.push([...dims.map((_, j) => (j === 0 ? 'TOTAL' : '')), ...totals.map((v, i) => gaMetricCell(v, types[i]))]);
         const out = render(header, [{ columns: [...dims, ...metrics], rows }], ['# realtime data is cached for 30 seconds', rows.length > 1 ? ctx.note() : '']);
-        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, property, minutes: args.minutes, active_users: totalActive ?? null, truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, property, minutes: args.minutes, active_users: totalActive ?? null, table: out.text, truncated: out.truncated } };
     },
 });
 
@@ -263,6 +278,7 @@ export const ga4Metadata = defineTool({
     cost: 1,
     invoking: 'Reading GA4 fields…',
     invoked: 'GA4 fields listed',
+    output: { data: 'table', props: { site: J.str, property: J.str, matched: J.int, returned: J.int } },
     async run(args, ctx) {
         const site = await ctx.site(args.site);
         const { property } = requireGa4(site);
@@ -283,6 +299,6 @@ export const ga4Metadata = defineTool({
         const rows: Cell[][] = fields.slice(0, args.limit).map((f) => [f.kind, f.apiName, ctx.san.text(f.uiName, 60), (f.type || '').replace(/^TYPE_/, '').toLowerCase(), ctx.san.text(f.category, 40), f.customDefinition ? 'yes' : '', ctx.san.text(f.description, 100)]);
         const header = [...ctx.banner(), headerLine(['ga4_metadata', site.site_id, property, `${rows.length} of ${total} fields`])];
         const out = render(header, [{ columns: ['kind', 'api_name', 'label', 'type', 'category', 'custom', 'description'], rows }], [total > rows.length ? '# more fields match; narrow with search, kind or category' : '']);
-        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, property, matched: total, returned: rows.length, truncated: out.truncated || total > rows.length } };
+        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, property, matched: total, returned: rows.length, table: out.text, truncated: out.truncated || total > rows.length } };
     },
 });

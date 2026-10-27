@@ -27,15 +27,56 @@ export const dateRangeArg = z.object({
 
 export const formatArg = z.enum(['table', 'json']).default('table').describe('table is compact TSV; json returns columns and rows.');
 
-/** Result envelope (structuredContent): small, open-ended, never the rows. */
-export const Envelope = fromJsonSchema<Record<string, unknown>>({
-    type: 'object',
-    properties: {
-        truncated: { type: 'boolean' },
-        warnings: { type: 'array', items: { type: 'string' } },
+// ───────────── output schemas (structuredContent) ─────────────
+//
+// MCP clients such as Claude read structuredContent instead of the text content when a tool declares an
+// outputSchema, so structuredContent carries the data itself: `table` (the same compact TSV as the text) for
+// table output, `columns` + `rows` for format:"json", `text` for help. Metadata sits beside it.
+
+type JsonSchema = Record<string, unknown>;
+
+/** Small JSON Schema builders for tool output schemas. */
+export const J = {
+    str: { type: 'string' } as JsonSchema,
+    int: { type: 'integer' } as JsonSchema,
+    num: { type: 'number' } as JsonSchema,
+    bool: { type: 'boolean' } as JsonSchema,
+    strs: { type: 'array', items: { type: 'string' } } as JsonSchema,
+    range: { type: 'object', properties: { start: { type: 'string' }, end: { type: 'string' } } } as JsonSchema,
+    obj(properties: Record<string, JsonSchema> = {}): JsonSchema {
+        return { type: 'object', properties };
     },
-    additionalProperties: true,
-});
+    /** The same schema, also allowing null (anyOf rather than a type array, which single-type dialects reject). */
+    orNull(s: JsonSchema): JsonSchema {
+        return { anyOf: [s, { type: 'null' }] };
+    },
+};
+
+/** Compact TSV, the same as the text content: # header lines, a column-name line, one line per row, # notes. */
+const TABLE_PROPS: Record<string, JsonSchema> = { table: J.str };
+/** Rows are arrays of cells (strings, numbers or null; one per column). */
+const JSON_PROPS: Record<string, JsonSchema> = { columns: J.strs, rows: { type: 'array', items: { type: 'array' } } };
+const COMMON_PROPS: Record<string, JsonSchema> = {
+    truncated: J.bool,
+    warnings: J.strs,
+    demo: J.bool,
+    flagged_cells: J.int,
+};
+
+/** What a tool's structuredContent holds: a TSV `table`, `table` or `columns` + `rows` (tools with format), or `text`. */
+export interface OutputSpec {
+    data: 'table' | 'format' | 'text';
+    /** The tool's metadata fields beside the data. */
+    props: Record<string, JsonSchema>;
+}
+
+export function outputJsonSchema(spec: OutputSpec): JsonSchema {
+    const data = spec.data === 'text' ? { text: J.str } : spec.data === 'table' ? TABLE_PROPS : { ...TABLE_PROPS, ...JSON_PROPS };
+    const schema: JsonSchema = { type: 'object', properties: { ...spec.props, ...data, ...COMMON_PROPS }, required: ['warnings'] };
+    if (spec.data === 'format') schema.anyOf = [{ required: ['table'] }, { required: ['columns', 'rows'] }];
+    else (schema.required as string[]).unshift(spec.data === 'text' ? 'text' : 'table');
+    return schema;
+}
 
 // ───────────── context ─────────────
 
@@ -69,6 +110,7 @@ export interface ToolDef<S extends z.ZodObject> {
     cost: number | ((args: z.output<S>) => number);
     invoking: string;
     invoked: string;
+    output: OutputSpec;
     run: (args: z.output<S>, ctx: ToolContext) => Promise<ToolResult>;
 }
 
@@ -128,7 +170,7 @@ export function registerTool<S extends z.ZodObject>(server: McpServer, principal
         title: def.title,
         description: def.description,
         inputSchema: def.input,
-        outputSchema: Envelope,
+        outputSchema: fromJsonSchema<Record<string, unknown>>(outputJsonSchema(def.output) as never),
         annotations: { title: def.title, readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         _meta: {
             securitySchemes: [{ type: 'oauth2', scopes: ['mcp:read'] }],

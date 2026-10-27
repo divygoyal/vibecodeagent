@@ -4,7 +4,7 @@ import { ToolError } from '../errors';
 import { deltaPct, fmtInt, fmtNum, headerLine, render, type Cell } from '../format';
 import { gaRows, type GoogleClient } from '../google';
 import type { SiteRecord } from '../siteResolver';
-import { defineTool, type ToolContext } from '../toolkit';
+import { defineTool, J, type ToolContext } from '../toolkit';
 import { gaDate, gscBody, mapLimit, takeInspectionQuota, userKeyOf } from './common';
 
 type Severity = 'high' | 'medium' | 'low';
@@ -234,6 +234,7 @@ export const siteHealth = defineTool({
     cost: (a) => (a.site === 'all' ? 65 : 8),
     invoking: 'Running health checks…',
     invoked: 'Health checks done',
+    output: { data: 'table', props: { sites_checked: J.int, findings_total: J.int, returned: J.int, checked: J.strs, skipped: { type: 'object', additionalProperties: J.str } } },
     async run(args, ctx) {
         const catalog = await ctx.catalog();
         const all = args.site === 'all';
@@ -268,7 +269,7 @@ export const siteHealth = defineTool({
         return {
             text: out.text,
             rows: out.rowsReturned,
-            structured: { sites_checked: targets.length, findings_total: findings.length, returned: top.length, checked, skipped: Object.fromEntries(skipped), truncated: out.truncated || findings.length > top.length },
+            structured: { sites_checked: targets.length, findings_total: findings.length, returned: top.length, checked, skipped: Object.fromEntries(skipped), table: out.text, truncated: out.truncated || findings.length > top.length },
         };
     },
 });

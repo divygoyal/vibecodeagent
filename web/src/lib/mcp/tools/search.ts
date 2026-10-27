@@ -6,7 +6,7 @@ import { ToolError } from '../errors';
 import { fmtInt, fmtNum, headerLine, render, renderJson, type Cell, type Section } from '../format';
 import type { GscRow } from '../google';
 import { brandTokens, requireGsc } from '../siteResolver';
-import { dateRangeArg, defineTool, formatArg, siteArg, type ToolContext } from '../toolkit';
+import { dateRangeArg, defineTool, formatArg, J, siteArg, type ToolContext } from '../toolkit';
 import { ensureQueriesAllowed, gscBody, mapLimit, takeInspectionQuota, userKeyOf } from './common';
 
 const OPP_TYPES = ['striking_distance', 'low_ctr', 'decaying_pages', 'cannibalization', 'new_queries'] as const;
@@ -43,6 +43,7 @@ export const seoOpportunities = defineTool({
     cost: 8,
     invoking: 'Looking for quick wins…',
     invoked: 'Opportunities found',
+    output: { data: 'table', props: { site: J.str, period: J.range, counts: { type: 'object', additionalProperties: J.int }, estimate: J.bool } },
     async run(args, ctx) {
         const site = await ctx.site(args.site);
         const { siteUrl } = requireGsc(site);
@@ -146,7 +147,7 @@ export const seoOpportunities = defineTool({
         const header = [...ctx.banner(), headerLine(['seo_opportunities', site.site_id, `GSC ${fmtPeriod(period)}`, `min_impressions ${minImp}`, args.exclude_branded && !noQueries ? `branded excluded (${brand.slice(0, 5).join(', ')})` : null])];
         const footer = ['# est_extra_clicks_28d is a rough range from typical CTR by position, not a forecast.', ctx.note()];
         const out = render(header, sections, footer);
-        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, period: { start: period.start, end: period.end }, counts, estimate: true, truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, period: { start: period.start, end: period.end }, counts, estimate: true, table: out.text, truncated: out.truncated } };
     },
 });
 
@@ -176,6 +177,7 @@ export const gscSearchAnalytics = defineTool({
     cost: 2,
     invoking: 'Querying Search Console…',
     invoked: 'Search Console answered',
+    output: { data: 'format', props: { site: J.str, period: J.range, search_type: J.str, rows_returned: J.int, next_offset: J.orNull(J.int), data_through: J.str } },
     async run(args, ctx) {
         const site = await ctx.site(args.site);
         const { siteUrl } = requireGsc(site);
@@ -213,7 +215,7 @@ export const gscSearchAnalytics = defineTool({
         const envelope = { site: site.site_id, period: { start: period.start, end: period.end }, search_type: args.search_type, rows_returned: tableRows.length, next_offset: more ? args.offset + tableRows.length : null, data_through: period.end };
         if (args.format === 'json') {
             const j = renderJson([{ columns, rows: tableRows }], envelope);
-            return { text: j.text, rows: j.rowsReturned, structured: { ...envelope, truncated: j.truncated } };
+            return { text: j.text, rows: j.rowsReturned, structured: { ...envelope, ...j.data, truncated: j.truncated } };
         }
         const header = [...ctx.banner(), headerLine(['gsc_search_analytics', site.site_id, siteUrl, `${fmtPeriod(period)}${args.fresh ? ' (includes incomplete days)' : ''}`, `type ${args.search_type}`, `sorted by ${args.sort_by}`])];
         const footer = [
@@ -224,7 +226,7 @@ export const gscSearchAnalytics = defineTool({
             tableRows.length && (dims.includes('query') || dims.includes('page')) ? ctx.note() : '',
         ];
         const out = render(header, [{ columns, rows: tableRows }], footer);
-        return { text: out.text, rows: out.rowsReturned, structured: { ...envelope, truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned, structured: { ...envelope, table: out.text, truncated: out.truncated } };
     },
 });
 
@@ -240,6 +242,7 @@ export const gscInspectUrl = defineTool({
     cost: (a) => 3 * a.urls.length,
     invoking: 'Inspecting URLs…',
     invoked: 'URLs inspected',
+    output: { data: 'table', props: { site: J.str, inspected: J.int } },
     async run(args, ctx) {
         const site = await ctx.site(args.site);
         const { siteUrl } = requireGsc(site);
@@ -281,6 +284,6 @@ export const gscInspectUrl = defineTool({
         });
         const header = [...ctx.banner(), headerLine(['gsc_inspect_url', site.site_id, siteUrl, `${urls.length} URL(s)`])];
         const out = render(header, [{ columns: ['url', 'verdict', 'coverage_state', 'indexing_state', 'robots_txt_state', 'page_fetch_state', 'last_crawl', 'crawled_as', 'google_canonical', 'user_canonical', 'mobile_usability', 'rich_results'], rows }], [ctx.note()]);
-        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, inspected: urls.length, truncated: out.truncated } };
+        return { text: out.text, rows: out.rowsReturned, structured: { site: site.site_id, inspected: urls.length, table: out.text, truncated: out.truncated } };
     },
 });
