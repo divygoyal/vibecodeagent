@@ -35,9 +35,48 @@ entries for /security and /changelog, the footer.
   above `PROOF_MIN` = 25 listed sites / 10 owner-verified sites.
 - Live on 2026-10-27: 6 listed, 0 owner-verified (all 6 rank on the GA4 "grace" rule) → nothing shows, by design.
 
+## New pages
+- `/security` "Security and data" (app/(marketing)/security): summary tiles, what we read (the 3 scopes from lib/auth.ts, plus
+  offline access), what we store with why and how long, how tokens are protected (Fernet for Google tokens, SHA-256 hashes for
+  MCP tokens and API keys, 1 h access / 30-day rolling refresh / 180-day cap, max 5 keys), what we never do, who else sees data
+  (Google, Gemini for Ask, the connected AI app, Dodo, GA/Clarity/Tawk on our own site), revoke steps (Google permissions,
+  Settings › Google, Connect AI, share dialog, leaderboard), deletion (Settings › Danger zone or privacy@, within 30 days; export
+  first). Linked from the hero trust line, the home FAQ, the pricing trust line, the footer (Company), sitemap and llms.txt.
+- `/changelog` (app/(marketing)/changelog): two releases dated 2026-10-27 (the redesign 4b1db9c and the same-morning follow-ups
+  01a2a25/05bf31f/QA fixes), grouped by feature, written from `git log 1b62be9..tc/integrate`; data in
+  components/marketing/changelog/entries.ts, which also feeds the home "What's new" row. Footer (Product), sitemap, llms.txt.
+- Both have OG images (components/marketing/site/og).
+
+## Pricing and demo (copy polish, no pricing facts changed)
+- Pricing: "RECOMMENDED" caps badge → sentence-case "Recommended" pill (critique 2.9 rule 1); feature rows name the site pages
+  like the app ("Traffic, Search, What to fix next and Audit"); trust line under the plans ("Every plan: read-only Google access ·
+  nothing to install · no site limit", first item links /security); sponsor link → /leaderboard/advertise (no redirect hop).
+- Demo: banner sticks under the header (teardown-b #21), one line on phones ("Live demo · sample data" + "Connect your sites"),
+  names the 11 sample sites on wider screens; /demo now ends with a Connect Google CTA ("See your own sites like this.").
+- FinalCta default line: "Read-only, nothing to install, no card, no site limit."
+- Footer trademark line also covers ChatGPT, Claude and Cursor (named in the new Works-with strip).
+
+## Brand
+- Works-with strip uses plain product names only, no logos or marks: Google's, OpenAI's and Anthropic's brand rules restrict logo
+  use, and plain names cannot be "modified logos". Footer says the names belong to their owners and TrafficClaw is not affiliated.
+
 ## [confirm] for the owner (left out of the pages until confirmed)
 - [confirm] Proof thresholds: 25 listed sites and 10 owner-verified sites. Change `PROOF_MIN` in proof.ts.
 - [confirm] Which ChatGPT and Claude plans can add a custom connector (teardown-b FAQ #5). Not on the page.
+- [confirm] A dedicated security contact (security@…). The page uses privacy@trafficclaw.com and the contact form.
+- [confirm] Hosting provider and data location (country/region). Not on the page.
+- [confirm] Whether removing access in Google alone should count as a deletion request. The privacy policy says revoking or
+  emailing both lead to deletion within 30 days; no code reacts to a Google revoke, so /security tells people to use Settings ›
+  Danger zone or email for deletion, and says revoking stops our reads.
 
-## Findings for the owner (not changed here)
-(filled in as the security page is written)
+## Findings for the owner (not changed here, outside WS4)
+- **Google refresh token reaches the browser.** `lib/auth.ts` `session()` copies `googleAccessToken`, `googleRefreshToken`,
+  `accessToken` and `refreshToken` onto `session.user`, so `GET /api/auth/session` (and `useSession()`) returns them to any
+  same-origin script. Several server routes already read them from the JWT with `getToken()`; recommend moving the rest
+  there and dropping the tokens from the session payload (check client uses first). /security makes no claim that tokens never reach the browser.
+- **Admin user delete does not cover every table.** `DELETE /api/users/{id}` (admin/main.py) removes the container, OAuth tokens,
+  MCP rows, portfolio rows, action states and the user row, but not dashboards (+versions, shares, embed tokens), chat threads /
+  messages / facts / embeddings, annotations, goals, funnels, leaderboard entries / profiles / daily / audience, weekly digests or
+  support messages. Deletion is a manual request today (Settings › Danger zone → support inbox), so the admin must clear the rest
+  by hand to meet the 30-day promise in the privacy policy and on /security.
+- Tawk.to is loaded only inside the app (AppShell) in this branch; WS1 moves it. /security just says the support chat runs on Tawk.to.
