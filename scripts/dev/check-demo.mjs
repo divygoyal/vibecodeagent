@@ -114,7 +114,7 @@ async function httpChecks() {
     check('a router prefetch of /demo starts nothing (204, no cookie)', r.status === 204 && r.setCookies.length === 0, `${r.status} ${r.setCookies.join()}`);
     r = await http('GET', '/demo', { headers: { 'sec-fetch-mode': 'navigate', 'sec-purpose': 'prefetch;prerender' } });
     check('a speculative prerender of /demo starts nothing (204)', r.status === 204 && r.setCookies.length === 0, `${r.status}`);
-    r = await http('GET', '/demo/exit', { headers: { 'sec-fetch-mode': 'cors' }, cookie: 'tc_demo=x' });
+    r = await http('GET', '/demo/exit', { headers: { 'sec-fetch-mode': 'cors' }, cookie: `tc_demo=${demoJwt}` });
     check('a router fetch of /demo/exit ends nothing (204, no cookie)', r.status === 204 && r.setCookies.length === 0, `${r.status} ${r.setCookies.join()}`);
     r = await http('GET', '/demo?static=1');
     check('/demo?static=1 -> the marketing demo page (200)', r.status === 200 && /<html/i.test(r.text), r.status);
