@@ -14,7 +14,7 @@ import useSWR from 'swr';
 import { toast } from 'sonner';
 import {
     ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, LayoutTemplate, Loader2, Monitor, MoreHorizontal, Pencil,
-    Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson,
+    Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson, ClipboardPaste, MonitorPlay,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -22,9 +22,14 @@ import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, Dropdo
 import { addPage, addWidget, duplicatePage, duplicateWidget, firstFreeSlot, layoutFor, moveWidgetToPage, movePage, readingOrder, removePage, removeWidget, renamePage, setLayout, updatePage, clampItem } from '@/lib/builder/docOps';
 import { defaultWidget, widgetMeta, widgetTitle, newWidgetId } from '@/lib/builder/registry';
 import { dimLabel } from '@/lib/builder/catalog';
+import { clipLabel, copyPage, copyWidgets, parseClip, pastePage, pasteWidgets, type Clip } from '@/lib/builder/clipboard';
+import { isDefaultLook, type Mode } from '@/lib/builder/themes';
 import type { DashboardDocV2, DashboardRecord, FilterControl, LayoutItem, WidgetDef, WidgetType } from '@/lib/builder/types';
+import { useResolvedTheme } from '@/lib/theme';
 import { useEditorStore, type Viewport } from '@/stores/dashboardEditorStore';
 import { DashboardCanvas, type Bp } from '../DashboardCanvas';
+import { DashboardCover } from '../DashboardCover';
+import { dashRootProps } from '../theme/DashTheme';
 import { DateControl, FilterControlView } from '../Controls';
 import { ShareDialog } from '../ShareDialog';
 import { textVars } from '../DashboardView';
@@ -37,6 +42,20 @@ import { PropertiesPanel } from './PropertiesPanel';
 import type { SiteOption } from './Fields';
 
 const VIEWPORT_W: Record<Viewport, number | null> = { desktop: null, tablet: 768, phone: 390 };
+const CLIP_KEY = 'tc-dash-clipboard';
+
+/** Last copy in this browser (fallback when the system clipboard cannot be read). */
+function rememberClip(text: string) {
+    try { localStorage.setItem(CLIP_KEY, text); } catch { /* storage blocked */ }
+}
+async function readClip(): Promise<Clip | null> {
+    try {
+        const text = await navigator.clipboard?.readText?.();
+        const c = parseClip(text);
+        if (c) return c;
+    } catch { /* permission denied: fall back */ }
+    try { return parseClip(localStorage.getItem(CLIP_KEY)); } catch { return null; }
+}
 const VIEWPORT_BP: Record<Viewport, Bp> = { desktop: 'lg', tablet: 'md', phone: 'sm' };
 
 function isTyping(t: EventTarget | null): boolean {
@@ -80,6 +99,8 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const [resolvedDates, setResolvedDates] = useState<import('@/lib/builder/types').ResolvedDates | undefined>();
     const searchRef = useRef<HTMLInputElement>(null);
     const [canvasRef, availWidth] = useElementWidth<HTMLDivElement>();
+    const appMode = useResolvedTheme();
+    const [themePreview, setThemePreview] = useState<Mode | null>(null);
     const { data: sitesData } = useSWR<{ connected: boolean; sites: SiteOption[] }>('/api/dashboards/sites', (u: string) => fetchJson(u), { revalidateOnFocus: false });
     const sites = useMemo(() => sitesData?.sites ?? [], [sitesData]);
 
@@ -159,6 +180,55 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
         setTimeout(() => document.querySelector(`[data-widget-id="${w.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 80);
     }, [families]);
 
+    // ── copy and paste (widgets and pages, also across dashboards and tabs) ──
+    const doPaste = useCallback((clip: Clip) => {
+        const st = useEditorStore.getState();
+        if (!st.doc || !st.pageId) return;
+        if (clip.tc === 'trafficclaw/page') {
+            let res: { pageId: string; ids: string[] } = { pageId: '', ids: [] };
+            st.apply((d) => { const r = pastePage(d, clip); res = r; return r.doc; }, { announce: `Pasted ${clipLabel(clip)}` });
+            if (res.pageId) st.setPage(res.pageId);
+            else toast.error('A dashboard can have at most 20 pages.');
+        } else {
+            let ids: string[] = [];
+            st.apply((d) => { const r = pasteWidgets(d, st.pageId!, clip); ids = r.ids; return r.doc; }, { announce: `Pasted ${clipLabel(clip)}` });
+            if (ids[0]) {
+                st.select(ids[0]);
+                setTimeout(() => document.querySelector(`[data-widget-id="${ids[0]}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 80);
+            }
+        }
+        toast(`Pasted ${clipLabel(clip)}`, { action: { label: 'Undo', onClick: () => useEditorStore.getState().undo() } });
+    }, []);
+    const copyText = useCallback((text: string | null, what: string) => {
+        if (!text) return;
+        rememberClip(text);
+        void navigator.clipboard?.writeText(text).catch(() => undefined);
+        toast(`${what} copied`, { description: 'Paste with ⌘V here or in another dashboard.' });
+    }, []);
+    useEffect(() => {
+        const onCopy = (e: ClipboardEvent) => {
+            if (isTyping(e.target) || window.getSelection()?.toString()) return;
+            const st = useEditorStore.getState();
+            if (!st.doc || !st.selectedId || !st.pageId) return;
+            const text = copyWidgets(st.doc, st.pageId, [st.selectedId]);
+            if (!text) return;
+            e.clipboardData?.setData('text/plain', text);
+            e.preventDefault();
+            rememberClip(text);
+            toast(`${widgetTitle(st.doc.widgets[st.selectedId])} copied`, { description: 'Paste with ⌘V here or in another dashboard.' });
+        };
+        const onPaste = (e: ClipboardEvent) => {
+            if (isTyping(e.target)) return;
+            const clip = parseClip(e.clipboardData?.getData('text/plain'));
+            if (!clip) return;
+            e.preventDefault();
+            doPaste(clip);
+        };
+        window.addEventListener('copy', onCopy);
+        window.addEventListener('paste', onPaste);
+        return () => { window.removeEventListener('copy', onCopy); window.removeEventListener('paste', onPaste); };
+    }, [doPaste]);
+
     const commitLayout = useCallback((b: Bp, items: LayoutItem[]) => {
         const st = useEditorStore.getState();
         if (!st.doc || !st.pageId) return;
@@ -235,6 +305,11 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const dc = doc.controls.find((c) => c.type === 'date');
 
     const statusText = status === 'saving' ? 'Saving…' : status === 'dirty' ? 'Unsaved' : status === 'error' ? 'Not saved' : status === 'conflict' ? 'Changed elsewhere' : 'Saved';
+    // Round 2: the canvas shows the dashboard's theme live (light or dark preview).
+    const themed = !isDefaultLook(doc.theme);
+    const canvasMode: Mode = themePreview ?? appMode;
+    const look = themed ? dashRootProps(doc.theme, canvasMode) : null;
+    const showCover = Boolean(doc.theme.cover?.enabled) && page.id === doc.pages.find((p) => !p.hidden)?.id;
 
     return (
         <div className="tc-root fixed inset-0 z-[45] flex flex-col bg-canvas text-fg" data-editor>
@@ -267,6 +342,8 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                             <DropdownMenuItem icon={Copy} onSelect={async () => { await save(); const r = await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${s.id}/duplicate`, { method: 'POST', body: '{}' }); router.push(`/dashboard/dashboards/${r.dashboard.id}/edit`); }}>Duplicate</DropdownMenuItem>
                             <DropdownMenuItem icon={LayoutTemplate} onSelect={async () => { await save(); await fetchJson(`/api/dashboards/${s.id}/duplicate?asTemplate=1`, { method: 'POST', body: '{}' }); toast.success('Saved to My templates'); }}>Save as my template</DropdownMenuItem>
                             <DropdownMenuItem icon={Settings2} onSelect={() => { s.select(null); s.selectControl(null); }}>Dashboard settings</DropdownMenuItem>
+                            <DropdownMenuItem icon={ClipboardPaste} shortcut="⌘V" onSelect={async () => { const c = await readClip(); if (c) doPaste(c); else toast('Nothing to paste', { description: 'Copy a widget (⌘C) or a page first, in any dashboard.' }); }}>Paste widgets</DropdownMenuItem>
+                            <DropdownMenuItem icon={MonitorPlay} onSelect={async () => { await save(); window.open(`/dashboard/dashboards/${s.id}?tv=1`, '_blank', 'noopener'); }}>Present (TV mode)</DropdownMenuItem>
                             <DropdownMenuItem icon={History} onSelect={() => setVersionsOpen(true)}>Version history</DropdownMenuItem>
                             <DropdownMenuItem icon={FileJson} onSelect={() => {
                                 const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
@@ -309,6 +386,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                                 <DropdownMenuContent>
                                                     <DropdownMenuItem icon={Pencil} onSelect={() => setRenaming(p.id)}>Rename</DropdownMenuItem>
                                                     <DropdownMenuItem icon={Copy} onSelect={() => { let nid = ''; s.apply((d) => { const r = duplicatePage(d, p.id); nid = r.id; return r.doc; }); if (nid) s.setPage(nid); }}>Duplicate</DropdownMenuItem>
+                                                    <DropdownMenuItem icon={ClipboardPaste} onSelect={() => copyText(copyPage(doc, p.id), `Page “${p.title}”`)}>Copy page</DropdownMenuItem>
                                                     <DropdownMenuItem icon={ChevronLeft} disabled={i === 0} onSelect={() => s.apply((d) => movePage(d, p.id, -1))}>Move left</DropdownMenuItem>
                                                     <DropdownMenuItem icon={ChevronRight} disabled={i === doc.pages.length - 1} onSelect={() => s.apply((d) => movePage(d, p.id, 1))}>Move right</DropdownMenuItem>
                                                     <DropdownMenuItem icon={p.hidden ? Eye : EyeOff} onSelect={() => s.apply((d) => updatePage(d, p.id, (x) => ({ ...x, hidden: !x.hidden })))}>{p.hidden ? 'Show to viewers' : 'Hide from viewers'}</DropdownMenuItem>
@@ -349,11 +427,17 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                             options={[{ value: 'desktop', label: 'Desktop', icon: Monitor }, { value: 'tablet', label: 'Tablet', icon: Tablet }, { value: 'phone', label: 'Phone', icon: Smartphone }]} />
                         {viewport === 'phone' && customPhone ? <span className="flex items-center gap-2 text-meta text-fg-muted">Custom phone layout <button type="button" className="font-medium text-brand-text hover:underline" onClick={() => s.apply((d) => updatePage(d, page.id, (p) => ({ ...p, layouts: { ...p.layouts, sm: undefined } })))}>Reset to automatic</button></span> : null}
                         {viewport === 'tablet' && customTablet ? <span className="flex items-center gap-2 text-meta text-fg-muted">Custom tablet layout <button type="button" className="font-medium text-brand-text hover:underline" onClick={() => s.apply((d) => updatePage(d, page.id, (p) => ({ ...p, layouts: { ...p.layouts, md: undefined } })))}>Reset to automatic</button></span> : null}
+                        {themed ? <SegmentedControl<Mode> ariaLabel="Theme preview" variant="neutral" size="sm" value={canvasMode} onChange={(m) => setThemePreview(m)} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} /> : null}
                     </div>
 
                     {/* Canvas */}
-                    <div ref={canvasRef} className="min-h-0 flex-1 overflow-auto px-6 pb-16" onClick={(e) => { if (e.target === e.currentTarget) { s.select(null); s.selectControl(null); } }}>
+                    <div ref={canvasRef} {...look?.attrs} style={look?.style} className={cn('min-h-0 flex-1 overflow-auto px-6 pb-16', look && 'pt-4', look?.className)} onClick={(e) => { if (e.target === e.currentTarget) { s.select(null); s.selectControl(null); } }}>
                         <div className="mx-auto" style={{ width: canvasWidth || undefined }}>
+                            {showCover ? (
+                                <div className="pointer-events-none mb-4" aria-label="Cover preview">
+                                    <DashboardCover theme={doc.theme} name={doc.name} vars={vars} pages={doc.pages.filter((p) => !p.hidden)} currentPageId={page.id} dark={(look?.mode ?? canvasMode) === 'dark'} />
+                                </div>
+                            ) : null}
                             <DashboardCanvas
                                 doc={doc}
                                 page={page}
@@ -367,6 +451,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                     onCommitLayout: commitLayout,
                                     onDropNew: (type, at) => addOfType(type, at),
                                     onDuplicate: (id) => { let nid = ''; s.apply((d) => { const r = duplicateWidget(d, id); nid = r.id; return r.doc; }); if (nid) s.select(nid); },
+                                    onCopy: (id) => copyText(copyWidgets(doc, page.id, [id]), widgetTitle(doc.widgets[id])),
                                     onDelete: (id) => s.apply((d) => removeWidget(d, id), { announce: 'Widget deleted' }),
                                     onMoveToPage: (id, to) => s.apply((d) => moveWidgetToPage(d, id, to), { announce: 'Widget moved to another page' }),
                                     pages: doc.pages,

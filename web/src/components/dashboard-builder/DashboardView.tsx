@@ -14,9 +14,12 @@ import { EmptyState } from '@/components/ui';
 import { fmtDateRange } from '@/lib/format';
 import { compareFromParam, compareToParam, rangeFromParam, rangeToParam } from '@/lib/builder/dates';
 import { dateControlOf, defaultControlState } from '@/lib/builder/publicDoc';
+import { isDefaultLook, type Mode } from '@/lib/builder/themes';
 import type { ControlState, DashboardDocV2, DashboardQueryResponse, FilterControl, ResolvedDates, WidgetDef } from '@/lib/builder/types';
 import { DashboardCanvas, bpForWidth, type Bp } from './DashboardCanvas';
 import { ControlsBar, DateControl, PageTabs, type OptionsSource } from './Controls';
+import { DashboardCover } from './DashboardCover';
+import { dashRootProps } from './theme/DashTheme';
 import { WidgetRenderer } from './widgets/WidgetRenderer';
 
 /** Viewer state <-> URL. Only keys the viewer may change are read. */
@@ -64,6 +67,8 @@ export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'>, 
         setPage: (id: string) => set({ page: id }),
         setDate: (range: ControlState['date']['range'], compare: ControlState['date']['compare']) => set({ range: rangeToParam(range), compare: compareToParam(compare), from: null, to: null }),
         setFilter: (id: string, values: string[]) => set({ [`f.${id}`]: values.length ? values.join(',') : null }),
+        /** TV mode (round 2): ?tv=1. */
+        setTv: (on: boolean) => set({ tv: on ? '1' : null }),
         query: sp,
     };
 }
@@ -97,10 +102,20 @@ export interface DashboardViewProps {
     /** Content root for PDF export. */
     exportRef?: React.Ref<HTMLDivElement>;
     onChooseSource?: () => void;
+    /**
+     * Round 2 themes. 'panel': this view is the themed root (owner view inside the app: the
+     * dashboard sits on its theme's canvas). 'inherit': a parent already carries the theme (share
+     * link, embed, TV mode). Default look: no attributes at all, today's DOM.
+     */
+    shell?: 'panel' | 'inherit';
+    /** Mode the themed panel renders in (the app's light or dark). */
+    appMode?: Mode;
+    /** TV mode: no header, cover or page tabs; filters hide unless settings.tv says otherwise. */
+    tv?: boolean;
 }
 
 export function DashboardView({
-    doc, mode, siteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource,
+    doc, mode, siteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv,
 }: DashboardViewProps) {
     const [ref, width] = useElementWidth<HTMLDivElement>();
     const bp: Bp = bpForWidth(width || 1200);
@@ -109,7 +124,17 @@ export function DashboardView({
     const dc = dateControlOf(doc);
     const filters = doc.controls.filter((c): c is FilterControl => c.type === 'filter');
     const vars = textVars(siteLabel, data?.resolved, page?.title ?? '');
-    const contained = doc.settings.widthMode !== 'full';
+    const contained = doc.settings.widthMode !== 'full' && !tv;
+    const root = shell === 'panel' ? dashRootProps(doc.theme, appMode ?? 'light') : null;
+    const themed = !isDefaultLook(doc.theme);
+    const showControls = !tv || doc.settings.tv?.hideControls === false;
+    const cover = !tv && doc.theme.cover?.enabled && page && page.id === pages[0]?.id;
+    const kpiWidget = cover && doc.theme.cover?.showKpis ? page?.layouts.lg.map((l) => doc.widgets[l.i]).find((w) => w?.type === 'kpi-strip') : undefined;
+    const brand = doc.theme.brand;
+    const credits = brand ? [
+        brand.preparedBy && brand.preparedFor ? `Prepared by ${brand.preparedBy} for ${brand.preparedFor}` : brand.preparedBy ? `Prepared by ${brand.preparedBy}` : brand.preparedFor ? `Prepared for ${brand.preparedFor}` : '',
+        brand.footer ?? '',
+    ].filter(Boolean).join(' · ') : '';
 
     const render = useCallback((widget: WidgetDef, heightPx: number, b: Bp) => (
         <WidgetRenderer
@@ -129,9 +154,13 @@ export function DashboardView({
     ), [data, loading, refetching, state.date.compare.mode, mode, vars, onRetry, onChooseSource]);
 
     return (
-        <div ref={exportRef} className={cn('flex flex-col gap-4', contained && 'mx-auto w-full max-w-[1440px]')}>
-            {header}
-            <div className="flex flex-wrap items-center justify-between gap-3" data-pdf-ignore="true">
+        <div ref={exportRef} {...root?.attrs} {...(root ? { 'data-dash-panel': '' } : {})} style={root?.style} className={cn('flex flex-col gap-4', contained && 'mx-auto w-full max-w-[1440px]', root?.className)}>
+            {tv ? null : themed ? <div data-dash-header="">{header}</div> : header}
+            {cover ? (
+                <DashboardCover theme={doc.theme} name={doc.name} vars={vars} pages={pages} currentPageId={page?.id} onPage={pages.length > 1 ? onPage : undefined}
+                    dark={(root?.mode ?? appMode) === 'dark'} kpis={kpiWidget ? render(kpiWidget, 120, bp) : undefined} />
+            ) : null}
+            {showControls ? <div className="flex flex-wrap items-center justify-between gap-3" data-pdf-ignore="true">
                 <ControlsBar
                     filters={filters}
                     state={state}
@@ -156,8 +185,8 @@ export function DashboardView({
                         {data.resolved.compare ? ` · vs ${fmtDateRange(data.resolved.compare.start, data.resolved.compare.end)}` : ''}
                     </p>
                 ) : null}
-            </div>
-            {pages.length > 1 ? <PageTabs pages={pages} value={page?.id ?? ''} onChange={onPage} /> : null}
+            </div> : null}
+            {pages.length > 1 && !tv ? <PageTabs pages={pages} value={page?.id ?? ''} onChange={onPage} /> : null}
             <div ref={ref} className="min-w-0">
                 {page ? (
                     <DashboardCanvas
@@ -171,6 +200,7 @@ export function DashboardView({
                     />
                 ) : null}
             </div>
+            {credits && !tv ? <p className="text-center text-meta text-fg-muted" data-dash-credits="">{credits}</p> : null}
             {footer}
         </div>
     );

@@ -6,6 +6,7 @@ import { ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { EmptyState, MetricDelta, SearchInput, Table, type TableColumn as UiColumn } from '@/components/ui';
 import { dimLabel, fmtMetricValue, metricHeatbar, metricLabel } from '@/lib/builder/catalog';
+import { cellStyle } from '@/lib/builder/cfRules';
 import type { CellValue, TableWidget } from '@/lib/builder/types';
 import { okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { dimText } from './Charts';
@@ -66,10 +67,12 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                 const v = typeof r[`m:${id}`] === 'number' ? (r[`m:${id}`] as number) : null;
                 const pv = r[`m:${id}:prev`];
                 const pct = col.visual === 'bar' || col.visual === 'heat' ? (maxOf[id] > 0 && v ? Math.min(100, (v / maxOf[id]) * 100) : 0) : 0;
+                // Conditional formatting (round 2): only tables with rules get the extra classes.
+                const cf = c.rules?.length ? cellStyle(c.rules, col, r) : null;
                 return (
                     <span className="relative flex min-h-7 items-center justify-end gap-2">
                         {pct ? <span aria-hidden className={cn('absolute inset-y-0.5 right-[-6px] rounded-md', metricHeatbar(id))} style={{ width: `calc(${pct}% + 6px)` }} /> : null}
-                        <span className="relative">{fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format })}</span>
+                        <span className={cf ? `relative tc-cf-cell tc-cf-${cf} font-medium` : 'relative'} title={cf ? (cf === 'good' ? 'Meets a good rule' : cf === 'bad' ? 'Matches a bad rule' : 'Needs attention') : undefined}>{fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format })}</span>
                         {showDelta && pv !== undefined ? (
                             <MetricDelta className="relative" current={v} previous={typeof pv === 'number' ? pv : null} format={dsFormat(id)} better={metricBetter(id)} />
                         ) : null}

@@ -84,7 +84,7 @@ export function TextView({ widget, vars }: WidgetViewProps<TextWidget>) {
     const c = widget.config;
     const md = c.variables ? fillVars(c.markdown, vars) : c.markdown;
     return (
-        <div className={cn(
+        <div data-dash-widget={c.role !== 'callout' && widget.style?.background === 'surface' ? 'md' : undefined} className={cn(
             'h-full overflow-auto',
             c.role === 'callout' ? 'rounded-card border border-border-subtle bg-surface-sunken p-4' : widget.style?.background === 'surface' ? 'rounded-card border border-border-subtle bg-surface p-4 shadow-card' : 'px-1 py-1',
         )}>

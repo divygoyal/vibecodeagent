@@ -53,7 +53,7 @@ function TemplateCard({ id, title, description, audience, needs, onPick, thumb, 
     return (
         <button type="button" onClick={onPick} className="group flex flex-col overflow-hidden rounded-card border border-border-subtle bg-surface text-left shadow-card transition-[box-shadow,border-color,transform] duration-120 hover:-translate-y-px hover:border-border hover:shadow-card-hover" data-template={id}>
             {theme && theme.id ? (
-                <DashThemeRoot theme={theme} mode={mode} className="flex aspect-[16/10] items-start justify-center overflow-hidden border-b border-border-subtle p-4">{art}</DashThemeRoot>
+                <DashThemeRoot theme={theme} mode={theme.mode === 'dark' ? 'dark' : themePreset(theme.id).preferredMode ?? mode} className="flex aspect-[16/10] items-start justify-center overflow-hidden border-b border-border-subtle p-4">{art}</DashThemeRoot>
             ) : (
                 <div className="flex aspect-[16/10] items-start justify-center overflow-hidden border-b border-border-subtle bg-surface-sunken p-4">{art}</div>
             )}
@@ -63,7 +63,7 @@ function TemplateCard({ id, title, description, audience, needs, onPick, thumb, 
                     {isNew ? <Badge variant="brand" className="shrink-0">New</Badge> : null}
                 </div>
                 <p className="text-body-sm text-fg-muted">{description}</p>
-                {audience ? <p className="text-meta text-fg-secondary">For {audience.charAt(0).toLowerCase()}{audience.slice(1)}</p> : null}
+                {audience ? <p className="text-meta text-fg-secondary">For {/^[A-Z][a-z]/.test(audience) ? audience.charAt(0).toLowerCase() + audience.slice(1) : audience}</p> : null}
                 <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
                     {chip ? <Badge variant="neutral">{chip}</Badge> : null}
                     {needs.map((n) => <Badge key={n} variant="outline">{n}</Badge>)}

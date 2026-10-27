@@ -107,8 +107,11 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
     const showTitle = widget.showTitle !== false;
     const padding = widget.style?.padding === 'none' ? 'p-0' : widget.style?.padding === 'sm' ? 'p-3' : 'p-4';
     const transparent = widget.style?.background === 'transparent';
+    const card = !(widget.style?.border === false || transparent);
     return (
         <div
+            // Themes restyle cards through this marker (dashboard-themes.css); no visual effect alone.
+            data-dash-widget={card ? (widget.style?.padding ?? 'md') : undefined}
             className={cn(
                 'group/frame relative flex h-full min-h-0 flex-col overflow-hidden',
                 transparent ? 'bg-transparent' : 'bg-surface',

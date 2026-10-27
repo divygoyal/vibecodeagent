@@ -125,7 +125,7 @@ export function compileWidget(widget: WidgetDef, ctx: CompileCtx): CompiledWidge
             const metrics = widgetMetrics(widget);
             if (!metrics.length || !c.dimensions.length) break;
             const sortRef = c.sort.by.replace(/^[dm]:/, '');
-            const wantsCompare = compareOn && (c.sortByChange || c.columns.some((col) => col.kind === 'metric' && !col.hidden && (col.showDelta || col.visual === 'delta')));
+            const wantsCompare = compareOn && (c.sortByChange || c.columns.some((col) => col.kind === 'metric' && !col.hidden && (col.showDelta || col.visual === 'delta')) || Boolean(c.rules?.some((r) => r.on === 'change')));
             queries.push({
                 ...base, part: 'rows', metrics, dimensions: c.dimensions.slice(0, 3),
                 sort: { by: metrics.includes(sortRef) || c.dimensions.includes(sortRef) ? sortRef : metrics[0], dir: c.sort.dir },

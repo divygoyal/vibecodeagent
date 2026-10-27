@@ -13,13 +13,16 @@ import { signIn } from 'next-auth/react';
 import { Copy, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { cn } from '@/lib/cn';
 import { Button, EmptyState, Skeleton } from '@/components/ui';
 import { DashboardView, useUrlControls } from '@/components/dashboard-builder/DashboardView';
 import { DashboardBrandHeader, MadeWithBadge } from '@/components/dashboard-builder/DashboardBrandHeader';
+import { TvFrame, tvRefreshMs } from '@/components/dashboard-builder/TvMode';
+import { dashRootProps } from '@/components/dashboard-builder/theme/DashTheme';
 import { fetchJson, publicPageLoader, QueryHttpError, usePageResults } from '@/components/dashboard-builder/useWidgetData';
 import { canonicalJson } from '@/lib/builder/compile';
 import { compareToParam, rangeToParam } from '@/lib/builder/dates';
-import type { DashboardDocV2, PublicDashboard } from '@/lib/builder/types';
+import type { DashboardDocV2, PublicDashboard, ThemeV2 } from '@/lib/builder/types';
 
 const keyName = (token: string) => `tc_dash_key_${token.slice(0, 12)}`;
 
@@ -62,8 +65,10 @@ export function PublicDashboard({ token, forceEmbed }: { token: string; forceEmb
         el.style.colorScheme = theme;
     }, [theme]);
 
+    // Round 2 themes: the page is the themed root (no attributes for the default look).
+    const look = pub?.doc && pub.unlocked !== false ? dashRootProps(pub.doc.theme as ThemeV2, theme) : null;
     const frame = (children: React.ReactNode) => (
-        <div data-theme={theme} className="tc-root min-h-dvh bg-canvas text-fg">
+        <div data-theme={theme} {...look?.attrs} style={look?.style} className={cn('tc-root min-h-dvh bg-canvas text-fg', look?.className)}>
             <div className={embed ? 'p-3 sm:p-4' : 'mx-auto w-full max-w-[1440px] px-4 py-6 md:px-6 md:py-8'}>{children}</div>
         </div>
     );
@@ -77,7 +82,13 @@ export function PublicDashboard({ token, forceEmbed }: { token: string; forceEmb
         return frame(<PasswordGate token={token} name={pub.name} onUnlocked={(k) => { try { sessionStorage.setItem(keyName(token), k); } catch { /* private mode */ } setUnlockKey(k); void mutate(); }} />);
     }
     if (!pub.doc) return frame(<EmptyState variant="page" title="This dashboard is no longer shared" />);
-    return frame(<Loaded token={token} pub={pub} doc={pub.doc as unknown as DashboardDocV2} unlockKey={unlockKey} embed={embed} />);
+    const doc = pub.doc as unknown as DashboardDocV2;
+    if (sp.get('tv') === '1' && !embed) {
+        const tvMode = sp.get('theme') === 'light' || sp.get('theme') === 'dark' ? theme : doc.theme.mode === 'auto' ? theme : doc.theme.mode;
+        const r = dashRootProps(doc.theme, tvMode);
+        return <Loaded token={token} pub={pub} doc={doc} unlockKey={unlockKey} embed={false} tv={{ attrs: r?.attrs ?? { 'data-theme': tvMode }, style: r?.style, className: r?.className }} />;
+    }
+    return frame(<Loaded token={token} pub={pub} doc={doc} unlockKey={unlockKey} embed={embed} dark={(look?.mode ?? theme) === 'dark'} />);
 }
 
 function PasswordGate({ token, name, onUnlocked }: { token: string; name: string; onUnlocked: (key: string) => void }) {
@@ -110,7 +121,7 @@ function PasswordGate({ token, name, onUnlocked }: { token: string; name: string
     );
 }
 
-function Loaded({ token, pub, doc, unlockKey, embed }: { token: string; pub: PublicDashboard; doc: DashboardDocV2; unlockKey: string | null; embed: boolean }) {
+function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string; pub: PublicDashboard; doc: DashboardDocV2; unlockKey: string | null; embed: boolean; dark?: boolean; tv?: { attrs: Record<string, string>; style?: React.CSSProperties; className?: string } }) {
     const allow = pub.share?.viewerControls ?? { date: false, compare: false, filters: false };
     const ctl = useUrlControls(doc, allow);
     const query = useMemo(() => {
@@ -121,7 +132,7 @@ function Loaded({ token, pub, doc, unlockKey, embed }: { token: string; pub: Pub
         for (const [k, v] of Object.entries(ctl.state.filters)) if (v.length) q.set(`f.${k}`, v.join(','));
         return q;
     }, [ctl.state]);
-    const page = usePageResults(`pub:${token}:${pub.rev}:${canonicalJson(ctl.state)}:${unlockKey ?? ''}`, publicPageLoader(token, query, unlockKey), doc.settings.autoRefreshSec ? doc.settings.autoRefreshSec * 1000 : 300_000);
+    const page = usePageResults(`pub:${token}:${pub.rev}:${canonicalJson(ctl.state)}:${unlockKey ?? ''}`, publicPageLoader(token, query, unlockKey), tv ? tvRefreshMs(doc) : doc.settings.autoRefreshSec ? doc.settings.autoRefreshSec * 1000 : 300_000);
     const rootRef = useRef<HTMLDivElement>(null);
 
     // Embeds report their height so the host page can size the iframe (PostHog-style).
@@ -147,9 +158,20 @@ function Loaded({ token, pub, doc, unlockKey, embed }: { token: string; pub: Pub
         }
     };
 
+    if (tv) {
+        const updatedAt = page.data ? Object.values(page.data.results).map((r) => (r.status === 'ok' ? r.fetchedAt : '')).filter(Boolean).sort()[0] : undefined;
+        return (
+            <TvFrame doc={doc} pageId={ctl.state.pageId} onPage={ctl.setPage} onExit={() => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); ctl.setTv(false); }}
+                resolved={page.data?.resolved} updatedAt={updatedAt} themeAttrs={tv.attrs} themeStyle={tv.style} themeClass={tv.className}>
+                <DashboardView doc={doc} mode="public" siteLabel={siteLabel} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter} allow={allow}
+                    data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)} onRetry={() => void page.mutate()} options={{}} shell="inherit" tv />
+            </TvFrame>
+        );
+    }
+
     const header = (
         <div className="flex flex-col gap-3">
-            <DashboardBrandHeader doc={doc} />
+            {doc.theme.cover?.enabled && (ctl.state.pageId ?? doc.pages[0]?.id) === doc.pages[0]?.id ? null : <DashboardBrandHeader doc={doc} dark={dark} />}
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                     <h1 className={embed ? 'truncate text-title text-fg' : 'truncate text-heading text-fg'}>{doc.name}</h1>
@@ -178,6 +200,7 @@ function Loaded({ token, pub, doc, unlockKey, embed }: { token: string; pub: Pub
                 options={{}}
                 header={header}
                 footer={pub.share?.badge ? <div className="flex justify-center pt-2"><MadeWithBadge /></div> : null}
+                shell="inherit"
             />
             {page.error ? <p className="mt-4 text-center text-body-sm text-fg-muted">{page.error instanceof Error ? page.error.message : 'Data is temporarily unavailable.'}</p> : null}
         </div>

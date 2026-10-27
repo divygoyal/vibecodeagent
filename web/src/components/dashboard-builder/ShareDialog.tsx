@@ -6,11 +6,14 @@
  * preview as viewer; iframe embed with auto-height listener; logo, company name and badge.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, ExternalLink, KeyRound, RotateCcw } from 'lucide-react';
+import { Copy, ExternalLink, KeyRound, MonitorPlay, RotateCcw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Banner, Button, Checkbox, Modal, SegmentedControl, Select, Switch, Tabs } from '@/components/ui';
+import { applyThemePreset, clientReportTheme, themeOptions } from '@/lib/builder/themes';
 import type { DashboardDocV2, ShareState } from '@/lib/builder/types';
+import { useResolvedTheme } from '@/lib/theme';
+import { BrandColorInput, ThemeGallery } from './theme/AppearanceSettings';
 import { fetchJson } from './useWidgetData';
 
 interface Props {
@@ -48,6 +51,7 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
     const [pwOpen, setPwOpen] = useState(false);
     const [embedTheme, setEmbedTheme] = useState<'light' | 'dark'>('light');
     const [embedHeight, setEmbedHeight] = useState('800');
+    const appMode = useResolvedTheme();
     const [company, setCompany] = useState(doc.theme.header.companyName ?? '');
     const [logo, setLogo] = useState(doc.theme.header.logoUrl ?? '');
     useEffect(() => {
@@ -146,6 +150,11 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
                                     <Button asChild variant="secondary" icon={ExternalLink}><a href={`/view/${share.token}?preview=1`} target="_blank" rel="noopener noreferrer">Preview as viewer</a></Button>
                                 </div>
                             </div>
+                            <div className="space-y-1.5 border-t border-border-subtle pt-3">
+                                <p className="flex items-center gap-1.5 text-body-sm font-medium text-fg"><MonitorPlay aria-hidden size={14} />TV link</p>
+                                <CopyField value={`${link}?tv=1`} label="TV link" />
+                                <p className="text-meta text-fg-muted">Full screen for an office screen: no buttons, pages rotate, data refreshes on its own.</p>
+                            </div>
                         </>
                     ) : null}
                 </div>
@@ -182,7 +191,21 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
             ) : null}
 
             {tab === 'appearance' ? (
-                <form className="space-y-4" onSubmit={(e) => {
+                <div className="space-y-4">
+                <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-body-sm font-medium text-fg">Theme</p>
+                        <Button size="sm" variant="secondary" icon={Sparkles} onClick={() => { onDocChange({ ...doc, theme: clientReportTheme(doc.theme) }); toast.success('Client report look applied'); }}>Client report preset</Button>
+                    </div>
+                    <ThemeGallery compact value={themeOptions(doc.theme).id} mode={appMode} brand={doc.theme.brand?.color} onPick={(id) => onDocChange({ ...doc, theme: applyThemePreset(doc.theme, id) })} />
+                    <p className="text-meta text-fg-muted">The dashboard behind this window updates as you pick. Shared links and embeds use the same theme.</p>
+                </div>
+                <div className="space-y-1.5">
+                    <p className="text-body-sm font-medium text-fg">Brand colour</p>
+                    <BrandColorInput value={doc.theme.brand?.color} onChange={(c) => { const brand = { ...(doc.theme.brand ?? {}), color: c }; if (!c) delete brand.color; onDocChange({ ...doc, theme: { ...doc.theme, brand: Object.keys(brand).length ? brand : undefined } }); }} />
+                </div>
+                <Switch checked={Boolean(doc.theme.cover?.enabled)} onCheckedChange={(v) => onDocChange({ ...doc, theme: { ...doc.theme, cover: { layout: 'left', title: '{{name}}', subtitle: '{{date_range}}', ...(doc.theme.cover ?? {}), enabled: v } } })} label="Cover page" description="A title page above page one and on the first PDF page. Edit the text in Dashboard settings." />
+                <form className="space-y-4 border-t border-border-subtle pt-4" onSubmit={(e) => {
                     e.preventDefault();
                     const logoOk = !logo || /^https:\/\//i.test(logo);
                     if (!logoOk) { toast.error('Logo must be an https URL'); return; }
@@ -196,9 +219,10 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
                         <input value={logo} onChange={(e) => setLogo(e.target.value.trim())} placeholder="https://…/logo.png" className="h-9 w-full rounded-control border border-border bg-surface px-3 text-body text-fg" />
                     </label>
                     <Switch checked={doc.theme.badge.show} onCheckedChange={(v) => { onDocChange({ ...doc, theme: { ...doc.theme, badge: { show: v } } }); void put({ badge: v }); }} label="Show “Made with TrafficClaw”" description="Free either way." />
-                    <p className="text-meta text-fg-muted">Colours follow the metric so they mean the same everywhere; they cannot be changed.</p>
+                    <p className="text-meta text-fg-muted">Metric colours stay the same in every theme so they mean the same everywhere.</p>
                     <div className="flex justify-end"><Button type="submit" variant="primary">Save</Button></div>
                 </form>
+                </div>
             ) : null}
         </Modal>
     );

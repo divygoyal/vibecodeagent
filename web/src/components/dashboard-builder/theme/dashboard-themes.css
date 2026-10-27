@@ -91,8 +91,9 @@
 [data-dash-theme] [data-dash-widget="md"] { padding: var(--tc-dash-card-pad); }
 
 /* Header rule under the dashboard title (Executive, Paper, Studio). */
-[data-dash-theme] [data-dash-header] { border-bottom: var(--tc-dash-header-rule); padding-bottom: 12px; }
-[data-dash-theme][data-dash-header-rule="none"] [data-dash-header] { padding-bottom: 0; }
+[data-dash-theme] [data-dash-header] { border-bottom: var(--tc-dash-header-rule); }
+:is([data-dash-theme="executive"], [data-dash-theme="paper"], [data-dash-theme="studio"]) [data-dash-header] { padding-bottom: 14px; }
+[data-dash-theme="paper"] [data-dash-header] { padding-bottom: 12px; }
 
 /* 1. Density (mirrored in densityPx() for the grid row height and gap). */
 [data-dash-density="compact"] { --tc-dash-card-pad: 12px; }
@@ -127,7 +128,7 @@
 [data-dash-font="system"] { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
 [data-dash-font="serif-headings"] { --tc-dash-font-heading: var(--font-source-serif), Georgia, "Times New Roman", serif; }
 [data-dash-font="mono-numbers"] { --tc-dash-font-num: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace; }
-[data-dash-font="serif-headings"] :is(h1, h2, [data-dash-widget] h3, [data-dash-cover-title]) { font-family: var(--tc-dash-font-heading); letter-spacing: -0.01em; font-weight: 600; }
+[data-dash-font="serif-headings"] :is(h1, h2, h3) { font-family: var(--tc-dash-font-heading); letter-spacing: -0.01em; font-weight: 600; }
 [data-dash-font="mono-numbers"] :is(.text-stat, .text-stat-lg, .tabular-nums) { font-family: var(--tc-dash-font-num); letter-spacing: -0.02em; }
 
 /* 5. Chart strokes. */
@@ -273,8 +274,8 @@
 .tc-cf-good { color: var(--tc-up); }
 .tc-cf-bad { color: var(--tc-down); }
 .tc-cf-warn { color: var(--tc-warn); }
-.tc-cf-cell { position: relative; }
-.tc-cf-cell::before { content: ""; position: absolute; inset: 2px -6px 2px -6px; border-radius: 6px; z-index: 0; }
+.tc-cf-cell { position: relative; isolation: isolate; }
+.tc-cf-cell::before { content: ""; position: absolute; inset: -2px -6px; border-radius: 6px; z-index: -1; }
 .tc-cf-cell.tc-cf-good::before { background: var(--tc-up-soft); }
 .tc-cf-cell.tc-cf-bad::before { background: var(--tc-down-soft); }
 .tc-cf-cell.tc-cf-warn::before { background: var(--tc-warn-soft); }
