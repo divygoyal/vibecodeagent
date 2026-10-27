@@ -65,9 +65,10 @@ entries for /security and /changelog, the footer.
 - [confirm] Which ChatGPT and Claude plans can add a custom connector (teardown-b FAQ #5). Not on the page.
 - [confirm] A dedicated security contact (security@…). The page uses privacy@trafficclaw.com and the contact form.
 - [confirm] Hosting provider and data location (country/region). Not on the page.
-- [confirm] Whether removing access in Google alone should count as a deletion request. The privacy policy says revoking or
-  emailing both lead to deletion within 30 days; no code reacts to a Google revoke, so /security tells people to use Settings ›
-  Danger zone or email for deletion, and says revoking stops our reads.
+- Deletion wording (judge fix 5): no code deletes accounts on a timer, so /security and the home FAQ now say what is true: on
+  request (Settings › Data & privacy → Delete account, which sends a request to the support inbox, or privacy@) we delete the
+  account and all its data; Google access can be removed at any time. The privacy policy and the Danger zone UI still say
+  "within 30 days" (not WS4 files): owner to confirm that promise or reword them.
 
 ## Findings for the owner (not changed here, outside WS4)
 - **Google refresh token reaches the browser.** `lib/auth.ts` `session()` copies `googleAccessToken`, `googleRefreshToken`,
@@ -98,3 +99,21 @@ entries for /security and /changelog, the footer.
 - Page heights: home 8,065 px desktop (live 6,784) / 13,303 px at 390 (live 10,955): the fifth card, the step visuals, What's new
   and 5 more FAQ questions add height; pricing 3,497 / 5,366 (live 3,428 / 5,132); demo 2,674 / 5,017 (live 2,222 / 4,519, the
   new closing CTA).
+
+## Judge round (2026-10-27, VERDICT: candidate 6/6, ship with fixes) — fixes on tc/r2-home
+1. Leaderboard logo "A": the preview uses the same /api/favicon path as the leaderboard. Production returns Antigravity's icon
+   (200, from its 7-day cache); from this box Google's s2 now answers 404 for antigravity.codes and the site itself does not
+   respond, so the dev server correctly fell back to the letter. Same code as live, not a regression. The recapture serves the
+   real hosts' favicons from production's /api/favicon (saved responses), as it does for the leaderboard JSON.
+   Live mobile's blank squares are lazy images below the fold in a capture that never scrolled; real scrolling loads them.
+2. "Works with" is one row at every width: on phones it scrolls sideways with a right-edge fade (smaller type, label inline),
+   and the product frame sits 16px higher (mt-8 on phones).
+3. Mobile demo banner: "Live demo · sample data, nothing is read from Google" + "Connect yours" (icon hidden on phones).
+4. Changelog: one launch note dated 2026-10-27 (background sync folded into Portfolio; "same morning", "one calm design
+   system", "equally careful dark mode" and the icon-button fix dropped or rewritten for users), plus earlier releases at their
+   commit dates (UTC): 2026-09-08 sponsor slots + audience panel (48e7b70, 1e029eb), 2026-05-11 simpler pricing (95655e9),
+   2026-05-08 in-app support (b196074), 2026-05-04 multi-site leaderboard + profile links (2bd93c0, 3d0dea6). Removed features
+   (weekly briefing page, globe, Telegram) are left out. Home "What's new": Oct 27 ×2 and Sep 8.
+5. /security: deletion reworded (see above); new "What we store" row: daily numbers for listed sites, last 190 days while the
+   site is listed (DAILY_RETENTION_DAYS); the "totals, not visitors" line now says it covers Google data and that the table
+   also lists what you create (dashboards, Ask chats).

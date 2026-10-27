@@ -59,7 +59,7 @@ export default function HomePage() {
 
             <section aria-label="Introduction" className="bg-canvas">
                 <HomeHero />
-                <div className="mx-auto mt-12 max-w-[1200px] px-4 pb-16 md:mt-16 md:px-6 md:pb-24">
+                <div className="mx-auto mt-8 max-w-[1200px] px-4 pb-16 md:mt-16 md:px-6 md:pb-24">
                     <PortfolioPreview portfolio={portfolio} />
                 </div>
             </section>

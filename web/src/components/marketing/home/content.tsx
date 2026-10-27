@@ -62,7 +62,7 @@ export const HOME_FAQ: FaqItem[] = [
     },
     {
         q: 'Can I delete my data?',
-        a: `Yes. Ask for deletion in Settings, under Danger zone, or email privacy@trafficclaw.com, and we delete your account and the data stored with it within 30 days. You can also remove ${BRAND_NAME}'s access at any time in your Google Account permissions.`,
+        a: `Yes. Ask for deletion in Settings › Data & privacy, which sends the request to our support inbox, or email privacy@trafficclaw.com. On request, we delete your account and all the data stored with it. You can also remove ${BRAND_NAME}'s access at any time in your Google Account permissions.`,
     },
 ];
 

@@ -23,7 +23,8 @@ export const metadata: Metadata = {
  * lifetimes in admin/migrations/019_add_mcp_oauth.sql, web/src/lib/mcp/config.ts and
  * admin/mcp_api.py (30-day audit log); snapshots in admin/migrations/020_add_portfolio.sql
  * and web/src/lib/portfolio/ranges.ts; caches in web/src/app/api/site/_lib/google.ts;
- * deletion in Settings > Danger zone and the privacy policy. Keep it in sync.
+ * deletion requests via Settings > Data & privacy / Danger zone (a support-inbox request, no timed purge),
+ * leaderboard daily history in admin/leaderboard_core.py (DAILY_RETENTION_DAYS = 190). Keep it in sync.
  */
 
 const SUMMARY: Array<{ icon: LucideIcon; title: string; text: string }> = [
@@ -59,6 +60,7 @@ const STORED: Array<{ what: string; why: string; kept: string }> = [
     { what: 'Connected AI apps: which sites each app may see, token and API key hashes, and a log of tool calls without their results', why: 'To check each request and show you the activity', kept: 'Tokens until they expire or you revoke them; the log for 30 days' },
     { what: 'Weekly summaries of your sites', why: 'The weekly report', kept: '26 weeks' },
     { what: 'Your leaderboard profile, only if you list a site', why: 'The public profile, with only the numbers you chose to show', kept: 'Public until you pause it; kept until you delete it' },
+    { what: 'Daily numbers for each site you list on the leaderboard', why: 'The charts, trends and rankings on its profile', kept: 'The last 190 days, while the site is listed' },
     { what: 'Google answers in memory', why: 'Speed, and to spare your Google quota', kept: 'A few minutes' },
 ];
 
@@ -138,8 +140,9 @@ export default function SecurityPage() {
             <section aria-labelledby="store" className="mt-14">
                 <SectionTitle id="store">What we store</SectionTitle>
                 <p className="mt-4 text-body-lg text-fg-secondary">
-                    Totals, not visitors: Google only gives us aggregate numbers, and that is all we keep. Each account’s data is
-                    kept separate, and every connection to TrafficClaw uses HTTPS.
+                    From Google we only ever get totals, never individual visitors, and totals are all we keep of your Google data.
+                    The table also lists what you create in the app, such as dashboards and Ask chats. Each account’s data is kept
+                    separate, and every connection to TrafficClaw uses HTTPS.
                 </p>
                 <div className="mt-6 overflow-hidden rounded-card border border-border-subtle bg-surface shadow-card">
                     <table className="w-full text-left">
@@ -281,9 +284,14 @@ export default function SecurityPage() {
                     <Trash2 aria-hidden size={20} strokeWidth={1.75} className="mt-0.5 shrink-0 text-fg-muted" />
                     <div className="min-w-0 text-body-lg text-fg-secondary">
                         <p>
-                            In the app, go to Settings › Danger zone and choose <strong className="font-medium text-fg">Delete account</strong>,
-                            or email <a href="mailto:privacy@trafficclaw.com" className="text-brand-text underline underline-offset-4 hover:text-fg">privacy@trafficclaw.com</a>.
-                            We delete your account and the data stored with it within 30 days.
+                            Ask for deletion in Settings › Data &amp; privacy (it takes you to <strong className="font-medium text-fg">Delete account</strong>,
+                            which sends the request to our support inbox), or email{' '}
+                            <a href="mailto:privacy@trafficclaw.com" className="text-brand-text underline underline-offset-4 hover:text-fg">privacy@trafficclaw.com</a>.
+                            On request, we delete your account and all the data stored with it.
+                        </p>
+                        <p className="mt-3">
+                            You can also remove our access at any time in your Google Account; we can no longer read anything from Google
+                            after that.
                         </p>
                         <p className="mt-3">
                             Want a copy first? Settings › Data &amp; privacy › <strong className="font-medium text-fg">Export my data</strong> downloads

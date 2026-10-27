@@ -1,10 +1,12 @@
 /**
  * The public changelog (/changelog) and the home page's "What's new" row.
  *
- * Written by hand from the git history of tc/integrate since 1b62be9
- * (2026-09-09): only changes a user can see, in plain words, grouped by
- * feature. The redesign shipped to trafficclaw.com on 2026-10-27
- * (4b1db9c, then 6fdf71f the same morning). Newest release first.
+ * Written by hand from the git history: only changes a user can see, in plain
+ * words, grouped by feature. Dates are real: the redesign went live on
+ * trafficclaw.com on 2026-10-27 (03:46 UTC, release 4b1db9c; background sync
+ * 6fdf71f the same day); earlier entries use their commit dates in UTC
+ * (48e7b70/1e029eb, 95655e9, b196074, 2bd93c0/3d0dea6). Features that were
+ * later removed are left out of the earlier entries. Newest release first.
  */
 
 export interface ChangeGroup {
@@ -14,7 +16,7 @@ export interface ChangeGroup {
 }
 
 export interface Release {
-    /** ISO date the release went live. */
+    /** ISO date the release went live (UTC). */
     date: string;
     /** Anchor on /changelog. */
     id: string;
@@ -26,46 +28,19 @@ export interface Release {
 export const RELEASES: Release[] = [
     {
         date: '2026-10-27',
-        id: 'fresh-portfolios',
-        title: 'Portfolios stay fresh on their own',
-        summary: 'Two follow-ups to the redesign, shipped the same morning.',
-        groups: [
-            {
-                title: 'Portfolio',
-                items: [
-                    'Your sites now sync in the background, so the portfolio is up to date when you open it. Each site refreshes about every six hours, with no setup on your side.',
-                ],
-            },
-            {
-                title: 'ChatGPT and Claude',
-                items: [
-                    'Connect AI is on for every account. Add the TrafficClaw server to ChatGPT, Claude, Cursor or VS Code from the Connect AI page.',
-                ],
-            },
-            {
-                title: 'Fixes',
-                items: [
-                    'Site pages no longer flash “We couldn’t find this site” while they load.',
-                    'Buttons with icons render correctly on every page.',
-                ],
-            },
-        ],
-    },
-    {
-        date: '2026-10-27',
         id: 'redesign',
         title: 'A new TrafficClaw: one screen for every site',
         summary:
-            'The biggest release so far. The app now opens on a portfolio of every site you own, each site has its own pages for search, traffic and what to fix next, and everything was rebuilt on one calm design system.',
+            'TrafficClaw now opens on a portfolio of every site you own. Each site has its own pages for search, traffic and what to fix next, and you can ask ChatGPT or Claude about any of them.',
         groups: [
             {
                 title: 'Portfolio',
                 items: [
                     'Every Google Analytics 4 property and Search Console site you can see becomes a card with clicks, impressions, position, users, sessions and a sparkline, paired by domain.',
-                    'A totals strip and chart for all sites, compared with the previous period.',
+                    'A totals strip and chart for all your sites, compared with the previous period.',
                     'Sort, search, star and hide sites; switch to a table; export a CSV.',
                     'Alerts when a site drops 30% or more, or stops getting traffic.',
-                    'Exact user counts for each date range (no double counting across days).',
+                    'Your sites sync in the background about every six hours, so the portfolio is ready when you open it.',
                 ],
             },
             {
@@ -100,15 +75,15 @@ export const RELEASES: Release[] = [
                     'You choose how each number is shown: exact, as a range, or hidden.',
                     'New tabs: Top, Search, Rising, New, Offers and Categories.',
                     'Public profiles with charts and audience breakdowns, plus an embeddable badge.',
-                    'Visitors can send offers for sponsorships, acquisitions or partnerships, and owners can list their own ad slots.',
+                    'Visitors can send offers for sponsorships, acquisitions or partnerships.',
                 ],
             },
             {
                 title: 'ChatGPT and Claude',
                 items: [
-                    'A hosted MCP server: connect ChatGPT, Claude, Cursor or VS Code and ask about your sites in plain English.',
+                    'Connect ChatGPT, Claude, Cursor or VS Code to TrafficClaw and ask about your sites in plain English.',
                     'You approve each app, pick which sites it can see, and can hide your search queries from it.',
-                    'Read-only tools for your portfolio, Analytics reports, realtime, Search Console, period comparisons, top movers and what to fix next.',
+                    'It can read your portfolio, Analytics reports, realtime visitors, Search Console, period comparisons, top movers and what to fix next. It cannot change anything.',
                     'Personal API keys, an activity log, and one-click revoke for each app or all of them.',
                 ],
             },
@@ -117,26 +92,84 @@ export const RELEASES: Release[] = [
                 items: [
                     'Settings in tabs: Profile, Google, Appearance, Notifications, Data and privacy, and Danger zone.',
                     'Export everything we keep about you as a JSON file, or ask for your account to be deleted.',
-                    'Weekly report settings moved to Settings › Notifications.',
                 ],
             },
             {
                 title: 'Design and phones',
                 items: [
-                    'A new light design with an equally careful dark mode. Each metric keeps one colour everywhere: clicks are blue, impressions purple, users indigo.',
-                    'A ⌘K command palette, a bottom tab bar on phones, and larger tap targets on touch screens.',
+                    'A cleaner look in light and dark mode. Each metric keeps its colour everywhere (clicks blue, impressions purple, users indigo), so charts read at a glance.',
+                    'Press ⌘K to jump to any site or page. On phones, a bottom tab bar and larger tap targets.',
                 ],
             },
             {
                 title: 'Public site',
                 items: [
-                    'A new home page, a live demo with sample sites (no sign-in), a simpler pricing page and restyled free SEO tools.',
+                    'A new home page, a live demo with sample sites (no sign-in), a simpler pricing page and refreshed free SEO tools.',
                 ],
             },
             {
                 title: 'Removed',
                 items: [
                     'The Telegram bot, the X and Reddit pages, the 3D globe and the share studio. Old links redirect to their closest page.',
+                ],
+            },
+        ],
+    },
+    {
+        date: '2026-09-08',
+        id: 'sponsorships',
+        title: 'Sponsor slots on the leaderboard',
+        summary: 'Owners of verified sites can sell their own ad placements, and buyers can see who a site reaches before asking.',
+        groups: [
+            {
+                title: 'Leaderboard',
+                items: [
+                    'List your own ad slots on a verified profile: name each one, set your price, billing period and availability, and add a preview.',
+                    'Buyers request a specific slot from your profile, and you track each request until it is paid.',
+                    'Profiles gained an audience panel: countries, channels, devices, top pages and top search queries.',
+                    'One page lists every open sponsor slot across verified sites.',
+                ],
+            },
+        ],
+    },
+    {
+        date: '2026-05-11',
+        id: 'simpler-pricing',
+        title: 'Simpler pricing',
+        summary: 'Everything stays free. Paid plans now only add Ask messages.',
+        groups: [
+            {
+                title: 'Pricing',
+                items: [
+                    'Every account starts with 5 free Ask messages. Growth ($19 a month) adds 50 a month and Pro ($29 a month) adds 100.',
+                    'The Starter plan was retired.',
+                ],
+            },
+        ],
+    },
+    {
+        date: '2026-05-08',
+        id: 'support',
+        title: 'Support inside the app',
+        summary: 'Talk to us without leaving TrafficClaw.',
+        groups: [
+            {
+                title: 'Support',
+                items: ['A Support page with one ongoing thread to the team, and a badge when we reply.'],
+            },
+        ],
+    },
+    {
+        date: '2026-05-04',
+        id: 'leaderboard-profiles',
+        title: 'More than one site on the leaderboard',
+        summary: 'List every site you run, each with its own profile.',
+        groups: [
+            {
+                title: 'Leaderboard',
+                items: [
+                    'Add more than one site to the leaderboard.',
+                    'Readable profile links (/leaderboard/your-site), founder and contact details, and badge snippets to embed your listing.',
                 ],
             },
         ],
@@ -158,9 +191,9 @@ export const HOME_HIGHLIGHTS: Array<{ date: string; title: string; text: string;
         href: '/changelog#redesign',
     },
     {
-        date: '2026-10-27',
-        title: 'Background sync',
-        text: 'Your portfolio refreshes on its own, about every six hours.',
-        href: '/changelog#fresh-portfolios',
+        date: '2026-09-08',
+        title: 'Sponsor slots on the leaderboard',
+        text: 'Verified owners sell their own ad placements at their own price.',
+        href: '/changelog#sponsorships',
     },
 ];

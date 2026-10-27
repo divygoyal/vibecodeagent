@@ -48,13 +48,17 @@ export function HomeHero() {
                 <span aria-hidden>·</span>
                 <span>No site limit</span>
             </p>
-            <div className="mt-8 flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-4">
-                <p className="text-meta text-fg-muted">Works with</p>
-                <ul aria-label="Works with" className="flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-body-sm font-medium text-fg-secondary">
-                    {WORKS_WITH.map((name) => (
-                        <li key={name} className="whitespace-nowrap">{name}</li>
-                    ))}
-                </ul>
+            {/* One row at every width: on phones it scrolls sideways (fade at the right edge) instead of wrapping,
+                so the product picture stays high on the first screen. */}
+            <div className="-mx-4 mt-5 overflow-x-auto px-4 [mask-image:linear-gradient(to_right,black_88%,transparent)] [scrollbar-width:none] sm:mx-0 sm:mt-8 sm:overflow-visible sm:px-0 sm:[mask-image:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex w-max items-center gap-3 sm:mx-auto sm:gap-4">
+                    <p className="shrink-0 text-meta text-fg-muted">Works with</p>
+                    <ul aria-label="Works with" className="flex items-center gap-x-4 text-meta font-medium whitespace-nowrap text-fg-secondary sm:gap-x-5 sm:text-body-sm">
+                        {WORKS_WITH.map((name) => (
+                            <li key={name}>{name}</li>
+                        ))}
+                    </ul>
+                </div>
             </div>
         </div>
     );
