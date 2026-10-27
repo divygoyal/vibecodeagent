@@ -234,8 +234,11 @@ export async function fetchReportData(
     accessToken: string,
     propertyId: string | undefined,
     siteUrl: string,
-    period: ReportPeriod
+    period: ReportPeriod,
+    /** GA4 token when the property sits in another Google account than the site (linked accounts). */
+    gaAccessToken?: string,
 ): Promise<ReportRawData> {
+    const gaToken = gaAccessToken || accessToken;
     const { startDate, endDate, prevStartDate, prevEndDate } = period;
     const hasGa4 = Boolean(propertyId);
     const reportMode: ReportMode = hasGa4 ? 'full' : 'gsc_only';
@@ -262,16 +265,16 @@ export async function fetchReportData(
         gscPagesCurrent,
         gscPagesPrev,
     ] = await Promise.all([
-        hasGa4 ? runGAReport(accessToken, propertyId!, ['date'], ga4Metrics, startDate, endDate, 100) : Promise.resolve(null),
-        hasGa4 ? runGAReport(accessToken, propertyId!, ['date'], ga4MetricsShort, prevStartDate, prevEndDate, 100) : Promise.resolve(null),
-        hasGa4 ? runGAReport(accessToken, propertyId!, ['sessionDefaultChannelGroup'], ['sessions', 'activeUsers'], startDate, endDate, 20, 'sessions') : Promise.resolve(null),
-        hasGa4 ? runGAReport(accessToken, propertyId!, ['sessionDefaultChannelGroup'], ['sessions', 'activeUsers'], prevStartDate, prevEndDate, 20, 'sessions') : Promise.resolve(null),
-        hasGa4 ? runGAReport(accessToken, propertyId!, ['pagePath'], ['sessions', 'activeUsers', 'bounceRate', 'averageSessionDuration'], startDate, endDate, 100, 'sessions') : Promise.resolve(null),
-        hasGa4 ? runGAReport(accessToken, propertyId!, ['pagePath'], ['sessions', 'activeUsers', 'bounceRate'], prevStartDate, prevEndDate, 100, 'sessions') : Promise.resolve(null),
-        hasGa4 ? runGAReport(accessToken, propertyId!, ['country'], ['activeUsers', 'sessions'], startDate, endDate, 30, 'activeUsers') : Promise.resolve(null),
-        hasGa4 ? runGAReport(accessToken, propertyId!, ['country'], ['activeUsers', 'sessions'], prevStartDate, prevEndDate, 30, 'activeUsers') : Promise.resolve(null),
-        hasGa4 ? runGAReport(accessToken, propertyId!, ['deviceCategory'], ['sessions', 'activeUsers'], startDate, endDate, 5, 'sessions') : Promise.resolve(null),
-        hasGa4 ? runGAReport(accessToken, propertyId!, ['deviceCategory'], ['sessions', 'activeUsers'], prevStartDate, prevEndDate, 5, 'sessions') : Promise.resolve(null),
+        hasGa4 ? runGAReport(gaToken, propertyId!, ['date'], ga4Metrics, startDate, endDate, 100) : Promise.resolve(null),
+        hasGa4 ? runGAReport(gaToken, propertyId!, ['date'], ga4MetricsShort, prevStartDate, prevEndDate, 100) : Promise.resolve(null),
+        hasGa4 ? runGAReport(gaToken, propertyId!, ['sessionDefaultChannelGroup'], ['sessions', 'activeUsers'], startDate, endDate, 20, 'sessions') : Promise.resolve(null),
+        hasGa4 ? runGAReport(gaToken, propertyId!, ['sessionDefaultChannelGroup'], ['sessions', 'activeUsers'], prevStartDate, prevEndDate, 20, 'sessions') : Promise.resolve(null),
+        hasGa4 ? runGAReport(gaToken, propertyId!, ['pagePath'], ['sessions', 'activeUsers', 'bounceRate', 'averageSessionDuration'], startDate, endDate, 100, 'sessions') : Promise.resolve(null),
+        hasGa4 ? runGAReport(gaToken, propertyId!, ['pagePath'], ['sessions', 'activeUsers', 'bounceRate'], prevStartDate, prevEndDate, 100, 'sessions') : Promise.resolve(null),
+        hasGa4 ? runGAReport(gaToken, propertyId!, ['country'], ['activeUsers', 'sessions'], startDate, endDate, 30, 'activeUsers') : Promise.resolve(null),
+        hasGa4 ? runGAReport(gaToken, propertyId!, ['country'], ['activeUsers', 'sessions'], prevStartDate, prevEndDate, 30, 'activeUsers') : Promise.resolve(null),
+        hasGa4 ? runGAReport(gaToken, propertyId!, ['deviceCategory'], ['sessions', 'activeUsers'], startDate, endDate, 5, 'sessions') : Promise.resolve(null),
+        hasGa4 ? runGAReport(gaToken, propertyId!, ['deviceCategory'], ['sessions', 'activeUsers'], prevStartDate, prevEndDate, 5, 'sessions') : Promise.resolve(null),
         gscQuery(accessToken, siteUrl, ['date'], startDate, endDate, 1000),
         gscQuery(accessToken, siteUrl, ['date'], prevStartDate, prevEndDate, 1000),
         gscQuery(accessToken, siteUrl, ['query'], startDate, endDate, 500),

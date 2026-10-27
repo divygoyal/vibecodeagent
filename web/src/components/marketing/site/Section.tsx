@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 
-import { Pill } from '@/components/ui';
 import { cn } from '@/lib/cn';
 
 /** Page section with the marketing rhythm: py-24 desktop / py-16 mobile, 1200px content (DESIGN 5.16). */
@@ -30,7 +29,11 @@ export function Section({
     );
 }
 
-/** Eyebrow pill + section title (display-sm) + lead description. */
+/**
+ * Eyebrow + section title (display-sm) + lead description. The eyebrow is plain
+ * pine text (round 2, critique #15): one eyebrow style on every marketing page,
+ * no grey pill above every heading.
+ */
 export function SectionHeading({
     id,
     eyebrow,
@@ -50,7 +53,7 @@ export function SectionHeading({
 }) {
     return (
         <div className={cn(align === 'center' ? 'mx-auto max-w-[720px] text-center' : 'max-w-[720px]', className)}>
-            {eyebrow ? <Pill tone="neutral" className="mb-4">{eyebrow}</Pill> : null}
+            {eyebrow ? <p className="mb-3 text-body-sm font-medium text-brand-text">{eyebrow}</p> : null}
             <H id={id} className={cn('text-balance text-fg', H === 'h1' ? 'text-display-sm md:text-display' : 'text-[1.875rem] leading-9 font-semibold tracking-[-0.025em] md:text-display-sm')}>
                 {title}
             </H>
@@ -71,8 +74,8 @@ export function BrowserFrame({ url, children, className, bodyClassName }: { url:
                     <span className="size-2.5 rounded-full bg-border" />
                     <span className="size-2.5 rounded-full bg-border" />
                 </div>
-                <div className="mx-auto flex h-6 min-w-0 max-w-[360px] flex-1 items-center justify-center truncate rounded-full bg-subtle px-3 font-mono text-caption text-fg-muted">
-                    {url}
+                <div className="mx-auto flex h-6 min-w-0 max-w-[360px] flex-1 items-center justify-center rounded-full bg-subtle px-3 font-mono text-caption text-fg-muted">
+                    <span className="truncate">{url}</span>
                 </div>
                 <div aria-hidden className="w-[42px]" />
             </div>

@@ -2,7 +2,6 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import Script from 'next/script';
 import { usePathname } from 'next/navigation';
 import { Suspense, useEffect, type ReactNode } from 'react';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
@@ -103,7 +102,7 @@ function ShellBody({ children }: { children: ReactNode }) {
     // Setup is a focused layout: logo + "Exit setup", no sidebar (DESIGN 5.3).
     if (isSetup) {
         return (
-            <div className="tc-root min-h-dvh bg-canvas text-fg">
+            <div className="tc-root tc-app min-h-dvh bg-canvas text-fg">
                 <header className="flex h-14 items-center justify-between px-4 md:px-6">
                     <Link href="/dashboard" className="flex items-center gap-2"><BrandMark size={24} /><Wordmark /></Link>
                     <Button asChild variant="ghost" size="sm"><Link href="/dashboard">Exit setup</Link></Button>
@@ -114,20 +113,7 @@ function ShellBody({ children }: { children: ReactNode }) {
     }
 
     return (
-        <div className="tc-root flex min-h-dvh bg-canvas text-fg">
-            {/* Tawk.to live chat: dashboard only (moved from the old layout). */}
-            <Script id="tawk-init" strategy="afterInteractive">
-                {`var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
-                  Tawk_API.customStyle={visibility:{desktop:{position:'br',xOffset:20,yOffset:20},mobile:{position:'br',xOffset:12,yOffset:84}}};
-                  (function(){
-                    var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
-                    s1.async=true;
-                    s1.src='https://embed.tawk.to/6a065190bb83b51c35dd7459/1jokat7nr';
-                    s1.charset='UTF-8';
-                    s1.setAttribute('crossorigin','*');
-                    s0.parentNode.insertBefore(s1,s0);
-                  })();`}
-            </Script>
+        <div className="tc-root tc-app flex min-h-dvh bg-canvas text-fg">
             {/* The aside is a full-height column (its surface and border run the
                 whole page, also in full-page screenshots); the sidebar inside it
                 sticks to the viewport and scrolls on its own. */}

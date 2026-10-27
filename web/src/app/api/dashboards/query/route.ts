@@ -9,7 +9,11 @@ import type { ControlDef, ControlState, SourceRef } from '@/lib/builder/types';
 
 export const dynamic = 'force-dynamic';
 
-const controlDefsSchema = z.array(z.looseObject({ id: z.string().max(64), type: z.enum(['date', 'filter', 'site', 'metric']) })).max(30);
+const controlDefsSchema = z.array(z.union([
+    // Round 2 dashboard variables: strict, their values reach Google filters.
+    z.object({ id: z.string().min(1).max(32).regex(/^[a-z0-9_]+$/), type: z.literal('variable'), label: z.string().max(60), kind: z.enum(['text', 'regex', 'number']), default: z.string().max(300), viewerCanChange: z.boolean() }),
+    z.looseObject({ id: z.string().max(64), type: z.enum(['date', 'filter', 'site', 'metric']) }),
+])).max(30);
 
 /**
  * POST /api/dashboards/query: evaluate widgets (BUILDER.md 8.1-8.2).

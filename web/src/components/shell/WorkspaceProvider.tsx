@@ -12,15 +12,20 @@ import {
 } from '@/lib/dashboardSelection';
 import { isRangePreset, LEGACY_RANGES, toLegacyRange } from '@/lib/dateRange';
 import { DEMO_DOMAIN_LABEL } from '@/lib/demoWorkspace';
-import { buildSiteDirectory, PAIRS_KEY, siteForSelection } from '@/lib/sites/siteDirectory';
-import { useConnections, usePropertyList, useSiteList } from '@/lib/useDashboardData';
+import { buildSiteDirectory, DIRECTORY_KEY, DIRECTORY_STORE_KEY, siteForSelection } from '@/lib/sites/siteDirectory';
+import type { DirectoryPayload } from '@/lib/sites/directoryTypes';
+import { useConnections } from '@/lib/useDashboardData';
 import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
 import { useChatStore } from '@/stores/chatStore';
 import { WorkspaceContext, type WorkspaceSaveInput } from './workspaceContext';
 
-async function pairsFetcher(url: string): Promise<{ pairs: Record<string, string | null> }> {
+/** GET /api/sites/directory (live or ?source=store). A failure is an error for SWR; the caller decides what to show. */
+async function directoryFetcher(url: string): Promise<DirectoryPayload> {
     const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return { pairs: {} };
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || `Could not load your sites (${res.status})`);
+    }
     return res.json();
 }
 
@@ -36,15 +41,6 @@ function writeSiteCookie(host: string | null) {
     } else {
         document.cookie = `${SITE_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
     }
-}
-
-function getInventoryErrorMessage(error: unknown) {
-    if (error && typeof error === 'object' && 'info' in error) {
-        const info = (error as { info?: { error?: string } }).info;
-        if (info?.error) return info.error;
-    }
-    if (error instanceof Error) return error.message;
-    return null;
 }
 
 const LEGACY_SET = new Set<string>(LEGACY_RANGES);
@@ -325,6 +321,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                 hasGoogleConnection: false,
                 siteDirectory: [],
                 siteDirectoryLoading: true,
+                googleReauth: false,
                 welcomeSeen,
                 markWelcomeSeen,
             }}
@@ -360,23 +357,51 @@ interface InventoryLayerProps {
 }
 
 /**
- * Second layer: the inventory hooks use useRegisteredSWR, which reads
- * isRegistered from the context above, so they must sit inside it.
+ * Second layer: the site inventory (Google's Search Console sites and GA4 properties, plus the stored pairing).
+ *
+ * One request to /api/sites/directory, fired as soon as the user is signed in: it loads both Google lists in
+ * parallel on the server (cached per user) and the pairing alongside, instead of /api/connections, then each
+ * list, then the pairing, one after the other. A second, fast request (?source=store) answers from the
+ * portfolio store alone, so a site page can resolve its host and start fetching while Google is still
+ * answering; once the live answer is in, it replaces the fast one.
  */
 function InventoryLayer({ children, user, pathname, isSetupRoute, router, getUserKey, selectedProperty, selectedSite, setSelectedProperty, setSelectedSite }: InventoryLayerProps) {
     const parent = useWorkspaceParent();
     const { status: sessionStatus } = useSession();
-    const { hasGoogleConnection, isLoading: connectionsLoading } = useConnections();
-    // Until the session and /api/connections answer we do not know whether Google is
-    // connected (always the case in the server render and the first client render).
-    const connectionUnknown = !hasGoogleConnection && (sessionStatus === 'loading' || connectionsLoading);
-    const { sites: gscSites, isLoading: siteInventoryLoading, hasLoaded: siteInventoryLoaded, error: siteErr } = useSiteList(hasGoogleConnection);
-    const { properties, isLoading: propertyInventoryLoading, hasLoaded: propertyInventoryLoaded, error: propErr } = usePropertyList(hasGoogleConnection);
+    const { hasGoogleConnection: connectionRows, isLoading: connectionsLoading } = useConnections();
+    const signedIn = sessionStatus === 'authenticated';
 
-    const typedSites = gscSites as SiteOption[];
-    const typedProperties = properties as PropertyOption[];
-    const siteInventoryError = getInventoryErrorMessage(siteErr);
-    const propertyInventoryError = getInventoryErrorMessage(propErr);
+    const live = useSWR<DirectoryPayload>(signedIn ? DIRECTORY_KEY : null, directoryFetcher, {
+        revalidateOnFocus: false,
+        dedupingInterval: 60_000,
+        keepPreviousData: true,
+        errorRetryCount: 2,
+        errorRetryInterval: 3_000,
+    });
+    const fast = useSWR<DirectoryPayload>(signedIn ? DIRECTORY_STORE_KEY : null, directoryFetcher, {
+        revalidateOnFocus: false,
+        dedupingInterval: 60_000,
+        keepPreviousData: true,
+        shouldRetryOnError: false,
+    });
+    const liveData = live.data;
+    const liveFailed = Boolean(live.error) && !liveData;
+
+    // Google connected: an admin OAuth row, a token in the session, or the directory itself saying so.
+    const hasGoogleConnection = connectionRows || Boolean(liveData?.connected);
+    // Until the session and the directory answer we do not know whether Google is connected
+    // (always the case in the server render and the first client render).
+    const connectionUnknown = !hasGoogleConnection && (sessionStatus === 'loading' || connectionsLoading || (signedIn && !liveData && !liveFailed));
+    const siteInventoryLoaded = liveData !== undefined;
+    const propertyInventoryLoaded = siteInventoryLoaded;
+    const siteInventoryLoading = signedIn && !siteInventoryLoaded && !liveFailed;
+    const propertyInventoryLoading = siteInventoryLoading;
+
+    const typedSites = useMemo(() => (liveData?.sites ?? []) as SiteOption[], [liveData]);
+    const typedProperties = useMemo(() => (liveData?.properties ?? []) as PropertyOption[], [liveData]);
+    const failureText = liveFailed ? (live.error instanceof Error ? live.error.message : 'Could not load your sites') : null;
+    const siteInventoryError = liveData?.errors?.sites?.message ?? failureText;
+    const propertyInventoryError = liveData?.errors?.properties?.message ?? failureText;
 
     const selection = useMemo(() => resolveDashboardSelection({
         selectedSite,
@@ -397,23 +422,29 @@ function InventoryLayer({ children, user, pathname, isSetupRoute, router, getUse
         && !siteInventoryError && !propertyInventoryError
         && typedSites.length === 0 && typedProperties.length === 0;
 
-    // The pairing the portfolio stored (stream URIs + manual overrides), so the switcher,
-    // setup and site pages pair sites exactly like the portfolio and the MCP tools.
-    const { data: pairsData } = useSWR<{ pairs: Record<string, string | null> }>(
-        user && hasGoogleConnection ? PAIRS_KEY : null,
-        pairsFetcher,
-        { revalidateOnFocus: false, dedupingInterval: 60_000 },
-    );
-    const storedPairs = pairsData?.pairs;
-    const siteDirectory = useMemo(() => buildSiteDirectory({
+    // The directory: the live one once Google has answered (the pairing the portfolio stored decides the pairs,
+    // so the switcher, setup and site pages pair sites exactly like the portfolio and the MCP tools); until then,
+    // or when Google could not list anything, what the portfolio store knows. Same builder, same route keys.
+    const liveDirectory = useMemo(() => (liveData ? buildSiteDirectory({
         sites: typedSites,
         properties: typedProperties,
-        pairs: storedPairs,
-    }), [typedSites, typedProperties, storedPairs]);
-    // Loading while that is unknown too: otherwise /dashboard/s/<host> first paints
-    // "We couldn't find <host>" and the tc_site cookie is cleared on every page load.
+        pairs: liveData.pairs,
+    }) : []), [liveData, typedSites, typedProperties]);
+    const fastData = fast.data;
+    const fastDirectory = useMemo(() => (fastData ? buildSiteDirectory({
+        sites: fastData.sites,
+        properties: fastData.properties,
+        pairs: fastData.pairs,
+    }) : []), [fastData]);
+    const googleListedNothing = Boolean(liveData?.errors?.sites) && Boolean(liveData?.errors?.properties);
+    // Revoked / expired Google token: the directory says so with the code lib/googleErrors emits (google_reauth).
+    const googleReauth = liveData?.errors?.sites?.code === 'google_reauth' || liveData?.errors?.properties?.code === 'google_reauth';
+    const siteDirectory = liveData && !googleListedNothing ? liveDirectory : fastDirectory;
+    // Loading until Google has answered (or failed): a host the portfolio store has not seen yet must not first
+    // paint "We couldn't find <host>", and the tc_site cookie must not be cleared on every page load.
+    // A page that finds its site in `siteDirectory` does not have to wait for this (SiteRouteGuard).
     const siteDirectoryLoading = connectionUnknown
-        || (hasGoogleConnection && !(siteInventoryLoaded && propertyInventoryLoaded) && !(siteInventoryError && propertyInventoryError));
+        || (hasGoogleConnection && !siteInventoryLoaded && !liveFailed);
 
     // Stale saved selection: old single-site pages send the user to the picker.
     // Portfolio and /dashboard/s/[host] pick the site themselves, so they never redirect.
@@ -479,6 +510,7 @@ function InventoryLayer({ children, user, pathname, isSetupRoute, router, getUse
                 hasGoogleConnection,
                 siteDirectory,
                 siteDirectoryLoading,
+                googleReauth,
             }}
         >
             {children}

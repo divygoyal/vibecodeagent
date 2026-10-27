@@ -189,7 +189,7 @@ export function GoalsPanel() {
                                     <div><dt className="text-meta text-fg-muted">Sessions</dt><dd className="text-stat text-fg">{fmtFull(g.summary.totalSessions)}</dd></div>
                                 </dl>
                                 {g.explanation ? <p className="text-body-sm text-fg-secondary">{g.explanation}</p> : null}
-                                <ChartCard title="Conversions per day" height="compact" state={g.trend.length ? 'ready' : 'empty'} className="!p-0 !border-0 !shadow-none">
+                                <ChartCard title="Conversions per day" height="compact" state={g.trend.length ? 'ready' : 'empty'} bare>
                                     <TimeSeriesChart data={g.trend as unknown as Record<string, number | string>[]} series={[{ metric: 'conversions', key: 'conversions', label: 'Conversions' }]} height={200} ariaLabel={`${current.item.name} conversions per day`} />
                                 </ChartCard>
                                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -379,7 +379,7 @@ export function FunnelsTab() {
                                 {f.biggestDrop?.from ? (
                                     <p className="text-body-sm text-fg-secondary">Biggest drop: <span className="font-medium text-fg">{f.biggestDrop.from} → {f.biggestDrop.to}</span> ({f.biggestDrop.rate.toFixed(1)}% leave here).</p>
                                 ) : null}
-                                <ChartCard title="Completions per day" height="compact" state={f.trend.length ? 'ready' : 'empty'} className="!p-0 !border-0 !shadow-none">
+                                <ChartCard title="Completions per day" height="compact" state={f.trend.length ? 'ready' : 'empty'} bare>
                                     <TimeSeriesChart data={f.trend as unknown as Record<string, number | string>[]} series={[{ metric: 'conversions', key: 'completions', label: 'Completions' }]} height={200} ariaLabel="Funnel completions per day" />
                                 </ChartCard>
                             </div>

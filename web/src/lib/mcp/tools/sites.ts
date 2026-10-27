@@ -3,7 +3,7 @@ import { previousPeriod, resolvePeriod, type Period } from '../dates';
 import { ToolError } from '../errors';
 import { deltaPct, fmtDelta, fmtInt, fmtNum, headerLine, render, renderJson, type Cell } from '../format';
 import { resolveSite, type SiteRecord } from '../siteResolver';
-import { dateRangeArg, defineTool, formatArg } from '../toolkit';
+import { dateRangeArg, defineTool, formatArg, J } from '../toolkit';
 import { ga4Totals, gscTotals, mapLimit, type GscTotals } from './common';
 
 export const listSites = defineTool({
@@ -18,6 +18,7 @@ export const listSites = defineTool({
     cost: 1,
     invoking: 'Listing your sites…',
     invoked: 'Sites listed',
+    output: { data: 'table', props: { counts: J.obj({ total: J.int, paired: J.int, ga4_only: J.int, gsc_only: J.int }), returned: J.int } },
     async run(args, ctx) {
         const catalog = await ctx.catalog({ refresh: args.refresh });
         if (catalog.errors.ga4) ctx.warn(`GA4 properties could not be listed (${catalog.errors.ga4.status}): ${ctx.san.text(catalog.errors.ga4.message, 160, { pii: false })}`);
@@ -53,7 +54,7 @@ export const listSites = defineTool({
         ];
         const out = render(header, [{ columns: ['site_id', 'ga4_property', 'ga4_name', 'gsc_property', 'gsc_permission', 'paired_by'], rows }],
             [sites.length > capped.length ? `# showing ${capped.length} of ${sites.length}; pass query to narrow` : '', rows.length ? ctx.note() : '']);
-        return { text: out.text, rows: out.rowsReturned };
+        return { text: out.text, rows: out.rowsReturned, structured: { counts, returned: out.rowsReturned, table: out.text, truncated: out.truncated || sites.length > capped.length } };
     },
 });
 
@@ -83,6 +84,17 @@ export const portfolioSummary = defineTool({
     cost: (a) => 4 + 0.5 * Math.min(a.site_ids?.length ?? 50, 100),
     invoking: 'Checking your sites…',
     invoked: 'Portfolio checked',
+    output: {
+        data: 'format',
+        props: {
+            period: J.obj({ ga4: J.range, gsc: J.range }),
+            compare: J.orNull(J.obj({ ga4: J.range, gsc: J.range })),
+            sites_returned: J.int,
+            sites_total: J.int,
+            data_through: J.obj({ ga4: J.str, gsc: J.str }),
+            incomplete_sites: J.strs,
+        },
+    },
     async run(args, ctx) {
         const catalog = await ctx.catalog();
         let targets: SiteRecord[];
@@ -202,7 +214,7 @@ export const portfolioSummary = defineTool({
         };
         if (args.format === 'json') {
             const j = renderJson([{ columns, rows }], envelope);
-            return { text: j.text, rows: j.rowsReturned };
+            return { text: j.text, rows: j.rowsReturned, structured: { ...envelope, ...j.data, truncated: j.truncated || rowsData.length > shown.length } };
         }
         const header = [...ctx.banner(), headerLine([
             'portfolio_summary',
@@ -217,6 +229,6 @@ export const portfolioSummary = defineTool({
             '# TOTAL sums sessions, key events, clicks and impressions across all compared sites; CTR and position are impression-weighted.',
         ];
         const out = render(header, [{ columns, rows }], footer);
-        return { text: out.text, rows: out.rowsReturned };
+        return { text: out.text, rows: out.rowsReturned, structured: { ...envelope, table: out.text, truncated: out.truncated || rowsData.length > shown.length } };
     },
 });

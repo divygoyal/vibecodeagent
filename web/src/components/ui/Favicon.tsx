@@ -23,8 +23,8 @@ function cleanHost(input: string): string {
 
 const RADIUS: Record<FaviconSize, string> = {
     16: 'rounded-[4px]',
-    20: 'rounded-[4px]',
-    24: 'rounded-md',
+    20: 'rounded-badge',
+    24: 'rounded-badge',
     32: 'rounded-md ring-1 ring-border-subtle',
     64: 'rounded-xl ring-1 ring-border-subtle',
 };
@@ -53,7 +53,8 @@ export function Favicon({ host, size = 20, className }: FaviconProps) {
             <span
                 aria-hidden
                 className={cn(box, 'bg-subtle font-semibold text-fg-secondary')}
-                style={{ width: size, height: size, fontSize: Math.max(9, Math.round(size * 0.5)) }}
+                // Never under the 11px floor (critique #10): 11px in 16/20px tiles, half the tile above.
+                style={{ width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.5)), lineHeight: 1 }}
             >
                 {(h[0] ?? '?').toUpperCase()}
             </span>

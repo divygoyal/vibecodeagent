@@ -3,10 +3,10 @@
 import type { ReactNode } from 'react';
 
 import { fmtDateRange } from '@/lib/format';
-import { Badge } from '@/components/ui/Badge';
 import { Favicon } from '@/components/ui/Favicon';
 import { DateRangeControl, useDateRange } from '@/components/shell/DateRangeControl';
 import { PageHeader } from '@/components/shell/PageHeader';
+import { PeriodStepper } from './chart/ChartExtras';
 import { useSite } from './useSiteData';
 
 export interface SiteHeaderProps {
@@ -25,7 +25,7 @@ export interface SiteHeaderProps {
     title?: ReactNode;
 }
 
-/** Site page header: favicon + host + source badges, range facts, date range control last. */
+/** Site page header: favicon + host, range facts, date range control last (no source badges: the subtitle names the source). */
 export function SiteHeader({ section, source, search, actions, tabs, noRange, backHref, title }: SiteHeaderProps) {
     const { site, label, gsc } = useSite();
     const dr = useDateRange();
@@ -42,17 +42,16 @@ export function SiteHeader({ section, source, search, actions, tabs, noRange, ba
                     {section ? <span className="font-normal text-fg-muted"> · {section}</span> : null}
                 </>
             )}
-            badges={site ? (
-                <>
-                    {site.gscKind ? <Badge>{site.gscKind === 'domain' ? 'Domain' : 'Prefix'}</Badge> : null}
-                    {site.ga4PropertyId ? <Badge>GA4</Badge> : null}
-                </>
-            ) : undefined}
             subtitle={facts.length ? facts.map((f, i) => <span key={i}>{i > 0 ? ' · ' : ''}{f}</span>) : undefined}
             actions={actions || !noRange ? (
                 <>
                     {actions}
-                    {noRange ? null : <DateRangeControl searchOnly={search} />}
+                    {noRange ? null : (
+                        <span className="flex shrink-0 items-center gap-1">
+                            <PeriodStepper search={search} />
+                            <DateRangeControl searchOnly={search} />
+                        </span>
+                    )}
                 </>
             ) : undefined}
             tabs={tabs}

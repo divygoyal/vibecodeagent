@@ -22,6 +22,8 @@ Everything is free with no site limit: the portfolio, per-site traffic and searc
 - [Sponsor slots](${SITE_URL}/sponsor): labelled sponsor placements on the leaderboard
 - [Free SEO tools](${SITE_URL}/tools): no sign-up tools
 ${FREE_TOOLS.map((t) => `  - [${t.title}](${SITE_URL}/tools/${t.slug}): ${t.short}`).join('\n')}
+- [Security and data](${SITE_URL}/security): exactly what ${BRAND_NAME} reads (read-only scopes), what it stores and how, what it never does, how to revoke access and delete data
+- [Changelog](${SITE_URL}/changelog): what shipped, newest first
 - [About](${SITE_URL}/about): who it is for and how ${BRAND_NAME} makes money
 - [Contact](${SITE_URL}/contact): contact form
 - [Privacy policy](${SITE_URL}/privacy): Google user data (Limited Use), the public leaderboard and connected AI apps

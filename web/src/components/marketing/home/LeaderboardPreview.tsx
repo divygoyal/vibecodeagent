@@ -10,6 +10,7 @@ import { fmtCompact } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { Section, SectionHeading } from '../site/Section';
 import { SiteIcon } from '../site/SiteIcon';
+import { fetchProofCounts, proofItems, type ProofItem } from './proof';
 
 /** One row, normalised from either the v3 board (`rows`) or the legacy list (`entries`). */
 interface PreviewRow {
@@ -87,9 +88,13 @@ function Delta({ pct }: { pct: number | null }) {
  * Live leaderboard teaser for the home page. Reads the public leaderboard API;
  * renders nothing at all (no section) until real rows arrive, and nothing when
  * the board is empty or unavailable. Never shows placeholder rows.
+ *
+ * Social proof (round 2): live counts of listed and owner-verified sites from
+ * the same API, each shown only above its threshold (proof.ts), never invented.
  */
 export function LeaderboardPreview() {
     const [rows, setRows] = useState<PreviewRow[] | null>(null);
+    const [proof, setProof] = useState<ProofItem[]>([]);
 
     useEffect(() => {
         const ctrl = new AbortController();
@@ -97,6 +102,9 @@ export function LeaderboardPreview() {
             .then((res) => (res.ok ? res.json() : null))
             .then((data) => setRows(data ? normalise(data).filter((r) => r.name) : []))
             .catch(() => { /* aborted or offline: stay hidden */ });
+        fetchProofCounts(ctrl.signal)
+            .then((counts) => setProof(proofItems(counts)))
+            .catch(() => { /* aborted or offline: no proof row */ });
         return () => ctrl.abort();
     }, []);
 
@@ -112,6 +120,16 @@ export function LeaderboardPreview() {
                         title="Show off verified traffic"
                         description="Add a site to the public leaderboard. The numbers come straight from Google, you choose what is public, and only owners verified in Search Console can rank."
                     />
+                    {proof.length ? (
+                        <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4" aria-label="Leaderboard right now">
+                            {proof.map((p) => (
+                                <div key={p.key} className="flex max-w-[200px] flex-col-reverse">
+                                    <dt className="mt-0.5 text-body-sm text-fg-muted">{p.label}</dt>
+                                    <dd className="text-stat tabular-nums text-fg">{p.value.toLocaleString('en-US')}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    ) : null}
                     <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                         <Button asChild variant="primary" size="lg">
                             <Link href="/leaderboard/join">Add your site, free</Link>

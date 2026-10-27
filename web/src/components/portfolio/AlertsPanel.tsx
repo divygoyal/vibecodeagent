@@ -12,17 +12,19 @@ import type { PortfolioAlert } from '@/lib/portfolio/types';
 const VISIBLE = 4;
 
 /** Drops of more than 30% and zero-traffic runs, worst first. */
-export function AlertsPanel({ alerts, hrefFor, onOpen, className }: {
+export function AlertsPanel({ alerts, hrefFor, onOpen, className, id }: {
     alerts: PortfolioAlert[];
     hrefFor: (slug: string) => string;
     onOpen?: (alert: PortfolioAlert) => void;
     className?: string;
+    /** Anchor for the header's "N alerts ↓" link (focusable target). */
+    id?: string;
 }) {
     const [all, setAll] = useState(false);
     if (alerts.length === 0) return null;
     const shown = all ? alerts : alerts.slice(0, VISIBLE);
     return (
-        <Card padding="none" className={cn('overflow-hidden', className)} as="section" aria-labelledby="portfolio-alerts">
+        <Card padding="none" className={cn('overflow-hidden', className)} as="section" aria-labelledby="portfolio-alerts" id={id} tabIndex={id ? -1 : undefined}>
             <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-3">
                 <AlertTriangle aria-hidden size={16} strokeWidth={1.75} className="text-down" />
                 <h2 id="portfolio-alerts" className="text-title-sm text-fg">Alerts</h2>

@@ -6,6 +6,7 @@ Nothing here talks to production, Google, email, Telegram or payments.
 
 > **RAM rule: bring a server up, take shots, bring it down; never leave it idle.**
 > **Disk rule: delete your worktree's `web/.next` when your session of checks is done** (`rm -rf web/.next`; 0.4–1.4 GB each).
+> **Better: run the checks on worker1 instead (isolated, production build, 4 instances in parallel, nothing on this box): `WORKER1.md`.**
 > (Production runs on this box. Max 2 dev servers at once; `up.sh` refuses below 2.5 GB free RAM
 > or 3 GB free disk; `down.sh` deletes `web/.next` itself when / has under 8 GB free.)
 
@@ -109,7 +110,8 @@ automatically:
 Requests with a non-demo bearer token are refused (401) and never leave the
 box. Gemini/Vertex calls are not intercepted; with no key configured the AI
 features show their normal "unavailable" path. It never runs when
-`NODE_ENV=production`, and nothing changes when `TC_DEMO_DATA` is unset.
+`NODE_ENV=production` (the one exception is the isolated test machine, see `WORKER1.md`: `web/src/lib/demo/gate.ts`
+needs `TC_ALLOW_DEMO_IN_PROD_BUILD=1` and a localhost `NEXTAUTH_URL`), and nothing changes when `TC_DEMO_DATA` is unset.
 
 ### Use the generator directly (new features, public demo page)
 
@@ -197,15 +199,18 @@ Make the demo Google APIs fail like the real ones (`web/src/lib/demo/faults.ts`)
 | cookie `tc_demo_faults=<spec>` | one browser, no restart (`check-mobile.mjs --cookie tc_demo_faults=429`) |
 | token suffix `demo-access:main~<spec>` | one demo user, also background syncs/crons (the `f*` users below) |
 
-`<spec>` = comma list of `[scope:]fault[:ms]`; faults `403` `429` `500` `timeout[:ms]` (default 30 s,
-honours the caller's AbortSignal, then 504) `empty` `revoked` (refresh → `invalid_grant`, data → 401)
+`<spec>` = comma list of `[scope:]fault[:ms]`; faults `403` `429` `500` `502` (Google's HTML Bad Gateway page, always) `flaky[:n]` (the same 502 for the first n=2 tries of each distinct request, then it clears) `timeout[:ms]` (default 30 s,
+honours the caller's AbortSignal, then 504) `latency[:ms]` (default 1.5 s; waits, then answers normally:
+a slow Google, to time page loads) `empty` `revoked` (refresh → `invalid_grant`, data → 401)
 `huge` (counts × 10 M); scopes `ga4` `gsc` `psi` `list` (account/site lists) `all`. No scope = every
-data call (lists still work). E.g. `gsc:403`, `ga4:timeout:8000,gsc:empty`, `all:500`.
+data call (lists still work). E.g. `gsc:403`, `ga4:timeout:8000,gsc:empty`, `all:500`, `all:latency:2000`.
 
 Scenario users for `login.mjs --user` (no sample records seeded): `empty` (Google, 0 sites), `one`,
 `ga4only`, `gsconly`, `many` (200 generated sites, some with very long names), `nogoogle` (GitHub
 sign-in, no Google), `nocredits` (free, 0 credits), and `f403 f429 f500 ftimeout fempty frevoked fhuge`
 (the demo account's sites with that fault on every Google call).
+Also `f502` (every data call answers an HTML 502), `fflaky` (`flaky:2`: the first two tries of each data request get a 502, a retry
+gets through), `fflakyall` (the same on the site lists too) and `fslow` (`all:latency:1500`).
 
 ## 8. Checks
 

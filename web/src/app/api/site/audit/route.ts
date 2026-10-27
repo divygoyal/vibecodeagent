@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { cachedFetch, invalidateCache } from '@/lib/apiCache';
 import { getDemoAuditReport } from '@/lib/demoWorkspaceData';
+import { demoDataAllowed } from '@/lib/demo/gate';
 import { runSiteAudit, type AuditReport } from '@/lib/siteAudit';
 import { isBlockedUrl } from '@/lib/urlValidation';
 import { getSessionUserId, jsonError, NO_STORE } from '../_lib/context';
@@ -25,7 +26,7 @@ function normalize(raw: string | null | undefined): string | null {
 
 /** Demo data mode: the catalogue's *.example sites have no real pages to fetch. */
 function demoReport(url: string): AuditReport | null {
-    if (process.env.TC_DEMO_DATA !== '1' || process.env.NODE_ENV === 'production') return null;
+    if (!demoDataAllowed()) return null;
     const host = new URL(url).hostname;
     if (!host.endsWith('.example')) return null;
     const base = getDemoAuditReport(url);

@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { isDemoRequest } from '@/lib/demoWorkspace';
 import { getDemoRealtimeData } from '@/lib/demoWorkspaceData';
 import { getValidAccessToken, fetchRealtimeVisitors } from '@/lib/googleApi';
-import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
+import { getGoogleCredentialsForAsset } from '@/lib/serverAuth';
 import { cachedFetch } from '@/lib/apiCache';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
             // @ts-expect-error - id added in callbacks
             const userId = session.user.id;
             // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
-            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId));
+            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForAsset(req, String(userId), propertyId ? { kind: 'ga4', id: propertyId } : null);
 
             if (!googleAccess && !googleRefresh) {
                 return NextResponse.json({ error: 'Google not connected', code: 'GOOGLE_NOT_CONNECTED' }, { status: 400 });

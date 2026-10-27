@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ExternalLink, ShieldCheck } from 'lucide-react';
@@ -11,11 +11,12 @@ import { Favicon } from '@/components/ui/Favicon';
 import { CategoryBadge, Ga4Badge, VerificationBadge } from '@/components/leaderboard/shared';
 import { EmbedCard, LiveNow, OfferSection, ProfileCharts, RangeSwitch, ShareButton } from '@/components/leaderboard/ProfileClient';
 import { AboutCard, Breakdowns, GrowthCard, KpiGrid, OpenToLine, SimilarCard, SiteLine, SlotsCard } from '@/components/leaderboard/ProfileSections';
-import { SITE_ORIGIN } from '@/lib/leaderboard/constants';
+import { DEFAULT_RANGE, SITE_ORIGIN } from '@/lib/leaderboard/constants';
 import { fmtDay } from '@/lib/format';
-import { metricText } from '@/lib/leaderboard/format';
+import { freshness, metricText } from '@/lib/leaderboard/format';
 import { getProfile, parseRange } from '@/lib/leaderboard/server';
 import { jsonLdString } from '@/lib/leaderboard/jsonld';
+import { canonicalRedirect } from '@/lib/leaderboard/canonical';
 
 // Server rendered per request; the data fetch is cached 60 s.
 export const dynamic = 'force-dynamic';
@@ -55,10 +56,19 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
     const p = await getProfile(id, range);
     if (!p) notFound();
 
+    // An id (or any other spelling the admin API resolves) goes to the canonical slug. Unknown
+    // or retired slugs never resolve, so they fall through to notFound() above.
+    const canonical = canonicalRedirect(id, p);
+    if (canonical) {
+        // Temporary redirect: the slug itself can change again.
+        redirect(`/leaderboard/${canonical}${range !== DEFAULT_RANGE ? `?range=${encodeURIComponent(range)}` : ''}`);
+    }
+
     const slug = p.slug || String(p.id);
     const profileUrl = `${SITE_ORIGIN}/leaderboard/${slug}`;
     const host = (p.website_url || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     const pending = p.status === 'pending';
+    const updated = freshness(p.updated_at);
 
     const jsonLd = {
         '@context': 'https://schema.org',
@@ -121,7 +131,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
                                 {rankPills.map((r) => (
                                     <span key={r} className="inline-flex h-6 items-center rounded-full bg-subtle px-2.5 text-meta font-medium text-fg-secondary">{r}</span>
                                 ))}
-                                {p.live.enabled ? <LiveNow idOrSlug={slug} /> : null}
+                                {p.live.enabled ? <LiveNow entryId={p.id} /> : null}
                             </div>
                         </div>
                         {p.description ? <p className="mt-2 max-w-[680px] text-body-lg text-fg-secondary">{p.description}</p> : null}
@@ -149,7 +159,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
                         <span className="text-fg-secondary">{p.verification.label}</span>
                         {p.verification.ga4_connected && p.verification.level === 'owner' ? <span>· GA4 data stream matches {host}</span> : null}
                         {p.verification.checked_at ? <span>· checked {fmtDay(p.verification.checked_at.slice(0, 10))}</span> : null}
-                        {p.updated_at ? <span>· numbers updated {fmtDay(p.updated_at.slice(0, 10))}</span> : null}
+                        {updated.text ? <span>· numbers {updated.text.charAt(0).toLowerCase() + updated.text.slice(1)}</span> : null}
                     </p>
 
                     <div className="mt-6 flex flex-col gap-4">

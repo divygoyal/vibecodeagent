@@ -61,12 +61,14 @@ test('fmtAxis: compact, max 1 decimal', () => {
     assert.equal(fmtAxis(null), '–');
 });
 
-test('fmtPercent: CTR 1 decimal, <0.1% for tiny, 0%, tiles round rates >= 10%', () => {
+test('fmtPercent: CTR always 1 decimal, <0.1% for tiny, 0%, tiles round rates >= 10%', () => {
     assert.equal(fmtPercent(0.034), '3.4%');
     assert.equal(fmtPercent(0.0025), '0.3%');
     assert.equal(fmtPercent(0.0004), '<0.1%');
     assert.equal(fmtPercent(0), '0%');
-    assert.equal(fmtPercent(0.05), '5%');
+    assert.equal(fmtPercent(0.05), '5.0%');
+    assert.equal(fmtPercent(0.23), '23.0%');
+    assert.equal(fmtPercent(0.05, { tile: true }), '5%');
     assert.equal(fmtPercent(0.4412), '44.1%');
     assert.equal(fmtPercent(0.4412, { tile: true }), '44%');
     assert.equal(fmtPercent(0.034, { tile: true }), '3.4%');
@@ -79,12 +81,13 @@ test('fmtPosition: 1 decimal', () => {
     assert.equal(fmtPosition(null), '–');
 });
 
-test('fmtDuration: 53s · 1m 56s · 1h 4m', () => {
+test('fmtDuration: 53s · 1m 56s · 2m 05s · 1h 04m', () => {
     assert.equal(fmtDuration(53), '53s');
     assert.equal(fmtDuration(116), '1m 56s');
-    assert.equal(fmtDuration(3840), '1h 4m');
+    assert.equal(fmtDuration(125), '2m 05s');
+    assert.equal(fmtDuration(3840), '1h 04m');
     assert.equal(fmtDuration(0), '0s');
-    assert.equal(fmtDuration(59.6), '1m 0s');
+    assert.equal(fmtDuration(59.6), '1m 00s');
     assert.equal(fmtDuration(null), '–');
 });
 
@@ -92,6 +95,7 @@ test('fmtDelta: percent change, 1 decimal < 100, 0 decimals 100-999, >999%', () 
     assert.equal(fmtDelta(12400, 10473), '▲ 18.4%');
     assert.equal(fmtDelta(1282, 2548), '▼ 49.7%');
     assert.equal(fmtDelta(274, 100), '▲ 174%');
+    assert.equal(fmtDelta(109, 100), '▲ 9.0%'); // fixed decimal: a column never mixes 9% and 8.5%
     assert.equal(fmtDelta(20000, 10), '▲ >999%');
     assert.equal(fmtDelta(100, 0), 'new');
     assert.equal(fmtDelta(0, 0), '–');
@@ -101,7 +105,7 @@ test('fmtDelta: percent change, 1 decimal < 100, 0 decimals 100-999, >999%', () 
 
 test('rate deltas: percentage points', () => {
     assert.equal(fmtDeltaPoints(0.024, 0.025), '▼ 0.1 pt');
-    assert.equal(fmtDeltaPoints(0.45, 0.4), '▲ 5 pt');
+    assert.equal(fmtDeltaPoints(0.45, 0.4), '▲ 5.0 pt');
     assert.equal(fmtDeltaPoints(0.4, 0.4), '0 pt');
     const d = computeDelta(0.024, 0.025, { mode: 'points' });
     assert.equal(d.tone, 'bad');

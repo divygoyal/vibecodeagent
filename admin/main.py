@@ -45,6 +45,7 @@ from security.github_app_jwt import is_configured as github_app_is_configured
 from docker_manager import docker_manager
 from mcp_api import build_mcp_router, ensure_mcp_schema
 from user_delete import delete_user_rows
+from google_accounts import build_google_accounts_router, ensure_google_accounts_schema, primary_only
 
 
 # ============= Database Setup =============
@@ -322,6 +323,8 @@ async def init_db():
 
         # 019_add_mcp_oauth.sql — hosted MCP server (Connect AI). See mcp_api.py.
         await ensure_mcp_schema(conn)
+        # 024_add_linked_google_accounts.sql: extra Google accounts (google_accounts.py).
+        await ensure_google_accounts_schema(conn)
         # 021_leaderboard_v3.sql: profiles (verification + privacy), daily series,
         # range stats, inquiries. Additive; existing rows are interpreted by
         # leaderboard_core when they have no profile row.
@@ -602,7 +605,8 @@ async def get_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[
     # Provider account IDs can be large numeric strings (for example Google),
     # so resolve OAuth identities before attempting internal integer ID lookup.
     print(f"[DEBUG] User not found by github_id, trying OAuthConnection for '{identifier}'")
-    stmt = select(OAuthConnection).where(OAuthConnection.provider_account_id == identifier)
+    # Linked extra Google accounts are data connections only: they never resolve a user.
+    stmt = select(OAuthConnection).where(OAuthConnection.provider_account_id == identifier, primary_only())
     oauth_res = await db.execute(stmt)
     oauth = oauth_res.scalars().first()
     
@@ -680,6 +684,7 @@ def get_user_runtime_identifier(user: User) -> str:
 from portfolio_api import build_portfolio_router, ensure_portfolio_schema  # noqa: E402
 from site_actions_api import build_site_actions_router, ensure_site_actions_schema  # noqa: E402
 app.include_router(build_portfolio_router(get_db, verify_admin_key, get_user_by_identifier))
+app.include_router(build_google_accounts_router(get_db, verify_admin_key, get_user_by_identifier))
 
 
 def has_non_empty_token(value: Optional[str]) -> bool:
@@ -750,7 +755,7 @@ def serialize_provider(connection: OAuthConnection) -> Dict[str, Any]:
 
 async def get_connected_oauth_connections(db: AsyncSession, user_id: int) -> List[OAuthConnection]:
     oauth_result = await db.execute(
-        select(OAuthConnection).where(OAuthConnection.user_id == user_id)
+        select(OAuthConnection).where(OAuthConnection.user_id == user_id, primary_only())
     )
     return [
         connection
@@ -779,6 +784,7 @@ async def has_connected_oauth_provider(db: AsyncSession, user_id: int, provider:
         select(OAuthConnection).where(
             OAuthConnection.user_id == user_id,
             OAuthConnection.provider == provider,
+            primary_only(),
         )
     )
     connection = result.scalars().first()
@@ -1008,6 +1014,7 @@ async def create_user(
         stmt = select(OAuthConnection).where(
             OAuthConnection.provider == user_data.provider,
             OAuthConnection.provider_account_id == user_data.provider_id,
+            primary_only(),
         )
         result = await db.execute(stmt)
         oauth_link = result.scalars().first()
@@ -1048,7 +1055,8 @@ async def create_user(
         if user_data.provider and user_data.provider_id:
             stmt = select(OAuthConnection).where(
                 OAuthConnection.user_id == user.id,
-                OAuthConnection.provider == user_data.provider
+                OAuthConnection.provider == user_data.provider,
+                primary_only(),
             )
             result = await db.execute(stmt)
             oauth = result.scalars().first()  # Use first() to handle multiple connections gracefully
@@ -1239,7 +1247,7 @@ async def list_users(
                 OAuthConnection.user_id,
                 OAuthConnection.provider,
                 OAuthConnection.access_token,
-            ).where(OAuthConnection.user_id.in_(user_ids))
+            ).where(OAuthConnection.user_id.in_(user_ids), primary_only())
         )
         for user_id, provider, access_token in oauth_rows.all():
             if not has_non_empty_token(access_token):
@@ -1586,15 +1594,17 @@ async def sync_user_container(
     # 1. Upsert OAuthConnection for this provider
     stmt = select(OAuthConnection).where(
         OAuthConnection.user_id == user.id,
-        OAuthConnection.provider == sync_data.provider
+        OAuthConnection.provider == sync_data.provider,
+        primary_only(),
     )
     result = await db.execute(stmt)
     oauth = result.scalars().first()
     
     if oauth:
-        if sync_data.access_token:
+        # Never replace a stored token with an empty one (a sign-in without consent returns no refresh token).
+        if has_non_empty_token(sync_data.access_token):
             oauth.access_token = sync_data.access_token
-        if sync_data.refresh_token:
+        if has_non_empty_token(sync_data.refresh_token):
             oauth.refresh_token = sync_data.refresh_token
         oauth.updated_at = datetime.utcnow()
     else:
@@ -1616,7 +1626,7 @@ async def sync_user_container(
         return {"success": True, "message": "Provider registered (no bot yet)", "synced": False}
     
     # 3. Load ALL connections from DB (only valid tokens)
-    res = await db.execute(select(OAuthConnection).where(OAuthConnection.user_id == user.id))
+    res = await db.execute(select(OAuthConnection).where(OAuthConnection.user_id == user.id, primary_only()))
     connections = {}
     for c in res.scalars().all():
         if has_non_empty_token(c.access_token) or has_non_empty_token(c.refresh_token):
@@ -1677,15 +1687,17 @@ async def update_user(
         # We need to find the connection for this provider
         stmt = select(OAuthConnection).where(
             OAuthConnection.user_id == user.id,
-            OAuthConnection.provider == user_update.provider
+            OAuthConnection.provider == user_update.provider,
+            primary_only(),
         )
         result = await db.execute(stmt)
         conn = result.scalars().first()
         
         if conn:
-            if user_update.access_token:
+            # Never replace a stored token with an empty one.
+            if has_non_empty_token(user_update.access_token):
                 conn.access_token = user_update.access_token
-            if user_update.refresh_token:
+            if has_non_empty_token(user_update.refresh_token):
                 conn.refresh_token = user_update.refresh_token
             conn.updated_at = datetime.utcnow()
         else:
@@ -1746,7 +1758,7 @@ async def update_user(
         
         # Fetch connections with valid tokens for container recreation
         result_conns = await db.execute(
-            select(OAuthConnection).where(OAuthConnection.user_id == user.id)
+            select(OAuthConnection).where(OAuthConnection.user_id == user.id, primary_only())
         )
         connections = {}
         for c in result_conns.scalars().all():
@@ -1792,7 +1804,7 @@ async def update_user(
     # If plan changed, sync container with new limits
     if user_update.plan and user_update.plan != user.plan:
         result_conns = await db.execute(
-            select(OAuthConnection).where(OAuthConnection.user_id == user.id)
+            select(OAuthConnection).where(OAuthConnection.user_id == user.id, primary_only())
         )
         connections = {}
         for c in result_conns.scalars().all():
@@ -2009,7 +2021,7 @@ async def container_action(
             
             # Fetch connections
             result_conns = await db.execute(
-                select(OAuthConnection).where(OAuthConnection.user_id == user.id)
+                select(OAuthConnection).where(OAuthConnection.user_id == user.id, primary_only())
             )
             conns_list = result_conns.scalars().all()
             connections = {}
@@ -2175,7 +2187,8 @@ async def execute_plugin_command_for_user(
     if plugin in GOOGLE_PLUGINS:
         stmt = select(OAuthConnection).where(
             OAuthConnection.user_id == user.id,
-            OAuthConnection.provider == "google"
+            OAuthConnection.provider == "google",
+            primary_only(),
         )
         result = await db.execute(stmt)
         oauth = result.scalars().first()
@@ -2269,6 +2282,7 @@ async def get_google_inventory_for_user(user: User, db: AsyncSession) -> Dict[st
         select(OAuthConnection).where(
             OAuthConnection.user_id == user.id,
             OAuthConnection.provider == "google",
+            primary_only(),
         )
     )
     google_connection = google_oauth_result.scalars().first()
@@ -2715,7 +2729,8 @@ async def get_user_oauth_token(
     result = await db.execute(
         select(OAuthConnection).where(
             OAuthConnection.user_id == user.id,
-            OAuthConnection.provider == provider
+            OAuthConnection.provider == provider,
+            primary_only(),
         )
     )
     oauth = result.scalars().first()
@@ -3011,7 +3026,8 @@ async def get_embed_token_google_creds(
     oauth_result = await db.execute(
         select(OAuthConnection).where(
             OAuthConnection.user_id == embed_token.user_id,
-            OAuthConnection.provider == "google"
+            OAuthConnection.provider == "google",
+            primary_only(),
         )
     )
     oauth = oauth_result.scalars().first()
@@ -4510,7 +4526,8 @@ async def refresh_leaderboard_stats(
         oauth_result = await db.execute(
             select(OAuthConnection).where(
                 OAuthConnection.user_id == entry.user_id,
-                OAuthConnection.provider == "google"
+                OAuthConnection.provider == "google",
+                primary_only(),
             )
         )
         oauth = oauth_result.scalars().first()
@@ -4525,6 +4542,8 @@ async def refresh_leaderboard_stats(
                 # v3 additions (older callers ignore unknown keys)
                 "gsc_site_url": profile.gsc_site_url if profile else None,
                 "verification_manual": bool(profile.verification_manual) if profile else False,
+                # Lets the caller skip entries refreshed recently (daily scheduler, repeated cron calls).
+                "last_refreshed": (entry.last_refreshed.isoformat() + "Z") if entry.last_refreshed else None,
             })
 
     return {"entries": refresh_list, "total": len(refresh_list)}

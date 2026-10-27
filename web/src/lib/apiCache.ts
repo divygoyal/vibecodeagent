@@ -96,6 +96,16 @@ export function invalidateCache(keyOrPrefix: string) {
     }
 }
 
+/**
+ * Drop every key that contains `fragment` (e.g. `:<userId>`), cached or in flight. Used after a
+ * Google account is disconnected, so nothing read through it is served from the cache afterwards.
+ */
+export function invalidateCacheContaining(fragment: string) {
+    if (!fragment) return;
+    for (const key of cache.keys()) if (key.includes(fragment)) cache.delete(key);
+    for (const key of pendingFetches.keys()) if (key.includes(fragment)) pendingFetches.delete(key);
+}
+
 // Cache TTL constants (in milliseconds)
 export const CACHE_TTL = {
     PROPERTY_LIST: 5 * 60 * 1000,    // 5 minutes - property/site lists rarely change

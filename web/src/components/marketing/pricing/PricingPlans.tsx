@@ -5,14 +5,14 @@ import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
 import { ArrowRight, Check } from 'lucide-react';
 
-import { Badge, Button, buttonClasses } from '@/components/ui';
+import { Button, buttonClasses, Pill } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { dodoCheckoutUrl, FREE_START_CREDITS, PAID_PLANS, pricePerMessage, type PaidPlan } from '@/lib/plans';
 import { ConnectGoogleButton } from '../site/ConnectGoogleButton';
 
 const FREE_FEATURES = [
     'Portfolio of every site, no site limit',
-    'Traffic, search, actions and audit pages per site',
+    'Traffic, Search, What to fix next and Audit for each site',
     'Unlimited dashboards, public links and embeds',
     'Public leaderboard profile',
     'ChatGPT & Claude connector (MCP)',
@@ -114,7 +114,7 @@ export function PricingPlans() {
                 <PlanCard key={plan.key} recommended={plan.recommended}>
                     <div className="flex items-center gap-2">
                         <h2 className="text-title text-fg">{plan.name}</h2>
-                        {plan.recommended ? <Badge variant="brand">Recommended</Badge> : null}
+                        {plan.recommended ? <Pill tone="brand">Recommended</Pill> : null}
                     </div>
                     <p className="mt-1 text-body text-fg-secondary">Everything in Free, plus more Ask messages.</p>
                     <p className="mt-6 flex items-baseline gap-1.5">

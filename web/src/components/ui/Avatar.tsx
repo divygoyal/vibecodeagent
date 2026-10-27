@@ -49,7 +49,7 @@ export function Avatar({ name, src, size = 28, className }: AvatarProps) {
     return (
         <span
             aria-hidden
-            className={cn(box, 'bg-brand-soft text-meta font-semibold text-brand-soft-fg', size <= 24 && 'text-[10px]')}
+            className={cn(box, 'bg-brand-soft text-meta font-semibold text-brand-soft-fg', size <= 24 && 'text-caption tracking-normal')}
             style={{ width: size, height: size }}
         >
             {initials(name)}

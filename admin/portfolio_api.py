@@ -73,7 +73,14 @@ def _derived(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
 ASSET_COLUMNS = (
     "asset_kind, asset_id, display_name, host, account_name, permission_level, paired_with, "
     "pairing_override, starred, hidden, missing, status, last_error, last_synced_at, "
-    "sync_started_at, data_start, data_end, backfill_done, created_at, updated_at"
+    "sync_started_at, data_start, data_end, backfill_done, created_at, updated_at, connection_id"
+)
+
+# 024_add_linked_google_accounts.sql: which Google connection listed the asset (NULL = primary) and
+# whether that extra account was disconnected (row kept, no longer listed).
+LINKED_ACCOUNT_DDL = (
+    "ALTER TABLE portfolio_assets ADD COLUMN connection_id VARCHAR(255)",
+    "ALTER TABLE portfolio_assets ADD COLUMN disconnected INTEGER NOT NULL DEFAULT 0",
 )
 
 
@@ -96,6 +103,11 @@ async def ensure_portfolio_schema(engine) -> None:
                 await conn.execute(text(ddl))
             except Exception as exc:  # pragma: no cover - logged, never fatal
                 print(f"[startup] portfolio DDL skipped: {type(exc).__name__}: {exc}")
+        for ddl in LINKED_ACCOUNT_DDL:
+            try:
+                await conn.execute(text(ddl))
+            except Exception:
+                pass  # column already there
 
 
 async def delete_user_portfolio_rows(db, user_id: int) -> None:
@@ -135,6 +147,8 @@ class AssetIn(BaseModel):
     account_name: Optional[str] = Field(None, max_length=300)
     permission_level: Optional[str] = Field(None, max_length=40)
     paired_with: Optional[str] = Field(None, max_length=500)
+    # Google `sub` of the linked account this asset was listed from; None = the primary connection.
+    connection_id: Optional[str] = Field(None, max_length=255)
 
 
 class AssetsPut(BaseModel):
@@ -239,7 +253,9 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
 
     async def list_assets(db, user_id: int) -> List[dict]:
         rows = (await db.execute(
-            text(f"SELECT {ASSET_COLUMNS} FROM portfolio_assets WHERE user_id = :u ORDER BY asset_kind, asset_id"),
+            # Rows of a disconnected extra Google account are kept but not listed.
+            text(f"SELECT {ASSET_COLUMNS} FROM portfolio_assets WHERE user_id = :u AND COALESCE(disconnected, 0) = 0 "
+                 "ORDER BY asset_kind, asset_id"),
             {"u": user_id},
         )).fetchall()
         return [_asset_dict(r) for r in rows]
@@ -263,13 +279,14 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
             params.append({
                 "u": user_id, "k": a.kind, "a": a.asset_id, "dn": a.display_name, "h": a.host,
                 "acc": a.account_name, "perm": a.permission_level, "pw": a.paired_with, "now": now,
+                "cid": a.connection_id or None,
             })
         if params:
             await db.execute(text(
                 """
                 INSERT INTO portfolio_assets (user_id, asset_kind, asset_id, display_name, host, account_name,
-                    permission_level, paired_with, missing, status, created_at, updated_at)
-                VALUES (:u, :k, :a, :dn, :h, :acc, :perm, :pw, 0, 'pending', :now, :now)
+                    permission_level, paired_with, missing, status, created_at, updated_at, connection_id, disconnected)
+                VALUES (:u, :k, :a, :dn, :h, :acc, :perm, :pw, 0, 'pending', :now, :now, :cid, 0)
                 ON CONFLICT(user_id, asset_kind, asset_id) DO UPDATE SET
                     display_name = excluded.display_name,
                     host = excluded.host,
@@ -277,6 +294,8 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
                     permission_level = excluded.permission_level,
                     paired_with = excluded.paired_with,
                     missing = 0,
+                    connection_id = excluded.connection_id,
+                    disconnected = 0,
                     updated_at = excluded.updated_at
                 """
             ), params)
@@ -564,7 +583,7 @@ def build_portfolio_router(get_db: Callable, verify_admin_key: Callable, get_use
                    (SELECT oc.provider_account_id FROM oauth_connections oc
                      WHERE oc.user_id = pa.user_id AND oc.provider = 'google' LIMIT 1) AS google_id
             FROM portfolio_assets pa JOIN users u ON u.id = pa.user_id
-            WHERE pa.hidden = 0 AND pa.missing = 0
+            WHERE pa.hidden = 0 AND pa.missing = 0 AND COALESCE(pa.disconnected, 0) = 0
             GROUP BY pa.user_id
             HAVING oldest < :cutoff
             ORDER BY oldest

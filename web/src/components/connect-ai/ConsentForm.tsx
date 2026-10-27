@@ -39,8 +39,13 @@ export function ConsentForm(p: ConsentFormProps) {
     return (
         <form method="post" action="/oauth/authorize/decision" className="space-y-5" onSubmit={(e) => {
             const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+            // Disabling the buttons below drops the clicked button from the submitted form data, so the choice
+            // travels in the hidden action_choice field (read first by the route). It is rendered from state:
+            // a hidden input's .value IS its value attribute, so writing it in the DOM here would be reset to
+            // defaultValue by React's re-render. State set in this handler is flushed before the browser reads the form.
             setSubmitting(submitter?.value ?? 'allow');
         }}>
+            <input type="hidden" name="action_choice" value={submitting ?? ''} />
             <input type="hidden" name="txn" value={p.txn} />
             <input type="hidden" name="csrf" value={p.csrf} />
             <input type="hidden" name="sites" value={mode} />

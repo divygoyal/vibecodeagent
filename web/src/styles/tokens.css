@@ -129,7 +129,8 @@
   --tc-chart-axis:   var(--tc-gray-200);
   --tc-chart-tick:   var(--tc-gray-500);
   --tc-chart-cursor: var(--tc-gray-300);
-  --tc-chart-fill-top: 16%;   /* area gradient start opacity */
+  --tc-chart-fill-top: 10%;   /* area gradient start opacity (16% before round 2: a slab under every line) */
+  --tc-spark-fill-top: 16%;   /* sparkline area (portfolio cards, KPI tiles) */
   --tc-heatbar:        12%;   /* table heat-bar opacity */
 
   /* Elevation */
@@ -163,9 +164,11 @@
   --tc-fg-faint:     var(--tc-night-500);  /* 3.1:1, disabled only */
   --tc-fg-inverse:   var(--tc-gray-900);
 
-  --tc-brand:         var(--tc-pine-300);
-  --tc-brand-hover:   var(--tc-pine-200);
-  --tc-brand-fg:      var(--tc-pine-950);  /* 9.2:1 on brand */
+  /* Filled brand states keep the deep pine of light mode (round 2, critique D1):
+     pastel mint (pine-300) was the loudest thing on every dark page. */
+  --tc-brand:         var(--tc-pine-600);
+  --tc-brand-hover:   var(--tc-pine-500);
+  --tc-brand-fg:      #ffffff;             /* 5.6:1 on brand */
   --tc-brand-text:    var(--tc-pine-300);  /* 10:1 */
   --tc-brand-soft:    rgb(120 211 177 / 0.12);
   --tc-brand-soft-fg: var(--tc-pine-200);
@@ -195,8 +198,9 @@
   --tc-chart-axis:   var(--tc-night-300);
   --tc-chart-tick:   var(--tc-night-600);
   --tc-chart-cursor: var(--tc-night-400);
-  --tc-chart-fill-top: 22%;
-  --tc-heatbar:        18%;
+  --tc-chart-fill-top: 12%;   /* 22% before round 2: a navy slab under every line */
+  --tc-spark-fill-top: 8%;
+  --tc-heatbar:        12%;   /* 18% before round 2: pink bars turned into maroon slabs */
 
   --tc-shadow-xs:         0 1px 2px rgb(0 0 0 / 0.4);
   --tc-shadow-card:       inset 0 1px 0 rgb(255 255 255 / 0.03);
@@ -322,6 +326,7 @@
 
 /* Keyframes live outside @theme so they are always emitted (the skeleton utility uses one directly) */
 @keyframes tc-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes tc-skel-sweep { from { background-position: 100% 0; } to { background-position: 0% 0; } }
 @keyframes tc-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes tc-pop-in { from { opacity: 0; transform: scale(0.97) translateY(2px); } to { opacity: 1; transform: none; } }
 @keyframes tc-sheet-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
@@ -359,10 +364,15 @@
 }
 
 /* ---------- 7. Small helpers ---------- */
+/* Skeleton: a flat block for the first second, then a soft sweep (round 2,
+   critique 2.6): fast loads never see motion, slow ones see progress. */
 @utility skeleton {
-  background: linear-gradient(90deg, var(--tc-subtle) 25%, var(--tc-subtle-strong) 50%, var(--tc-subtle) 75%);
-  background-size: 200% 100%;
-  animation: tc-shimmer 1.4s linear infinite;
+  background-color: var(--tc-subtle);
+  background-image: linear-gradient(90deg, transparent 40%, var(--tc-subtle-strong) 50%, transparent 60%);
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  background-position: 100% 0;
+  animation: tc-skel-sweep 1.6s linear 1s infinite both;
   border-radius: 6px;
 }
 @utility heatbar-clicks { background: color-mix(in oklab, var(--tc-m-clicks) var(--tc-heatbar), transparent); }

@@ -56,7 +56,7 @@ async function main() {
 const out: Record<string, Record<string, number[]>> = {};
 const token = demoAccessToken();
 for (const t of [...TEMPLATES.map((x) => x.id)]) {
-    const site = t === 'key-events-revenue' ? { type: 'site' as const, siteId: 'creativeprints.example' } : { type: 'site' as const, siteId: 'acmeanalytics.example' };
+    const site = t === 'key-events-revenue' || t === 'ecommerce-funnel' ? { type: 'site' as const, siteId: 'creativeprints.example' } : { type: 'site' as const, siteId: 'acmeanalytics.example' };
     const doc = buildFromTemplate(t, { name: t, defaultSource: TEMPLATES.find((x) => x.id === t)!.portfolio ? { type: 'portfolio', include: 'all' } : site });
     const page = doc.pages[0];
     const res = await evaluateWidgets({

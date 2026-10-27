@@ -28,9 +28,14 @@
  *   ga4only   GA4 properties, no Search Console  gsconly   Search Console sites, no GA4
  *   many      200 sites (long names, mixed)      nogoogle  signed in with GitHub, no Google
  *   nocredits free plan with 0 Ask credits
- *   f403 f429 f500 ftimeout fempty frevoked fhuge
+ *   multi     two Google accounts: signs in with demo account `multi` (2 sites) and has `multi2`
+ *             (4 more sites, Acme's Search Console site in both) linked as an extra data connection
+ *             (Settings -> Google, "Connect another Google account"); each login re-links multi2 with
+ *             a good token
+ *   f403 f429 f500 f502 ftimeout fempty frevoked fhuge fflaky fflakyall fslow
  *             the demo account's 18 sites with that Google failure injected on every call
- *             (token suffix, see web/src/lib/demo/faults.ts)
+ *             (token suffix, see web/src/lib/demo/faults.ts). fflaky: transient 502s on the data calls that
+ *             clear on retry; fflakyall: the same on the site lists too; fslow: every call takes 1.5 s.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -58,8 +63,13 @@ const USERS = {
     gsconly: { sub: '100000000000000000014', name: 'Search Console Only User', email: 'gsconly@trafficclaw.example', account: 'gsconly', plan: 'free', property: null, site: 'sc-domain:acmeanalytics.example', label: 'Acme Analytics', scenario: true },
     many: { sub: '100000000000000000015', name: 'Two Hundred Sites User', email: 'many@trafficclaw.example', account: 'many', plan: 'pro', property: 'properties/412400001', site: 'https://site-001.example/', label: 'Site 001', scenario: true },
     nogoogle: { sub: '100000000000000000016', name: 'GitHub Only User', email: 'nogoogle@trafficclaw.example', account: null, provider: 'github', plan: 'free', property: null, site: null, label: null, scenario: true },
+    multi: {
+        sub: '100000000000000000041', name: 'Two Accounts User', email: 'multi@trafficclaw.example', account: 'multi', plan: 'pro',
+        property: 'properties/412300101', site: 'sc-domain:acmeanalytics.example', label: 'Acme Analytics', scenario: true,
+        linked: [{ account: 'multi2', sub: '100000000000000000042', email: 'multi.agency@trafficclaw.example', name: 'Two Accounts User (agency)' }],
+    },
     nocredits: { sub: '100000000000000000017', name: 'No Credits User', email: 'nocredits@trafficclaw.example', account: 'main', plan: 'free', credits: 0, property: 'properties/412300101', site: 'sc-domain:acmeanalytics.example', label: 'Acme Analytics', scenario: true },
-    ...Object.fromEntries([['f403', '403', 21], ['f429', '429', 22], ['f500', '500', 23], ['ftimeout', 'timeout:15000', 24], ['fempty', 'empty', 25], ['frevoked', 'revoked', 26], ['fhuge', 'huge', 27]].map(([key, faults, n]) => [key, {
+    ...Object.fromEntries([['f403', '403', 21], ['f429', '429', 22], ['f500', '500', 23], ['ftimeout', 'timeout:15000', 24], ['fempty', 'empty', 25], ['frevoked', 'revoked', 26], ['fhuge', 'huge', 27], ['f502', '502', 28], ['fflaky', 'flaky:2', 29], ['fflakyall', 'all:flaky:2', 30], ['fslow', 'all:latency:1500', 31]].map(([key, faults, n]) => [key, {
         sub: `1000000000000000000${n}`, name: `Fault ${faults} User`, email: `${key}@trafficclaw.example`, account: 'main', faults, plan: 'pro',
         property: 'properties/412300101', site: 'sc-domain:acmeanalytics.example', label: 'Acme Analytics', scenario: true,
     }])),
@@ -97,14 +107,27 @@ function readEnvFile(file) {
     return env;
 }
 
+// Several instance folders can name the same port (a stopped instance of another worktree keeps its
+// instance.env), so the one whose web process is alive wins, then the newest instance.env.
 function findInstance(port) {
+    const found = [];
     for (const name of fs.existsSync(DEV_HOME) ? fs.readdirSync(DEV_HOME) : []) {
         const f = path.join(DEV_HOME, name, 'instance.env');
         if (!fs.existsSync(f)) continue;
         const env = readEnvFile(f);
-        if (Number(env.WEB_PORT) === port) return { dir: path.dirname(f), ...env };
+        if (Number(env.WEB_PORT) !== port) continue;
+        const dir = path.dirname(f);
+        let alive = false;
+        try {
+            const pid = Number(fs.readFileSync(path.join(dir, 'web.pid'), 'utf8').trim());
+            if (pid > 0) { process.kill(pid, 0); alive = true; }
+        } catch (e) {
+            alive = e?.code === 'EPERM';
+        }
+        found.push({ inst: { dir, ...env }, alive, mtime: fs.statSync(f).mtimeMs });
     }
-    return null;
+    found.sort((a, b) => Number(b.alive) - Number(a.alive) || b.mtime - a.mtime);
+    return found[0]?.inst ?? null;
 }
 
 async function http(method, url, { headers = {}, body, cookie } = {}) {
@@ -169,6 +192,14 @@ async function main() {
         },
     });
     if (!r.ok) throw new Error(`admin PATCH workspace failed: ${r.status} ${JSON.stringify(r.data)}`);
+    // Extra Google accounts (data connections only; admin/google_accounts.py), as the link flow stores them.
+    for (const l of user.linked || []) {
+        r = await http('PUT', `${adminUrl}/api/users/${user.sub}/google/linked/${l.sub}`, {
+            headers: adminHeaders,
+            body: { email: l.email, name: l.name, access_token: `demo-access:${l.account}`, refresh_token: `demo-refresh:${l.account}`, scope: 'openid email profile https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly' },
+        });
+        if (!r.ok) throw new Error(`admin PUT linked account failed: ${r.status} ${JSON.stringify(r.data)}`);
+    }
 
     // 2. NextAuth session JWT (same fields lib/auth.ts sets for a Google sign-in).
     const requireWeb = createRequire(path.join(inst.REPO, 'web', 'package.json'));

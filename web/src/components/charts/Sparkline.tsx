@@ -95,7 +95,7 @@ export function Sparkline({ series, dates, height = 72, area = 'first', interact
                     <>
                         <defs>
                             <linearGradient id={`spark-${uid}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor={shapes[0].color} style={{ stopOpacity: 'var(--tc-chart-fill-top)' }} />
+                                <stop offset="0%" stopColor={shapes[0].color} style={{ stopOpacity: 'var(--tc-spark-fill-top)' }} />
                                 <stop offset="100%" stopColor={shapes[0].color} stopOpacity={0} />
                             </linearGradient>
                         </defs>

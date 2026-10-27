@@ -48,6 +48,7 @@ const controlSchema = z.union([
     z.object({ id, type: z.literal('filter'), label: shortText, dimension: dimId, ui: z.enum(['multiselect', 'select', 'chips', 'search']), default: z.array(z.string().max(500)).max(100).optional(), source: sourceRefSchema.optional(), scope, viewerCanChange: z.boolean() }),
     z.object({ id, type: z.literal('site'), label: shortText, options: z.union([z.literal('all'), z.array(z.string().max(253)).max(500)]), default: z.string().max(253), scope }),
     z.object({ id, type: z.literal('metric'), label: shortText, options: z.array(metricId).max(30), default: metricId, scope }),
+    z.object({ id: z.string().min(1).max(32).regex(/^[a-z0-9_]+$/), type: z.literal('variable'), label: z.string().min(1).max(60), kind: z.enum(['text', 'regex', 'number']), default: z.string().max(300), viewerCanChange: z.boolean() }),
 ]);
 
 const numberFormat = z.object({ kind: z.enum(['auto', 'integer', 'decimal', 'percent', 'duration', 'currency', 'position']).optional(), decimals: z.number().int().min(0).max(6).optional(), compact: z.boolean().optional(), currency: z.string().max(3).optional() });
@@ -107,8 +108,35 @@ export const docSchema = z.object({
         header: z.object({ show: z.boolean(), title: z.string().max(200).optional(), subtitle: z.string().max(300).optional(), companyName: z.string().max(120).optional(), logoUrl: httpsUrl.optional(), logoPosition: z.enum(['left', 'center', 'right']), showDates: z.boolean() }),
         badge: z.object({ show: z.boolean() }),
         legacy: z.record(z.string(), z.unknown()).optional(),
+        // round 2 (optional; theme and settings are plain objects, so every new key is listed here or it is dropped on save)
+        id: z.enum(['trafficclaw', 'executive', 'analyst', 'midnight', 'paper', 'sunrise', 'studio', 'contrast']).optional(),
+        density: z.enum(['compact', 'comfortable', 'airy']).optional(),
+        card: z.enum(['elevated', 'outlined', 'flat', 'ruled', 'glass']).optional(),
+        pattern: z.enum(['none', 'dots', 'grid', 'glow']).optional(),
+        font: z.enum(['geist', 'system', 'serif-headings', 'mono-numbers']).optional(),
+        palette: z.enum(['standard', 'contrast']).optional(),
+        brand: z.object({
+            color: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
+            logoDarkUrl: httpsUrl.optional(),
+            footer: z.string().max(160).optional(),
+            preparedFor: z.string().max(80).optional(),
+            preparedBy: z.string().max(80).optional(),
+        }).optional(),
+        cover: z.object({
+            enabled: z.boolean(),
+            layout: z.enum(['left', 'center', 'split']),
+            title: z.string().max(120).optional(),
+            subtitle: z.string().max(200).optional(),
+            imageUrl: httpsUrl.optional(),
+            showKpis: z.boolean().optional(),
+        }).optional(),
     }),
-    settings: z.object({ widthMode: z.enum(['contained', 'full']), autoRefreshSec: z.union([z.literal(0), z.literal(300), z.literal(900), z.literal(1800), z.literal(3600)]), timezone: z.string().max(64).optional() }),
+    settings: z.object({
+        widthMode: z.enum(['contained', 'full']),
+        autoRefreshSec: z.union([z.literal(0), z.literal(300), z.literal(900), z.literal(1800), z.literal(3600)]),
+        timezone: z.string().max(64).optional(),
+        tv: z.object({ rotateSec: z.union([z.literal(0), z.literal(15), z.literal(30), z.literal(60), z.literal(120)]), hideControls: z.boolean() }).optional(),
+    }),
     meta: z.object({ createdFrom: z.string().max(64).optional(), migratedFromV1: z.object({ at: z.string(), propertyId: z.string(), siteUrl: z.string().optional() }).optional() }),
 });
 

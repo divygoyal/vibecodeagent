@@ -45,14 +45,15 @@ export function RangeSwitch({ range }: { range: RangeKey }) {
 
 // ─── live now ────────────────────────────────────────────────────────────────
 
-export function LiveNow({ idOrSlug, className }: { idOrSlug: string; className?: string }) {
+/** `entryId` is the entry's stable numeric id (slugs change; cached pages must not depend on them). */
+export function LiveNow({ entryId, className }: { entryId: number; className?: string }) {
     const [users, setUsers] = useState<number | null>(null);
     useEffect(() => {
         let stopped = false;
         const load = async () => {
             if (document.visibilityState === 'hidden') return;
             try {
-                const res = await fetch(`/api/leaderboard/${encodeURIComponent(idOrSlug)}/live`, { cache: 'no-store' });
+                const res = await fetch(`/api/leaderboard/${encodeURIComponent(String(entryId))}/live`, { cache: 'no-store' });
                 const data = (await res.json()) as { enabled: boolean; active_users: number | null };
                 if (!stopped && data.enabled) setUsers(data.active_users);
             } catch {
@@ -62,7 +63,7 @@ export function LiveNow({ idOrSlug, className }: { idOrSlug: string; className?:
         void load();
         const t = window.setInterval(load, 60_000);
         return () => { stopped = true; window.clearInterval(t); };
-    }, [idOrSlug]);
+    }, [entryId]);
     if (users === null) return null;
     return (
         <span className={cn('inline-flex h-6 items-center gap-1.5 rounded-full bg-up-soft px-2.5 text-meta font-semibold text-up', className)} aria-live="polite">

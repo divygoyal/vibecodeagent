@@ -6,6 +6,7 @@ import { ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { EmptyState, MetricDelta, SearchInput, Table, type TableColumn as UiColumn } from '@/components/ui';
 import { dimLabel, fmtMetricValue, metricHeatbar, metricLabel } from '@/lib/builder/catalog';
+import { cellStyle } from '@/lib/builder/cfRules';
 import type { CellValue, TableWidget } from '@/lib/builder/types';
 import { okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { dimText } from './Charts';
@@ -40,14 +41,18 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                 sortable: true,
                 firstSortDir: 'asc',
                 sortValue: (r) => dimText(dim, r[`d:${dim}`], frame?.labels),
-                className: cn('max-w-[340px]', i === 0 && 'min-w-[160px]'),
+                // Round 2: narrow template tables set a width so long URLs truncate instead of pushing columns out.
+                className: cn(typeof col.width === 'number' && col.width <= 200 ? 'max-w-[200px]' : 'max-w-[340px]', i === 0 && (typeof col.width === 'number' && col.width <= 200 ? 'min-w-[120px]' : 'min-w-[160px]')),
                 cell: (r) => {
                     const text = dimText(dim, r[`d:${dim}`], frame?.labels);
                     const raw = String(r[`d:${dim}`] ?? '');
                     const href = col.link && /^https?:\/\//.test(raw) ? raw : null;
+                    const pick = props.onFilterClick && dim === c.dimensions[0] && raw && raw !== '(other)' ? props.onFilterClick : undefined;
                     return (
                         <span className="flex min-w-0 items-center gap-1">
-                            <span className="truncate" title={text}>{text}</span>
+                            {pick ? (
+                                <button type="button" onClick={() => pick(raw)} title={`Filter the page by ${text}`} className={cn('truncate text-left hover:text-brand-text hover:underline', props.selectedValue === raw && 'font-semibold text-brand-text')}>{text}</button>
+                            ) : <span className="truncate" title={text}>{text}</span>}
                             {href && props.mode !== 'edit' ? <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${text}`} className="shrink-0 text-fg-faint hover:text-fg-muted"><ExternalLink aria-hidden size={12} /></a> : null}
                         </span>
                     );
@@ -66,10 +71,12 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                 const v = typeof r[`m:${id}`] === 'number' ? (r[`m:${id}`] as number) : null;
                 const pv = r[`m:${id}:prev`];
                 const pct = col.visual === 'bar' || col.visual === 'heat' ? (maxOf[id] > 0 && v ? Math.min(100, (v / maxOf[id]) * 100) : 0) : 0;
+                // Conditional formatting (round 2): only tables with rules get the extra classes.
+                const cf = c.rules?.length ? cellStyle(c.rules, col, r) : null;
                 return (
                     <span className="relative flex min-h-7 items-center justify-end gap-2">
                         {pct ? <span aria-hidden className={cn('absolute inset-y-0.5 right-[-6px] rounded-md', metricHeatbar(id))} style={{ width: `calc(${pct}% + 6px)` }} /> : null}
-                        <span className="relative">{fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format })}</span>
+                        <span className={cf ? `relative tc-cf-cell tc-cf-${cf} font-medium` : 'relative'} title={cf ? (cf === 'good' ? 'Meets a good rule' : cf === 'bad' ? 'Matches a bad rule' : 'Needs attention') : undefined}>{fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format })}</span>
                         {showDelta && pv !== undefined ? (
                             <MetricDelta className="relative" current={v} previous={typeof pv === 'number' ? pv : null} format={dsFormat(id)} better={metricBetter(id)} />
                         ) : null}
@@ -88,7 +95,12 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
             ))}
         </div>
     ) : undefined;
-    const pageSize = props.bp === 'sm' ? 5 : Math.max(5, Math.min(c.pageSize, Math.floor((props.height - 140) / 36)));
+    // Phones show two-line list rows (~72px, plus the Sort bar and the pager): size the page to the
+    // cell so no row is cut mid-row, and always paginate there (WS1 round 2, judge fix).
+    const phone = props.bp === 'sm';
+    const pageSize = phone
+        ? Math.max(2, Math.min(5, Math.floor((props.height - 230) / 64)))
+        : Math.max(5, Math.min(c.pageSize, Math.floor((props.height - 140) / 36)));
 
     return (
         <WidgetFrame props={props} skeleton="table" bodyClassName="flex flex-col">
@@ -103,9 +115,12 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                             rowKey={(r, i) => `${c.dimensions.map((d) => String(r[`d:${d}`])).join('|')}-${i}`}
                             defaultSort={defaultSort}
                             density={c.density === 'comfortable' ? 'default' : 'compact'}
-                            pagination={c.pagination ? { pageSize } : undefined}
+                            pagination={c.pagination || phone ? { pageSize } : undefined}
+                            mobileList="compact"
                             footer={footer}
-                            empty={<EmptyState variant="inline" title="No rows in this period" />}
+                            empty={widget.filters?.length || c.rowFilters?.length
+                                ? <EmptyState variant="inline" title="Nothing matches yet" description={widget.filters?.length ? 'No rows match this widget’s filter in this period. Rows appear here as soon as they do.' : 'No rows pass this table’s thresholds in this period.'} />
+                                : <EmptyState variant="inline" title="No rows in this period" />}
                             caption={widget.title}
                         />
                     </div>

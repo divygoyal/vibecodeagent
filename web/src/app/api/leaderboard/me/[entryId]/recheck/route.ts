@@ -30,6 +30,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ entryI
         websiteUrl: entry.website_url,
         accessToken: user.accessToken,
         refreshToken: user.refreshToken,
+        userIdentifier: user.userId,
     });
     const fresh = await findMine(user.userId, entryId);
     return NextResponse.json({

@@ -18,12 +18,27 @@ export function readEnvFile(file) {
 }
 
 /** The dev instance (scripts/dev/up.sh) serving `port`: { dir, REPO, WEB_PORT, ADMIN_URL, … }. */
+// Several instance folders can name the same port (a stopped instance of another worktree keeps its
+// instance.env), so the one whose web process is alive wins, then the newest instance.env.
 export function findInstance(port) {
+    const found = [];
     for (const name of fs.existsSync(DEV_HOME) ? fs.readdirSync(DEV_HOME) : []) {
         const f = path.join(DEV_HOME, name, 'instance.env');
-        if (fs.existsSync(f) && Number(readEnvFile(f).WEB_PORT) === port) return { dir: path.dirname(f), ...readEnvFile(f) };
+        if (!fs.existsSync(f)) continue;
+        const env = readEnvFile(f);
+        if (Number(env.WEB_PORT) !== port) continue;
+        const dir = path.dirname(f);
+        let alive = false;
+        try {
+            const pid = Number(fs.readFileSync(path.join(dir, 'web.pid'), 'utf8').trim());
+            if (pid > 0) { process.kill(pid, 0); alive = true; }
+        } catch (e) {
+            alive = e?.code === 'EPERM';
+        }
+        found.push({ inst: { dir, ...env }, alive, mtime: fs.statSync(f).mtimeMs });
     }
-    return null;
+    found.sort((a, b) => Number(b.alive) - Number(a.alive) || b.mtime - a.mtime);
+    return found[0]?.inst ?? null;
 }
 
 /** All page routes under web/src/app, with route groups removed. */

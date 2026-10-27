@@ -58,6 +58,30 @@ function Tile({ m, total, spark, showDelta, showSpark, sparkHeight, big, mode, c
     );
 }
 
+/**
+ * Progress towards a goal for the period (round 2, C10). "Lower is better" metrics (position,
+ * bounce rate) count as met at or under the target.
+ */
+export function TargetBar({ metricId, value, target, label, currency }: { metricId: string; value: number | null; target: number; label?: string; currency?: string }) {
+    if (!(target > 0) || value === null) return null;
+    const lower = metricBetter(metricId) === 'down';
+    const ratio = lower ? (value > 0 ? target / value : 1) : value / target;
+    const met = lower ? value <= target : value >= target;
+    const pct = Math.max(0, Math.min(1, ratio));
+    const text = `${Math.round(ratio * 100)}% of ${label || 'target'} ${fmtMetricValue(metricId, target, { compact: true, tile: true, currency })}`;
+    return (
+        <div className="mt-2 w-full" data-dash-target="">
+            <div className="flex items-baseline justify-between gap-2 text-meta">
+                <span className={met ? 'font-medium text-up' : 'text-fg-muted'}>{met ? `${label || 'Target'} met` : text}</span>
+                {met ? <span className="text-fg-muted">{text}</span> : null}
+            </div>
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-subtle" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct * 100)} aria-label={text}>
+                <div className={cn('h-full rounded-full', met ? 'bg-up' : 'bg-brand')} style={{ width: `${pct * 100}%` }} />
+            </div>
+        </div>
+    );
+}
+
 export function ScorecardView(props: WidgetViewProps<ScorecardWidget>) {
     const { widget, result, loading, refetching, height } = props;
     const ok = okResult(result);
@@ -65,8 +89,10 @@ export function ScorecardView(props: WidgetViewProps<ScorecardWidget>) {
     const c = widget.config;
     const fam = c.metric.id.split(':')[0];
     const missing = ok?.flags.missingFamilies?.includes(fam as 'ga4' | 'gsc');
+    const target = c.target && c.target.value > 0 && !missing ? c.target : undefined;
+    const totalRaw = ok?.parts.total?.rows[0]?.[`m:${c.metric.id}`];
     return (
-        <div className={cn('relative flex h-full flex-col overflow-hidden rounded-card border border-border-subtle bg-surface p-4 shadow-card', c.align === 'center' && 'items-center text-center')}>
+        <div data-dash-widget="md" className={cn('relative flex h-full flex-col overflow-hidden rounded-card border border-border-subtle bg-surface p-4 shadow-card', c.align === 'center' && 'items-center text-center')}>
             {loading && !ok ? (
                 <div className="flex flex-col gap-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-7 w-28" /><Skeleton className="h-3.5 w-36" /></div>
             ) : result?.status === 'error' && !ok ? (
@@ -76,12 +102,13 @@ export function ScorecardView(props: WidgetViewProps<ScorecardWidget>) {
                     <Tile
                         m={{ ...c.metric, label: c.metric.label || (widget.showTitle !== false ? widget.title : undefined) }}
                         total={ok?.parts.total} spark={ok?.parts.spark}
-                        showDelta={c.comparison.show && props.compare !== 'none'} showSpark={c.sparkline.show}
-                        sparkHeight={Math.max(28, Math.min(72, height - 120))} big={height >= 220} mode={props.compare} currency={ok?.flags.currency} missing={missing}
+                        showDelta={c.comparison.show && props.compare !== 'none'}
+                        sparkHeight={Math.max(28, Math.min(72, height - (target ? 176 : 120)))} showSpark={c.sparkline.show && (!target || height >= 200)} big={height >= 220} mode={props.compare} currency={ok?.flags.currency} missing={missing}
                     />
+                    {target ? <TargetBar metricId={c.metric.id} value={typeof totalRaw === 'number' ? totalRaw : null} target={target.value} label={target.label} currency={ok?.flags.currency} /> : null}
                 </div>
             )}
-            {notes.length && height >= 200 ? <p className="mt-1 truncate text-caption text-fg-muted" title={notes.join(' · ')}>{notes.join(' · ')}</p> : null}
+            {notes.length && height >= (target ? 260 : 200) ? <p className="mt-1 truncate text-caption text-fg-muted" title={notes.join(' · ')}>{notes.join(' · ')}</p> : null}
         </div>
     );
 }
@@ -92,7 +119,7 @@ export function KpiStripView(props: WidgetViewProps<KpiStripWidget>) {
     const c = widget.config;
     const notes = flagNotes(ok, widget);
     return (
-        <div className="relative flex h-full flex-col overflow-hidden rounded-card border border-border-subtle bg-surface shadow-card">
+        <div data-dash-widget="strip" className="relative flex h-full flex-col overflow-hidden rounded-card border border-border-subtle bg-surface shadow-card">
             {widget.showTitle && widget.title ? <h3 className="px-4 pt-3 text-title-sm text-fg">{widget.title}</h3> : null}
             {result?.status === 'error' && !ok ? (
                 <WidgetError result={result} onRetry={props.onRetry} onChooseSource={props.onChooseSource} compact />

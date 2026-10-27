@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy import case, delete, func, select, text
 
 import leaderboard_core as core
+from google_accounts import primary_only
 from models import (
     AdSlot,
     AdSlotRequest,
@@ -869,7 +870,7 @@ def build_router(
         if not core.settings_for(prof, ed)["privacy"]["live"]:
             return {"enabled": False}
         oauth = (await db.execute(
-            select(OAuthConnection).where(OAuthConnection.user_id == entry.user_id, OAuthConnection.provider == "google")
+            select(OAuthConnection).where(OAuthConnection.user_id == entry.user_id, OAuthConnection.provider == "google", primary_only())
         )).scalars().first()
         if not oauth or not oauth.access_token:
             return {"enabled": True, "available": False}

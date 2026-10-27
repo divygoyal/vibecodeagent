@@ -58,7 +58,7 @@ export function PrivacyTab({ goToDanger }: { goToDanger: () => void }) {
                         <FileText aria-hidden size={14} />Privacy policy
                     </Link>
                     <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-brand-text underline underline-offset-2">
-                        Google account permissions<ExternalLink aria-hidden size={12} />
+                        Google account permissions<ExternalLink aria-hidden size={14} />
                     </a>
                 </div>
             </SettingsSection>
@@ -66,7 +66,7 @@ export function PrivacyTab({ goToDanger }: { goToDanger: () => void }) {
             <SettingsSection title="Delete your account" description="Removes your account and the data above.">
                 <SettingsRow
                     title="Ask us to delete everything"
-                    description="You confirm in the Danger zone. Deletion is finished within 30 days."
+                    description="You confirm in the Danger zone. We then delete your account and all its data."
                     control={<Button variant="secondary" icon={ShieldAlert} onClick={goToDanger}>Go to danger zone</Button>}
                 />
             </SettingsSection>

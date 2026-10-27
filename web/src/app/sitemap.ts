@@ -23,6 +23,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         { path: '/leaderboard/advertise', priority: 0.6, changeFrequency: 'weekly' },
         { path: '/tools', priority: 0.8, changeFrequency: 'monthly' },
         ...FREE_TOOLS.map((t) => ({ path: `/tools/${t.slug}`, priority: 0.7, changeFrequency: 'monthly' as Freq })),
+        { path: '/security', priority: 0.5, changeFrequency: 'monthly' },
+        { path: '/changelog', priority: 0.5, changeFrequency: 'weekly' },
         { path: '/about', priority: 0.5, changeFrequency: 'monthly' },
         { path: '/contact', priority: 0.4, changeFrequency: 'yearly' },
         { path: '/privacy', priority: 0.2, changeFrequency: 'yearly' },

@@ -230,6 +230,16 @@ export async function fetchGoogleTokensFromDb(
     }
 }
 
+/** A failed token refresh. `code` is Google's OAuth error ("invalid_grant": the refresh token is revoked or expired). */
+export class GoogleTokenError extends Error {
+    code?: string;
+    constructor(message: string, code?: string) {
+        super(message);
+        this.name = 'GoogleTokenError';
+        this.code = code;
+    }
+}
+
 // Bug #8 fix: Deduplication map for concurrent token refresh requests.
 // Keyed by refresh token, holds the in-flight promise so multiple callers share one refresh.
 const pendingRefresh = new Map<string, Promise<string>>();
@@ -276,6 +286,8 @@ export async function getValidAccessToken(
 
         (async () => {
             let settled = false;
+            // Google's OAuth error code ("invalid_grant" = revoked, expired or evicted refresh token).
+            let oauthError: string | undefined;
             try {
                 const res = await fetch('https://oauth2.googleapis.com/token', {
                     method: 'POST',
@@ -311,6 +323,10 @@ export async function getValidAccessToken(
                     return;
                 }
                 const errText = await res.text();
+                try {
+                    const parsed = JSON.parse(errText) as { error?: unknown };
+                    if (typeof parsed?.error === 'string') oauthError = parsed.error;
+                } catch { /* not JSON */ }
                 console.error('Google token refresh failed:', res.status, errText);
             } catch (err) {
                 console.error('Google token refresh network error:', err);
@@ -324,7 +340,7 @@ export async function getValidAccessToken(
                     if (accessToken) {
                         resolveRefresh!(accessToken);
                     } else {
-                        rejectRefresh!(new Error('Failed to refresh Google token'));
+                        rejectRefresh!(new GoogleTokenError('Failed to refresh Google token', oauthError));
                     }
                 }
             }

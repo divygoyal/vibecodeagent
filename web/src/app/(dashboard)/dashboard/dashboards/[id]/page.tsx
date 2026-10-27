@@ -4,18 +4,34 @@ import { use, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
-import { ArrowLeft, Copy, FileDown, LayoutTemplate, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, FileDown, Globe, LayoutTemplate, Lock, MonitorPlay, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Pill, Skeleton } from '@/components/ui';
+import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Skeleton } from '@/components/ui';
 import { DashboardView, useUrlControls } from '@/components/dashboard-builder/DashboardView';
 import { DashboardBrandHeader } from '@/components/dashboard-builder/DashboardBrandHeader';
 import { ShareDialog } from '@/components/dashboard-builder/ShareDialog';
+import { TvFrame, tvRefreshMs } from '@/components/dashboard-builder/TvMode';
+import { dashRootProps } from '@/components/dashboard-builder/theme/DashTheme';
 import { fetchJson, ownerPageLoader, usePageResults } from '@/components/dashboard-builder/useWidgetData';
 import { canonicalJson } from '@/lib/builder/compile';
 import { presetLabel } from '@/lib/builder/dates';
+import { cssToHex, exportReportPdf, hasReportKit } from '@/lib/builder/reportPdf';
+import { themePreset } from '@/lib/builder/themes';
 import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
+import { useResolvedTheme } from '@/lib/theme';
 import type { DashboardDocV2, DashboardRecord, FilterControl, ShareState } from '@/lib/builder/types';
+
+/** One-time note for dashboards made before the new builder (was a permanent header pill). */
+function noteOlderDashboard(rec: DashboardRecord) {
+    if (rec.schemaVersion !== 1) return;
+    const k = `tc-v1-note-${rec.id}`;
+    try {
+        if (localStorage.getItem(k)) return;
+        localStorage.setItem(k, '1');
+    } catch { /* storage blocked: show it anyway */ }
+    toast.info('This dashboard was made with the older builder. It opens in the new editor; nothing is lost.');
+}
 
 function timeAgo(iso?: string | null): string {
     if (!iso) return '';
@@ -46,15 +62,16 @@ export default function DashboardViewPage({ params }: { params: Promise<{ id: st
             </div>
         );
     }
-    return <Loaded rec={rec} onRecord={(r) => mutate({ dashboard: r }, { revalidate: false })} openShare={sp.get('share') === '1'} router={router} />;
+    return <Loaded rec={rec} onRecord={(r) => mutate({ dashboard: r }, { revalidate: false })} openShare={sp.get('share') === '1'} tv={sp.get('tv') === '1'} router={router} />;
 }
 
-function Loaded({ rec, onRecord, openShare, router }: { rec: DashboardRecord; onRecord: (r: DashboardRecord) => void; openShare: boolean; router: ReturnType<typeof useRouter> }) {
+function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord; onRecord: (r: DashboardRecord) => void; openShare: boolean; tv: boolean; router: ReturnType<typeof useRouter> }) {
     const doc = rec.doc;
+    const appMode = useResolvedTheme();
     const ctl = useUrlControls(doc, { date: true, compare: true, filters: true });
     const [fresh, setFresh] = useState(false);
     const key = `owner:${rec.id}:${rec.rev}:${canonicalJson(ctl.state)}`;
-    const page = usePageResults(key, ownerPageLoader(rec.id, ctl.state.pageId ?? doc.pages[0].id, ctl.state, fresh), doc.settings.autoRefreshSec * 1000);
+    const page = usePageResults(key, ownerPageLoader(rec.id, ctl.state.pageId ?? doc.pages[0].id, ctl.state, fresh), tv ? tvRefreshMs(doc) : doc.settings.autoRefreshSec * 1000);
     const [share, setShare] = useState(openShare);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [wide, setWide] = useState(true);
@@ -89,6 +106,13 @@ function Loaded({ rec, onRecord, openShare, router }: { rec: DashboardRecord; on
     };
     const exportPdf = useCallback(async () => {
         if (!exportRef.current) return;
+        if (hasReportKit(doc.theme)) {
+            // Client report kit: cover as its own first page, credits in the footer.
+            const cs = getComputedStyle(exportRef.current);
+            const tok = (name: string, fallback: string) => cssToHex(cs.getPropertyValue(name).trim(), fallback);
+            toast.promise(exportReportPdf(exportRef.current, { name: doc.name, dateLabel: presetLabel(ctl.state.date.range), theme: doc.theme, background: tok('--tc-canvas', '#f6f7f9'), ink: tok('--tc-fg', '#171a20'), muted: tok('--tc-fg-muted', '#636b78') }), { loading: 'Preparing PDF…', success: 'PDF downloaded', error: 'PDF export failed' });
+            return;
+        }
         const bg = getComputedStyle(document.body).backgroundColor;
         const hex = (() => {
             const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(bg);
@@ -105,21 +129,22 @@ function Loaded({ rec, onRecord, openShare, router }: { rec: DashboardRecord; on
     const header = (
         <div className="flex flex-col gap-3">
             <Link href="/dashboard/dashboards" className="tap-area inline-flex w-fit items-center gap-1 text-body-sm text-fg-muted hover:text-fg"><ArrowLeft aria-hidden size={14} />Dashboards</Link>
-            <DashboardBrandHeader doc={doc} />
+            {doc.theme.cover?.enabled && (ctl.state.pageId ?? doc.pages.find((p) => !p.hidden)?.id) === doc.pages.find((p) => !p.hidden)?.id ? null : <DashboardBrandHeader doc={doc} dark={appMode === 'dark' && Boolean(doc.theme.id)} />}
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                     <h1 className="truncate text-heading text-fg">{doc.name}</h1>
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-body-sm text-fg-muted">
                         <span>{siteLabel}</span>
                         {updatedAt ? <span>· Updated {timeAgo(updatedAt)}</span> : null}
-                        {rec.share.enabled ? <Pill tone="brand" dot>Public link</Pill> : <Pill>Private</Pill>}
-                        {rec.schemaVersion === 1 ? <Pill tone="info">Older dashboard: opens in the new editor</Pill> : null}
+                        {rec.share.enabled
+                            ? <span className="inline-flex items-center gap-1"><Globe aria-hidden size={14} />Public</span>
+                            : <span className="inline-flex items-center gap-1"><Lock aria-hidden size={14} />Private</span>}
                     </p>
                     {doc.description ? <p className="mt-1 max-w-[720px] text-body text-fg-secondary">{doc.description}</p> : null}
                 </div>
                 <div className="flex items-center gap-2" data-pdf-ignore="true">
                     <Button variant="ghost" size="md" icon={RefreshCw} iconOnly aria-label="Refresh data" onClick={() => { setFresh(true); void page.mutate().finally(() => setFresh(false)); }} />
-                    {wide ? <Button asChild variant="secondary" icon={Pencil}><Link href={`/dashboard/dashboards/${rec.id}/edit`}>Edit</Link></Button> : null}
+                    {wide ? <Button asChild variant="secondary" icon={Pencil}><Link href={`/dashboard/dashboards/${rec.id}/edit`} onClick={() => noteOlderDashboard(rec)}>Edit</Link></Button> : null}
                     <Button variant="primary" icon={Share2} onClick={() => setShare(true)}>Share</Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" iconOnly icon={MoreHorizontal} aria-label="More actions" /></DropdownMenuTrigger>
@@ -127,6 +152,7 @@ function Loaded({ rec, onRecord, openShare, router }: { rec: DashboardRecord; on
                             <DropdownMenuItem icon={Copy} onSelect={() => duplicate(false)}>Duplicate</DropdownMenuItem>
                             <DropdownMenuItem icon={LayoutTemplate} onSelect={() => duplicate(true)}>Save as my template</DropdownMenuItem>
                             <DropdownMenuItem icon={FileDown} onSelect={exportPdf}>Export PDF</DropdownMenuItem>
+                            <DropdownMenuItem icon={MonitorPlay} onSelect={() => { void document.documentElement.requestFullscreen?.().catch(() => undefined); ctl.setTv(true); }}>Present (TV mode)</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem icon={Trash2} destructive onSelect={() => setConfirmDelete(true)}>Delete</DropdownMenuItem>
                         </DropdownMenuContent>
@@ -136,6 +162,21 @@ function Loaded({ rec, onRecord, openShare, router }: { rec: DashboardRecord; on
             {!wide ? <Banner variant="neutral">Editing works on larger screens.</Banner> : null}
         </div>
     );
+
+    if (tv) {
+        const tvMode = doc.theme.mode === 'auto' ? (themePreset(doc.theme.id).preferredMode ?? appMode) : doc.theme.mode;
+        const r = dashRootProps(doc.theme, tvMode);
+        return (
+            <TvFrame doc={doc} pageId={ctl.state.pageId} onPage={ctl.setPage} onExit={() => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); ctl.setTv(false); }}
+                resolved={page.data?.resolved} updatedAt={updatedAt} themeAttrs={r?.attrs ?? { 'data-theme': tvMode }} themeStyle={r?.style} themeClass={r?.className}>
+                {(fit) => <DashboardView
+                    fitHeight={fit} doc={doc} mode="view" siteLabel={siteLabel} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter}
+                    allow={{ date: true, compare: true, filters: true }} data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)}
+                    onRetry={() => void page.mutate()} options={{}} shell="inherit" tv
+                />}
+            </TvFrame>
+        );
+    }
 
     return (
         <>
@@ -147,6 +188,8 @@ function Loaded({ rec, onRecord, openShare, router }: { rec: DashboardRecord; on
                 onPage={ctl.setPage}
                 onDate={ctl.setDate}
                 onFilter={ctl.setFilter}
+                onVariable={ctl.setVariable}
+                onInteraction={ctl.setInteraction}
                 allow={{ date: true, compare: true, filters: true }}
                 data={page.data}
                 loading={!page.data && !page.error}
@@ -156,6 +199,8 @@ function Loaded({ rec, onRecord, openShare, router }: { rec: DashboardRecord; on
                 header={header}
                 exportRef={exportRef}
                 onChooseSource={wide ? () => router.push(`/dashboard/dashboards/${rec.id}/edit`) : undefined}
+                shell="panel"
+                appMode={appMode}
             />
             {page.error ? <Banner variant="danger" className="mt-4">{page.error instanceof Error ? page.error.message : 'Could not load data'}</Banner> : null}
             <ShareDialog

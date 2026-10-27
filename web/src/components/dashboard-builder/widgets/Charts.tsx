@@ -5,7 +5,7 @@ import { useElementWidth } from '../useElementWidth';
 import { useReducedMotion } from 'framer-motion';
 import { Bar, BarChart, CartesianGrid, Tooltip as RTooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts';
 
-import { BarList, ChartTooltipCard, Donut, type ChartTooltipRow } from '@/components/charts';
+import { AXIS_LINE, AXIS_TICK, BarList, ChartTooltipCard, Donut, GRID_STROKE, niceAxis, type ChartTooltipRow } from '@/components/charts';
 import { EmptyState } from '@/components/ui';
 import { fmtAxis } from '@/lib/format';
 import { channelColor, deviceColor, CATEGORICAL, CATEGORICAL_OTHER } from '@/lib/metrics';
@@ -82,7 +82,7 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
 
 // ── Bar ──────────────────────────────────────────────────────────────────
 
-function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, labels }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; height: number; currency?: string; labels?: Record<string, string> }) {
+function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, labels, onPick }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; height: number; currency?: string; labels?: Record<string, string>; onPick?: (value: string) => void }) {
     const c = widget.config;
     const anim = !useReducedMotion();
     const vertical = c.orientation === 'vertical';
@@ -105,11 +105,26 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, lab
             });
         return <ChartTooltipCard title={String(row.__label ?? '')} rows={out} />;
     };
-    const catAxis = { dataKey: '__label', type: 'category' as const, tick: { fill: 'var(--color-chart-tick)', fontSize: 11 }, tickLine: false, axisLine: { stroke: 'var(--color-chart-axis)' }, interval: 0 as const };
-    const valAxis = { type: 'number' as const, tickFormatter: fmtV(metrics[0]), tick: { fill: 'var(--color-chart-tick)', fontSize: 11 }, tickLine: false, axisLine: false, tickCount: 5, domain: [0, 'auto'] as [number, 'auto'] };
+    // Round value steps (0 / 5K / 10K) shared with every other chart (components/charts/axis.ts).
+    let valMax = 0;
+    for (const r of data) {
+        const keys = stacked ? seriesKeys! : metrics.flatMap((id) => (compare ? [`m:${id}`, `m:${id}:prev`] : [`m:${id}`]));
+        let sum = 0;
+        for (const k of keys) {
+            const v = (r as Record<string, unknown>)[k];
+            if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+            if (stacked) sum += v; else if (v > valMax) valMax = v;
+        }
+        if (stacked && sum > valMax) valMax = sum;
+    }
+    const valFmt = getMetric(metrics[0])?.format;
+    const nice = niceAxis(valMax, { format: valFmt === 'percent' || valFmt === 'duration' ? valFmt : valFmt === 'integer' ? 'count' : 'number' });
+    const catAxis = { dataKey: '__label', type: 'category' as const, tick: AXIS_TICK, tickLine: false, axisLine: AXIS_LINE, interval: 0 as const };
+    const valAxis = { type: 'number' as const, tickFormatter: fmtV(metrics[0]), tick: AXIS_TICK, tickLine: false, axisLine: false, domain: nice.domain, ticks: nice.ticks, interval: 0 as const };
     return (
-        <BarChart responsive data={data} layout={vertical ? 'horizontal' : 'vertical'} style={{ width: '100%', height }} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barCategoryGap="24%" accessibilityLayer>
-            <CartesianGrid horizontal={vertical} vertical={!vertical} stroke="var(--color-chart-grid)" />
+        <BarChart responsive data={data} layout={vertical ? 'horizontal' : 'vertical'} style={{ width: '100%', height, ...(onPick ? { cursor: 'pointer' } : {}) }}
+            onClick={onPick ? (st: { activeLabel?: string | number; activeIndex?: number | string | null }) => { const r = typeof st?.activeIndex === 'number' ? rows[st.activeIndex] : rows.find((x) => dimText(dim, x[`d:${dim}`], labels) === st?.activeLabel); const raw = r?.[`d:${dim}`]; if (raw !== undefined && raw !== null && raw !== '(other)') onPick(String(raw)); } : undefined} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barCategoryGap="24%" accessibilityLayer>
+            <CartesianGrid horizontal={vertical} vertical={!vertical} stroke={GRID_STROKE} />
             {vertical ? <XAxis {...catAxis} tickFormatter={(v: string) => (v.length > 12 ? `${v.slice(0, 11)}…` : v)} /> : <YAxis {...catAxis} width={Math.min(140, Math.max(60, Math.max(...data.map((d) => String(d.__label).length)) * 6.5))} tickFormatter={(v: string) => (v.length > 20 ? `${v.slice(0, 19)}…` : v)} />}
             {vertical ? <YAxis {...valAxis} width={44} /> : <XAxis {...valAxis} />}
             <RTooltip content={tooltip} cursor={{ fill: 'var(--color-subtle)' }} isAnimationActive={false} />
@@ -140,6 +155,7 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
             ) : useList ? (
                 <div className="h-full overflow-y-auto">
                     <BarList
+                        onItemClick={props.onFilterClick ? (it) => { const raw = String(it.key).replace(/-\d+$/, ''); if (raw && raw !== '(other)') props.onFilterClick!(raw); } : undefined}
                         items={rows.map((r, i) => ({
                             key: `${String(r[`d:${c.dimension}`])}-${i}`,
                             label: dimText(c.dimension, r[`d:${c.dimension}`], frame.labels),
@@ -156,7 +172,7 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
                     />
                 </div>
             ) : (
-                <BarChartPlot widget={widget} rows={rows} seriesKeys={frame.seriesKeys} compare={compare} height={h} currency={ok?.flags.currency} labels={frame.labels} />
+                <BarChartPlot widget={widget} rows={rows} seriesKeys={frame.seriesKeys} compare={compare} height={h} currency={ok?.flags.currency} labels={frame.labels} onPick={props.onFilterClick} />
             )}
         </WidgetFrame>
     );
@@ -184,7 +200,9 @@ export function PieView(props: WidgetViewProps<PieWidget>) {
                 <EmptyState variant="inline" title={`No ${metricLabel(id).toLowerCase()} in this period`} />
             ) : (
                 <div ref={box} className="flex h-full items-center overflow-hidden">
-                    <Donut
+                    {/* Size and legend side depend on the cell width: draw nothing until it is measured, so the
+                        donut never paints at the 96px fallback first (the golden-screenshot race). */}
+                    {width > 0 ? <Donut
                         items={rows.map((r, i) => {
                             const raw = String(r[`d:${c.dimension}`] ?? '');
                             return { key: `${raw}-${i}`, label: dimText(c.dimension, raw, frame.labels), value: typeof r[`m:${id}`] === 'number' ? (r[`m:${id}`] as number) : 0, color: categoryColor(c.dimension, raw, i) };
@@ -195,7 +213,7 @@ export function PieView(props: WidgetViewProps<PieWidget>) {
                         maxSlices={maxSlices}
                         legend={bottom ? 'bottom' : 'right'}
                         className="w-full"
-                    />
+                    /> : null}
                 </div>
             )}
         </WidgetFrame>

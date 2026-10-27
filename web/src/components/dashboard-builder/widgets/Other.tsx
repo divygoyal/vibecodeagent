@@ -43,20 +43,20 @@ export function GeoView(props: WidgetViewProps<GeoWidget>) {
     const below = c.topList > 0 && !side;
     const listW = side ? Math.min(240, Math.floor(width * 0.34)) : 0;
     const mapW = Math.max(120, width - listW - (side ? 16 : 0));
-    const mapH = below ? Math.max(100, h - Math.min(c.topList, 5) * 36 - 8) : h;
+    const mapH = below ? Math.max(100, h - Math.min(c.topList, 5) * 36 - 12) : h;
     const top = [...values.entries()].sort((a, b) => b[1] - a[1]).slice(0, c.topList || 0);
     const fmt = (v: number) => fmtMetricValue(id, v, { compact: true, currency: ok?.flags.currency });
     return (
         <WidgetFrame props={props}>
-            <div ref={ref} className={cn('flex h-full min-w-0', side ? 'flex-row gap-4' : 'flex-col gap-2')}>
+            <div ref={ref} className={cn('flex h-full min-w-0', side ? 'flex-row gap-4' : 'flex-col gap-3')}>
                 {!frame ? null : !values.size ? (
                     <EmptyState variant="inline" title={`No ${metricLabel(id).toLowerCase()} by country in this period`} />
                 ) : (
                     <>
-                        {width > 0 ? <ChoroplethMap values={values} color={metricColor(id)} width={mapW} height={mapH} projection={c.projection} steps={c.scale.steps} format={fmt} label={metricLabel(id)} showLegend={c.showLegend} /> : null}
+                        {width > 0 ? <ChoroplethMap values={values} color={metricColor(id)} width={mapW} height={mapH} projection={c.projection} steps={c.scale.steps} format={fmt} label={metricLabel(id)} showLegend={c.showLegend} onSelect={props.onFilterClick} /> : null}
                         {top.length ? (
                             <div className="min-w-0 flex-1 overflow-hidden" style={side ? { width: listW } : undefined}>
-                                <BarList items={top.map(([code, v]) => ({ key: code, label: countryName(code), text: countryName(code), value: v }))} metric={dsKey(id)} limit={below ? Math.min(top.length, 5) : top.length} formatValue={(v) => fmtMetricValue(id, v, { currency: ok?.flags.currency })} labelHeader="Country" />
+                                <BarList items={top.map(([code, v]) => ({ key: code, label: countryName(code), text: countryName(code), value: v }))} metric={dsKey(id)} limit={below ? Math.min(top.length, 5) : top.length} formatValue={(v) => fmtMetricValue(id, v, { currency: ok?.flags.currency })} labelHeader="Country" onItemClick={props.onFilterClick ? (it) => props.onFilterClick!(String(it.key)) : undefined} />
                             </div>
                         ) : null}
                     </>
@@ -69,7 +69,7 @@ export function GeoView(props: WidgetViewProps<GeoWidget>) {
 // ── Text, section, image ─────────────────────────────────────────────────
 
 export function fillVars(md: string, vars: Record<string, string>): string {
-    return md.replace(/\{\{\s*([a-z_:]+)\s*\}\}/gi, (m, k: string) => vars[k] ?? m);
+    return md.replace(/\{\{\s*([a-z0-9_:]+)\s*\}\}/gi, (m, k: string) => vars[k] ?? vars[k.toLowerCase()] ?? m);
 }
 
 const ROLE: Record<TextWidget['config']['role'], string> = {
@@ -80,11 +80,17 @@ const ROLE: Record<TextWidget['config']['role'], string> = {
     callout: 'text-body text-fg-secondary',
 };
 
-export function TextView({ widget, vars }: WidgetViewProps<TextWidget>) {
+/** Viewers never see empty bullet points left for the author to fill in (round 2). */
+export function stripEmptyBullets(md: string): string {
+    return /^[ \t]*[-*+][ \t]*$/m.test(md) ? md.split('\n').filter((l) => !/^[ \t]*[-*+][ \t]*$/.test(l)).join('\n') : md;
+}
+
+export function TextView({ widget, vars, mode }: WidgetViewProps<TextWidget>) {
     const c = widget.config;
-    const md = c.variables ? fillVars(c.markdown, vars) : c.markdown;
+    const filled = c.variables ? fillVars(c.markdown, vars) : c.markdown;
+    const md = mode === 'edit' ? filled : stripEmptyBullets(filled);
     return (
-        <div className={cn(
+        <div data-dash-widget={c.role !== 'callout' && widget.style?.background === 'surface' ? 'md' : undefined} className={cn(
             'h-full overflow-auto',
             c.role === 'callout' ? 'rounded-card border border-border-subtle bg-surface-sunken p-4' : widget.style?.background === 'surface' ? 'rounded-card border border-border-subtle bg-surface p-4 shadow-card' : 'px-1 py-1',
         )}>

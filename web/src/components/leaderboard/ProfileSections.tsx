@@ -165,7 +165,6 @@ export function GrowthCard({ p }: { p: ProfilePayload }) {
     if (g.rank_overall !== null) rows.push(['Overall rank', <span key="r" className="font-medium">#{g.rank_overall} <span className="text-fg-muted">of {g.rank_overall_total}</span></span>]);
     if (g.rank_category !== null && p.category) rows.push([`Rank in ${p.category}`, <span key="rc" className="font-medium">#{g.rank_category} <span className="text-fg-muted">of {g.rank_category_total}</span></span>]);
     if (g.best_day) rows.push(['Best day', <span key="b" className="font-medium">{fmtDay(g.best_day.date)}{g.best_day.value !== undefined ? <span className="text-fg-muted"> · {fmtFull(g.best_day.value)} visitors</span> : null}</span>]);
-    if (g.days_listed !== null) rows.push(['Listed for', <span key="d" className="font-medium">{g.days_listed} day{g.days_listed === 1 ? '' : 's'}</span>]);
     if (rows.length === 0) return null;
     return (
         <Card>

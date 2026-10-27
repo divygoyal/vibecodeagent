@@ -7,7 +7,7 @@ import { normalizeHost } from '@/lib/sites/pairing';
 import type { ControlState, DashboardDocV2, DashboardQueryResponse, SourceRef, WidgetDef } from '../types';
 import { evaluateWidgets, type EngineDeps } from './engine';
 import { loadSiteDirectory, sourceLabel, type SiteDirectory } from './sources';
-import { googleTokenFor } from './access';
+import { googleTokenFor, googleTokenForAsset } from './access';
 
 export function jsonError(status: number, error: string, extra: Record<string, unknown> = {}) {
     return NextResponse.json({ error, ...extra }, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -49,6 +49,7 @@ export function ownerDeps(userIdentifier: string, mode: 'owner' | 'public', fres
         mode,
         fresh: mode === 'owner' && fresh,
         getToken: () => (tokenPromise ??= googleTokenFor(userIdentifier)),
+        getTokenFor: (asset) => googleTokenForAsset(userIdentifier, asset),
     };
 }
 

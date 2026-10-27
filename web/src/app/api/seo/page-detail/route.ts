@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { getValidAccessToken } from '@/lib/googleApi';
-import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
+import { getGoogleCredentialsForAsset } from '@/lib/serverAuth';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const GSC_BASE = 'https://www.googleapis.com/webmasters/v3';
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     const userId = session.user.id;
 
     // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
-    const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId));
+    const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForAsset(req, String(userId), siteUrl ? { kind: 'gsc', id: siteUrl } : null);
 
     if (!googleAccess && !googleRefresh) {
       return NextResponse.json({ error: 'Google not connected', code: 'GOOGLE_NOT_CONNECTED' }, { status: 400 });

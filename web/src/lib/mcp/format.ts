@@ -125,11 +125,17 @@ export function render(header: string[], sections: Section[], footer: string[] =
     return { text, rowsReturned: counts.reduce((a, b) => a + b, 0), truncated, flaggedCells: 0 };
 }
 
-/** {columns, rows} JSON for format:"json". */
-export function renderJson(sections: Section[], meta: Record<string, unknown>, budget = OUTPUT_BUDGET_CHARS): { text: string; value: Record<string, unknown>; rowsReturned: number; truncated: boolean } {
+export interface JsonTable { name?: string; columns: string[]; rows: (string | number | null)[][] }
+
+/**
+ * {columns, rows} JSON for format:"json". `data` is the same rows for structuredContent:
+ * {columns, rows} for one section, {tables} for several (the tool output schemas allow one section only).
+ */
+export function renderJson(sections: Section[], meta: Record<string, unknown>, budget = OUTPUT_BUDGET_CHARS): { text: string; value: Record<string, unknown>; data: { columns: string[]; rows: JsonTable['rows'] } | { tables: JsonTable[] }; rowsReturned: number; truncated: boolean } {
     const counts = sections.map((s) => s.rows.length);
+    const tablesFor = (): JsonTable[] => sections.map((s, i) => ({ ...(s.title ? { name: s.title } : {}), columns: s.columns, rows: s.rows.slice(0, counts[i]).map((r) => r.map((c) => (c === undefined ? null : c))) }));
     const make = () => {
-        const tables = sections.map((s, i) => ({ ...(s.title ? { name: s.title } : {}), columns: s.columns, rows: s.rows.slice(0, counts[i]).map((r) => r.map((c) => (c === undefined ? null : c))) }));
+        const tables = tablesFor();
         return tables.length === 1 ? { ...tables[0], meta } : { tables, meta };
     };
     let value = make();
@@ -149,7 +155,9 @@ export function renderJson(sections: Section[], meta: Record<string, unknown>, b
         (value as { meta: Record<string, unknown> }).meta = { ...meta, truncated: true };
         text = JSON.stringify(value);
     }
-    return { text, value, rowsReturned: counts.reduce((a, b) => a + b, 0), truncated };
+    const tables = tablesFor();
+    const data = tables.length === 1 ? { columns: tables[0].columns, rows: tables[0].rows } : { tables };
+    return { text, value, data, rowsReturned: counts.reduce((a, b) => a + b, 0), truncated };
 }
 
 export function headerLine(parts: (string | null | undefined | false)[]): string {

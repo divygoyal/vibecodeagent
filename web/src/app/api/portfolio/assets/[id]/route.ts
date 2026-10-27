@@ -58,7 +58,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!patch) return NextResponse.json({ error: 'Nothing to change' }, { status: 400 });
 
     try {
-        const assets = await adminStore.getAssets(identifier);
+        let assets = await adminStore.getAssets(identifier);
+        // A site or a target the store has not seen yet (the user just added it in Google and pressed "Check
+        // again", or has never opened the portfolio): store the current Google inventory once, then look again.
+        const wanted = (list: StoreAsset[]) => {
+            const s = membersOf(list, key);
+            if (!s) return false;
+            if (typeof patch.gscSite === 'string') return list.some((a) => a.asset_kind === 'gsc' && a.asset_id === patch.gscSite && !a.missing);
+            if (typeof patch.ga4Property === 'string') return list.some((a) => a.asset_kind === 'ga4' && a.asset_id === patch.ga4Property && !a.missing);
+            return true;
+        };
+        if (!wanted(assets)) {
+            const access = await googleAccessFor(identifier, req);
+            if (access.ok) assets = await repairPairs(identifier, access.token).catch(() => assets);
+        }
         const site = membersOf(assets, key);
         if (!site) return NextResponse.json({ error: 'Site not found' }, { status: 404 });
         const members = [site.gsc, site.ga4].filter((a): a is StoreAsset => Boolean(a));

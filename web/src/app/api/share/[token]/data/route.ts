@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
+import { accessForAsset, storedCredentialsForAsset } from '@/lib/googleAccounts';
 import { getShareData } from '@/app/api/share/route';
 import {
-    fetchGoogleTokensFromDb,
     getValidAccessToken,
     fetchAnalyticsDashboard,
     fetchSeoDashboard,
@@ -86,7 +86,8 @@ export async function GET(
     }
 
     /* ─── Fetch the share owner's Google tokens ─── */
-    const tokens = await fetchGoogleTokensFromDb(share.userId);
+    // The share owner's token for the shared property (a linked Google account's when it lists it).
+    const tokens = await storedCredentialsForAsset(share.userId, share.propertyId ? { kind: 'ga4', id: share.propertyId } : share.siteUrl ? { kind: 'gsc', id: share.siteUrl } : null);
     if (!tokens) {
         return NextResponse.json(
             { error: 'Analytics data is temporarily unavailable' },
@@ -161,7 +162,8 @@ export async function GET(
     /* ─── Fetch SEO data (if enabled and siteUrl is available) ─── */
     if (shareConfig.seo && share.siteUrl) {
         try {
-            const seoDashboard = await fetchSeoDashboard(accessToken, share.siteUrl);
+            const seoAccess = await accessForAsset(share.userId, { kind: 'gsc', id: share.siteUrl }, async () => tokens);
+            const seoDashboard = await fetchSeoDashboard(seoAccess.ok ? seoAccess.token : accessToken, share.siteUrl);
             result.seo = seoDashboard;
         } catch (err) {
             console.error('Share data — GSC fetch error:', err);

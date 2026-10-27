@@ -40,7 +40,7 @@ export default async function LeaderboardWidget({ params, searchParams }: { para
                                 <ShieldCheck aria-hidden size={13} strokeWidth={1.75} /> {e.verification.label}
                             </p>
                         </div>
-                        {e.live_enabled ? <LiveNow idOrSlug={e.slug || String(e.id)} /> : null}
+                        {e.live_enabled ? <LiveNow entryId={e.id} /> : null}
                     </div>
                     <div className="flex items-end justify-between gap-4">
                         <div>

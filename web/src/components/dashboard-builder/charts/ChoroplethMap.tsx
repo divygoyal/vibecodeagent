@@ -42,9 +42,11 @@ export interface ChoroplethMapProps {
     format: (v: number) => string;
     label: string;
     showLegend: boolean;
+    /** Click to filter (round 2): a click on a country with data calls this with its code. */
+    onSelect?: (code: string) => void;
 }
 
-export function ChoroplethMap({ values, color, width, height, projection, steps, format, label, showLegend }: ChoroplethMapProps) {
+export function ChoroplethMap({ values, color, width, height, projection, steps, format, label, showLegend, onSelect }: ChoroplethMapProps) {
     const [features, setFeatures] = useState<CountryFeature[] | null>(null);
     const [failed, setFailed] = useState(false);
     const [hover, setHover] = useState<{ x: number; y: number; code: string } | null>(null);
@@ -80,7 +82,7 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
 
     return (
         <div className="relative" style={{ width, height }}>
-            <svg ref={ref} width={width} height={mapH} role="img" aria-label={`${label} by country`} onMouseLeave={() => setHover(null)}>
+            <svg ref={ref} width={width} height={mapH} className="block" role="img" aria-label={`${label} by country`} onMouseLeave={() => setHover(null)}>
                 {features.map((f, i) => {
                     const code = f.id !== undefined ? numericToAlpha2(f.id) : null;
                     const v = code ? values.get(code) : undefined;
@@ -93,6 +95,8 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
                             fill={fillFor(v)}
                             stroke="var(--color-surface)"
                             strokeWidth={0.5}
+                            onClick={onSelect && code && v ? () => onSelect(code) : undefined}
+                            style={onSelect && code && v ? { cursor: 'pointer' } : undefined}
                             onMouseMove={(e) => {
                                 const box = ref.current?.getBoundingClientRect();
                                 if (box && code) setHover({ x: e.clientX - box.left, y: e.clientY - box.top, code });
@@ -108,7 +112,7 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
                 </div>
             ) : null}
             {showLegend ? (
-                <div className="mt-1 flex items-center gap-2 text-caption text-fg-muted">
+                <div className="mt-1 flex h-[18px] items-center gap-2 overflow-hidden whitespace-nowrap text-caption leading-none text-fg-muted">
                     <span className="tabular-nums">{format(0)}</span>
                     <span className="flex h-2 w-28 overflow-hidden rounded-full">
                         {Array.from({ length: steps }, (_, i) => (

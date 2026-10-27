@@ -106,7 +106,7 @@ function Settings() {
             <PageHeader
                 title="Settings"
                 subtitle="Your account, Google connection and preferences"
-                tabs={<Tabs items={TAB_ITEMS} value={tab} onValueChange={setTab} ariaLabel="Settings sections" panelIdPrefix="settings" />}
+                tabs={<Tabs items={TAB_ITEMS} value={tab} onValueChange={setTab} ariaLabel="Settings sections" panelIdPrefix="settings" showIcons />}
             />
             <div id={`settings-${tab}`} role="tabpanel" className="flex flex-col gap-4">
                 {tab === 'profile' ? <ProfileTab /> : null}

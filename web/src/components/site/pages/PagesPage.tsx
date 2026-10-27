@@ -8,6 +8,7 @@ import { fmtDuration, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
 import { METRICS } from '@/lib/metrics';
 import { BarList } from '@/components/charts/BarList';
 import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
+import { TrendBars } from '@/components/charts/TrendBars';
 import { Banner } from '@/components/ui/Banner';
 import { Button } from '@/components/ui/Button';
 import { Drawer } from '@/components/ui/Drawer';
@@ -18,9 +19,12 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Table, type TableColumn } from '@/components/ui/Table';
 import { mergePages, type MergedPage } from '../lib/pages';
 import { isDecaying, pageRef } from '../lib/rules';
-import type { DecayRow, Ga4BreakdownResponse, GscDetailResponse, GscRowsResponse } from '../lib/types';
+import type { DecayRow, Ga4BreakdownResponse, Ga4PageTrends, GscDetailResponse, GscRowsResponse } from '../lib/types';
 import { SiteHeader } from '../SiteHeader';
+import { sourceParts } from '../SourceIcon';
 import { AskButton, LoadError } from '../SiteStates';
+import { PagePath } from '../PagePath';
+import { pageLabel } from '../lib/pagePath';
 import { downloadCsv, useGa4, useGsc, useSite, useSiteRange } from '../useSiteData';
 import { useStringParam } from '../useTabParam';
 
@@ -49,6 +53,19 @@ export function PagesPage() {
     const ga = useGa4<Ga4BreakdownResponse>(site.hasGa4 ? 'pages' : null);
     const sc = useGsc<GscRowsResponse>(site.hasGsc ? 'pages' : null);
     const decay = useGsc<{ rows: DecayRow[] }>(site.hasGsc ? 'decay' : null);
+    // Titles for the top pages and trend bars for the top 25 (one extra GA4 call pair, cached).
+    const trends = useGa4<Ga4PageTrends>(site.hasGa4 ? 'pageTrends' : null, { extra: { limit: '30' } });
+    const { titleBy, trendBy, trendMax } = useMemo(() => {
+        const t = new Map<string, string>();
+        const tr = new Map<string, number[]>();
+        for (const x of trends.data?.titles ?? []) t.set(pageRef(x.path, x.host || site.siteHost).key, x.title);
+        for (const x of trends.data?.rows ?? []) {
+            const k = pageRef(x.path, x.host || site.siteHost).key;
+            if (x.title) t.set(k, x.title);
+            if (x.trend) tr.set(k, x.trend);
+        }
+        return { titleBy: t, trendBy: tr, trendMax: Math.max(0, ...[...tr.values()].flat()) };
+    }, [trends.data, site.siteHost]);
     const [segRaw, setSeg] = useStringParam('segment');
     const segment = (SEGMENTS.some((s) => s.value === segRaw) ? segRaw : 'all') as Segment;
     const [pageKey, setPageKey] = useStringParam('page', 'push');
@@ -82,9 +99,17 @@ export function PagesPage() {
     const columns: TableColumn<Row>[] = [
         {
             key: 'page', header: 'Page', width: '34%', sortable: true, firstSortDir: 'asc', sortValue: (r) => r.label,
-            cell: (r) => <span title={r.url ?? r.label}>{r.label}</span>,
-            heat: site.hasGa4 ? { metric: 'pageviews', value: (r) => r.views } : { metric: 'clicks', value: (r) => r.clicks },
+            cell: (r) => <PagePath path={r.label} title={titleBy.get(r.key)} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto" />,
+            // Rows with trend bars read better without a heat bar; keep it for GSC-only sites.
+            heat: site.hasGa4 ? undefined : { metric: 'clicks', value: (r) => r.clicks },
         },
+        ...(site.hasGa4 ? [{
+            key: 'trend', header: 'Trend', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
+            cell: (r: Row) => {
+                const t = trendBy.get(r.key);
+                return t ? <TrendBars values={t} max={trendMax} color={METRICS.pageviews.color} partialLast ariaLabel={`Views trend for ${r.label}`} /> : <span className="text-meta text-fg-faint" title="Trend bars show for the top 30 pages by views">–</span>;
+            },
+        }] : []),
         ...(site.hasGa4 ? [
             { key: 'views', header: 'Views', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.views ?? -1, cell: (r: Row) => fmtFull(r.views) },
             { key: 'users', header: 'Users', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.users ?? -1, cell: (r: Row) => fmtFull(r.users) },
@@ -98,7 +123,7 @@ export function PagesPage() {
         ...(compareOn ? [{
             key: 'delta', header: site.hasGa4 ? 'Δ views' : 'Δ clicks', align: 'right' as const, sortable: true,
             sortValue: (r: Row) => { const c = change(r, site.hasGa4); return c.prev === undefined || c.prev === null ? null : c.cur - c.prev; },
-            cell: (r: Row) => { const c = change(r, site.hasGa4); return c.prev === undefined ? '' : <MetricDelta metric={site.hasGa4 ? 'pageviews' : 'clicks'} current={c.cur} previous={c.prev} />; },
+            cell: (r: Row) => { const c = change(r, site.hasGa4); return c.prev === undefined ? '' : <MetricDelta metric={site.hasGa4 ? 'pageviews' : 'clicks'} current={c.cur} previous={c.prev} variant="chip" />; },
         }] : []),
         ...(segment === 'decaying' ? [{
             key: 'decay', header: 'Clicks / 28 days', align: 'right' as const, cell: (r: Row) => (r.decay ? <span className="whitespace-nowrap">{r.decay.map(fmtFull).join(' → ')}</span> : '–'),
@@ -152,22 +177,24 @@ export function PagesPage() {
                 )}
             />
             {(ga.data?.truncated || sc.data?.truncated) ? <p className="mt-2 text-meta text-fg-muted">Showing the top pages Google returned for this range.</p> : null}
-            <PageDrawer row={selected} pageKey={pageKey} loading={loading} onClose={() => void setPageKey(null)} />
+            <PageDrawer row={selected} pageKey={pageKey} knownTitle={pageKey ? titleBy.get(pageKey) ?? null : null} loading={loading} onClose={() => void setPageKey(null)} />
         </div>
     );
 }
 
 /** Page drawer: KPIs, views chart, queries for this page, sources, Ask. */
-function PageDrawer({ row, pageKey, loading, onClose }: { row: Row | null; pageKey: string | null; loading: boolean; onClose: () => void }) {
+function PageDrawer({ row, pageKey, knownTitle, loading, onClose }: { row: Row | null; pageKey: string | null; knownTitle: string | null; loading: boolean; onClose: () => void }) {
     const site = useSite();
     const { compareOn } = useSiteRange();
     const open = Boolean(pageKey);
-    const gaPage = useGa4<{ series: Record<string, number | string | null>[]; totals: { pageviews: number; users: number; engagement: number; conversions: number }; previous: { pageviews: number; users: number } | null; sources: { name: string; views: number }[] }>(
+    const gaPage = useGa4<{ series: Record<string, number | string | null>[]; totals: { pageviews: number; users: number; engagement: number; conversions: number }; previous: { pageviews: number; users: number } | null; sources: { name: string; views: number }[]; title?: string | null }>(
         open && row?.gaPath ? 'page' : null,
         { extra: row?.gaPath ? { path: row.gaPath, ...(row.gaHost ? { host: row.gaHost } : {}) } : undefined },
     );
     const scPage = useGsc<GscDetailResponse>(open && row?.url ? 'detail' : null, { extra: row?.url ? { page: row.url } : undefined });
     const title = row?.label ?? pageKey ?? '';
+    // The page's <title> from GA4: the top pages already have it, the drawer's own report has it for the rest.
+    const pageTitle = knownTitle ?? gaPage.data?.title ?? null;
     const prompt = row
         ? `How can I improve ${title} on ${site.siteHost ?? site.label}?${row.views !== null ? ` It had ${fmtFull(row.views)} views and ${fmtDuration(row.engagement ?? 0)} average engagement.` : ''}${row.clicks !== null ? ` In Google it got ${fmtFull(row.clicks)} clicks from ${fmtFull(row.impressions)} impressions at position ${fmtPosition(row.position)}.` : ''}`
         : '';
@@ -175,8 +202,8 @@ function PageDrawer({ row, pageKey, loading, onClose }: { row: Row | null; pageK
         <Drawer
             open={open}
             onOpenChange={(o) => { if (!o) onClose(); }}
-            title={<span className="[overflow-wrap:anywhere]">{title}</span>}
-            subtitle="Page"
+            title={<span className="[overflow-wrap:anywhere]">{pageLabel(title)}</span>}
+            subtitle={pageTitle ? <span className="[overflow-wrap:anywhere]">{pageTitle}</span> : 'Page'}
             width="wide"
             footer={row ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -226,7 +253,7 @@ function PageDrawer({ row, pageKey, loading, onClose }: { row: Row | null; pageK
                         <div>
                             <p className="mb-2 text-body-sm font-medium text-fg">Where viewers came from</p>
                             {gaPage.state === 'error' ? null : (
-                                <BarList items={(gaPage.data?.sources ?? []).map((s) => ({ key: s.name, label: s.name, text: s.name, value: s.views }))} metric="pageviews" limit={6} loading={!gaPage.data} labelHeader="Source"
+                                <BarList items={(gaPage.data?.sources ?? []).map((s) => ({ key: s.name, ...sourceParts(s.name), value: s.views }))} metric="pageviews" limit={6} loading={!gaPage.data} labelHeader="Source"
                                     empty={<EmptyState variant="inline" title="No views in this period" />} />
                             )}
                         </div>

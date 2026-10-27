@@ -6,7 +6,7 @@ import { googleErrorResponse } from '@/lib/googleErrors'
 import { isDemoRequest } from '@/lib/demoWorkspace'
 import { getDemoAnalyticsDashboard } from '@/lib/demoWorkspaceData'
 import { getValidAccessToken, listAnalyticsProperties, fetchAnalyticsDashboard } from '@/lib/googleApi'
-import { getGoogleCredentialsForRequest } from '@/lib/serverAuth'
+import { getGoogleCredentialsForAsset, linkedAwarePropertyList } from '@/lib/serverAuth'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 const ANALYTICS_PROPERTY_LIST_TIMEOUT_MS = 10000
@@ -259,7 +259,9 @@ export async function GET(req: Request) {
             // @ts-expect-error - id added in callbacks
             const userId = session.user.id
             // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
-            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId))
+            // The token of the Google connection that lists the property (sign-in or a linked account).
+            const requestedProperty = searchParams.get('propertyId')
+            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForAsset(req, String(userId), requestedProperty ? { kind: 'ga4', id: requestedProperty } : null)
 
             if (!googleAccess && !googleRefresh) {
                 return NextResponse.json({ error: "Google not connected", code: "GOOGLE_NOT_CONNECTED" }, { status: 400 })
@@ -282,6 +284,8 @@ export async function GET(req: Request) {
                 CACHE_TTL.PROPERTY_LIST,
                 async () => {
                     try {
+                        const union = await linkedAwarePropertyList(req, String(userId))
+                        if (union) return union
                         return await listAnalyticsProperties(
                             token,
                             AbortSignal.timeout(ANALYTICS_PROPERTY_LIST_TIMEOUT_MS)

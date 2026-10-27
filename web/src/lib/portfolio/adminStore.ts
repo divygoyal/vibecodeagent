@@ -18,7 +18,10 @@ export class AdminStoreError extends Error {
     }
 }
 
-async function call<T>(method: string, path: string, body?: unknown, timeoutMs = 15_000): Promise<T> {
+/** Waits (ms) before each retry of a store call that failed transiently. Mutable for tests. */
+export const adminRetry = { delays: [300, 900] };
+
+async function callOnce<T>(method: string, path: string, body: unknown, timeoutMs: number): Promise<T> {
     const res = await fetch(`${ADMIN_API_URL}/api/portfolio${path}`, {
         method,
         headers: { 'X-API-Key': ADMIN_API_KEY, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
@@ -33,6 +36,24 @@ async function call<T>(method: string, path: string, body?: unknown, timeoutMs =
     return (await res.json()) as T;
 }
 
+/**
+ * One call to the store. A 5xx ("database is locked" while a first sync is writing, a restart) or a dropped
+ * connection is retried silently, twice. Writes are upserts, so repeating one is safe; a timeout is only
+ * retried for reads (`readOnly`), where a second try costs nothing.
+ */
+async function call<T>(method: string, path: string, body?: unknown, timeoutMs = 15_000, readOnly = false): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            return await callOnce<T>(method, path, body, timeoutMs);
+        } catch (err) {
+            const transient = err instanceof AdminStoreError ? err.status >= 500
+                : err instanceof Error && (err instanceof TypeError || (readOnly && (err.name === 'TimeoutError' || err.name === 'AbortError')));
+            if (!transient || attempt >= adminRetry.delays.length) throw err;
+            await new Promise((resolve) => setTimeout(resolve, adminRetry.delays[attempt]));
+        }
+    }
+}
+
 const u = (identifier: string) => `/users/${encodeURIComponent(identifier)}`;
 
 export interface AssetUpsert {
@@ -43,6 +64,8 @@ export interface AssetUpsert {
     account_name?: string | null;
     permission_level?: string | null;
     paired_with?: string | null;
+    /** Linked Google account (sub) the asset was listed from; null = the primary connection. */
+    connection_id?: string | null;
 }
 
 export interface StatusUpdate {
@@ -59,7 +82,7 @@ export interface StatusUpdate {
 
 export const adminStore = {
     async getAssets(identifier: string): Promise<StoreAsset[]> {
-        return (await call<{ assets: StoreAsset[] }>('GET', `${u(identifier)}/assets`)).assets;
+        return (await call<{ assets: StoreAsset[] }>('GET', `${u(identifier)}/assets`, undefined, 15_000, true)).assets;
     },
 
     async putAssets(identifier: string, assets: AssetUpsert[], completeKinds: AssetKind[]): Promise<StoreAsset[]> {
@@ -84,7 +107,7 @@ export const adminStore = {
     },
 
     async snapshot(identifier: string, req: SnapshotRequest): Promise<SnapshotData> {
-        return call<SnapshotData>('POST', `${u(identifier)}/snapshot`, req, 20_000);
+        return call<SnapshotData>('POST', `${u(identifier)}/snapshot`, req, 20_000, true);
     },
 
     async upsertRangeTotals(identifier: string, rows: (Omit<RangeTotalRow, 'asset_kind' | 'fetched_at'> & { kind: 'ga4' })[]): Promise<void> {
@@ -94,7 +117,7 @@ export const adminStore = {
 
     async staleUsers(olderThanS: number, limit: number): Promise<{ identifier: string; user_id: number; oldest_synced_at: number | null }[]> {
         return (await call<{ users: { identifier: string; user_id: number; oldest_synced_at: number | null }[] }>(
-            'GET', `/stale-users?older_than_s=${olderThanS}&limit=${limit}`,
+            'GET', `/stale-users?older_than_s=${olderThanS}&limit=${limit}`, undefined, 15_000, true,
         )).users;
     },
 };

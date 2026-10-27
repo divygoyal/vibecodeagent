@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { fmtDateRange, fmtFull } from '@/lib/format';
+import { fmtDateRange } from '@/lib/format';
 import { channelColor, deviceColor, METRICS, type MetricKey } from '@/lib/metrics';
 import { BarList } from '@/components/charts/BarList';
 import { ChartCard } from '@/components/charts/ChartCard';
@@ -11,13 +11,17 @@ import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { KpiStrip } from '@/components/ui/StatCard';
-import { flagForName } from '../lib/geo';
-import { isAiSource, pageRef, displayPage } from '../lib/rules';
+import { PagesCard, SourcesCard, TechCard } from '../breakdown/Cards';
+import { GeoCard } from '../breakdown/GeoCard';
+import { ChartMarkers, IntervalSwitch, toAnnotations, useChartMarkers, useInterval } from '../chart/ChartExtras';
+import { useTrafficFinding } from '../chart/useFindings';
+import { FindingLine } from '../Finding';
 import type { Ga4BreakdownResponse, Ga4Summary } from '../lib/types';
 import { MetricTile } from '../MetricTile';
 import { LoadError } from '../SiteStates';
 import { SectionCard } from '../SummaryPanels';
-import { downloadCsv, useGa4, useSite, useSiteRange } from '../useSiteData';
+import { downloadCsv, useGa4, useSiteRange } from '../useSiteData';
+import { PeakHoursCard } from './PeakHours';
 
 const STRIP: MetricKey[] = ['users', 'sessions', 'pageviews', 'conversions', 'ai'];
 
@@ -29,17 +33,21 @@ function cap(s: string) {
     return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
-/** Traffic > Overview (DESIGN 5.6). */
+/** Traffic > Overview (DESIGN 5.6, round 2: tabbed cards, map, peak hours, findings, filters). */
 export function TrafficOverviewTab() {
-    const { compareOn, compareText, dr } = useSiteRange();
-    const q = useGa4<Ga4Summary>('summary');
+    const { compareOn, compareText, dr, days } = useSiteRange();
+    const { interval } = useInterval(days);
+    const q = useGa4<Ga4Summary>('summary', { extra: interval === 'day' ? undefined : { interval } });
     const [metric, setMetric] = useState<MetricKey>('users');
     const d = q.data;
-    const series = d?.series ?? [];
+    const series = useMemo(() => d?.series ?? [], [d]);
+    const dates = useMemo(() => series.map((p) => p.date), [series]);
     const loading = q.state === 'loading';
     const prev = compareOn ? d?.previous ?? null : undefined;
     const t = d?.totals;
     const empty = q.state === 'ready' && t && t.sessions === 0;
+    const finding = useTrafficFinding(metric, d, { daily: interval === 'day' });
+    const marks = useChartMarkers(dates, dr.resolved.start, dr.resolved.end);
 
     return (
         <div className="flex flex-col gap-4">
@@ -57,23 +65,27 @@ export function TrafficOverviewTab() {
                 }))}
             >
                 <ChartCard
-                    className="!border-0 !p-0 !shadow-none"
-                    title={`${METRICS[metric].label} per day`}
+                    bare
+                    title={`${METRICS[metric].label} per ${interval}`}
                     subtitle={compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')} · today is partial` : 'Today is partial'}
+                    actions={<IntervalSwitch days={days} />}
                     state={q.state === 'error' ? 'error' : empty ? 'empty' : q.state}
                     error={{ message: q.error?.message, onRetry: q.mutate }}
                     empty={{ title: 'No visits in this period', description: 'Try a longer range, or check the GA4 tag is installed.' }}
                     height="large"
-                    onDownloadCsv={d ? () => downloadCsv('traffic-daily.csv', ['date', ...STRIP], series.map((p) => [p.date, p.users, p.sessions, p.pageviews, p.conversions, p.ai])) : undefined}
+                    onDownloadCsv={d ? () => downloadCsv(`traffic-${interval}.csv`, ['date', ...STRIP], series.map((p) => [p.date, p.users, p.sessions, p.pageviews, p.conversions, p.ai])) : undefined}
                 >
+                    <FindingLine finding={finding} />
                     <TimeSeriesChart
                         data={series as unknown as Record<string, number | string | null>[]}
                         series={[{ metric, key: metric, compareKey: compareOn ? `prev_${metric}` : undefined }]}
                         compareDateKey="prevDate"
                         partialFrom={series.length > 1 ? series.length - 1 : undefined}
+                        annotations={toAnnotations(marks.markers)}
                         height={300}
-                        ariaLabel={`${METRICS[metric].label} per day, ${fmtDateRange(dr.resolved.start, dr.resolved.end)}`}
+                        ariaLabel={`${METRICS[metric].label} per ${interval}, ${fmtDateRange(dr.resolved.start, dr.resolved.end)}`}
                     />
+                    <ChartMarkers markers={marks.markers} start={dr.resolved.start} end={dr.resolved.end} notesKey={marks.notesKey} scope={marks.scope} onChanged={marks.mutateNotes} notesFailed={marks.notesFailed} />
                 </ChartCard>
             </KpiStrip>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -83,19 +95,15 @@ export function TrafficOverviewTab() {
                 <MetricTile metric="pageviews" label="Views per session" format="position" better="up" value={t && t.sessions ? Math.round((t.pageviews / t.sessions) * 100) / 100 : null}
                     previous={prev === undefined ? undefined : prev && prev.sessions ? Math.round((prev.pageviews / prev.sessions) * 100) / 100 : null} loading={loading} comparisonLabel={compareText} />
             </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <ChannelsDonut />
-                <ReferrersList />
-                <AiList />
-            </div>
+            {/* One height per row: the side lists grow and keep "View all" at the bottom. */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <LandingList />
-                <CountriesList />
+                <SourcesCard />
+                <PagesCard action="filter" />
             </div>
+            <GeoCard />
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <DevicesDonut />
-                <SimpleList report="browsers" dim="browser" title="Browsers" />
-                <SimpleList report="os" dim="operatingSystem" title="Operating systems" />
+                <TechCard />
+                <PeakHoursCard className="lg:col-span-2" />
             </div>
         </div>
     );
@@ -125,61 +133,6 @@ export function DevicesDonut() {
             {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : q.state === 'loading' ? <DonutSkeleton /> : items.length ? (
                 <Donut items={items} centerLabel="Users" size={136} legend="bottom" />
             ) : <EmptyState variant="inline" title="No users in this period" />}
-        </SectionCard>
-    );
-}
-
-function ReferrersList() {
-    const q = useGa4<Ga4BreakdownResponse>('referrers');
-    const items = (q.data?.rows ?? []).map((r) => ({ key: r.key, label: r.dims.sessionSource, text: r.dims.sessionSource, value: r.cur.sessions ?? 0 }));
-    return (
-        <SectionCard title="Sources" description="Sessions by source">
-            {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : (
-                <BarList items={items} metric="sessions" limit={7} loading={q.state === 'loading'} labelHeader="Source" viewAllTitle="Sources" empty={<EmptyState variant="inline" title="No sessions in this period" />} />
-            )}
-        </SectionCard>
-    );
-}
-
-function AiList() {
-    const q = useGa4<Ga4BreakdownResponse>('referrers');
-    const items = (q.data?.rows ?? []).filter((r) => isAiSource(r.dims.sessionSource)).map((r) => ({ key: r.key, label: r.dims.sessionSource, text: r.dims.sessionSource, value: r.cur.sessions ?? 0 }));
-    const total = items.reduce((a, b) => a + b.value, 0);
-    return (
-        <SectionCard title="AI assistants" description={q.data ? `${fmtFull(total)} sessions from ChatGPT, Perplexity, Claude, Gemini and others` : 'Sessions referred by AI assistants'}>
-            {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : (
-                <BarList items={items} metric="ai" limit={7} loading={q.state === 'loading'} labelHeader="Assistant" viewAllTitle="AI assistants"
-                    empty={<EmptyState variant="inline" title="No AI referrals yet" description="Visits from ChatGPT, Perplexity and similar show up here." />} />
-            )}
-        </SectionCard>
-    );
-}
-
-function LandingList() {
-    const { siteHost } = useSite();
-    const q = useGa4<Ga4BreakdownResponse>('landing');
-    const items = (q.data?.rows ?? []).filter((r) => r.dims.landingPage && r.dims.landingPage !== '(not set)').map((r) => {
-        const ref = pageRef(r.dims.landingPage, siteHost);
-        const label = displayPage(ref, siteHost);
-        return { key: r.key, label, text: label, value: r.cur.sessions ?? 0 };
-    });
-    return (
-        <SectionCard title="Landing pages" description="Sessions that started on each page">
-            {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : (
-                <BarList items={items} metric="sessions" limit={8} loading={q.state === 'loading'} labelHeader="Page" viewAllTitle="Landing pages" empty={<EmptyState variant="inline" title="No sessions in this period" />} />
-            )}
-        </SectionCard>
-    );
-}
-
-function CountriesList() {
-    const q = useGa4<Ga4BreakdownResponse>('countries');
-    const items = (q.data?.rows ?? []).map((r) => ({ key: r.key, label: r.dims.country, text: r.dims.country, value: r.cur.activeUsers ?? 0, icon: <Flag>{flagForName(r.dims.country)}</Flag> }));
-    return (
-        <SectionCard title="Countries" description="Users">
-            {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : (
-                <BarList items={items} metric="users" limit={8} showShare loading={q.state === 'loading'} labelHeader="Country" viewAllTitle="Countries" empty={<EmptyState variant="inline" title="No users in this period" />} />
-            )}
         </SectionCard>
     );
 }

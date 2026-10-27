@@ -7,7 +7,8 @@
  * TODO(portfolio): read pairing overrides and stars from the Portfolio snapshot store
  * (tc/portfolio, admin /api/portfolio/users/{id}/assets) once it is merged.
  */
-import { fetchInventory, type Inventory } from '@/lib/sites/fetchInventory';
+import { loadUserInventory } from '@/lib/googleAccounts';
+import type { Inventory } from '@/lib/sites/fetchInventory';
 import { normalizeHost, pairSites, type SitePair } from '@/lib/sites/pairing';
 import type { SiteRef, SourceRef } from '../types';
 
@@ -70,7 +71,8 @@ export function buildDirectory(inv: Inventory): SiteDirectory {
 }
 
 export async function loadSiteDirectory(userId: string, accessToken: string): Promise<SiteDirectory> {
-    const inv = await fetchInventory(accessToken, { cacheKey: `builder:${userId}` });
+    // Every Google connection of the owner (sign-in account + linked accounts), each asset once.
+    const inv = await loadUserInventory(userId, { primary: { ok: true, token: accessToken }, cacheKey: `builder:${userId}` });
     return buildDirectory(inv);
 }
 

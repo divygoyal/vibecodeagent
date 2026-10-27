@@ -14,7 +14,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { isBlockedUrl } from '@/lib/urlValidation';
 import { synthesizeAuditPlan, type TieredActionPlan, type GscQueryRow } from '@/lib/auditSynth';
-import { fetchGoogleTokensFromDb, getValidAccessToken, runGSCQuery } from '@/lib/googleApi';
+import { getValidAccessToken, runGSCQuery } from '@/lib/googleApi';
+import { storedCredentialsForAsset } from '@/lib/googleAccounts';
 import { cachedFetch } from '@/lib/apiCache';
 import type { AuditReport } from '@/lib/siteAudit';
 import { createHash } from 'crypto';
@@ -125,7 +126,7 @@ export async function POST(req: Request) {
                 if (body.optionalGscSiteUrl) {
                     controller.enqueue(encodeSSE({ type: 'status', message: 'Fetching search performance...' }));
                     try {
-                        const tokens = await fetchGoogleTokensFromDb(String(userId));
+                        const tokens = await storedCredentialsForAsset(String(userId), { kind: 'gsc', id: body.optionalGscSiteUrl });
                         if (tokens) {
                             const accessToken = await getValidAccessToken(tokens.accessToken, tokens.refreshToken);
                             const end = new Date().toISOString().slice(0, 10);

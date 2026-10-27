@@ -158,3 +158,48 @@ mcp_tokens rows and leaves the other user alone.
   KeywordDetailDrawer,OverviewDetailDrawer,OverviewInsights,PageDetailDrawer,ShareDashboardModal,SparklineCell,
   TableActionMenu,Toast,WorldMap}.tsx, components/analytics/* (except AnalyticsIcons, AnimatedCounter, DataRow,
   WorldMap), components/dashboard/*, components/domain-overview/*, components/workspace/*.
+
+## Google sign-in: consent only when needed (2026-10-27, owner-approved)
+Problem: the Google provider asked `access_type=offline&prompt=consent` on every sign-in, so Google issued a new
+refresh token each time and silently revoked the oldest past ~100 per account + client (preview and live share one
+client). Now (web/src/lib/googleConsent.ts, wired in lib/auth.ts):
+
+| Sign-in | Google returns | Stored token (admin DB, by Google sub) | Result |
+|---|---|---|---|
+| Default button (`prompt=select_account`, offline) | refresh token (Google showed consent: first grant, grant revoked, new scopes) | any | store the new one |
+| Default button | none | works (one refresh call to Google says OK) | keep the stored one (copied into the JWT) |
+| Default button | none | none stored | redirect once to `/connect-google?auto=1` -> consent sign-in (first-time connect) |
+| Default button | none | Google says `invalid_grant` (revoked/evicted) | same redirect (reason `revoked`) |
+| Default button | none, grant lacks GA/GSC scope | any | same redirect (reason `scope_upgrade`) |
+| Default button | none | admin or Google unreachable | keep (server code reads the DB per request) |
+| Any of the redirects again within 10 min (cookie `tc_g_consent` set by /connect-google) | none | none/revoked | sign in anyway; the access token works ~1 h, then the existing Reconnect state (google_reauth) |
+| Reconnect / Connect Google buttons (`prompt: 'select_account consent'`, unchanged) | refresh token | any | store the new one |
+
+An empty refresh token never overwrites a stored one: jwt() (`nonEmptyToken`), adminUserSync (omits
+`refresh_token`), admin `POST /api/users` (already), `POST /api/users/{id}/sync` and `PATCH /api/users/{id}` (now
+`has_non_empty_token`). serverAuth.getGoogleCredentialsForRequest fills a missing JWT refresh token from the DB.
+Tokens stay server-only (tests/authSession.test.mjs passes). Tests: tests/googleConsent.test.mjs (decision table,
+demo token endpoint incl. frevoked's invalid_grant), admin/tests/test_oauth_token_keep.py.
+
+Noticed, not changed: NextAuth v4 calls jwt() with a fresh token on every OAuth sign-in, so the "secondary connect
+keeps the primary identity" branch in jwt() never sees an earlier primaryProvider. Connect-GitHub-after-Google makes
+GitHub the session identity; Google tokens are then read from the DB.
+
+### How to test with real Google on the preview (later; worker1 has no real OAuth)
+Do it after the owner's review, on a preview deploy of this commit. Use a test Google account that has GA4/GSC.
+Check the web log for `[Auth] Google sign-in needs consent (...)` lines and the superadmin user page
+("Refresh token" pill) after each step.
+1. Returning user: sign out, "Continue with Google". Expect only the account chooser, no consent screen, and a
+   dashboard with data. At https://myaccount.google.com/connections the app's grant stays; no new refresh token is
+   issued (data still loads after 1 h+, because the stored token is kept).
+2. First connect: remove the app at myaccount.google.com/connections (this revokes the grant), sign in. Google shows
+   consent by itself (grant gone) and returns a refresh token: no redirect, data loads.
+3. Stored token missing: in the preview admin DB clear `oauth_connections.refresh_token` for that user (or delete the
+   google row), sign out, sign in. Expect a short "Taking you to Google" page, then the consent screen, then the
+   dashboard; the DB has a refresh token again.
+4. Scope upgrade: on a consent screen untick Search Console (the token is stored as granted). The next default
+   sign-in redirects once to consent; untick again and sign-in completes without a loop; Search Console calls then
+   fail as no-access (403), not as a dead end.
+5. Reconnect button (Settings > Google): always shows consent; afterwards the DB token is the new one.
+6. Count check: repeat step 1 ten times; myaccount.google.com/connections should still list one grant and the token
+   from step 2/3 keeps working (before this change each sign-in minted a new one).

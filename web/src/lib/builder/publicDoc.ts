@@ -5,6 +5,8 @@
  * never come from the query string.
  */
 import { compareFromParam, rangeFromParam } from './dates';
+import { clickableDims, interactionFromParam } from './interaction';
+import { cleanVariable } from './variables';
 import type {
     CompareSpec,
     ControlState,
@@ -58,7 +60,7 @@ export function publicDoc(doc: DashboardDocV2, labelOf: (s: SourceRef) => string
         pages,
         widgets,
         theme,
-        settings: { widthMode: doc.settings.widthMode, autoRefreshSec: doc.settings.autoRefreshSec },
+        settings: { widthMode: doc.settings.widthMode, autoRefreshSec: doc.settings.autoRefreshSec, ...(doc.settings.tv ? { tv: doc.settings.tv } : {}) },
         meta: {},
     };
 }
@@ -68,7 +70,7 @@ const MAX_FILTER_VALUES = 20;
 /** Viewer state from a public query string, limited to what the share allows. */
 export function publicControlsFromQuery(
     q: URLSearchParams,
-    doc: Pick<DashboardDocV2, 'controls' | 'pages'>,
+    doc: Pick<DashboardDocV2, 'controls' | 'pages'> & { widgets?: DashboardDocV2['widgets'] },
     share: { viewerControls: { date: boolean; compare: boolean; filters: boolean } },
 ): ControlState {
     const base = defaultControlState(doc);
@@ -93,8 +95,16 @@ export function publicControlsFromQuery(
             if (values.length) filters[c.id] = values;
             else delete filters[c.id];
         }
+        for (const c of doc.controls) {
+            if (c.type !== 'variable' || !c.viewerCanChange) continue;
+            const raw = q.get(`f.${c.id}`);
+            if (raw === null) continue;
+            const v = cleanVariable(c, raw);
+            if (v !== c.default) filters[c.id] = [v];
+        }
     }
+    const interaction = share.viewerControls.filters && doc.widgets ? interactionFromParam(q.get('x'), clickableDims(doc as Pick<DashboardDocV2, 'widgets'>)) : [];
     const pageParam = q.get('page');
     const pageId = pageParam && doc.pages.some((p) => p.id === pageParam && !p.hidden) ? pageParam : undefined;
-    return { date: { range, compare }, filters, pageId };
+    return { date: { range, compare }, filters, pageId, ...(interaction.length ? { interaction } : {}) };
 }

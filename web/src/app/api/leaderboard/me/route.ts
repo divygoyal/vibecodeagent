@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     if (!fields.ok) return NextResponse.json({ error: fields.error }, { status: 400 });
     const f = fields.value;
 
-    const outcome = await checkOwnership({ websiteUrl, gaPropertyId, accessToken: user.accessToken, refreshToken: user.refreshToken });
+    const outcome = await checkOwnership({ websiteUrl, gaPropertyId, accessToken: user.accessToken, refreshToken: user.refreshToken, userIdentifier: user.userId });
 
     const join = await lbAdmin<{ success: boolean; id: number }>(`/api/leaderboard/${encodeURIComponent(user.userId)}/join`, {
         method: 'POST',
@@ -120,6 +120,7 @@ export async function POST(req: Request) {
             websiteUrl,
             accessToken: user.accessToken,
             refreshToken: user.refreshToken,
+            userIdentifier: user.userId,
             skipVerify: true,
             gscSiteUrl: outcome.gscSiteUrl ?? gscSiteUrl,
         }).catch((err) => console.error('[Leaderboard join] first refresh failed:', err)),

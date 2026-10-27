@@ -39,7 +39,7 @@ export function Checkbox({ checked, onCheckedChange, label, description, disable
             )}
         >
             <C.Indicator>
-                {checked === 'indeterminate' ? <Minus aria-hidden size={12} strokeWidth={3} /> : <Check aria-hidden size={12} strokeWidth={3} />}
+                {checked === 'indeterminate' ? <Minus aria-hidden size={12} strokeWidth={3} className="stroke-keep" /> : <Check aria-hidden size={12} strokeWidth={3} className="stroke-keep" />}
             </C.Indicator>
         </C.Root>
     );

@@ -54,13 +54,15 @@ export function DateControl({ range, compare, onChange, canChange = true, canCom
     }
     return (
         <div className="flex items-center gap-2">
-            <SegmentedControl<DatePresetId>
-                ariaLabel="Date range"
-                size={size}
-                value={quick}
-                onChange={(id) => onChange({ kind: 'preset', id }, compare)}
-                options={QUICK_PRESETS.map((id) => ({ value: id, label: PRESETS.find((p) => p.id === id)?.short ?? id }))}
-            />
+            {quick ? (
+                <SegmentedControl<DatePresetId>
+                    ariaLabel="Date range"
+                    size={size}
+                    value={quick}
+                    onChange={(id) => onChange({ kind: 'preset', id }, compare)}
+                    options={QUICK_PRESETS.map((id) => ({ value: id, label: PRESETS.find((p) => p.id === id)?.short ?? id }))}
+                />
+            ) : null}
             <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
                     <button
@@ -68,7 +70,7 @@ export function DateControl({ range, compare, onChange, canChange = true, canCom
                         aria-label={quick ? 'More date ranges and compare' : `Date range: ${label}`}
                         className={cn(
                             'inline-flex h-9 items-center gap-1.5 rounded-control border px-2.5 text-body-sm font-medium transition-colors duration-120',
-                            quick ? 'border-border bg-surface text-fg-secondary hover:text-fg' : 'border-transparent bg-brand-soft text-brand-soft-fg',
+                            quick ? 'border-border bg-surface text-fg-secondary hover:text-fg' : 'border-border bg-surface text-fg hover:bg-subtle',
                         )}
                     >
                         <CalendarDays aria-hidden size={16} strokeWidth={1.75} />

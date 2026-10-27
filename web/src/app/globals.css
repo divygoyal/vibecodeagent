@@ -133,3 +133,18 @@ button:focus-visible {
     border-color: CanvasText;
   }
 }
+
+/* Tawk.to chat (components/ui/chatWidget.ts): no auto-greeting. Its greeting
+   card lives in #message-preview; it stays hidden until the visitor has opened
+   the chat once (agent replies after that show as usual). */
+html:not([data-chat-engaged]) #message-preview {
+  display: none !important;
+}
+
+/* One icon stroke in the app (critique #10, 2.8): every lucide icon at 1.75,
+   whatever its strokeWidth prop says. Scoped to pages that mount the app shell
+   (menus and dialogs portal to <body>, so the scope is the body). Add
+   `stroke-keep` to an icon that must keep its own stroke. */
+body:has(.tc-app) svg.lucide:not(.stroke-keep) {
+  stroke-width: 1.75px;
+}

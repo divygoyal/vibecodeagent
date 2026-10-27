@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Favicon } from '@/components/ui/Favicon';
 import { billingPeriodSuffix, formatCents } from '@/lib/adSlots';
+import { boardColumns, hasOffer, hasTrend as hasTrendRow, type BoardColumns } from '@/lib/leaderboard/columns';
 import { profilePath, RANGE_NAMES } from '@/lib/leaderboard/constants';
 import { fmtFull } from '@/lib/format';
 import type { BoardResponse, BoardRow, SponsoredCard } from '@/lib/leaderboard/types';
@@ -15,7 +16,16 @@ import { CategoryBadge, CountValue, Ga4Badge, OpenToChips, PctDelta, RankMark, R
 
 // Rows lay out by the width of the list (container query), not the viewport, so the same row
 // works in the public board and in the narrow "Public preview" column of /dashboard/leaderboard.
-const GRID = '@3xl:grid @3xl:grid-cols-[44px_minmax(0,1fr)_150px_150px_170px] @3xl:items-center @3xl:gap-4';
+// A column nobody has anything in is dropped (see lib/leaderboard/columns.ts), so the grid has four shapes.
+// Full class names on purpose: Tailwind only sees literal strings.
+const GRIDS: Record<string, string> = {
+    'trend open': '@3xl:grid @3xl:grid-cols-[44px_minmax(0,1fr)_150px_150px_170px] @3xl:items-center @3xl:gap-4',
+    'trend': '@3xl:grid @3xl:grid-cols-[44px_minmax(0,1fr)_150px_170px] @3xl:items-center @3xl:gap-4',
+    'open': '@3xl:grid @3xl:grid-cols-[44px_minmax(0,1fr)_150px_190px] @3xl:items-center @3xl:gap-4',
+    '': '@3xl:grid @3xl:grid-cols-[44px_minmax(0,1fr)_170px] @3xl:items-center @3xl:gap-4',
+};
+const gridFor = (cols: BoardColumns) => GRIDS[[cols.trend ? 'trend' : '', cols.openTo ? 'open' : ''].filter(Boolean).join(' ')];
+const ALL_COLUMNS: BoardColumns = { trend: true, openTo: true };
 
 function hostOf(url: string | null): string {
     return (url || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
@@ -25,12 +35,12 @@ function metricFor(row: BoardRow, focus: 'visitors' | 'clicks') {
     return focus === 'clicks' ? row.clicks : row.visitors;
 }
 
-export function BoardRowItem({ row, focus, range, showNew }: { row: BoardRow; focus: 'visitors' | 'clicks'; range: BoardResponse['range']; showNew: boolean }) {
+export function BoardRowItem({ row, focus, range, showNew, cols = ALL_COLUMNS }: { row: BoardRow; focus: 'visitors' | 'clicks'; range: BoardResponse['range']; showNew: boolean; cols?: BoardColumns }) {
     const m = metricFor(row, focus);
     const host = hostOf(row.website_url);
     const label = focus === 'clicks' ? 'search clicks' : 'visitors';
     return (
-        <li className={cn('relative border-b border-border-subtle px-4 py-3.5 last:border-b-0 transition-colors duration-120 hover:bg-subtle/40', GRID)}>
+        <li className={cn('relative border-b border-border-subtle px-4 py-3.5 last:border-b-0 transition-colors duration-120 hover:bg-subtle/40', gridFor(cols))}>
             <div className="flex items-start gap-3 @3xl:contents">
                 <div className="flex w-7 shrink-0 justify-center pt-1 @3xl:block @3xl:pt-0"><RankMark rank={row.rank} /></div>
                 <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -61,25 +71,27 @@ export function BoardRowItem({ row, focus, range, showNew }: { row: BoardRow; fo
                     </div>
                     <p className="text-meta text-fg-muted">{label} · {RANGE_NAMES[range].replace('last ', '')}</p>
                 </div>
-                <div className="w-32 shrink-0 @3xl:hidden"><RowSpark spark={row.spark} height={32} /></div>
+                {cols.trend && hasTrendRow(row) ? <div className="w-32 shrink-0 @3xl:hidden"><RowSpark spark={row.spark} height={32} /></div> : null}
             </div>
 
-            <div className="hidden @3xl:block"><RowSpark spark={row.spark} height={32} /></div>
+            {cols.trend ? <div className="hidden @3xl:block"><RowSpark spark={row.spark} height={32} /></div> : null}
 
-            <div className="relative z-10 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 @3xl:mt-0 @3xl:flex-col @3xl:items-start">
-                <OpenToChips items={row.open_to} limit={2} />
-                {row.min_slot_price_cents !== null && row.ad_slot_count > 0 ? (
-                    <span className="text-meta text-fg-muted">Ads from {formatCents(row.min_slot_price_cents)}</span>
-                ) : null}
-            </div>
+            {cols.openTo ? (
+                <div className={cn('relative z-10 flex flex-wrap items-center gap-x-2 gap-y-1 @3xl:mt-0 @3xl:flex-col @3xl:items-start', hasOffer(row) ? 'mt-2' : '@max-3xl:hidden')}>
+                    <OpenToChips items={row.open_to} limit={2} />
+                    {row.min_slot_price_cents !== null && row.ad_slot_count > 0 ? (
+                        <span className="text-meta text-fg-muted">Ads from {formatCents(row.min_slot_price_cents)}</span>
+                    ) : null}
+                </div>
+            ) : null}
         </li>
     );
 }
 
-function SponsoredRow({ card }: { card: SponsoredCard }) {
+function SponsoredRow({ card, cols }: { card: SponsoredCard; cols: BoardColumns }) {
     const host = card.site.name;
     return (
-        <li className={cn('relative border-b border-border-subtle bg-warn-soft/40 px-4 py-3 transition-colors duration-120 hover:bg-warn-soft/70', GRID)}>
+        <li className={cn('relative border-b border-border-subtle bg-warn-soft/40 px-4 py-3 transition-colors duration-120 hover:bg-warn-soft/70', gridFor(cols))}>
             <div className="hidden @3xl:block" />
             <div className="flex min-w-0 items-center gap-3">
                 <Favicon host={host} size={32} />
@@ -96,7 +108,7 @@ function SponsoredRow({ card }: { card: SponsoredCard }) {
                 </div>
             </div>
             <div className="hidden @3xl:block" />
-            <div className="hidden @3xl:block" />
+            {cols.trend ? <div className="hidden @3xl:block" /> : null}
             <div className="mt-2 @3xl:mt-0 @3xl:text-right">
                 <span className="inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary">View slot <ArrowRight aria-hidden size={14} /></span>
             </div>
@@ -104,26 +116,32 @@ function SponsoredRow({ card }: { card: SponsoredCard }) {
     );
 }
 
-function Header({ focus }: { focus: 'visitors' | 'clicks' }) {
+function Header({ focus, cols }: { focus: 'visitors' | 'clicks'; cols: BoardColumns }) {
     return (
-        <div className={cn('hidden border-b border-border-subtle bg-surface-sunken px-4 py-2.5 text-meta font-medium text-fg-muted', GRID)}>
+        <div className={cn('hidden border-b border-border-subtle bg-surface-sunken px-4 py-2.5 text-meta font-medium text-fg-muted', gridFor(cols))}>
             <span className="text-center">#</span>
             <span>Site</span>
             <span>{focus === 'clicks' ? 'Search clicks' : 'Visitors'}</span>
-            <span>Trend</span>
-            <span>Open to</span>
+            {cols.trend ? <span>Trend</span> : null}
+            {cols.openTo ? <span>Open to</span> : null}
         </div>
     );
 }
 
 export function BoardRows({ data, hasFilters, clearHref }: { data: BoardResponse; hasFilters: boolean; clearHref: string }) {
     if (data.rows.length === 0) {
+        // The offers tab is empty until an owner turns an offer on: say so, instead of "Nothing here yet".
+        const noOffers = data.tab === 'offers' && !hasFilters;
         return (
             <Card padding="none">
                 <EmptyState
-                    icon={SearchX}
-                    title={hasFilters ? 'No sites match' : 'Nothing here yet'}
-                    description={hasFilters ? 'Try a different category or clear the search.' : 'Verified sites show up here as soon as they are listed.'}
+                    icon={noOffers ? Megaphone : SearchX}
+                    title={hasFilters ? 'No sites match' : noOffers ? 'No site is open to offers yet' : 'Nothing here yet'}
+                    description={hasFilters
+                        ? 'Try a different category or clear the search.'
+                        : noOffers
+                            ? 'Owners can open their profile to sponsorships, acquisition or partnerships. Sites that do show up here.'
+                            : 'Verified sites show up here as soon as they are listed.'}
                     actions={hasFilters
                         ? <Button asChild variant="secondary" size="md"><Link href={clearHref}>Clear filters</Link></Button>
                         : <Button asChild variant="primary" size="md"><Link href="/leaderboard/join">Add your site, free</Link></Button>}
@@ -131,16 +149,17 @@ export function BoardRows({ data, hasFilters, clearHref }: { data: BoardResponse
             </Card>
         );
     }
+    const cols = boardColumns(data.rows, data.tab);
     const showSponsoredInline = data.tab === 'top' && data.page === 1 && data.sponsored.length > 0;
     const items: React.ReactNode[] = [];
     data.rows.forEach((row, i) => {
-        items.push(<BoardRowItem key={row.id} row={row} focus={data.focus} range={data.range} showNew={data.tab !== 'new' && row.is_new} />);
-        if (showSponsoredInline && i === 4) items.push(<SponsoredRow key={`sp-a`} card={data.sponsored[0]} />);
-        if (showSponsoredInline && i === 14 && data.sponsored[1]) items.push(<SponsoredRow key={`sp-b`} card={data.sponsored[1]} />);
+        items.push(<BoardRowItem key={row.id} row={row} focus={data.focus} range={data.range} showNew={data.tab !== 'new' && row.is_new} cols={cols} />);
+        if (showSponsoredInline && i === 4) items.push(<SponsoredRow key={`sp-a`} card={data.sponsored[0]} cols={cols} />);
+        if (showSponsoredInline && i === 14 && data.sponsored[1]) items.push(<SponsoredRow key={`sp-b`} card={data.sponsored[1]} cols={cols} />);
     });
     return (
         <Card padding="none" className="@container overflow-hidden">
-            <Header focus={data.focus} />
+            <Header focus={data.focus} cols={cols} />
             <ul>{items}</ul>
         </Card>
     );

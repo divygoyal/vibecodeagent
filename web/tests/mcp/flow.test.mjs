@@ -11,8 +11,9 @@
  * Covers: discovery, 401 challenge, DCR, CIMD (loopback document served by
  * this test), PKCE, consent decision with CSRF, token, refresh rotation and
  * reuse detection, revocation, demo grants without sign-in, site filter,
- * exclude-queries, API keys, both protocol eras, all 13 tools and the
- * negative cases of MCP.md 12.2.
+ * exclude-queries, API keys, both protocol eras, all 13 tools (with the data
+ * in structuredContent, which is what Claude reads) and the negative cases of
+ * MCP.md 12.2.
  */
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
@@ -142,6 +143,37 @@ async function call(tokenValue, name, args = {}, era = 'modern') {
     assert.equal(r.status, 200, `${name}: HTTP ${r.status} ${r.text.slice(0, 300)}`);
     assert.ok(r.json?.result, `${name}: ${r.text.slice(0, 300)}`);
     return r.json.result;
+}
+
+/**
+ * What the model sees. MCP clients such as Claude use structuredContent when a tool returns it (every tool here
+ * declares an outputSchema) and do not show the text content, so read results that way: structuredContent first.
+ */
+function modelView(result) {
+    return result.structuredContent ?? { text: result.content?.[0]?.text ?? '' };
+}
+
+/**
+ * Data rows a model can read from a view: JSON `rows`, or the TSV lines of `table` without the # lines and the
+ * column-name line that follows a # line (each section is: # title, column names, rows, # notes).
+ */
+function dataRows(view) {
+    if (Array.isArray(view.rows)) return view.rows.map((r) => r.map((c) => (c === null ? '' : String(c))));
+    if (typeof view.table !== 'string') return [];
+    const rows = [];
+    let afterComment = true;
+    for (const line of view.table.split('\n')) {
+        if (line.startsWith('#')) { afterComment = true; continue; }
+        if (!afterComment && line !== '(no rows)') rows.push(line.split('\t'));
+        afterComment = false;
+    }
+    return rows;
+}
+
+/** Checks a result against the outputSchema's required keys (and anyOf branches) from tools/list. */
+function assertRequired(schema, sc, label) {
+    for (const k of schema.required || []) assert.ok(k in sc, `${label}: structuredContent.${k} is required`);
+    if (schema.anyOf) assert.ok(schema.anyOf.some((b) => (b.required || []).every((k) => k in sc)), `${label}: none of ${JSON.stringify(schema.anyOf)}`);
 }
 
 // ───────────── a loopback CIMD document (needs TC_MCP_DEV_CIMD_LOOPBACK=1) ─────────────
@@ -323,7 +355,8 @@ describe('OAuth with a DCR client', () => {
         assert.ok(!sites.isError, sites.content[0].text);
         assert.match(sites.content[0].text, /^# list_sites \| \d+ sites/m);
         assert.match(sites.content[0].text, /acmeanalytics\.example/);
-        assert.equal(sites.structuredContent, undefined, 'rows live in the text; a structured part would hide them');
+        assert.equal(typeof sites.structuredContent.counts.total, 'number');
+        assert.match(modelView(sites).table, /^acmeanalytics\.example\tproperties\//m, 'the site rows are in structuredContent');
         const site = 'acmeanalytics.example';
         const calls = [
             ['portfolio_summary', {}],
@@ -353,9 +386,80 @@ describe('OAuth with a DCR client', () => {
             const text = res.content?.[0]?.text ?? '';
             assert.ok(!res.isError, `${name} ${JSON.stringify(args)} -> ${text.slice(0, 400)}`);
             assert.ok(text.length > 20 && text.length < 22_000, `${name}: ${text.length} chars`);
-            assert.equal(res.structuredContent, undefined, `${name}: no structuredContent`);
-            assert.ok(!/tcat_|tcrt_|ya29\./.test(text), `${name}: no tokens in output`);
+            assert.ok(res.structuredContent, `${name}: structuredContent`);
+            const view = modelView(res);
+            assert.ok(typeof view.table === 'string' || Array.isArray(view.rows) || typeof view.text === 'string', `${name}: data in structuredContent, not only metadata: ${JSON.stringify(view).slice(0, 300)}`);
+            assert.ok(!/tcat_|tcrt_|ya29\./.test(JSON.stringify(res)), `${name}: no tokens in output`);
         }
+    });
+
+    test('structuredContent carries the data (read the way Claude reads results)', async () => {
+        const list = await mcp(tokens.access_token, 'tools/list');
+        const schemas = Object.fromEntries(list.json.result.tools.map((t) => [t.name, t.outputSchema]));
+        const site = 'acmeanalytics.example';
+        // [tool, args, minimum data rows in structuredContent, rows must contain numbers]
+        const calls = [
+            ['list_sites', {}, 3, false],
+            ['portfolio_summary', {}, 2, true],
+            ['portfolio_summary', { format: 'json' }, 2, true],
+            ['site_health', {}, 1, false],
+            ['seo_opportunities', { site }, 1, true],
+            ['top_movers', { site }, 1, true],
+            ['compare_periods', { site }, 1, true],
+            ['compare_periods', { site, format: 'json' }, 1, true],
+            ['page_detail', { site, page: '/' }, 1, true],
+            ['gsc_search_analytics', { site, dimensions: ['query'], limit: 5 }, 1, true],
+            ['gsc_search_analytics', { site, dimensions: ['query'], limit: 5, format: 'json' }, 1, true],
+            ['gsc_inspect_url', { site, urls: [`https://${site}/`] }, 1, false],
+            ['ga4_run_report', { site, metrics: ['sessions'], dimensions: ['sessionDefaultChannelGroup'] }, 1, true],
+            ['ga4_run_report', { site, metrics: ['sessions'], dimensions: ['sessionDefaultChannelGroup'], format: 'json' }, 1, true],
+            ['ga4_realtime', { site, dimensions: ['country'] }, 1, true],
+            ['ga4_metadata', { site, search: 'session' }, 1, false],
+            ['trafficclaw_help', { topic: 'metrics' }, 0, false],
+        ];
+        const seen = new Set();
+        for (const [name, args, minRows, numeric] of calls) {
+            const label = `${name} ${JSON.stringify(args)}`;
+            const res = await call(tokens.access_token, name, args);
+            const text = res.content?.[0]?.text ?? '';
+            assert.ok(!res.isError, `${label} -> ${text.slice(0, 300)}`);
+            assert.ok(res.structuredContent, `${label}: structuredContent`);
+            const view = modelView(res);
+            assertRequired(schemas[name], view, label);
+            assert.ok(Array.isArray(view.warnings), label);
+            seen.add(name);
+            if (name === 'trafficclaw_help') {
+                assert.match(view.text, /## Metrics[\s\S]*ctr_pct/);
+                assert.equal(view.text, text);
+                continue;
+            }
+            const rows = dataRows(view);
+            assert.ok(rows.length >= minRows, `${label}: ${rows.length} data rows in structuredContent: ${JSON.stringify(view).slice(0, 400)}`);
+            if (numeric) assert.ok(rows.some((r) => r.some((c) => /^[+-]?\d/.test(c))), `${label}: no numbers in structuredContent`);
+            if (args.format === 'json') {
+                const parsed = JSON.parse(text);
+                assert.deepEqual([view.columns, view.rows], [parsed.columns, parsed.rows], `${label}: text and structuredContent agree`);
+                assert.equal(view.table, undefined, `${label}: no TSV copy in json format`);
+                assert.ok(rows.every((r) => r.length === view.columns.length), `${label}: row width`);
+            } else {
+                assert.ok(text.startsWith(view.table), `${label}: the text content starts with structuredContent.table`);
+            }
+            assert.ok(JSON.stringify(view).length < 24_000, `${label}: structuredContent is ${JSON.stringify(view).length} chars`);
+        }
+        assert.equal(seen.size, 13, 'all 13 tools');
+
+        // portfolio_summary, the call that once returned only metadata: the same rows in both formats, with numbers.
+        const ids = [site, 'puzzlehub.example'];
+        const pt = modelView(await call(tokens.access_token, 'portfolio_summary', { site_ids: ids }));
+        const pj = modelView(await call(tokens.access_token, 'portfolio_summary', { site_ids: ids, format: 'json' }));
+        assert.deepEqual(dataRows(pt), dataRows(pj), 'table and json give the same rows');
+        assert.equal(pj.sites_returned, 2);
+        const col = (n) => pj.columns.indexOf(n);
+        const acme = pj.rows.find((r) => r[0] === site);
+        assert.ok(acme, JSON.stringify(pj.rows));
+        assert.ok(Number(acme[col('ga4_sessions')]) > 0 && Number(acme[col('gsc_clicks')]) > 0 && Number(acme[col('gsc_impr')]) > 0, JSON.stringify(acme));
+        assert.equal(pj.rows.at(-1)[0], 'TOTAL');
+        assert.match(pt.table, /^site\tga4_sessions\tga4_vs_prev\t/m);
     });
 
     test('tool errors are model-friendly', async () => {
@@ -382,9 +486,9 @@ describe('OAuth with a DCR client', () => {
         assert.equal(init.headers.get('mcp-session-id'), null);
         const list = await mcp(tokens.access_token, 'tools/list', {}, { era: 'legacy', headers: { 'mcp-protocol-version': '2025-11-25' } });
         assert.equal(list.json.result.tools.length, 13);
-        assert.ok(list.json.result.tools.every((t) => !t.outputSchema), 'no tool advertises an outputSchema');
         const res = await call(tokens.access_token, 'list_sites', {}, 'legacy');
         assert.ok(!res.isError, res.content?.[0]?.text);
+        assert.match(modelView(res).table, /^acmeanalytics\.example\t/m, 'legacy era: rows in structuredContent');
         const prompts = await mcp(tokens.access_token, 'prompts/list', {}, { era: 'legacy', headers: { 'mcp-protocol-version': '2025-11-25' } });
         assert.deepEqual(prompts.json.result.prompts.map((p) => p.name).sort(), ['find_quick_wins', 'weekly_portfolio_review', 'why_did_traffic_drop']);
     });
@@ -444,6 +548,8 @@ describe('demo grant without sign-in', () => {
         const t = await connect({ clientId: c.client_id, redirectUri: 'http://127.0.0.1:9999/cb', action: 'demo', signedIn: false });
         const res = await call(t.access_token, 'list_sites');
         assert.match(res.content[0].text, /^# DEMO DATA/);
+        assert.equal(res.structuredContent.demo, true);
+        assert.match(modelView(res).table, /^# DEMO DATA/, 'the model sees the demo label too');
         const health = await call(t.access_token, 'site_health', { site: 'acmeanalytics.example' });
         assert.ok(!health.isError, health.content[0].text);
     });
@@ -465,6 +571,8 @@ describe('per-connection controls', () => {
         const list = await call(t.access_token, 'list_sites');
         assert.match(list.content[0].text, /puzzlehub\.example/);
         assert.doesNotMatch(list.content[0].text, /acmeanalytics/);
+        assert.match(modelView(list).table, /puzzlehub\.example/);
+        assert.doesNotMatch(JSON.stringify(list.structuredContent), /acmeanalytics/);
         for (const s of ['acmeanalytics.example', 'https://acmeanalytics.example/', 'sc-domain:acmeanalytics.example', 'properties/412300101', 'nonexistent.example']) {
             const r = await call(t.access_token, 'compare_periods', { site: s });
             assert.match(r.content[0].text, /^site_not_in_grant/, s);
@@ -476,8 +584,10 @@ describe('per-connection controls', () => {
         const t = await connect({ clientId: c.client_id, redirectUri: 'http://127.0.0.1:9996/cb', excludeQueries: true });
         const r = await call(t.access_token, 'gsc_search_analytics', { site: 'acmeanalytics.example', dimensions: ['query'] });
         assert.match(r.content[0].text, /^queries_excluded/);
-        const pages = await call(t.access_token, 'gsc_search_analytics', { site: 'acmeanalytics.example', dimensions: ['page'] });
+        const pages = await call(t.access_token, 'gsc_search_analytics', { site: 'acmeanalytics.example', dimensions: ['page'], format: 'json' });
         assert.ok(!pages.isError);
+        assert.deepEqual(pages.structuredContent.columns, ['page', 'clicks', 'impressions', 'ctr_pct', 'position']);
+        assert.ok(pages.structuredContent.rows.length > 0);
         const opp = await call(t.access_token, 'seo_opportunities', { site: 'acmeanalytics.example' });
         assert.match(opp.content[0].text, /by page: queries not shared/);
     });

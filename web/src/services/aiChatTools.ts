@@ -1069,9 +1069,23 @@ DO NOT spam — at most ONE annotation per chat response.`,
     },
 ];
 
+/** The Google token a tool call uses for `asset`: its own account's when linked accounts exist, else the user's. */
+async function toolToken(ctx: GscContext, asset: { kind: 'ga4' | 'gsc'; id?: string | null }): Promise<string> {
+    if (asset.id && ctx.tokenFor) {
+        const t = await ctx.tokenFor({ kind: asset.kind, id: String(asset.id) }).catch(() => null);
+        if (t) return t;
+    }
+    return getValidAccessToken(ctx.googleAccessToken, ctx.googleRefreshToken);
+}
+
 export interface GscContext {
     googleAccessToken?: string;
     googleRefreshToken?: string;
+    /**
+     * Token for one GA4 property / Search Console site when extra Google accounts are linked
+     * (the account that lists it, lib/googleAccounts.ts). Absent = the tokens above for everything.
+     */
+    tokenFor?: (asset: { kind: 'ga4' | 'gsc'; id: string }) => Promise<string | null>;
     githubAccessToken?: string;
     userId?: string;
     /** Pre-fetched dashboard SEO data (top queries/pages/kpis/trend). Lets get_alerts and
@@ -1279,7 +1293,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         }
 
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'gsc', id: args?.siteUrl });
             const { siteUrl, startDate, endDate, rowLimit, metricFilters } = args;
             let { dimensions } = args;
 
@@ -1431,7 +1445,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         }
 
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'ga4', id: args?.propertyId });
             const dims = dimensions || ['date'];
             const mets = metrics || ['activeUsers', 'sessions'];
 
@@ -1755,7 +1769,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         }
 
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'gsc', id: args?.siteUrl });
             const { siteUrl, period1Start, period1End, period2Start, period2End } = args;
             const dimensions = args.dimensions || ['query'];
 
@@ -1848,7 +1862,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         }
 
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'gsc', id: args?.siteUrl });
             const { siteUrl, startDate, endDate, minImpressions } = args;
             const minImp = minImpressions || 10;
 
@@ -1965,7 +1979,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         }
 
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'ga4', id: args?.propertyId });
             const dims = dimensions || ['country'];
 
             const data = await runFlexibleRealtimeReport(
@@ -2030,7 +2044,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
         }
 
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'ga4', id: args?.propertyId });
             const metadata = await getPropertyMetadata(token, propertyId);
 
             const customDims = metadata.customDimensions.map((d: any) => ({
@@ -2232,7 +2246,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             return { error: 'Google Account not connected. Connect it in Integrations settings.' };
         }
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'gsc', id: args?.siteUrl });
             const data = await inspectGscUrl(token, args.siteUrl, args.pageUrl);
             const result = data?.inspectionResult || {};
             return {
@@ -2323,7 +2337,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             const period1End = isoDate(new Date(today.getTime() - lookbackDays * 86400_000 - 86400_000));
             const period1Start = isoDate(new Date(today.getTime() - lookbackDays * 2 * 86400_000));
 
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'gsc', id: args?.siteUrl });
 
             // Step 1: period comparison to find the change magnitude
             const compareBody = (start: string, end: string) => ({
@@ -2455,7 +2469,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             return { error: 'Google Account not connected.' };
         }
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'ga4', id: args?.propertyId });
             const steps = await fetchFunnelData(token, args.propertyId, args.stepPages, args.range || '30d');
             return {
                 result: {
@@ -2479,7 +2493,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             return { error: 'Google Account not connected.' };
         }
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'ga4', id: args?.propertyId });
             const journey = await fetchJourneyData(token, args.propertyId, args.range || '30d');
             return {
                 result: {
@@ -2500,7 +2514,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             return { error: 'Google Account not connected.' };
         }
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'ga4', id: args?.propertyId });
             const data = await fetchRetentionCohorts(token, args.propertyId, args.mode || 'daily');
             if (!data) return { error: 'no_cohort_data', message: 'GA4 returned no cohort data — property may have insufficient history.' };
             return {
@@ -2783,7 +2797,7 @@ export async function executeAiChatTool(name: string, args: Record<string, any>,
             return { error: 'Google Account not connected. Connect it in Integrations settings.' };
         }
         try {
-            const token = await getValidAccessToken(gscContext.googleAccessToken, gscContext.googleRefreshToken);
+            const token = await toolToken(gscContext, { kind: 'gsc', id: args?.siteUrl });
             const { siteUrl, pageUrl } = args;
             if (!siteUrl || !pageUrl) {
                 return { error: 'invalid_args', message: 'Both siteUrl and pageUrl are required.', toolName: name };

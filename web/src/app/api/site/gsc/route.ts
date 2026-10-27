@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     const site = parseSiteUrl(sp.get('site'));
     if (!site) return jsonError('A Search Console site is required.', 400);
     const report = sp.get('report') ?? 'summary';
-    const ctx = await getSiteContext(req);
+    const ctx = await getSiteContext(req, { kind: 'gsc', id: site });
     if (ctx instanceof NextResponse) return ctx;
     const range = parseRange(sp, 2);
     const ok = (data: unknown) => NextResponse.json(data, { headers: PRIVATE_CACHE });

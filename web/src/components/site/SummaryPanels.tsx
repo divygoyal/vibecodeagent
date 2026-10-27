@@ -12,6 +12,10 @@ import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { MetricDelta } from '@/components/ui/MetricDelta';
 import { Table } from '@/components/ui/Table';
+import { ChartMarkers, IntervalSwitch, toAnnotations, useChartMarkers, useInterval } from './chart/ChartExtras';
+import { useSearchFinding, useTrafficFinding } from './chart/useFindings';
+import { FindingLine } from './Finding';
+import { bucketGscSeries } from './lib/intervals';
 import { MetricTile } from './MetricTile';
 import { LoadError, SourceMissing } from './SiteStates';
 import type { Ga4Summary, GscSummary } from './lib/types';
@@ -24,7 +28,7 @@ function SectionTitle({ title, source, href, linkLabel }: { title: string; sourc
     return (
         <div className="flex items-end justify-between gap-3">
             <div className="min-w-0">
-                <h2 className="text-title-sm text-fg">{title}</h2>
+                <h2 className="text-title text-fg">{title}</h2>
                 <p className="text-meta text-fg-muted">{source}</p>
             </div>
             {href ? (
@@ -44,14 +48,17 @@ function totalsOf(metric: MetricKey, t: Record<string, number> | null | undefine
 /** GA4 tiles (2x2) + one traffic chart. Search and traffic metrics never share a chart (DESIGN 2.3). */
 export function TrafficSummary({ href, className }: { href?: string; className?: string }) {
     const { hasGa4, ga4 } = useSite();
-    const { compareOn, compareText, dr } = useSiteRange();
-    const q = useGa4<Ga4Summary>('summary');
+    const { compareOn, compareText, dr, days } = useSiteRange();
+    const { interval } = useInterval(days);
+    const q = useGa4<Ga4Summary>('summary', { extra: interval === 'day' ? undefined : { interval } });
     const [metric, setMetric] = useState<MetricKey>('users');
     const d = q.data;
     const dates = useMemo(() => d?.series.map((p) => p.date) ?? [], [d]);
     const spark = (k: MetricKey) => d?.series.map((p) => (p as unknown as Record<string, number>)[k] ?? 0);
     const series = d?.series ?? [];
     const empty = q.state === 'ready' && d && d.totals.sessions === 0 && d.totals.users === 0;
+    const finding = useTrafficFinding(metric, d, { daily: interval === 'day' });
+    const marks = useChartMarkers(dates, dr.resolved.start, dr.resolved.end);
 
     return (
         <section aria-label="Traffic" className={cn('flex min-w-0 flex-col gap-3', className)}>
@@ -76,8 +83,9 @@ export function TrafficSummary({ href, className }: { href?: string; className?:
                         ))}
                     </div>
                     <ChartCard
-                        title={`${METRICS[metric].label} per day`}
+                        title={`${METRICS[metric].label} per ${interval}`}
                         subtitle={compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')}` : undefined}
+                        actions={<IntervalSwitch days={days} />}
                         state={q.state === 'error' ? 'error' : empty ? 'empty' : q.state}
                         error={{ message: q.error?.message, onRetry: q.mutate }}
                         empty={{ title: 'No visits in this period', description: 'Try a longer date range, or check the GA4 tag is installed.' }}
@@ -97,14 +105,17 @@ export function TrafficSummary({ href, className }: { href?: string; className?:
                         ) : undefined}
                         footer={d ? <AiFooter value={d.totals.ai} previous={compareOn ? d.previous?.ai ?? null : undefined} /> : undefined}
                     >
+                        <FindingLine finding={finding} />
                         <TimeSeriesChart
                             data={series as unknown as Record<string, number | string | null>[]}
                             series={[{ metric, key: metric, compareKey: compareOn ? `prev_${metric}` : undefined }]}
                             compareDateKey="prevDate"
                             partialFrom={series.length > 1 ? series.length - 1 : undefined}
+                            annotations={toAnnotations(marks.markers)}
                             height={240}
-                            ariaLabel={`${METRICS[metric].label} per day, ${fmtDateRange(dr.resolved.start, dr.resolved.end)}`}
+                            ariaLabel={`${METRICS[metric].label} per ${interval}, ${fmtDateRange(dr.resolved.start, dr.resolved.end)}`}
                         />
+                        <ChartMarkers markers={marks.markers} start={dr.resolved.start} end={dr.resolved.end} notesKey={marks.notesKey} scope={marks.scope} onChanged={marks.mutateNotes} notesFailed={marks.notesFailed} />
                     </ChartCard>
                 </>
             )}
@@ -126,12 +137,17 @@ function AiFooter({ value, previous }: { value: number; previous?: number | null
 /** GSC tiles (2x2) + one search chart. */
 export function SearchSummary({ href, className }: { href?: string; className?: string }) {
     const { hasGsc, gsc } = useSite();
-    const { compareOn, compareText, dr } = useSiteRange();
+    const { compareOn, compareText, dr, searchDays } = useSiteRange();
+    const { interval } = useInterval(searchDays);
     const q = useGsc<GscSummary>('summary');
     const [metric, setMetric] = useState<MetricKey>('clicks');
     const d = q.data;
     const series = useMemo(() => d?.series ?? [], [d]);
     const dates = useMemo(() => series.map((p) => p.date), [series]);
+    const chartSeries = useMemo(() => bucketGscSeries(series, interval), [series, interval]);
+    const chartDates = useMemo(() => chartSeries.map((p) => p.date), [chartSeries]);
+    const finding = useSearchFinding(metric, d, { daily: interval === 'day' });
+    const marks = useChartMarkers(chartDates, dr.resolvedSearch.start, d?.lastDate ?? dr.resolvedSearch.end);
     const spark = (k: MetricKey) => series.map((p) => {
         const v = (p as unknown as Record<string, number>)[k] ?? 0;
         return k === 'position' && !p.impressions ? null : v;
@@ -162,8 +178,9 @@ export function SearchSummary({ href, className }: { href?: string; className?: 
                         ))}
                     </div>
                     <ChartCard
-                        title={`${METRICS[metric].label} per day`}
+                        title={`${METRICS[metric].label} per ${interval}`}
                         subtitle={metric === 'position' ? 'Lower is better' : compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')}` : undefined}
+                        actions={<IntervalSwitch days={searchDays} />}
                         state={q.state === 'error' ? 'error' : empty ? 'empty' : q.state}
                         error={{ message: q.error?.message, onRetry: q.mutate }}
                         empty={{ title: 'No search impressions in this period', description: 'New sites can take a few weeks to appear in Google.' }}
@@ -171,13 +188,16 @@ export function SearchSummary({ href, className }: { href?: string; className?: 
                         onDownloadCsv={d ? () => downloadCsv(`search-${dates[0] ?? ''}.csv`, ['date', 'clicks', 'impressions', 'ctr', 'position'], series.map((p) => [p.date, p.clicks, p.impressions, p.ctr.toFixed(4), p.position.toFixed(2)])) : undefined}
                         footer="Search Console data is about 2 days behind."
                     >
+                        <FindingLine finding={finding} />
                         <TimeSeriesChart
-                            data={series as unknown as Record<string, number | string | null>[]}
+                            data={chartSeries as unknown as Record<string, number | string | null>[]}
                             series={[{ metric, key: metric, compareKey: compareOn ? `prev_${metric}` : undefined }]}
                             compareDateKey="prevDate"
+                            annotations={toAnnotations(marks.markers)}
                             height={240}
-                            ariaLabel={`${METRICS[metric].label} per day, ${fmtDateRange(dr.resolvedSearch.start, dr.resolvedSearch.end)}`}
+                            ariaLabel={`${METRICS[metric].label} per ${interval}, ${fmtDateRange(dr.resolvedSearch.start, dr.resolvedSearch.end)}`}
                         />
+                        <ChartMarkers markers={marks.markers} start={dr.resolvedSearch.start} end={d?.lastDate ?? dr.resolvedSearch.end} notesKey={marks.notesKey} scope={marks.scope} onChanged={marks.mutateNotes} notesFailed={marks.notesFailed} />
                     </ChartCard>
                 </>
             )}

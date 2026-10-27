@@ -2,12 +2,18 @@
  * Next.js instrumentation hook. Runs once when the server starts.
  *
  * Production: starts the portfolio sync scheduler (lib/portfolio/scheduledSync;
- * off with TC_PORTFOLIO_SCHEDULER=0).
+ * off with TC_PORTFOLIO_SCHEDULER=0) and the daily leaderboard refresh
+ * (lib/leaderboard/scheduledRefresh; off with TC_LEADERBOARD_SCHEDULER=0).
  *
  * Demo data mode (local development only): with TC_DEMO_DATA=1 every Google
  * data request is answered by src/lib/demo instead of the network. See
- * scripts/dev/README.md. It refuses to run when NODE_ENV is 'production'.
+ * scripts/dev/README.md. It refuses to run when NODE_ENV is 'production' unless
+ * lib/demo/gate.ts allows it (TC_ALLOW_DEMO_IN_PROD_BUILD=1 with a localhost NEXTAUTH_URL,
+ * used only by scripts/dev/worker1.sh).
  */
+import { demoDataAllowed } from './lib/demo/gate';
+
+
 export async function register() {
     if (process.env.NEXT_RUNTIME !== 'nodejs') return;
     // Keep portfolios fresh without an external cron (production only).
@@ -15,8 +21,13 @@ export async function register() {
         const { startPortfolioScheduler } = await import('./lib/portfolio/scheduledSync');
         startPortfolioScheduler();
     }
+    // Keep the public leaderboard fresh without an external cron (production only).
+    if (process.env.NODE_ENV === 'production' && process.env.TC_LEADERBOARD_SCHEDULER !== '0' && process.env.TC_DEMO_DATA !== '1') {
+        const { startLeaderboardScheduler } = await import('./lib/leaderboard/scheduledRefresh');
+        if (startLeaderboardScheduler()) console.log('[leaderboard-scheduler] started: daily refresh, first check a few minutes after boot');
+    }
     if (process.env.TC_DEMO_DATA !== '1') return;
-    if (process.env.NODE_ENV === 'production') {
+    if (!demoDataAllowed()) {
         console.warn('[demo-data] TC_DEMO_DATA=1 ignored: demo data is only allowed outside production.');
         return;
     }

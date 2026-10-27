@@ -198,11 +198,13 @@ export const SiteCard = memo(function SiteCard({
                 <Favicon host={site.host || site.label} size={20} />
                 <h3 className="min-w-0 truncate text-title-sm text-fg" title={site.gsc?.siteUrl ?? site.ga4?.displayName ?? site.label}>{site.label}</h3>
                 {site.variant ? <VariantChip text={site.variant} /> : null}
-                {/* Narrow cards (3 columns) keep the room for the host; the full URL is in its tooltip. */}
+                {/* Narrow cards and phones keep the room for the host; the full URL is in its
+                    tooltip. No GA4 badge: the users row already says the site has Analytics. */}
                 {site.gsc ? (
-                    <Badge className="hidden @xs:inline-flex">{site.gsc.propertyType === 'domain' ? 'Domain' : 'Prefix'}</Badge>
+                    <Badge className="hidden @xs:inline-flex max-sm:hidden">{site.gsc.propertyType === 'domain' ? 'Domain' : 'Prefix'}</Badge>
                 ) : (
-                    <Badge className="hidden @xs:inline-flex">GA4</Badge>
+                    // Analytics-only site: the one badge that carries meaning here, kept on phones too.
+                    <Badge title="Google Analytics only, no Search Console property">GA4</Badge>
                 )}
                 <span className="flex-1" />
                 {readOnly ? (

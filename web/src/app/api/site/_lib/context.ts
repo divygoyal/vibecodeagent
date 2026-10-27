@@ -13,7 +13,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { cachedFetch } from '@/lib/apiCache';
 import { getValidAccessToken } from '@/lib/googleApi';
-import { getGoogleCredentialsForRequest } from '@/lib/serverAuth';
+import { getGoogleCredentialsForAsset, type GoogleAssetRef } from '@/lib/serverAuth';
 
 
 export interface SiteContext {
@@ -27,19 +27,23 @@ export function jsonError(message: string, status: number, code?: string) {
     return NextResponse.json(code ? { error: message, code } : { error: message }, { status });
 }
 
-/** Session -> user id + a valid Google access token. Cached briefly per cookie. */
-export async function getSiteContext(req: Request): Promise<SiteContext | NextResponse> {
+/**
+ * Session -> user id + a valid Google access token for `asset` (the token of the Google
+ * connection that lists it: the sign-in account or an extra linked account,
+ * lib/googleAccounts.ts). Cached briefly per cookie and asset.
+ */
+export async function getSiteContext(req: Request, asset?: GoogleAssetRef | null): Promise<SiteContext | NextResponse> {
     const cookie = req.headers.get('cookie') || '';
     if (!cookie) return jsonError('Unauthorized', 401);
     const result = await cachedFetch<{ userId?: string; token?: string; error?: string; status?: number; code?: string }>(
-        `site-ctx:${cookie}`,
+        `site-ctx:${asset ? `${asset.kind}:${asset.id}:` : ''}${cookie}`,
         CONTEXT_TTL_MS,
         async () => {
             const session = await getServerSession(authOptions);
             const userId = (session?.user as { id?: string } | undefined)?.id;
             if (!userId) return { error: 'Unauthorized', status: 401 };
             // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
-            const { accessToken: access, refreshToken: refresh } = await getGoogleCredentialsForRequest(req, String(userId));
+            const { accessToken: access, refreshToken: refresh } = await getGoogleCredentialsForAsset(req, String(userId), asset);
             if (!access && !refresh) return { error: 'Google not connected', status: 400, code: 'GOOGLE_NOT_CONNECTED' };
             try {
                 const token = await getValidAccessToken(access, refresh);

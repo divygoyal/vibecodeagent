@@ -4,10 +4,12 @@ import { cn } from '@/lib/cn';
 import type { ThemeV2 } from '@/lib/builder/types';
 
 /** Logo and company name from the dashboard's Appearance settings (no colours: those are fixed). */
-export function DashboardBrandHeader({ doc }: { doc: { theme: ThemeV2 } }) {
+export function DashboardBrandHeader({ doc, dark }: { doc: { theme: ThemeV2 }; dark?: boolean }) {
     const h = doc.theme.header;
     if (!h.show || (!h.logoUrl && !h.companyName)) return null;
-    const logo = h.logoUrl && /^https:\/\//i.test(h.logoUrl) ? h.logoUrl : null;
+    // Round 2 brand kit: a separate logo for dark backgrounds, when set.
+    const src = (dark && doc.theme.brand?.logoDarkUrl) || h.logoUrl;
+    const logo = src && /^https:\/\//i.test(src) ? src : null;
     return (
         <div className={cn('flex items-center gap-3', h.logoPosition === 'center' && 'justify-center', h.logoPosition === 'right' && 'justify-end')}>
             {/* eslint-disable-next-line @next/next/no-img-element */}

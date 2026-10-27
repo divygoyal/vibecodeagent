@@ -15,7 +15,10 @@ import { addDays, daysBetween, type RangeParams } from './params';
 
 export interface ActionsInput {
     userId: string;
+    /** Search Console token (and GA4 too unless gaToken is set). */
     token: string;
+    /** GA4 token when the property sits in another Google account than the Search Console site. */
+    gaToken?: string;
     /** Site label for prompts ('acme.com'). */
     label: string;
     siteUrl: string | null;
@@ -231,9 +234,9 @@ async function trafficActions(inp: ActionsInput, partial: string[]): Promise<Sit
         return null;
     });
     const [summary, channels, pages] = await Promise.all([
-        settle(ga4Summary(inp.userId, inp.token, property, r), 'Analytics totals'),
-        settle(ga4Breakdown(inp.userId, inp.token, property, 'channels', r), 'Analytics channels'),
-        settle(ga4Breakdown(inp.userId, inp.token, property, 'pages', r), 'Analytics pages'),
+        settle(ga4Summary(inp.userId, inp.gaToken ?? inp.token, property, r), 'Analytics totals'),
+        settle(ga4Breakdown(inp.userId, inp.gaToken ?? inp.token, property, 'channels', r), 'Analytics channels'),
+        settle(ga4Breakdown(inp.userId, inp.gaToken ?? inp.token, property, 'pages', r), 'Analytics pages'),
     ]);
     const host = inp.label;
     const out: SiteAction[] = [];
