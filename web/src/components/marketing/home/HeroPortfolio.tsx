@@ -62,14 +62,14 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
                         {total} sites · {RANGE_LABEL[range]} vs previous · <span className="font-medium text-fg-secondary">sample data</span>
                     </p>
                 </div>
-                <div className="flex w-full items-center gap-2 sm:w-auto">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
                     <Select
                         value={sort}
                         onValueChange={(v) => setSort(v as SortKey)}
                         options={SORT_OPTIONS}
                         ariaLabel="Sort sites"
                         align="end"
-                        className="min-w-0 flex-1 sm:w-[164px] sm:flex-none"
+                        className="w-full min-w-0 sm:w-[164px]"
                     />
                     <SegmentedControl
                         options={RANGES.map((r) => ({ value: r, label: r, ariaLabel: RANGE_LABEL[r] }))}
