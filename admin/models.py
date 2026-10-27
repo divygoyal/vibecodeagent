@@ -101,7 +101,18 @@ class OAuthConnection(Base):
     token_type = Column(String(50))
     scope = Column(Text)
     id_token = Column(EncryptedToken)
-    
+
+    # Extra Google accounts (024_add_linked_google_accounts.sql, admin/google_accounts.py).
+    # NULL / "primary": the user's own sign-in or data connection (one per provider; the
+    # only row identity lookups and bot containers ever use). "linked": an extra Google
+    # account connected from Settings -> Google, a read-only data connection only; it
+    # never signs anyone in. Linked rows are keyed by the Google `sub` (provider_account_id).
+    account_role = Column(String(20), nullable=True)
+    account_email = Column(String(255), nullable=True)
+    account_name = Column(String(255), nullable=True)
+    # NULL / "connected", or "needs_reconnect" after Google refused the refresh token.
+    status = Column(String(30), nullable=True)
+
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
