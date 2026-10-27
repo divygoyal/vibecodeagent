@@ -109,7 +109,8 @@ automatically:
 Requests with a non-demo bearer token are refused (401) and never leave the
 box. Gemini/Vertex calls are not intercepted; with no key configured the AI
 features show their normal "unavailable" path. It never runs when
-`NODE_ENV=production`, and nothing changes when `TC_DEMO_DATA` is unset.
+`NODE_ENV=production` (the one exception is the isolated test machine, see `WORKER1.md`: `web/src/lib/demo/gate.ts`
+needs `TC_ALLOW_DEMO_IN_PROD_BUILD=1` and a localhost `NEXTAUTH_URL`), and nothing changes when `TC_DEMO_DATA` is unset.
 
 ### Use the generator directly (new features, public demo page)
 
