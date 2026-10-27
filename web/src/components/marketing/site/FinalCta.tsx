@@ -6,7 +6,7 @@ import { ConnectGoogleButton } from './ConnectGoogleButton';
 /** The only large brand-colour block on the site (DESIGN 5.16). */
 export function FinalCta({
     title = 'See every site you own on one screen.',
-    description = 'Connect Google once. Read-only, no card, no site limit.',
+    description = 'Connect Google once. Read-only, nothing to install, no card, no site limit.',
 }: {
     title?: string;
     description?: string;
