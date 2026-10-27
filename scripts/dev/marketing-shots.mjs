@@ -8,7 +8,8 @@
  * Each shot is a crop of the part that matters (the fix list, the dashboard, the AI traffic chart, the Ask answer...),
  * not the whole window: desktop = the content column of a 1280x900 viewport at 2x (about 1030 css px wide, so text is
  * full size on the home page), saved 1800 px wide; mobile = the top of the 390 px phone layout at 2x, saved 720 px
- * wide. Both themes. Output: <outDir>/<name>-<desktop|mobile>-<light|dark>.webp + shots.json (sizes).
+ * wide. Both themes. Output: <outDir>/<name>-<desktop|mobile>-<light|dark>.<hash>.webp, tourImages.json (the
+ * manifest the home page imports: names + pixel sizes; run the whole set, not --only, before copying it) and shots.json.
  *
  * Run it where Playwright and an instance are (worker1, production build). From the main VPS:
  *
@@ -19,7 +20,9 @@
  *     TC_CHROME=$(ls -d /root/ai-tutor-render/ms-playwright/chromium-*\/chrome-linux64/chrome | sort -V | tail -1) \
  *     FONTCONFIG_FILE=/root/trafficclaw-test/fontconfig/fonts.conf \
  *     node scripts/dev/marketing-shots.mjs <port printed by up> /root/trafficclaw-test/tmp/marketing'
- *   rsync -a --exclude=shots.json worker1:/root/trafficclaw-test/tmp/marketing/ web/public/marketing/
+ *   rm -f web/public/marketing/*.webp
+ *   rsync -a --include='*.webp' --exclude='*' worker1:/root/trafficclaw-test/tmp/marketing/ web/public/marketing/
+ *   scp worker1:/root/trafficclaw-test/tmp/marketing/tourImages.json web/src/components/marketing/home/tourImages.json
  *   scripts/dev/worker1.sh down r3-home
  *
  * Dev-only text is cleaned before each capture (a localhost URL becomes https://trafficclaw.com, the dev seed's
@@ -30,6 +33,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { launchBrowser, settle, watchPage } from './pw.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -249,14 +253,16 @@ try {
                     const clip = await cropRect(page, shot.crop, form);
                     if (!clip) throw new Error('crop target not found');
                     await page.screenshot({ path: png, clip, fullPage: true });
-                    const webp = path.join(opts.out, `${file}.webp`);
-                    const info = await sharp(png)
+                    const { data, info } = await sharp(png)
                         .resize({ width: VIEWPORTS[form].outWidth })
                         .webp({ quality: 76, effort: 6, smartSubsample: true })
-                        .toFile(webp);
+                        .toBuffer({ resolveWithObject: true });
+                    // Content hash in the name: a new picture is a new URL, so no image cache can serve the old one.
+                    const name = `${file}.${createHash('sha1').update(data).digest('hex').slice(0, 8)}.webp`;
+                    fs.writeFileSync(path.join(opts.out, name), data);
                     if (!opts.keepPng) fs.unlinkSync(png);
-                    results.push({ file: `${file}.webp`, width: info.width, height: info.height, kb: Math.round(info.size / 1024), url: page.url() });
-                    console.log(`ok   ${file}.webp ${info.width}x${info.height} ${Math.round(info.size / 1024)} KB`);
+                    results.push({ key: shot.name, form, theme, file: name, width: info.width, height: info.height, kb: Math.round(data.length / 1024), url: page.url() });
+                    console.log(`ok   ${name} ${info.width}x${info.height} ${Math.round(data.length / 1024)} KB`);
                 } catch (err) {
                     failed++;
                     console.error(`FAIL ${file}: ${err.message}`);
@@ -270,6 +276,14 @@ try {
     await browser.close();
 }
 fs.writeFileSync(path.join(opts.out, 'shots.json'), JSON.stringify(results, null, 2));
+// The manifest the home page reads (web/src/components/marketing/home/tourImages.json): file names and pixel sizes.
+const manifest = {};
+for (const r of results) {
+    manifest[r.key] ??= {};
+    manifest[r.key][r.form] ??= { width: r.width, height: r.height };
+    manifest[r.key][r.form][r.theme] = `/marketing/${r.file}`;
+}
+fs.writeFileSync(path.join(opts.out, 'tourImages.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 const total = results.reduce((s, r) => s + r.kb, 0);
 console.log(`${results.length} images, ${total} KB total${failed ? `, ${failed} failed` : ''}`);
 process.exit(failed ? 1 : 0);

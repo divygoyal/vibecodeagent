@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowRight, Check, LayoutGrid, ListChecks, PanelsTopLeft, PanelTop, Sparkles, Trophy, WandSparkles, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
+import tourImages from './tourImages.json';
 
 export type TourKey = 'portfolio' | 'site' | 'fixes' | 'traffic' | 'dashboards' | 'leaderboard' | 'ask';
 
@@ -32,23 +33,11 @@ const ICONS: Record<TourKey, LucideIcon> = {
 };
 
 /**
- * Pixel sizes of the crops written by scripts/dev/marketing-shots.mjs (desktop: the app's content column at 2x;
- * mobile: the phone layout at 2x). The crop heights are fixed in that script, so these stay right when the
- * pictures are regenerated; update them if the script's crops change.
+ * The pictures: written by scripts/dev/marketing-shots.mjs with a content hash in each file name (a new
+ * picture is a new URL, so no image cache serves an old one), plus their pixel sizes.
  */
-const SIZES: Record<TourKey, { desktop: [number, number]; mobile: [number, number] }> = {
-    portfolio: { desktop: [1800, 1240], mobile: [720, 494] },
-    site: { desktop: [1800, 1240], mobile: [720, 1432] },
-    fixes: { desktop: [1800, 1240], mobile: [720, 1432] },
-    traffic: { desktop: [1800, 1240], mobile: [720, 1432] },
-    dashboards: { desktop: [1800, 1240], mobile: [720, 1432] },
-    leaderboard: { desktop: [1800, 844], mobile: [720, 1403] },
-    ask: { desktop: [1800, 1134], mobile: [720, 1432] },
-};
-
-function src(key: TourKey, form: 'desktop' | 'mobile', theme: 'light' | 'dark') {
-    return `/marketing/${key}-${form}-${theme}.webp`;
-}
+type Form = { width: number; height: number; light: string; dark: string };
+const IMAGES = tourImages as Record<TourKey, { desktop: Form; mobile: Form }>;
 
 /**
  * Product tour: one tab per feature. Each shows the part of the real app that matters, cropped from a
@@ -96,8 +85,7 @@ export function FeatureTour({ stops }: { stops: TourStop[] }) {
         refs.current[next]?.focus();
     };
 
-    const [dw, dh] = SIZES[stop.key].desktop;
-    const [mw, mh] = SIZES[stop.key].mobile;
+    const { desktop, mobile } = IMAGES[stop.key];
 
     return (
         <div className="relative">
@@ -156,12 +144,12 @@ export function FeatureTour({ stops }: { stops: TourStop[] }) {
 
                 <figure className="mt-6" key={stop.key}>
                     <div className="hidden overflow-hidden rounded-panel border border-border-subtle bg-canvas shadow-[0_24px_64px_-28px_rgb(0_0_0/0.3)] md:block">
-                        <Image src={src(stop.key, 'desktop', 'light')} alt={stop.alt} width={dw} height={dh} sizes="(min-width: 1112px) 1064px, 96vw" className="block h-auto w-full dark:hidden" />
-                        <Image src={src(stop.key, 'desktop', 'dark')} alt={stop.alt} width={dw} height={dh} sizes="(min-width: 1112px) 1064px, 96vw" className="hidden h-auto w-full dark:block" />
+                        <Image src={desktop.light} alt={stop.alt} width={desktop.width} height={desktop.height} sizes="(min-width: 1112px) 1064px, 96vw" className="block h-auto w-full dark:hidden" />
+                        <Image src={desktop.dark} alt={stop.alt} width={desktop.width} height={desktop.height} sizes="(min-width: 1112px) 1064px, 96vw" className="hidden h-auto w-full dark:block" />
                     </div>
                     <div className="mx-auto max-w-[400px] overflow-hidden rounded-card border border-border-subtle bg-canvas shadow-card md:hidden">
-                        <Image src={src(stop.key, 'mobile', 'light')} alt={stop.alt} width={mw} height={mh} sizes="(max-width: 432px) 92vw, 400px" className="block h-auto w-full dark:hidden" />
-                        <Image src={src(stop.key, 'mobile', 'dark')} alt={stop.alt} width={mw} height={mh} sizes="(max-width: 432px) 92vw, 400px" className="hidden h-auto w-full dark:block" />
+                        <Image src={mobile.light} alt={stop.alt} width={mobile.width} height={mobile.height} sizes="(max-width: 432px) 92vw, 400px" className="block h-auto w-full dark:hidden" />
+                        <Image src={mobile.dark} alt={stop.alt} width={mobile.width} height={mobile.height} sizes="(max-width: 432px) 92vw, 400px" className="hidden h-auto w-full dark:block" />
                     </div>
                     <figcaption className="mt-3 text-center text-meta text-fg-muted">Real app · sample data</figcaption>
                 </figure>
