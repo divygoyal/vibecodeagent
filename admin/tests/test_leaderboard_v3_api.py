@@ -285,6 +285,19 @@ class LeaderboardV3ApiTests(unittest.TestCase):
         mine = next(e for e in self.c.get(f"/api/lb/mine/{self.users['owner']}", headers=KEY).json()["entries"] if e["id"] == eid)
         self.assertEqual(mine["privacy"]["metrics"]["pageviews"], "exact")
 
+    def test_13_refresh_list_carries_last_refreshed(self):
+        """The daily scheduler skips entries refreshed recently, so the list says when each one was last refreshed."""
+        eid = self.join("Refresh Listed", "refreshlisted.test", status="verified")
+        entries = self.c.post("/api/leaderboard/refresh", headers=KEY).json()["entries"]
+        mine = next(e for e in entries if e["entry_id"] == eid)
+        self.assertIsNone(mine["last_refreshed"])  # never refreshed: due
+        self.metrics(eid)
+        entries = self.c.post("/api/leaderboard/refresh", headers=KEY).json()["entries"]
+        mine = next(e for e in entries if e["entry_id"] == eid)
+        self.assertTrue(mine["last_refreshed"].endswith("Z"), mine["last_refreshed"])  # UTC, parseable by JS
+        board = self.board(tab="top")
+        self.assertTrue(board["updated_at"])
+
 
 if __name__ == "__main__":
     unittest.main()
