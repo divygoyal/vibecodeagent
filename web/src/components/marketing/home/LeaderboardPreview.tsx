@@ -10,7 +10,7 @@ import { fmtCompact } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { Section, SectionHeading } from '../site/Section';
 import { SiteIcon } from '../site/SiteIcon';
-import { fetchProofCounts, proofItems, type ProofItem } from './proof';
+import { boardRowsFor, fetchProofCounts, isTestServer, proofItems, type ProofItem } from './proof';
 
 /** One row, normalised from either the v3 board (`rows`) or the legacy list (`entries`). */
 interface PreviewRow {
@@ -94,13 +94,18 @@ function Delta({ pct }: { pct: number | null }) {
  */
 export function LeaderboardPreview() {
     const [rows, setRows] = useState<PreviewRow[] | null>(null);
+    const [sample, setSample] = useState(false);
     const [proof, setProof] = useState<ProofItem[]>([]);
 
     useEffect(() => {
         const ctrl = new AbortController();
         fetch('/api/leaderboard?tab=top&range=28d&sort=traffic&page_size=5', { signal: ctrl.signal, headers: { Accept: 'application/json' } })
             .then((res) => (res.ok ? res.json() : null))
-            .then((data) => setRows(data ? normalise(data).filter((r) => r.name) : []))
+            .then((data) => {
+                const board = boardRowsFor(data ? normalise(data).filter((r) => r.name) : [], isTestServer(window.location.hostname));
+                setRows(board.rows);
+                setSample(board.sample);
+            })
             .catch(() => { /* aborted or offline: stay hidden */ });
         fetchProofCounts(ctrl.signal)
             .then((counts) => setProof(proofItems(counts)))
@@ -117,21 +122,21 @@ export function LeaderboardPreview() {
                     <SectionHeading
                         id="lb-title"
                         eyebrow="Leaderboard"
-                        title="Real traffic, straight from Google"
-                        description="Numbers straight from Google. Only verified owners rank."
+                        title="A public board of verified traffic"
+                        description="Numbers come straight from Google. Only verified site owners rank."
                     />
                     {proof.length ? (
-                        <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4" aria-label="Leaderboard right now">
-                            {proof.map((p) => (
-                                <div key={p.key} className="flex max-w-[200px] flex-col-reverse">
-                                    <dt className="mt-0.5 text-body-sm text-fg-muted">{p.label}</dt>
-                                    <dd className="text-stat tabular-nums text-fg">{p.value.toLocaleString('en-US')}</dd>
-                                </div>
+                        <p className="mt-5 text-body-lg text-fg-secondary">
+                            {proof.map((p, i) => (
+                                <span key={p.key}>
+                                    {i > 0 ? ' · ' : null}
+                                    <strong className="font-semibold text-fg tabular-nums">{p.value.toLocaleString('en-US')}</strong> {p.label}
+                                </span>
                             ))}
-                        </dl>
+                        </p>
                     ) : null}
                     <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                        <Button asChild variant="secondary" size="lg">
+                        <Button asChild variant="primary" size="lg">
                             <Link href="/leaderboard/join">Add your site, free</Link>
                         </Button>
                         <Button asChild variant="ghost" size="lg" trailingIcon={ArrowRight}>
@@ -142,11 +147,15 @@ export function LeaderboardPreview() {
 
                 <div className="rounded-card border border-border-subtle bg-surface shadow-card">
                     <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
-                        <p className="text-title-sm text-fg">Top sites right now</p>
-                        <span className="inline-flex items-center gap-1.5 text-meta text-fg-muted">
-                            <span aria-hidden className="size-1.5 animate-live-dot rounded-full bg-up" />
-                            Live from the leaderboard
-                        </span>
+                        <p className="min-w-0 truncate text-title-sm text-fg">Top sites right now</p>
+                        {sample ? (
+                            <span title="Test server: these rows are seed data. Real visitors only ever see real listings." className="shrink-0 rounded-full bg-subtle px-2 py-0.5 text-meta font-medium text-fg-secondary">Sample rows</span>
+                        ) : (
+                            <span className="inline-flex shrink-0 items-center gap-1.5 text-meta text-fg-muted">
+                                <span aria-hidden className="size-1.5 animate-live-dot rounded-full bg-up" />
+                                Live<span className="max-sm:hidden"> from the leaderboard</span>
+                            </span>
+                        )}
                     </div>
                     <ol>
                         {rows.map((row) => (
@@ -159,7 +168,7 @@ export function LeaderboardPreview() {
                                             <span className="truncate text-body font-semibold text-fg">{row.name}</span>
                                             {row.verified ? <ShieldCheck aria-label="Verified" size={14} strokeWidth={1.75} className="shrink-0 text-brand-text" /> : null}
                                         </span>
-                                        <span className="flex items-center gap-2 text-body-sm text-fg-muted">
+                                        <span className="flex items-center gap-2 text-body-sm text-fg-muted max-sm:hidden">
                                             {row.host ? <span className="truncate">{row.host}</span> : null}
                                             {row.category ? <Badge variant="neutral" className="hidden sm:inline-flex">{row.category}</Badge> : null}
                                         </span>

@@ -19,8 +19,8 @@ test('social proof is hidden below the thresholds and never invented', () => {
 test('each figure shows on its own once it clears its threshold', () => {
     const onlyListed = proofItems({ listed: PROOF_MIN.listed, verified: 3 });
     assert.deepEqual(onlyListed.map((p) => [p.key, p.value]), [['listed', PROOF_MIN.listed]]);
-    const both = proofItems({ listed: 120, verified: 40 });
-    assert.deepEqual(both.map((p) => [p.key, p.value]), [['listed', 120], ['verified', 40]]);
+    const both = proofItems({ listed: 240, verified: 80 });
+    assert.deepEqual(both.map((p) => [p.key, p.value]), [['listed', 240], ['verified', 80]]);
     assert.deepEqual(proofItems({ listed: Number.NaN, verified: 50 }).map((p) => p.key), ['verified']);
 });
 
@@ -101,9 +101,20 @@ test('home data: every range, a story with real numbers, tour links into the dem
     const hosts = new Set(getDemoSites().map((s) => s.host.replace(/^www\./, '')));
     assert.ok(hosts.has(tour.host), 'tour host comes from the catalogue');
     assert.ok(byRange['28d'].sites.some((s) => s.slug === tour.slug), 'tour slug is a real app slug');
-    for (const k of ['portfolio', 'site', 'fixes', 'traffic', 'dashboards', 'connectAi']) {
+    for (const k of ['portfolio', 'site', 'fixes', 'traffic', 'dashboards', 'ask']) {
         assert.match(tour[k], /^\/demo\?to=\/dashboard(\/|$)/, `${k} deep-links into the demo`);
     }
     // Deterministic for the same day.
     assert.deepEqual(buildHomeData(now).story, story);
+});
+
+test('the home leaderboard never shows test-domain rows on a real server', async () => {
+    const { boardRowsFor, isSampleHost, isTestServer } = await import('../src/components/marketing/home/proof.ts');
+    assert.ok(isSampleHost('searchmetrics.example') && isSampleHost('a.test') && isSampleHost('x.example.'));
+    assert.ok(!isSampleHost('trafficclaw.com') && !isSampleHost('example.com') && !isSampleHost(null));
+    assert.ok(isTestServer('localhost') && isTestServer('127.0.0.1') && !isTestServer('trafficclaw.com'));
+    const rows = [{ host: 'real.com' }, { host: 'seed.example' }, { host: null }];
+    assert.deepEqual(boardRowsFor(rows, false), { rows: [{ host: 'real.com' }, { host: null }], sample: false });
+    assert.deepEqual(boardRowsFor(rows, true), { rows, sample: true });
+    assert.deepEqual(boardRowsFor([{ host: 'real.com' }], true).sample, false);
 });

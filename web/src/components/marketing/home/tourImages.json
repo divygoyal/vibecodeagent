@@ -1,0 +1,100 @@
+{
+  "portfolio": {
+    "desktop": {
+      "width": 1800,
+      "height": 1240,
+      "light": "/marketing/portfolio-desktop-light.9589f490.webp",
+      "dark": "/marketing/portfolio-desktop-dark.2fa95b76.webp"
+    },
+    "mobile": {
+      "width": 720,
+      "height": 494,
+      "light": "/marketing/portfolio-mobile-light.8ce76775.webp",
+      "dark": "/marketing/portfolio-mobile-dark.4c6da2f2.webp"
+    }
+  },
+  "site": {
+    "desktop": {
+      "width": 1800,
+      "height": 1240,
+      "light": "/marketing/site-desktop-light.8e296904.webp",
+      "dark": "/marketing/site-desktop-dark.bb6e6ccc.webp"
+    },
+    "mobile": {
+      "width": 720,
+      "height": 1432,
+      "light": "/marketing/site-mobile-light.2a562298.webp",
+      "dark": "/marketing/site-mobile-dark.f7b3b3bb.webp"
+    }
+  },
+  "fixes": {
+    "desktop": {
+      "width": 1800,
+      "height": 1240,
+      "light": "/marketing/fixes-desktop-light.075ee931.webp",
+      "dark": "/marketing/fixes-desktop-dark.b0fea7da.webp"
+    },
+    "mobile": {
+      "width": 720,
+      "height": 1432,
+      "light": "/marketing/fixes-mobile-light.37a31fe2.webp",
+      "dark": "/marketing/fixes-mobile-dark.cf78b525.webp"
+    }
+  },
+  "traffic": {
+    "desktop": {
+      "width": 1800,
+      "height": 1240,
+      "light": "/marketing/traffic-desktop-light.c1107a6a.webp",
+      "dark": "/marketing/traffic-desktop-dark.b67b172a.webp"
+    },
+    "mobile": {
+      "width": 720,
+      "height": 1432,
+      "light": "/marketing/traffic-mobile-light.7d062929.webp",
+      "dark": "/marketing/traffic-mobile-dark.e07df053.webp"
+    }
+  },
+  "dashboards": {
+    "desktop": {
+      "width": 1800,
+      "height": 1240,
+      "light": "/marketing/dashboards-desktop-light.4b5f7273.webp",
+      "dark": "/marketing/dashboards-desktop-dark.7d9a8cfd.webp"
+    },
+    "mobile": {
+      "width": 720,
+      "height": 1432,
+      "light": "/marketing/dashboards-mobile-light.164c3208.webp",
+      "dark": "/marketing/dashboards-mobile-dark.a8c4392c.webp"
+    }
+  },
+  "leaderboard": {
+    "desktop": {
+      "width": 1800,
+      "height": 844,
+      "light": "/marketing/leaderboard-desktop-light.2d0574e0.webp",
+      "dark": "/marketing/leaderboard-desktop-dark.2d0574e0.webp"
+    },
+    "mobile": {
+      "width": 720,
+      "height": 1403,
+      "light": "/marketing/leaderboard-mobile-light.f7bf8a33.webp",
+      "dark": "/marketing/leaderboard-mobile-dark.f7bf8a33.webp"
+    }
+  },
+  "ask": {
+    "desktop": {
+      "width": 1800,
+      "height": 1134,
+      "light": "/marketing/ask-desktop-light.a8753ae2.webp",
+      "dark": "/marketing/ask-desktop-dark.f586fbaa.webp"
+    },
+    "mobile": {
+      "width": 720,
+      "height": 1432,
+      "light": "/marketing/ask-mobile-light.343769f1.webp",
+      "dark": "/marketing/ask-mobile-dark.34126980.webp"
+    }
+  }
+}
