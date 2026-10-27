@@ -365,7 +365,11 @@ interface InventoryLayerProps {
  */
 function InventoryLayer({ children, user, pathname, isSetupRoute, router, getUserKey, selectedProperty, selectedSite, setSelectedProperty, setSelectedSite }: InventoryLayerProps) {
     const parent = useWorkspaceParent();
-    const { hasGoogleConnection } = useConnections();
+    const { status: sessionStatus } = useSession();
+    const { hasGoogleConnection, isLoading: connectionsLoading } = useConnections();
+    // Until the session and /api/connections answer we do not know whether Google is
+    // connected (always the case in the server render and the first client render).
+    const connectionUnknown = !hasGoogleConnection && (sessionStatus === 'loading' || connectionsLoading);
     const { sites: gscSites, isLoading: siteInventoryLoading, hasLoaded: siteInventoryLoaded, error: siteErr } = useSiteList(hasGoogleConnection);
     const { properties, isLoading: propertyInventoryLoading, hasLoaded: propertyInventoryLoaded, error: propErr } = usePropertyList(hasGoogleConnection);
 
@@ -406,7 +410,10 @@ function InventoryLayer({ children, user, pathname, isSetupRoute, router, getUse
         properties: typedProperties,
         pairs: storedPairs,
     }), [typedSites, typedProperties, storedPairs]);
-    const siteDirectoryLoading = hasGoogleConnection ? !(siteInventoryLoaded && propertyInventoryLoaded) && !(siteInventoryError && propertyInventoryError) : false;
+    // Loading while that is unknown too: otherwise /dashboard/s/<host> first paints
+    // "We couldn't find <host>" and the tc_site cookie is cleared on every page load.
+    const siteDirectoryLoading = connectionUnknown
+        || (hasGoogleConnection && !(siteInventoryLoaded && propertyInventoryLoaded) && !(siteInventoryError && propertyInventoryError));
 
     // Stale saved selection: old single-site pages send the user to the picker.
     // Portfolio and /dashboard/s/[host] pick the site themselves, so they never redirect.
