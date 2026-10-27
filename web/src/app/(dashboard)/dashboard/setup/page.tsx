@@ -8,7 +8,7 @@ import { useSWRConfig } from 'swr';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useWorkspace } from '@/components/shell/workspaceContext';
 import { DEMO_PROPERTY_ID, DEMO_SITE_URL } from '@/lib/demoWorkspace';
-import type { SiteEntry } from '@/lib/sites/siteDirectory';
+import { DIRECTORY_KEY, DIRECTORY_STORE_KEY, type SiteEntry } from '@/lib/sites/siteDirectory';
 import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
 import { ConnectStep } from './ConnectStep';
 import { SitesStep } from './SitesStep';
@@ -84,6 +84,9 @@ function Setup() {
     }, []);
 
     const recheck = useCallback(() => {
+        // The site directory comes from one call; ?refresh=1 skips the server's cached Google lists.
+        void mutate(DIRECTORY_KEY, fetch(`${DIRECTORY_KEY}?refresh=1`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error('directory')))), { revalidate: false }).catch(() => undefined);
+        void mutate(DIRECTORY_STORE_KEY);
         void mutate('/api/analytics?mode=list');
         void mutate('/api/seo?mode=list');
     }, [mutate]);

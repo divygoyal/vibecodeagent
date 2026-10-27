@@ -48,6 +48,10 @@ export interface DirectoryInput {
 
 /** SWR key of the stored pairing endpoint (revalidate it after a pairing change). */
 export const PAIRS_KEY = '/api/portfolio/pairs';
+/** SWR key of the live directory (Google lists + pairing in one call). Revalidate it after a pairing change too. */
+export const DIRECTORY_KEY = '/api/sites/directory';
+/** SWR key of the fast directory, from the portfolio store alone (no Google). */
+export const DIRECTORY_STORE_KEY = '/api/sites/directory?source=store';
 
 const HOST_KEY_RE = /^[a-z0-9.-]+(--\d+)?$|^ga4-\d+$/;
 

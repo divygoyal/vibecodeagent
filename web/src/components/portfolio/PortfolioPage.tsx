@@ -10,7 +10,7 @@ import { useDateRange } from '@/components/shell/DateRangeControl';
 import type { RangePreset } from '@/lib/dateRange';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite, SitePatch } from '@/lib/portfolio/types';
 import { parseFilter, parseSort, type FilterKey, type SortKey } from '@/lib/portfolio/view';
-import { PAIRS_KEY } from '@/lib/sites/siteDirectory';
+import { DIRECTORY_KEY, DIRECTORY_STORE_KEY, PAIRS_KEY } from '@/lib/sites/siteDirectory';
 import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
 import { PortfolioView } from './PortfolioView';
 
@@ -127,7 +127,11 @@ export function PortfolioPage() {
         }
         await mutate();
         // The app's site directory (switcher, setup, site pages) reads the stored pairing too.
-        if (patch.ga4Property !== undefined || patch.gscSite !== undefined || patch.resetPairing) void globalMutate(PAIRS_KEY);
+        if (patch.ga4Property !== undefined || patch.gscSite !== undefined || patch.resetPairing) {
+            void globalMutate(PAIRS_KEY);
+            void globalMutate(DIRECTORY_KEY);
+            void globalMutate(DIRECTORY_STORE_KEY);
+        }
         return res.ok;
     }, [mutate]);
 

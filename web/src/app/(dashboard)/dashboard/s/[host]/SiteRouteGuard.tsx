@@ -16,7 +16,8 @@ import { useWorkspace } from '@/components/shell/workspaceContext';
  * Makes the site in the URL the current site (saves the GA4 + Search Console
  * pair to the workspace, so old pages and other tabs follow) and shows a
  * "site not found" state for hosts the user cannot access (DESIGN 4.2).
- * Children render once the selection matches the URL.
+ * Children render once the selection matches the URL, without waiting for the live Google inventory when the
+ * portfolio store already knows the host.
  */
 export function SiteRouteGuard({ children }: { children: ReactNode }) {
     const { site, host, loading, unknownHost, selectSite } = useCurrentSite();
@@ -36,7 +37,10 @@ export function SiteRouteGuard({ children }: { children: ReactNode }) {
         selectSite(site, { navigate: false });
     }, [site, matches, wantSite, wantProp, selectSite]);
 
-    if (loading || (site && !matches)) return <PageSkeleton />;
+    // A site found in the directory is enough to start: the fast directory (the portfolio store) answers in
+    // milliseconds, while the live Google inventory can take seconds. Only a host nobody knows yet has to wait
+    // for the live answer before "We couldn't find ..." is allowed.
+    if ((loading && !site) || (site && !matches)) return <PageSkeleton />;
     if (unknownHost || !site) {
         return (
             <Card padding="none">
