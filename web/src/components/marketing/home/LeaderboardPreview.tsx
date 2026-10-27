@@ -126,10 +126,10 @@ export function LeaderboardPreview({ sampleRows = [] }: { sampleRows?: BoardPrev
                         </p>
                     ) : null}
                     <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                        <Button asChild variant="primary" size="lg">
+                        <Button asChild variant="primary" size="xl">
                             <Link href="/leaderboard/join">Add your site, free</Link>
                         </Button>
-                        <Button asChild variant="ghost" size="lg" trailingIcon={ArrowRight}>
+                        <Button asChild variant="ghost" size="xl" trailingIcon={ArrowRight}>
                             <Link href="/leaderboard">See the full leaderboard</Link>
                         </Button>
                     </div>
@@ -139,7 +139,7 @@ export function LeaderboardPreview({ sampleRows = [] }: { sampleRows?: BoardPrev
                     <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
                         <p className="min-w-0 truncate text-title-sm text-fg">Top sites right now</p>
                         {sample ? (
-                            <span title="Test server: these rows are seed data. Real visitors only ever see real listings." className="shrink-0 rounded-full bg-subtle px-2 py-0.5 text-meta font-medium text-fg-secondary">Sample rows</span>
+                            <span title="Test server: these rows are seed data. Real visitors only ever see real listings." className="shrink-0 rounded-full bg-subtle px-2 py-0.5 text-meta font-medium text-fg">Sample rows</span>
                         ) : (
                             <span className="inline-flex shrink-0 items-center gap-1.5 text-meta text-fg-muted">
                                 <span aria-hidden className="size-1.5 animate-live-dot rounded-full bg-up" />
@@ -154,20 +154,20 @@ export function LeaderboardPreview({ sampleRows = [] }: { sampleRows?: BoardPrev
                                     <span className="w-5 shrink-0 text-center text-body-sm font-medium tabular-nums text-fg-muted sm:w-6">{row.rank}</span>
                                     <SiteIcon host={row.host ?? row.name} size={24} />
                                     <span className="min-w-0 flex-1">
-                                        <span className="flex items-start gap-1.5">
-                                            <span className="line-clamp-2 text-body font-semibold leading-5 text-fg sm:truncate">{row.name}</span>
-                                            {row.verified ? <ShieldCheck aria-label="Verified" size={14} strokeWidth={1.75} className="mt-0.5 shrink-0 text-brand-text" /> : null}
+                                        <span className="flex min-w-0 items-center gap-1">
+                                            <span className="truncate text-body font-semibold text-fg">{row.name}</span>
+                                            {row.verified ? <ShieldCheck aria-label="Verified" size={14} strokeWidth={1.75} className="shrink-0 text-brand-text" /> : null}
                                         </span>
-                                        <span className="flex items-center gap-2 text-body-sm text-fg-muted max-sm:hidden">
+                                        <span className="flex min-w-0 items-center gap-2 text-body-sm text-fg-muted">
                                             {row.host ? <span className="truncate">{row.host}</span> : null}
-                                            {row.category ? <Badge variant="neutral">{row.category}</Badge> : null}
+                                            {row.category ? <Badge variant="neutral" className="max-sm:hidden">{row.category}</Badge> : null}
                                         </span>
                                     </span>
                                     {row.spark && row.spark.length > 1 ? (
-                                        <span className="w-14 shrink-0 sm:w-24">
+                                        <span className="hidden w-24 shrink-0 min-[480px]:block">
                                             <Sparkline height={28} series={[{ metric: 'users', values: row.spark, label: 'Visitors' }]} interactive={false} />
                                         </span>
-                                    ) : <span className="w-14 shrink-0 sm:w-24" aria-hidden />}
+                                    ) : <span className="hidden w-24 shrink-0 min-[480px]:block" aria-hidden />}
                                     <span className="w-[4.5rem] shrink-0 text-right sm:w-24">
                                         {row.visitors ? <span className="block whitespace-nowrap text-body font-semibold tabular-nums text-fg sm:text-stat-sm">{row.visitors}</span> : null}
                                         <Delta pct={row.deltaPct} />
@@ -176,7 +176,7 @@ export function LeaderboardPreview({ sampleRows = [] }: { sampleRows?: BoardPrev
                             </li>
                         ))}
                     </ol>
-                    <p className="border-t border-border-subtle px-4 py-2.5 text-meta text-fg-muted">
+                    <p className="border-t border-border-subtle px-4 py-2.5 text-meta text-fg-secondary">
                         Visitors, last 28 days{rows.some((r) => r.visitors && /[–-]/.test(r.visitors)) ? ' · a range means the owner chose to show a range' : ''}
                     </p>
                 </div>

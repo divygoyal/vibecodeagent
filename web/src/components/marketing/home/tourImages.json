@@ -1,72 +1,106 @@
 {
   "site": {
     "desktop": {
-      "width": 1520,
-      "height": 988,
-      "light": "/marketing/site-desktop-light.6d42dd10.webp",
-      "dark": "/marketing/site-desktop-dark.f50d5846.webp"
+      "width": 1016,
+      "height": 342,
+      "light": {
+        "x1": "/marketing/site-desktop-light@1x.3885c3a5.webp",
+        "x2": "/marketing/site-desktop-light@2x.9113c2f8.webp"
+      },
+      "dark": {
+        "x1": "/marketing/site-desktop-dark@1x.fabfa45c.webp",
+        "x2": "/marketing/site-desktop-dark@2x.c98975d9.webp"
+      }
     },
     "mobile": {
-      "width": 764,
-      "height": 1056,
-      "light": "/marketing/site-mobile-light.719e2032.webp",
-      "dark": "/marketing/site-mobile-dark.deb51528.webp"
+      "width": 382,
+      "height": 528,
+      "light": {
+        "x1": "/marketing/site-mobile-light@1x.cad150e5.webp",
+        "x2": "/marketing/site-mobile-light@2x.514e276b.webp"
+      },
+      "dark": {
+        "x1": "/marketing/site-mobile-dark@1x.9651595a.webp",
+        "x2": "/marketing/site-mobile-dark@2x.526505b8.webp"
+      }
     }
   },
   "fixes": {
     "desktop": {
-      "width": 1520,
-      "height": 1272,
-      "light": "/marketing/fixes-desktop-light.e8c48102.webp",
-      "dark": "/marketing/fixes-desktop-dark.ea34aee3.webp"
+      "width": 1016,
+      "height": 373,
+      "light": {
+        "x1": "/marketing/fixes-desktop-light@1x.6be8d0ba.webp",
+        "x2": "/marketing/fixes-desktop-light@2x.daf3fb40.webp"
+      },
+      "dark": {
+        "x1": "/marketing/fixes-desktop-dark@1x.564b023a.webp",
+        "x2": "/marketing/fixes-desktop-dark@2x.b04f66b9.webp"
+      }
     },
     "mobile": {
-      "width": 764,
-      "height": 878,
-      "light": "/marketing/fixes-mobile-light.f05fa685.webp",
-      "dark": "/marketing/fixes-mobile-dark.48637dbf.webp"
+      "width": 382,
+      "height": 433,
+      "light": {
+        "x1": "/marketing/fixes-mobile-light@1x.fee50937.webp",
+        "x2": "/marketing/fixes-mobile-light@2x.ccc85e3c.webp"
+      },
+      "dark": {
+        "x1": "/marketing/fixes-mobile-dark@1x.1d85af33.webp",
+        "x2": "/marketing/fixes-mobile-dark@2x.e31c9773.webp"
+      }
     }
   },
   "traffic": {
     "desktop": {
-      "width": 2032,
-      "height": 1152,
-      "light": "/marketing/traffic-desktop-light.3ea4f627.webp",
-      "dark": "/marketing/traffic-desktop-dark.3e55cd24.webp"
+      "width": 1016,
+      "height": 489,
+      "light": {
+        "x1": "/marketing/traffic-desktop-light@1x.4ee05d3b.webp",
+        "x2": "/marketing/traffic-desktop-light@2x.f8cafd71.webp"
+      },
+      "dark": {
+        "x1": "/marketing/traffic-desktop-dark@1x.3885a518.webp",
+        "x2": "/marketing/traffic-desktop-dark@2x.86463e80.webp"
+      }
     },
     "mobile": {
-      "width": 764,
-      "height": 1260,
-      "light": "/marketing/traffic-mobile-light.2cbbb91e.webp",
-      "dark": "/marketing/traffic-mobile-dark.23e4bc0d.webp"
+      "width": 382,
+      "height": 543,
+      "light": {
+        "x1": "/marketing/traffic-mobile-light@1x.0bfbe352.webp",
+        "x2": "/marketing/traffic-mobile-light@2x.9e40f23d.webp"
+      },
+      "dark": {
+        "x1": "/marketing/traffic-mobile-dark@1x.ee78153d.webp",
+        "x2": "/marketing/traffic-mobile-dark@2x.7d79c33b.webp"
+      }
     }
   },
   "dashboards": {
     "desktop": {
-      "width": 2032,
-      "height": 1280,
-      "light": "/marketing/dashboards-desktop-light.5803f317.webp",
-      "dark": "/marketing/dashboards-desktop-dark.93290c12.webp"
+      "width": 1016,
+      "height": 640,
+      "light": {
+        "x1": "/marketing/dashboards-desktop-light@1x.12fb3714.webp",
+        "x2": "/marketing/dashboards-desktop-light@2x.7619f428.webp"
+      },
+      "dark": {
+        "x1": "/marketing/dashboards-desktop-dark@1x.e2f0d1fd.webp",
+        "x2": "/marketing/dashboards-desktop-dark@2x.c2d29139.webp"
+      }
     },
     "mobile": {
-      "width": 764,
-      "height": 938,
-      "light": "/marketing/dashboards-mobile-light.8f3173d3.webp",
-      "dark": "/marketing/dashboards-mobile-dark.ab0ffdf1.webp"
-    }
-  },
-  "ask": {
-    "desktop": {
-      "width": 1520,
-      "height": 1024,
-      "light": "/marketing/ask-desktop-light.d9793574.webp",
-      "dark": "/marketing/ask-desktop-dark.c3989696.webp"
-    },
-    "mobile": {
-      "width": 764,
-      "height": 920,
-      "light": "/marketing/ask-mobile-light.0b98f838.webp",
-      "dark": "/marketing/ask-mobile-dark.efc1d26d.webp"
+      "width": 382,
+      "height": 624,
+      "light": {
+        "x1": "/marketing/dashboards-mobile-light@1x.f225bc5f.webp",
+        "x2": "/marketing/dashboards-mobile-light@2x.4df37f28.webp"
+      },
+      "dark": {
+        "x1": "/marketing/dashboards-mobile-dark@1x.29b8cafd.webp",
+        "x2": "/marketing/dashboards-mobile-dark@2x.f815008d.webp"
+      }
     }
   }
 }

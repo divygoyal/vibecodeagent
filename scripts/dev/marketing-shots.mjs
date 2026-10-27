@@ -65,10 +65,27 @@ const SITE = 'acmeanalytics.example';
  * The shots. `path` is an app path (opened through /demo?to=) or, with `public`, a public page.
  * `prepare(page, mobile, report)` runs after the page settles (clicks); `crop` picks the rectangle (cropRect).
  */
+/** Hide the KPI tile strip of the card that holds `text` (it scrolls sideways at this width and would look cut). */
+async function hideTileStrip(page, text) {
+    await page.evaluate((text) => {
+        const el = [...document.querySelectorAll('#main-content *')].find((n) => n.childElementCount === 0 && n.textContent?.trim() === text);
+        let card = el;
+        while (card && !card.querySelector('[role="tablist"]')) card = card.parentElement;
+        const strip = card?.querySelector('[role="tablist"]');
+        if (strip) (strip.parentElement?.childElementCount === 1 ? strip.parentElement : strip).style.display = 'none';
+    }, text);
+    await page.waitForTimeout(300);
+}
+
 const SHOTS = [
     // Each crop shows what its feature row on the home page says (see the bullets in app/(marketing)/page.tsx).
     // `height` is the most a crop may take; the bottom then snaps to the last whole card, so no card edge is cut.
-    { name: 'site', path: `/dashboard/s/${SITE}`, crop: { from: 'main', height: { desktop: 560, mobile: 660 } } },
+    {
+        name: 'site',
+        path: `/dashboard/s/${SITE}`,
+        // From the Traffic and Search headings down: both sides' KPI tiles, no empty band under the page controls.
+        crop: { from: { desktop: 'text=Google Analytics 4 · property', mobile: 'main' }, offset: -44, height: { desktop: 470, mobile: 600 } },
+    },
     {
         name: 'fixes',
         path: `/dashboard/s/${SITE}/actions`,
@@ -77,8 +94,8 @@ const SHOTS = [
             const btn = page.getByRole('button', { name: 'Suggested fix' }).first();
             if (!mobile && (await btn.count())) await btn.click();
         },
-        // Phones: exactly the first task card.
-        crop: { from: { desktop: 'main', mobile: 'card:High impact' }, offset: -12, whole: { mobile: true }, height: { desktop: 640, mobile: 900 } },
+        // Desktop: exactly the first task card; phones too.
+        crop: { from: 'card:High impact', offset: -6, whole: { desktop: true, mobile: true }, height: { desktop: 700, mobile: 900 } },
     },
     {
         name: 'traffic',
@@ -89,16 +106,13 @@ const SHOTS = [
                 await tile.click();
                 await page.waitForTimeout(900);
             }
+            await hideTileStrip(page, 'AI traffic per day');
         },
-        // Wider window so all five KPI tiles fit (at 1024 the strip scrolls); shown full width on the home page.
-        viewport: { desktop: { width: 1280, height: 900 } },
-        // The KPI card: the AI traffic tile selected and its daily chart.
-        crop: { from: 'card:AI traffic per day', offset: -12, height: { desktop: 620, mobile: 640 } },
+        // The AI traffic chart card (its tile strip hidden): chart, period comparison and notes.
+        crop: { from: 'card:AI traffic per day', offset: -6, whole: { desktop: true, mobile: true }, height: { desktop: 640, mobile: 760 } },
     },
     {
         name: 'dashboards',
-        // Wider window: the dashboard's scorecard row needs ~1000 px; the home page shows this one full width.
-        viewport: { desktop: { width: 1280, height: 900 } },
         path: '/dashboard/dashboards',
         prepare: async (page, mobile, report) => {
             // The first sample dashboard (not a template link).
@@ -109,30 +123,35 @@ const SHOTS = [
                 await settle(page, report);
                 await page.waitForTimeout(1200);
             }
-        },
-        // Phones: from the first chart (the scorecard row scrolls sideways on phones and would look cut).
-        crop: { from: { desktop: 'main', mobile: 'text=Search' }, offset: -14, height: { desktop: 860, mobile: 720 } },
-    },
-    {
-        name: 'ask',
-        path: '/dashboard/ask',
-        prepare: async (page, mobile, report) => {
-            // Desktop: a question and its sample answer; phones: the start screen with its question cards (the
-            // answer's tables scroll sideways on a phone).
-            const q = page.getByRole('button', { name: /grew the most/i }).first();
-            if (!mobile && (await q.count())) {
-                await q.click();
-                await settle(page, report);
-                await page.waitForTimeout(1500);
+            if (mobile) {
+                // Phones: the scorecard row scrolls sideways; keep its first two tiles, side by side and whole, and
+                // drop the phone-only "Editing works on larger screens" note.
+                await page.evaluate(() => {
+                    for (const el of document.querySelectorAll('#main-content *')) {
+                        const cs = getComputedStyle(el);
+                        if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 4 && el.childElementCount > 2) {
+                            [...el.children].forEach((c, i) => {
+                                if (i >= 2) c.style.display = 'none';
+                                else { c.style.flex = '1 1 0'; c.style.minWidth = '0'; }
+                            });
+                        }
+                    }
+                    const note = [...document.querySelectorAll('#main-content *')].find((n) => n.childElementCount === 0 && /Editing works on larger screens/i.test(n.textContent ?? ''));
+                    let box = note;
+                    while (box && box.id !== 'main-content' && !(parseFloat(getComputedStyle(box).borderTopWidth) > 0)) box = box.parentElement;
+                    if (box && box.id !== 'main-content') box.style.display = 'none';
+                });
+                await page.waitForTimeout(400);
             }
         },
-        crop: { from: { desktop: 'text=Which of my sites grew the most', mobile: 'text=Ask anything about' }, offset: -20, height: { desktop: 560, mobile: 640 } },
+        crop: { from: 'main', height: { desktop: 700, mobile: 760 } },
     },
 ];
 
 const VIEWPORTS = {
-    // 1024 px: the app with its sidebar, content column ~730 css px, the width the home page shows it at.
-    desktop: { viewport: { width: 1024, height: 900 }, deviceScaleFactor: 2, outWidth: null },
+    // 1280 px: the app with its sidebar, content column ~984 css px; the home page shows every crop full width
+    // (~1016 css px at 1440, ~976 at 1024), so the app's text keeps its size.
+    desktop: { viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2, outWidth: null },
     mobile: {
         viewport: { width: 390, height: 1000 },
         deviceScaleFactor: 2,
@@ -207,7 +226,8 @@ async function cropRect(page, crop, form) {
 async function cleanDevText(page, origin) {
     await page.evaluate((origin) => {
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-        const hide = [/Seeded by scripts\/dev/i, /demo site generated for local development/i];
+        // Dev seed text, and the "data still being processed" note (true, but noise on a marketing picture).
+        const hide = [/Seeded by scripts\/dev/i, /demo site generated for local development/i, /still being processed/i];
         const nodes = [];
         while (walker.nextNode()) nodes.push(walker.currentNode);
         for (const n of nodes) {
@@ -295,17 +315,21 @@ try {
                     const vh = page.viewportSize().height;
                     const clip = { x: rect.x, y: rect.y - scrolled, width: rect.width, height: Math.min(rect.height, vh - (rect.y - scrolled)) };
                     await page.screenshot({ path: png, clip });
-                    let img = sharp(png);
-                    if (VIEWPORTS[form].outWidth) img = img.resize({ width: VIEWPORTS[form].outWidth });
-                    const { data, info } = await img
-                        .webp({ quality: 80, effort: 6, smartSubsample: true })
-                        .toBuffer({ resolveWithObject: true });
-                    // Content hash in the name: a new picture is a new URL, so no image cache can serve the old one.
-                    const name = `${file}.${createHash('sha1').update(data).digest('hex').slice(0, 8)}.webp`;
-                    fs.writeFileSync(path.join(opts.out, name), data);
+                    // Two files per picture: the 2x capture and a 1x copy (sharp, Lanczos), served as a srcset so
+                    // each screen gets exactly its pixels (no optimizer re-encode, no soft upscaling).
+                    const meta = await sharp(png).metadata();
+                    const enc = (img) => img.webp({ quality: 86, effort: 6, smartSubsample: true }).toBuffer({ resolveWithObject: true });
+                    const x2 = await enc(sharp(png));
+                    const x1 = await enc(sharp(png).resize({ width: Math.round(meta.width / 2), kernel: 'lanczos3' }));
+                    const hash = (b) => createHash('sha1').update(b).digest('hex').slice(0, 8);
+                    const name = `${file}@2x.${hash(x2.data)}.webp`;
+                    const name1 = `${file}@1x.${hash(x1.data)}.webp`;
+                    fs.writeFileSync(path.join(opts.out, name), x2.data);
+                    fs.writeFileSync(path.join(opts.out, name1), x1.data);
                     if (!opts.keepPng) fs.unlinkSync(png);
-                    results.push({ key: shot.name, form, theme, file: name, width: info.width, height: info.height, kb: Math.round(data.length / 1024), url: page.url() });
-                    console.log(`ok   ${name} ${info.width}x${info.height} ${Math.round(data.length / 1024)} KB`);
+                    const info = { width: x1.info.width, height: x1.info.height };
+                    results.push({ key: shot.name, form, theme, file: name, file1: name1, width: info.width, height: info.height, kb: Math.round(x1.data.length / 1024), kb2: Math.round(x2.data.length / 1024), url: page.url() });
+                    console.log(`ok   ${file} ${info.width}x${info.height} css, 1x ${Math.round(x1.data.length / 1024)} KB, 2x ${Math.round(x2.data.length / 1024)} KB`);
                 } catch (err) {
                     failed++;
                     console.error(`FAIL ${file}: ${err.message}`);
@@ -324,9 +348,9 @@ const manifest = {};
 for (const r of results) {
     manifest[r.key] ??= {};
     manifest[r.key][r.form] ??= { width: r.width, height: r.height };
-    manifest[r.key][r.form][r.theme] = `/marketing/${r.file}`;
+    manifest[r.key][r.form][r.theme] = { x1: `/marketing/${r.file1}`, x2: `/marketing/${r.file}` };
 }
 fs.writeFileSync(path.join(opts.out, 'tourImages.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-const total = results.reduce((s, r) => s + r.kb, 0);
+const total = results.reduce((s, r) => s + r.kb + r.kb2, 0);
 console.log(`${results.length} images, ${total} KB total${failed ? `, ${failed} failed` : ''}`);
 process.exit(failed ? 1 : 0);

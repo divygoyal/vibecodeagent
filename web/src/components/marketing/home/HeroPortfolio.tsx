@@ -120,21 +120,23 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
             <div className="max-md:hidden">
                 <SegmentedControl<FilterKey> variant="neutral" size="sm" ariaLabel="Show" value={filter} onChange={setFilter} options={filterOptions(counts)} />
             </div>
-            {/* One row that scrolls sideways (fade at the edge), never wrapping into a stray chip. */}
-            <div role="radiogroup" aria-label="Show" className="-mx-3 flex gap-2 overflow-x-auto px-3 [mask-image:linear-gradient(to_right,black_85%,transparent)] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
-                {filterOptions(counts).map((o) => (
+            {/* Phones: the four filters as four equal buttons in one row (short labels, nothing cut off). */}
+            <div role="radiogroup" aria-label="Show" className="grid grid-cols-4 gap-1 rounded-full bg-subtle p-[3px] md:hidden">
+                {phoneFilters(counts).map((o) => (
                     <button
                         key={o.value}
                         type="button"
                         role="radio"
                         aria-checked={filter === o.value}
+                        aria-label={o.aria}
                         onClick={() => setFilter(o.value)}
                         className={cn(
-                            'tap-area inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-body-sm font-medium whitespace-nowrap',
-                            filter === o.value ? 'border-transparent bg-subtle text-fg' : 'border-border-subtle text-fg-secondary',
+                            'tap-area inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-full text-meta font-medium whitespace-nowrap',
+                            filter === o.value ? 'bg-surface text-fg shadow-xs' : 'text-fg-secondary',
                         )}
                     >
                         {o.label}
+                        <span className="text-fg-muted tabular-nums">{o.n}</span>
                     </button>
                 ))}
             </div>
@@ -148,9 +150,9 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
                     ))}
                 </ul>
                 {/* The app's own cards from 768 px; the "GA4 linked" icon is hidden here (it crowds "Details"). */}
-                <div className="grid grid-cols-2 gap-4 max-md:hidden lg:grid-cols-3 [&_span:has(>svg[aria-label='GA4_linked'])]:hidden">
+                <div className="grid grid-cols-2 gap-4 max-md:hidden xl:grid-cols-3 [&_span:has(>svg[aria-label='GA4_linked'])]:hidden">
                     {shown.slice(0, SHOWN).map((s, i) => (
-                        <div key={s.key} className={cn('flex min-w-0 [&>article]:flex-1', i >= 2 && 'max-lg:hidden')}>
+                        <div key={s.key} className={cn('flex min-w-0 [&>article]:flex-1', i >= 2 && 'max-xl:hidden')}>
                             <SiteCard
                                 site={s}
                                 windows={data.windows}
@@ -172,8 +174,8 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
             )}
 
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border-subtle pt-3 md:pt-4">
-                <p className="text-meta text-fg-muted">
-                    <span className="mr-1.5 rounded-full bg-subtle px-2 py-0.5 font-medium text-fg-secondary">Sample data</span>
+                <p className="text-meta text-fg-secondary">
+                    <span className="mr-1.5 rounded-full bg-subtle px-2 py-0.5 font-medium text-fg">Sample data</span>
                     Click a card to open it in the live demo.
                 </p>
                 <Link href={demoHref('/dashboard')} className="tap-area inline-flex items-center gap-1.5 text-body-sm font-medium text-brand-text hover:text-fg">
@@ -191,6 +193,15 @@ function filterOptions(counts: { all: number; gsc: number; ga4: number; starred:
         { value: 'gsc' as const, label: <>Search Console <Count n={counts.gsc} /></> },
         { value: 'ga4' as const, label: <>Analytics <Count n={counts.ga4} /></> },
         { value: 'starred' as const, label: <>Starred <Count n={counts.starred} /></> },
+    ];
+}
+
+function phoneFilters(counts: { all: number; gsc: number; ga4: number; starred: number }) {
+    return [
+        { value: 'all' as const, label: 'All', n: counts.all, aria: `All sites, ${counts.all}` },
+        { value: 'gsc' as const, label: 'Search', n: counts.gsc, aria: `Search Console, ${counts.gsc}` },
+        { value: 'ga4' as const, label: 'GA4', n: counts.ga4, aria: `Analytics, ${counts.ga4}` },
+        { value: 'starred' as const, label: 'Starred', n: counts.starred, aria: `Starred, ${counts.starred}` },
     ];
 }
 
