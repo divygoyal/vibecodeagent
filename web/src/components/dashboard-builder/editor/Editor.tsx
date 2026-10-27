@@ -39,6 +39,8 @@ import { WidgetRenderer } from '../widgets/WidgetRenderer';
 import { LeftPanel } from './LeftPanel';
 import { VersionsDialog } from './VersionsDialog';
 import { openAppearance, PropertiesPanel } from './PropertiesPanel';
+import { notifyReadOnly } from '@/components/demo/DemoBar';
+import { useDemoSession } from '@/components/demo/useDemoSession';
 import type { SiteOption } from './Fields';
 
 const VIEWPORT_W: Record<Viewport, number | null> = { desktop: null, tablet: 768, phone: 390 };
@@ -130,15 +132,25 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
             }
         }
     }, []);
+    // Public live demo: edits stay in this tab (nothing is saved, no "leave page?" prompt); say so once.
+    const { demo } = useDemoSession();
+    const demoNoticeShown = useRef(false);
     useEffect(() => {
         if (status !== 'dirty') return;
+        if (demo) {
+            if (!demoNoticeShown.current) notifyReadOnly();
+            demoNoticeShown.current = true;
+            return;
+        }
         const t = setTimeout(() => void save(), 800);
         return () => clearTimeout(t);
-    }, [doc, status, save]);
+    }, [doc, status, save, demo]);
+    const demoRef = useRef(demo);
+    demoRef.current = demo;
     useEffect(() => {
         const warn = (e: BeforeUnloadEvent) => {
             const st = useEditorStore.getState().status;
-            if (st === 'dirty' || st === 'saving') e.preventDefault();
+            if (!demoRef.current && (st === 'dirty' || st === 'saving')) e.preventDefault();
         };
         window.addEventListener('beforeunload', warn);
         return () => window.removeEventListener('beforeunload', warn);
@@ -304,7 +316,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const customTablet = Boolean(page.layouts.md?.length);
     const dc = doc.controls.find((c) => c.type === 'date');
 
-    const statusText = status === 'saving' ? 'Saving…' : status === 'dirty' ? 'Unsaved' : status === 'error' ? 'Not saved' : status === 'conflict' ? 'Changed elsewhere' : 'Saved';
+    const statusText = demo && status !== 'saved' ? 'Demo: not saved' : status === 'saving' ? 'Saving…' : status === 'dirty' ? 'Unsaved' : status === 'error' ? 'Not saved' : status === 'conflict' ? 'Changed elsewhere' : 'Saved';
     // Round 2: the canvas shows the dashboard's theme live (light or dark preview).
     const themed = !isDefaultLook(doc.theme);
     const canvasMode: Mode = themePreview ?? appMode;

@@ -9,7 +9,8 @@ import { connectGoogleFromDemo, DEMO_EXIT_HREF, useDemoSession } from './useDemo
 
 const TOAST_ID = 'tc-demo-readonly';
 
-function notifyReadOnly() {
+/** The demo's one "read-only" toast (also for places that skip the server, like the builder's autosave). */
+export function notifyReadOnly() {
     toast.info('This is a read-only demo', {
         id: TOAST_ID,
         description: 'Connect Google to do this on your own sites. It is free.',
