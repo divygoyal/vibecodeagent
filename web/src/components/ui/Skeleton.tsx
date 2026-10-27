@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
 export interface SkeletonProps {
     className?: string;
     style?: CSSProperties;
-    /** Show only after this many ms to avoid a flash on fast loads (default 150). 0 = immediately. */
+    /** Show only after this many ms to avoid a flash on fast loads (default 200). 0 = immediately. */
     delay?: number;
     rounded?: 'sm' | 'md' | 'full' | 'card';
 }
@@ -18,7 +18,7 @@ const ROUNDED = { sm: 'rounded-[4px]', md: 'rounded-md', full: 'rounded-full', c
  * Shimmer block. Size it like the final content (DESIGN 3.15). The space is
  * reserved during the delay, only the shimmer waits.
  */
-export function Skeleton({ className, style, delay = 150, rounded = 'md' }: SkeletonProps) {
+export function Skeleton({ className, style, delay = 200, rounded = 'md' }: SkeletonProps) {
     const [visible, setVisible] = useState(delay === 0);
     useEffect(() => {
         if (delay === 0) return;

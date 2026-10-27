@@ -58,7 +58,7 @@ export function PrivacyTab({ goToDanger }: { goToDanger: () => void }) {
                         <FileText aria-hidden size={14} />Privacy policy
                     </Link>
                     <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-brand-text underline underline-offset-2">
-                        Google account permissions<ExternalLink aria-hidden size={12} />
+                        Google account permissions<ExternalLink aria-hidden size={14} />
                     </a>
                 </div>
             </SettingsSection>

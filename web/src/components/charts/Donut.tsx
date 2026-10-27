@@ -4,9 +4,10 @@ import { useMemo, useState } from 'react';
 import { Cell, Pie, PieChart, Tooltip as RTooltip, type TooltipContentProps } from 'recharts';
 
 import { cn } from '@/lib/cn';
-import { fmtCompact, fmtFull, fmtPercent, fmtValue, type MetricFormat } from '@/lib/format';
+import { fmtCompact, fmtFull, fmtValue, type MetricFormat } from '@/lib/format';
 import { categoricalColor, CATEGORICAL_OTHER } from '@/lib/metrics';
 import { ChartTooltipCard } from './ChartTooltip';
+import { fmtShare } from './style';
 
 export interface DonutItem {
     key: string;
@@ -51,7 +52,7 @@ export function Donut({ items, centerLabel, format = 'count', size = 160, maxSli
         if (!s) return null;
         return (
             <ChartTooltipCard
-                rows={[{ key: s.key, label: s.label, color: s.color, value: `${fmtValue(format, s.value)} · ${total > 0 ? fmtPercent(s.value / total) : '–'}` }]}
+                rows={[{ key: s.key, label: s.label, color: s.color, value: `${fmtValue(format, s.value)} · ${total > 0 ? fmtShare(s.value / total) : '–'}` }]}
             />
         );
     };
@@ -96,7 +97,7 @@ export function Donut({ items, centerLabel, format = 'count', size = 160, maxSli
                         <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: s.color }} />
                         <span className="min-w-0 flex-1 truncate text-fg-secondary">{s.label}</span>
                         <span className="text-fg tabular-nums">{format === 'count' ? fmtFull(s.value) : fmtValue(format, s.value)}</span>
-                        <span className="w-10 text-right text-meta text-fg-muted tabular-nums">{total > 0 ? fmtPercent(s.value / total, { tile: true }) : '–'}</span>
+                        <span className="w-10 text-right text-meta text-fg-muted tabular-nums">{total > 0 ? fmtShare(s.value / total) : '–'}</span>
                     </li>
                 ))}
             </ul>

@@ -149,7 +149,7 @@ export function DateRangeControl({ searchOnly, hideCompare, className }: DateRan
                             {hideCompare ? null : (
                                 <>
                                     <div className="-mx-1 my-1 h-px bg-border-subtle" />
-                                    <p className="px-2 pt-1.5 pb-1 text-caption tracking-[0.04em] text-fg-muted uppercase">Compare to</p>
+                                    <p className="px-2 pt-1.5 pb-1 text-meta font-medium text-fg-muted">Compare to</p>
                                     <div role="radiogroup" aria-label="Compare to">
                                         {COMPARE_OPTIONS.map((c) => (
                                             <button

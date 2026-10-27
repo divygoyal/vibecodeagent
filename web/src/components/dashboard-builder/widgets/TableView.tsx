@@ -88,7 +88,12 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
             ))}
         </div>
     ) : undefined;
-    const pageSize = props.bp === 'sm' ? 5 : Math.max(5, Math.min(c.pageSize, Math.floor((props.height - 140) / 36)));
+    // Phones show two-line list rows (~72px, plus the Sort bar and the pager): size the page to the
+    // cell so no row is cut mid-row, and always paginate there (WS1 round 2, judge fix).
+    const phone = props.bp === 'sm';
+    const pageSize = phone
+        ? Math.max(2, Math.min(5, Math.floor((props.height - 230) / 64)))
+        : Math.max(5, Math.min(c.pageSize, Math.floor((props.height - 140) / 36)));
 
     return (
         <WidgetFrame props={props} skeleton="table" bodyClassName="flex flex-col">
@@ -103,7 +108,8 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                             rowKey={(r, i) => `${c.dimensions.map((d) => String(r[`d:${d}`])).join('|')}-${i}`}
                             defaultSort={defaultSort}
                             density={c.density === 'comfortable' ? 'default' : 'compact'}
-                            pagination={c.pagination ? { pageSize } : undefined}
+                            pagination={c.pagination || phone ? { pageSize } : undefined}
+                            mobileList="compact"
                             footer={footer}
                             empty={<EmptyState variant="inline" title="No rows in this period" />}
                             caption={widget.title}

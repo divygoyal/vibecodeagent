@@ -118,7 +118,7 @@ export function Sidebar({ collapsed = false, inDrawer = false, onNavigate, local
     const local = inDrawer || localSwitcher;
     const [localOpen, setLocalOpen] = useState(false);
     const setSwitcherOpen = local ? setLocalOpen : shell.setSwitcherOpen;
-    const { site, section } = useCurrentSite();
+    const { site, section, loading: sitesLoading } = useCurrentSite();
     const { data: unread } = useSWR<{ unread: number }>(
         '/api/support/unread-count',
         (url: string) => fetch(url, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ unread: 0 })),
@@ -177,7 +177,8 @@ export function Sidebar({ collapsed = false, inDrawer = false, onNavigate, local
                         onClick={site ? onNavigate : () => setSwitcherOpen(true)}
                     />
                 ))}
-                {!site && !collapsed ? (
+                {/* Only once the sites are known: no "Pick a site" flash that then shifts the nav (critique #13). */}
+                {!site && !collapsed && !sitesLoading ? (
                     <button type="button" onClick={() => setSwitcherOpen(true)} className="mx-3 mt-1 px-2 text-meta text-fg-muted underline-offset-4 hover:text-fg hover:underline">
                         Pick a site
                     </button>

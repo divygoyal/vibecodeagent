@@ -92,7 +92,9 @@ export interface PercentOptions {
 
 /**
  * A ratio as a percent. `3.4%`, `<0.1%` for tiny non-zero values, `0%`.
- * Trailing `.0` is dropped (`5%`). With `tile`, values >= 10% have no decimal.
+ * Always 1 decimal (`5.0%`, `23.0%`), so a table column never mixes `23%`
+ * with `24.8%` (round 2 critique 2.2). With `tile` (KPI tiles, axis ticks),
+ * values >= 10% have no decimal and a trailing `.0` is dropped (`5%`).
  */
 export function fmtPercent(ratio: Num, opts: PercentOptions = {}): string {
     if (!isNum(ratio)) return DASH;
@@ -101,7 +103,8 @@ export function fmtPercent(ratio: Num, opts: PercentOptions = {}): string {
     const abs = Math.abs(pct);
     if (abs < 0.1) return pct < 0 ? '>-0.1%' : '<0.1%';
     if (opts.tile && abs >= 9.95) return `${Math.round(pct)}%`;
-    return `${stripZeros(pct.toFixed(1))}%`;
+    if (opts.tile) return `${stripZeros(pct.toFixed(1))}%`;
+    return `${pct.toFixed(1)}%`;
 }
 
 /** GSC average position, 1 decimal: `23.2`, `3.0`. */
@@ -110,13 +113,14 @@ export function fmtPosition(p: Num): string {
     return p.toFixed(1);
 }
 
-/** `53s` · `1m 56s` · `1h 4m`. */
+/** `53s` · `1m 56s` · `2m 05s` · `1h 04m`: the second unit is zero-padded so a column aligns. */
 export function fmtDuration(seconds: Num): string {
     if (!isNum(seconds)) return DASH;
     const t = Math.max(0, Math.round(seconds));
+    const pad = (n: number) => String(n).padStart(2, '0');
     if (t < 60) return `${t}s`;
-    if (t < 3600) return `${Math.floor(t / 60)}m ${t % 60}s`;
-    return `${Math.floor(t / 3600)}h ${Math.floor((t % 3600) / 60)}m`;
+    if (t < 3600) return `${Math.floor(t / 60)}m ${pad(t % 60)}s`;
+    return `${Math.floor(t / 3600)}h ${pad(Math.floor((t % 3600) / 60))}m`;
 }
 
 /** Format a value by its metric format. Counts are full unless `compact`. */
@@ -178,10 +182,11 @@ function none(text: string, state: 'none' | 'new'): DeltaResult {
     };
 }
 
+/** Always 1 decimal under 100% (`9.0%`, `18.4%`) so a delta column never mixes `9%` with `8.5%`. */
 function fmtPercentChange(absPct: number): string {
     if (absPct >= 999.5) return '>999%';
     if (absPct >= 99.95) return `${Math.round(absPct)}%`;
-    return `${stripZeros(absPct.toFixed(1))}%`;
+    return `${absPct.toFixed(1)}%`;
 }
 
 export function computeDelta(current: Num, previous: Num, opts: DeltaOptions = {}): DeltaResult {
@@ -199,7 +204,7 @@ export function computeDelta(current: Num, previous: Num, opts: DeltaOptions = {
         if (abs < 0.05) {
             return { state: 'flat', direction: 'flat', tone: 'neutral', text: '0 pt', label: '0 pt', srText: 'no change', change: 0 };
         }
-        text = `${stripZeros(abs.toFixed(1))} pt`;
+        text = `${abs.toFixed(1)} pt`;
         spoken = `${stripZeros(abs.toFixed(1))} percentage points`;
     } else {
         if (previous === 0 && current === 0) return none(DASH, 'none');

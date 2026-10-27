@@ -15,6 +15,9 @@ interface ShellState {
     /** Site switcher popover (shortcut g s). */
     switcherOpen: boolean;
     setSwitcherOpen: (v: boolean) => void;
+    /** The page header has its own Ask AI action: the topbar hides its button (no duplicate Ask). */
+    pageAsk: boolean;
+    setPageAsk: (v: boolean) => void;
 }
 
 const Ctx = createContext<ShellState | null>(null);
@@ -24,6 +27,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     const [collapsed, setCollapsedState] = useState(false);
     const [crumbTitle, setCrumbTitle] = useState<string | null>(null);
     const [switcherOpen, setSwitcherOpen] = useState(false);
+    const [pageAsk, setPageAsk] = useState(false);
 
     useEffect(() => {
         try {
@@ -50,7 +54,9 @@ export function ShellProvider({ children }: { children: ReactNode }) {
         setCrumbTitle,
         switcherOpen,
         setSwitcherOpen,
-    }), [navOpen, collapsed, crumbTitle, switcherOpen]);
+        pageAsk,
+        setPageAsk,
+    }), [navOpen, collapsed, crumbTitle, switcherOpen, pageAsk]);
 
     return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -73,4 +79,9 @@ export function useBreadcrumbTitle(title: string | null | undefined) {
         set(title ?? null);
         return () => set(null);
     }, [set, title]);
+}
+
+/** Like useShell, but null outside AppShell (shared pieces such as PageHeader). */
+export function useOptionalShell(): ShellState | null {
+    return useContext(Ctx);
 }

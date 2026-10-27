@@ -134,7 +134,7 @@ export function CommandPalette() {
             { id: 'act:ask', label: 'Ask AI…', section: 'Actions', icon: Sparkles, keywords: ['chat', 'question'], run: go('/dashboard/ask') },
             {
                 id: 'act:today', label: 'What should I do today?', hint: 'Ask AI', section: 'Actions', icon: Sparkles,
-                keywords: ['recommend', 'grow', 'next'], run: go(buildAskAiUrl('What is the ONE thing I should do today to grow?')),
+                keywords: ['recommend', 'grow', 'next'], run: go(buildAskAiUrl('What’s the one thing I should do today to grow?')),
             },
             { id: 'act:new-dashboard', label: 'New dashboard', section: 'Actions', icon: Plus, keywords: ['create', 'report'], run: go('/dashboard/dashboards/new') },
             { id: 'act:connect-ai', label: 'Connect ChatGPT or Claude', section: 'Actions', icon: Plug, keywords: ['mcp', 'connect ai'], run: go('/dashboard/connect-ai') },
@@ -235,7 +235,7 @@ export function CommandPalette() {
                     <div ref={listRef} id={listId} role="listbox" aria-label="Results" className="max-h-[min(400px,55dvh)] overflow-y-auto overscroll-contain p-1.5">
                         {groups.map((g) => (
                             <div key={g.section} role="group" aria-label={g.section}>
-                                <div className="px-3 pt-2 pb-1 text-caption tracking-[0.04em] text-fg-muted uppercase">{g.section}</div>
+                                <div className="px-3 pt-2 pb-1 text-meta font-medium text-fg-muted">{g.section}</div>
                                 {g.items.map((c) => {
                                     const i = index++;
                                     const selected = i === activeIndex;

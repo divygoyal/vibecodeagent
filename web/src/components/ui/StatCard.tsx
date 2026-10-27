@@ -54,17 +54,19 @@ export function StatCard({ metric, value, previous, label, comparisonLabel, info
                 </>
             ) : (
                 <>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className={cn('text-fg', size === 'lg' ? 'text-stat-lg' : 'text-stat')}>
+                    <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
+                        <span className={cn('text-fg tabular-nums', size === 'lg' ? 'text-stat-lg' : 'text-stat')}>
                             {fmtMetric(metric, value, { compact: true, tile: true })}
                         </span>
                         {previous !== undefined ? (
-                            <MetricDelta metric={metric} current={value} previous={previous} variant="chip" comparisonLabel={comparisonLabel ? `versus ${comparisonLabel}` : undefined} />
+                            <MetricDelta metric={metric} current={value} previous={previous} size={size === 'lg' ? 'md' : 'sm'} comparisonLabel={comparisonLabel ? `versus ${comparisonLabel}` : undefined} />
                         ) : null}
                     </div>
                     {comparisonLabel && previous !== undefined ? (
                         <p className="text-meta text-fg-muted">
-                            vs {fmtMetric(metric, previous, { compact: true, tile: true })} {comparisonLabel}
+                            {previous === null || (previous === 0 && m.format === 'count')
+                                ? `None in the ${comparisonLabel}`
+                                : `vs ${fmtMetric(metric, previous, { compact: true, tile: true })} ${comparisonLabel}`}
                         </p>
                     ) : null}
                 </>
@@ -84,6 +86,8 @@ export interface KpiItem {
     value: number | null | undefined;
     previous?: number | null;
     label?: string;
+    /** Extra note on the tile (hover title + screen readers), e.g. "Summed across sites". */
+    hint?: string;
     loading?: boolean;
 }
 
@@ -134,28 +138,30 @@ export function KpiStrip({ items, selected, onSelect, comparisonLabel = 'previou
                             tabIndex={active ? 0 : -1}
                             onClick={() => onSelect(it.metric)}
                             onKeyDown={(e) => onKey(e, i)}
+                            title={it.hint}
                             className={cn(
-                                'relative min-w-[140px] flex-1 snap-start border-r border-border-subtle p-4 text-left last:border-r-0',
+                                // 168px: the value and its delta fit on one line ("12.5M ▲ 1.9%"); content sits at the top.
+                                'relative flex min-w-[168px] flex-1 snap-start flex-col items-start justify-start border-r border-border-subtle px-4 py-3.5 text-left last:border-r-0',
                                 'transition-colors duration-120 ease-standard focus-visible:-outline-offset-2',
                                 active ? 'bg-surface-sunken' : 'hover:bg-subtle/60',
                             )}
                         >
-                            <span className="flex items-center gap-2">
+                            <span className="flex w-full min-w-0 items-center gap-2">
                                 <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: m.color }} />
                                 <span className="truncate text-body-sm font-medium text-fg-secondary">{it.label ?? m.label}</span>
+                                {it.hint ? <span className="sr-only">({it.hint})</span> : null}
                             </span>
                             {it.loading ? (
-                                <>
-                                    <Skeleton className="mt-2 h-7 w-20" />
-                                    <Skeleton className="mt-1.5 h-3.5 w-12" />
-                                </>
+                                <span className="mt-1.5 flex items-center gap-2">
+                                    <Skeleton className="h-7 w-20" />
+                                    <Skeleton className="h-3.5 w-10" />
+                                </span>
                             ) : (
-                                <>
-                                    <span className="mt-1 block text-stat text-fg">{fmtMetric(it.metric, it.value, { compact: true, tile: true })}</span>
-                                    <span className="mt-0.5 block">
-                                        <MetricDelta metric={it.metric} current={it.value} previous={it.previous} comparisonLabel={`versus ${comparisonLabel}`} />
-                                    </span>
-                                </>
+                                // Two lines per tile (critique #11): label, then the value with its delta inline.
+                                <span className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
+                                    <span className="text-stat text-fg tabular-nums">{fmtMetric(it.metric, it.value, { compact: true, tile: true })}</span>
+                                    <MetricDelta metric={it.metric} current={it.value} previous={it.previous} comparisonLabel={`versus ${comparisonLabel}`} />
+                                </span>
                             )}
                             {active ? <span aria-hidden className="absolute inset-x-0 bottom-0 h-0.5" style={{ background: m.color }} /> : null}
                         </button>

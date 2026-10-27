@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Drawer } from '@/components/ui/Drawer';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Table } from '@/components/ui/Table';
+import { fmtShare, heatbarClass } from './style';
 
 export interface BarListItem {
     key: string;
@@ -63,14 +64,14 @@ export function BarList({
     const total = items.reduce((a, b) => a + (Number.isFinite(b.value) ? b.value : 0), 0);
     const max = Math.max(0, ...items.map((i) => i.value));
     const shown = items.slice(0, limit);
-    const heat = metric === 'neutral' ? 'heatbar-neutral' : METRICS[metric].heatbar;
+    const heat = heatbarClass(metric);
 
     if (loading) {
         return (
             <div className={cn('flex flex-col gap-1', className)} aria-busy>
                 {Array.from({ length: Math.min(limit, 6) }, (_, i) => (
-                    <div key={i} className="flex h-9 items-center gap-3">
-                        <Skeleton className="h-7 rounded-md" style={{ width: `${85 - i * 12}%` }} />
+                    <div key={i} className="flex h-8 items-center gap-3">
+                        <Skeleton className="h-6 rounded-md" style={{ width: `${85 - i * 12}%` }} />
                         <Skeleton className="ml-auto h-3 w-10" />
                     </div>
                 ))}
@@ -86,16 +87,16 @@ export function BarList({
                     const pct = max > 0 ? (item.value / max) * 100 : 0;
                     const content = (
                         <>
-                            <span className="relative flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-2">
+                            <span className="relative flex min-w-0 flex-1 items-center gap-2 py-1 pl-2">
                                 <span aria-hidden className={cn('absolute inset-y-0 left-0 rounded-md transition-opacity duration-120 group-hover:opacity-80', heat)} style={{ width: `${Math.max(pct, 0.5)}%` }} />
                                 {item.icon ? <span className="relative flex size-4 shrink-0 items-center justify-center">{item.icon}</span> : null}
                                 <span className="relative min-w-0 truncate text-body text-fg" title={item.text}>{item.label}</span>
                             </span>
                             <span className="shrink-0 pl-3 text-body text-fg tabular-nums">{fmt(item.value)}</span>
-                            {showShare ? <span className="w-12 shrink-0 text-right text-meta text-fg-muted tabular-nums">{total > 0 ? fmtPercent(item.value / total, { tile: true }) : '–'}</span> : null}
+                            {showShare ? <span className="w-11 shrink-0 text-right text-meta text-fg-muted tabular-nums">{total > 0 ? fmtShare(item.value / total) : '–'}</span> : null}
                         </>
                     );
-                    const rowCls = 'group flex h-9 w-full items-center gap-1 rounded-md text-left';
+                    const rowCls = 'group flex h-8 w-full items-center gap-1 rounded-md text-left';
                     return (
                         <li key={item.key}>
                             {item.href ? (
@@ -127,7 +128,7 @@ export function BarList({
                         columns={[
                             { key: 'label', header: labelHeader, cell: (r) => <span className="flex items-center gap-2">{r.icon}{r.label}</span>, sortable: true, sortValue: (r) => r.text ?? String(r.key), firstSortDir: 'asc', heat: { metric, value: (r) => r.value } },
                             { key: 'value', header: valueHeader ?? (metric === 'neutral' ? 'Value' : METRICS[metric].label), align: 'right', cell: (r) => fmt(r.value), sortable: true, sortValue: (r) => r.value },
-                            ...(showShare ? [{ key: 'share', header: 'Share', align: 'right' as const, cell: (r: BarListItem) => (total > 0 ? fmtPercent(r.value / total) : '–') }] : []),
+                            ...(showShare ? [{ key: 'share', header: 'Share', align: 'right' as const, cell: (r: BarListItem) => (total > 0 ? fmtShare(r.value / total) : '–') }] : []),
                         ]}
                     />
                 </Drawer>
