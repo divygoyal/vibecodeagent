@@ -307,8 +307,10 @@ export async function ga4PageTrends(userId: string, token: string, property: str
         const a = pages.get(`${x.dims[0]}\u0001${x.dims[1]}`);
         if (a) a.prev += x.m[0] ?? 0;
     }
-    const chosen = [...pages.values()].sort((a, b) => b.views - a.views).slice(0, n);
-    if (!chosen.length) return { rows: [], bars: 0, barDays: 0 };
+    const ranked = [...pages.values()].sort((a, b) => b.views - a.views);
+    const chosen = ranked.slice(0, n);
+    const titles = ranked.filter((p) => p.title).slice(0, 300).map((p) => ({ host: p.host, path: p.path, title: p.title }));
+    if (!chosen.length) return { rows: [], bars: 0, barDays: 0, titles };
 
     const days = daysBetween(r.cur.start, r.cur.end);
     const bars = Math.min(MAX_TREND_BARS, days);
@@ -347,6 +349,7 @@ export async function ga4PageTrends(userId: string, token: string, property: str
         }),
         bars,
         barDays: days / bars,
+        titles,
     };
 }
 

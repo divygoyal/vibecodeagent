@@ -75,6 +75,8 @@ export interface Ga4PageTrends {
     bars: number;
     /** Days per bar. */
     barDays: number;
+    /** Page titles for the top pages by views (up to 300), beyond the trend rows. */
+    titles?: { host: string; path: string; title: string }[];
 }
 
 export interface Ga4OrganicSeries {

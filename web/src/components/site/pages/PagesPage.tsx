@@ -8,6 +8,7 @@ import { fmtDuration, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
 import { METRICS } from '@/lib/metrics';
 import { BarList } from '@/components/charts/BarList';
 import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
+import { TrendBars } from '@/components/charts/TrendBars';
 import { Banner } from '@/components/ui/Banner';
 import { Button } from '@/components/ui/Button';
 import { Drawer } from '@/components/ui/Drawer';
@@ -18,7 +19,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Table, type TableColumn } from '@/components/ui/Table';
 import { mergePages, type MergedPage } from '../lib/pages';
 import { isDecaying, pageRef } from '../lib/rules';
-import type { DecayRow, Ga4BreakdownResponse, GscDetailResponse, GscRowsResponse } from '../lib/types';
+import type { DecayRow, Ga4BreakdownResponse, Ga4PageTrends, GscDetailResponse, GscRowsResponse } from '../lib/types';
 import { SiteHeader } from '../SiteHeader';
 import { AskButton, LoadError } from '../SiteStates';
 import { downloadCsv, useGa4, useGsc, useSite, useSiteRange } from '../useSiteData';
@@ -49,6 +50,19 @@ export function PagesPage() {
     const ga = useGa4<Ga4BreakdownResponse>(site.hasGa4 ? 'pages' : null);
     const sc = useGsc<GscRowsResponse>(site.hasGsc ? 'pages' : null);
     const decay = useGsc<{ rows: DecayRow[] }>(site.hasGsc ? 'decay' : null);
+    // Titles for the top pages and trend bars for the top 25 (one extra GA4 call pair, cached).
+    const trends = useGa4<Ga4PageTrends>(site.hasGa4 ? 'pageTrends' : null, { extra: { limit: '25' } });
+    const { titleBy, trendBy } = useMemo(() => {
+        const t = new Map<string, string>();
+        const tr = new Map<string, number[]>();
+        for (const x of trends.data?.titles ?? []) t.set(pageRef(x.path, x.host || site.siteHost).key, x.title);
+        for (const x of trends.data?.rows ?? []) {
+            const k = pageRef(x.path, x.host || site.siteHost).key;
+            if (x.title) t.set(k, x.title);
+            if (x.trend) tr.set(k, x.trend);
+        }
+        return { titleBy: t, trendBy: tr };
+    }, [trends.data, site.siteHost]);
     const [segRaw, setSeg] = useStringParam('segment');
     const segment = (SEGMENTS.some((s) => s.value === segRaw) ? segRaw : 'all') as Segment;
     const [pageKey, setPageKey] = useStringParam('page', 'push');
@@ -82,9 +96,24 @@ export function PagesPage() {
     const columns: TableColumn<Row>[] = [
         {
             key: 'page', header: 'Page', width: '34%', sortable: true, firstSortDir: 'asc', sortValue: (r) => r.label,
-            cell: (r) => <span title={r.url ?? r.label}>{r.label}</span>,
+            cell: (r) => {
+                const title = titleBy.get(r.key);
+                return title ? (
+                    <span className="block min-w-0" title={r.url ?? r.label}>
+                        <span className="block truncate font-medium text-fg">{title}</span>
+                        <span className="block truncate text-meta text-fg-muted">{r.label}</span>
+                    </span>
+                ) : <span title={r.url ?? r.label}>{r.label}</span>;
+            },
             heat: site.hasGa4 ? { metric: 'pageviews', value: (r) => r.views } : { metric: 'clicks', value: (r) => r.clicks },
         },
+        ...(site.hasGa4 ? [{
+            key: 'trend', header: 'Trend', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
+            cell: (r: Row) => {
+                const t = trendBy.get(r.key);
+                return t ? <TrendBars values={t} color={METRICS.pageviews.color} partialLast ariaLabel={`Views trend for ${r.label}`} /> : <span className="text-meta text-fg-faint" title="Trend bars show for the top 25 pages by views">–</span>;
+            },
+        }] : []),
         ...(site.hasGa4 ? [
             { key: 'views', header: 'Views', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.views ?? -1, cell: (r: Row) => fmtFull(r.views) },
             { key: 'users', header: 'Users', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.users ?? -1, cell: (r: Row) => fmtFull(r.users) },
@@ -98,7 +127,7 @@ export function PagesPage() {
         ...(compareOn ? [{
             key: 'delta', header: site.hasGa4 ? 'Δ views' : 'Δ clicks', align: 'right' as const, sortable: true,
             sortValue: (r: Row) => { const c = change(r, site.hasGa4); return c.prev === undefined || c.prev === null ? null : c.cur - c.prev; },
-            cell: (r: Row) => { const c = change(r, site.hasGa4); return c.prev === undefined ? '' : <MetricDelta metric={site.hasGa4 ? 'pageviews' : 'clicks'} current={c.cur} previous={c.prev} />; },
+            cell: (r: Row) => { const c = change(r, site.hasGa4); return c.prev === undefined ? '' : <MetricDelta metric={site.hasGa4 ? 'pageviews' : 'clicks'} current={c.cur} previous={c.prev} variant="chip" />; },
         }] : []),
         ...(segment === 'decaying' ? [{
             key: 'decay', header: 'Clicks / 28 days', align: 'right' as const, cell: (r: Row) => (r.decay ? <span className="whitespace-nowrap">{r.decay.map(fmtFull).join(' → ')}</span> : '–'),

@@ -14,7 +14,7 @@ import { flagForName } from '../lib/geo';
 import { sourceMediumInfo } from '../lib/sources';
 import { sourceMediumParts } from '../SourceIcon';
 import { displayPage, isAiSource, pageRef } from '../lib/rules';
-import type { Ga4BreakdownResponse, Ga4Row } from '../lib/types';
+import type { Ga4BreakdownResponse, Ga4PageTrends, Ga4Row } from '../lib/types';
 import { LoadError } from '../SiteStates';
 import { useGa4, useSite, useSiteRange } from '../useSiteData';
 import { ChannelsDonut, DevicesDonut, Flag, SimpleList } from './OverviewTab';
@@ -38,6 +38,8 @@ export function TrafficPagesTab() {
         return { r, ref, label: displayPage(ref, site.siteHost) };
     }).filter((x) => x.label && !x.label.includes('(not set)')), [pages.data, view, site.siteHost]);
     const open = (key: string) => router.push(`${siteHref(site.host, 'pages')}?page=${encodeURIComponent(key)}`);
+    const trends = useGa4<Ga4PageTrends>(view === 'pages' ? 'pageTrends' : null, { extra: { limit: '25' } });
+    const titleBy = useMemo(() => new Map((trends.data?.titles ?? []).map((t) => [pageRef(t.path, t.host || site.siteHost).key, t.title])), [trends.data, site.siteHost]);
     const toggle = (
         <SegmentedControl
             ariaLabel="Page report"
@@ -54,7 +56,19 @@ export function TrafficPagesTab() {
             <BreakdownTable
                 rows={rows}
                 rowKey={(x) => x.r.key}
-                label={{ header: 'Page', text: (x) => x.label }}
+                label={{
+                    header: 'Page',
+                    text: (x) => `${titleBy.get(x.ref.key) ?? ''} ${x.label}`,
+                    cell: (x) => {
+                        const title = titleBy.get(x.ref.key);
+                        return title ? (
+                            <span className="block min-w-0" title={x.label}>
+                                <span className="block truncate font-medium text-fg">{title}</span>
+                                <span className="block truncate text-meta text-fg-muted">{x.label}</span>
+                            </span>
+                        ) : <span title={x.label}>{x.label}</span>;
+                    },
+                }}
                 heat={{ metric: 'pageviews', value: (x) => v(x.r, 'screenPageViews') }}
                 loading={pages.state === 'loading'}
                 defaultSort="views"
