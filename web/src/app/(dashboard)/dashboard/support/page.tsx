@@ -5,13 +5,14 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
-import { ArrowRight, ArrowUp, BookOpen, Check, CheckCheck, Clock, LifeBuoy, Loader2, Lock, Mail } from 'lucide-react';
+import { ArrowRight, ArrowUp, BookOpen, Check, CheckCheck, Clock, LifeBuoy, Loader2, Lock, Mail, MessageCircle } from 'lucide-react';
 
 import { PageHeader } from '@/components/shell/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { openLiveChat } from '@/components/ui/chatWidget';
 import { cn } from '@/lib/cn';
 import { MAX_INPUT_CHARS, WARN_INPUT_CHARS, ERR_MESSAGE_TOO_LONG } from '@/lib/chatLimits';
 import { BRAND_NAME } from '@/lib/brand';
@@ -262,6 +263,7 @@ export default function SupportPage() {
 
                 {/* Other ways to get help */}
                 <aside aria-label="Other ways to get help" className="flex flex-col gap-3">
+                    <OptionCard onClick={openLiveChat} icon={MessageCircle} title="Chat with us" subtitle="Live chat when the team is online" />
                     <OptionCard href="/dashboard/docs" icon={BookOpen} title="Docs" subtitle="Guides for every part of the app" />
                     <OptionCard href="mailto:hello@trafficclaw.com" icon={Mail} title="Email us" subtitle="hello@trafficclaw.com" external />
                     <Card padding="sm">
@@ -282,8 +284,9 @@ export default function SupportPage() {
     );
 }
 
-function OptionCard({ href, icon: Icon, title, subtitle, external }: {
-    href: string;
+function OptionCard({ href, onClick, icon: Icon, title, subtitle, external }: {
+    href?: string;
+    onClick?: () => void;
     icon: typeof Mail;
     title: string;
     subtitle: string;
@@ -301,6 +304,7 @@ function OptionCard({ href, icon: Icon, title, subtitle, external }: {
             <ArrowRight aria-hidden size={16} className="shrink-0 text-fg-faint transition-transform duration-120 group-hover:translate-x-0.5 group-hover:text-fg-muted" />
         </Card>
     );
+    if (!href) return <button type="button" onClick={onClick} className="block w-full rounded-card text-left focus-visible:outline-2">{inner}</button>;
     return external
         ? <a href={href} className="block rounded-card focus-visible:outline-2">{inner}</a>
         : <Link href={href} className="block rounded-card focus-visible:outline-2">{inner}</Link>;

@@ -133,3 +133,10 @@ button:focus-visible {
     border-color: CanvasText;
   }
 }
+
+/* Tawk.to chat (components/ui/chatWidget.ts): no auto-greeting. Its greeting
+   card lives in #message-preview; it stays hidden until the visitor has opened
+   the chat once (agent replies after that show as usual). */
+html:not([data-chat-engaged]) #message-preview {
+  display: none !important;
+}
