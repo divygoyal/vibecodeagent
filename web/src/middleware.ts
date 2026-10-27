@@ -209,7 +209,8 @@ export async function middleware(request: NextRequest) {
         if (!token) {
             const signInUrl = new URL('/', request.url);
             signInUrl.searchParams.set('callbackUrl', originalPathPlusSearch);
-            return NextResponse.redirect(signInUrl);
+            const res = NextResponse.redirect(signInUrl);
+            return staleDemoCookie ? clearDemoCookie(res) : res;
         }
 
         // Setup gate. A user with Google connected goes straight into the app
