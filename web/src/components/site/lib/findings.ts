@@ -122,6 +122,35 @@ export function rateFinding(input: { metric: 'ctr' | 'position'; cur: number | n
         : { text: `Average position slipped from ${prev.toFixed(1)} to ${now}${vs}.`, tone: 'bad' };
 }
 
+/**
+ * "Clicks down 23% since the May 2026 core update began (May 21)." Compares the
+ * daily average in the 14 days before a Google update with the days from its
+ * start (needs 7+ days after). Only for a clear move (15%+); the biggest wins.
+ */
+export function updateImpactFinding(
+    series: { date: string; value: number }[],
+    updates: { name: string; start: string }[],
+    metric: string,
+): Finding | null {
+    let best: { u: { name: string; start: string }; p: number } | null = null;
+    for (const u of updates) {
+        const before = series.filter((x) => x.date < u.start).slice(-14);
+        const after = series.filter((x) => x.date >= u.start);
+        if (before.length < 7 || after.length < 7) continue;
+        const avg = (xs: { value: number }[]) => xs.reduce((a, b) => a + b.value, 0) / xs.length;
+        const b = avg(before);
+        if (b < 5) continue;
+        const p = pct(avg(after), b);
+        if (Math.abs(p) >= 15 && (!best || Math.abs(p) > Math.abs(best.p))) best = { u, p };
+    }
+    if (!best) return null;
+    const day = fmtDayLong(best.u.start).replace(/^\w+, /, '').replace(/, \d{4}$/, '');
+    return {
+        text: `${metric} ${best.p > 0 ? 'up' : 'down'} ${fmtPct(best.p)} a day on average since the ${best.u.name} began (${day}).`,
+        tone: best.p > 0 ? 'good' : 'bad',
+    };
+}
+
 // ─── Peak hours ───────────────────────────────────────────────────────────
 
 const DAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];

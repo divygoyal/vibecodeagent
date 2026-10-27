@@ -3,7 +3,8 @@
 import { useMemo } from 'react';
 
 import { METRICS, type MetricKey } from '@/lib/metrics';
-import { rateFinding, trendFinding, type Driver, type Finding } from '../lib/findings';
+import { rateFinding, trendFinding, updateImpactFinding, type Driver, type Finding } from '../lib/findings';
+import { googleUpdatesIn } from '../lib/googleUpdates';
 import { displayPage, isAiSource, pageRef } from '../lib/rules';
 import { sourceLabel } from '../lib/sources';
 import type { Ga4BreakdownResponse, Ga4Summary, GscRowsResponse, GscSummary } from '../lib/types';
@@ -59,6 +60,13 @@ export function useSearchFinding(metric: MetricKey, summary: GscSummary | undefi
         const cur = summary.totals[metric as 'clicks'];
         const prev = compareOn ? summary.previous?.[metric as 'clicks'] ?? null : undefined;
         if (metric === 'ctr' || metric === 'position') return rateFinding({ metric, cur, prev, compareText });
+        // A core update inside the range that clearly moved the metric is the finding that matters most.
+        const days = summary.series;
+        if (days.length > 14) {
+            const core = googleUpdatesIn(days[0].date, days[days.length - 1].date).filter((u) => u.kind === 'core');
+            const hit = updateImpactFinding(days.map((p) => ({ date: p.date, value: p[metric as 'clicks'] })), core, METRICS[metric].label);
+            if (hit) return hit;
+        }
         const rows = drivers.data?.rows ?? [];
         const lost = drivers.data?.lost ?? [];
         const list: Driver[] = [...rows, ...lost].filter((r) => r.prev !== undefined && r.prev !== null).map((r) => ({

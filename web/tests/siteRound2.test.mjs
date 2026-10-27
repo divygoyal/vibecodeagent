@@ -8,7 +8,7 @@ import test from 'node:test';
 const { sourceInfo, sourceMediumInfo, deviceLabel, geoLabel } = await import('../src/components/site/lib/sources.ts');
 const { parseFilterParams, filtersToParams, ga4DimensionFilter, andFilters, cleanFilters, hasFilters } = await import('../src/components/site/lib/filters.ts');
 const { bucketStart, isoWeekMonday, gaBucketDate, bucketDates, snapToBucket, bucketGscSeries, effectiveInterval, allowedIntervals } = await import('../src/components/site/lib/intervals.ts');
-const { trendFinding, rateFinding, peakHoursFinding, peakWindow, hourRange, overlayFinding, ctrBenchmarkFinding, geoFinding, topDriver } = await import('../src/components/site/lib/findings.ts');
+const { trendFinding, rateFinding, updateImpactFinding, peakHoursFinding, peakWindow, hourRange, overlayFinding, ctrBenchmarkFinding, geoFinding, topDriver } = await import('../src/components/site/lib/findings.ts');
 const { GOOGLE_UPDATES, googleUpdatesIn, googleUpdateOn } = await import('../src/components/site/lib/googleUpdates.ts');
 
 test('source names and favicon domains', () => {
@@ -127,6 +127,15 @@ test('CTR and position findings use points and positions', () => {
     assert.equal(rateFinding({ metric: 'position', cur: 16.8, prev: 17.2 }).text, 'Average position improved from 17.2 to 16.8.');
     assert.equal(rateFinding({ metric: 'position', cur: 16.8, prev: 15 }).tone, 'bad');
     assert.equal(rateFinding({ metric: 'position', cur: 0 }), null);
+});
+
+test('a Google update that moved clicks is named', () => {
+    const series = [];
+    for (let i = 1; i <= 30; i++) series.push({ date: `2026-05-${String(i).padStart(2, '0')}`, value: i < 21 ? 100 : 70 });
+    const f = updateImpactFinding(series, [{ name: 'May 2026 core update', start: '2026-05-21' }], 'Clicks');
+    assert.equal(f.text, 'Clicks down 30% a day on average since the May 2026 core update began (May 21).');
+    assert.equal(updateImpactFinding(series.map((x) => ({ ...x, value: 100 })), [{ name: 'x', start: '2026-05-21' }], 'Clicks'), null);
+    assert.equal(updateImpactFinding(series, [{ name: 'late', start: '2026-05-28' }], 'Clicks'), null); // fewer than 7 days after
 });
 
 test('peak hours finding', () => {
