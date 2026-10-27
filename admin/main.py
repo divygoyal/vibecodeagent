@@ -1229,8 +1229,12 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin_key)
 ):
-    """List all users"""
-    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    """List all users (the public demo's shared user is not a real user: left out)"""
+    result = await db.execute(
+        select(User)
+        .where(or_(User.github_id.is_(None), User.github_id != settings.PUBLIC_DEMO_USER_ID))
+        .order_by(User.created_at.desc())
+    )
     users = result.scalars().all()
     user_ids = [user.id for user in users]
 
@@ -2785,8 +2789,8 @@ async def admin_status(
     _: bool = Depends(verify_admin_key)
 ):
     """Get overall system status"""
-    # Count users by plan
-    result = await db.execute(select(User))
+    # Count users by plan (the public demo's shared user is not a real user)
+    result = await db.execute(select(User).where(or_(User.github_id.is_(None), User.github_id != settings.PUBLIC_DEMO_USER_ID)))
     users = result.scalars().all()
     
     plan_counts = {}
@@ -4068,6 +4072,9 @@ async def join_leaderboard_for_user(
     user = await get_user_by_identifier(db, identifier)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if user.github_id == settings.PUBLIC_DEMO_USER_ID:
+        # The public live demo is read-only and never appears on the public board.
+        raise HTTPException(status_code=403, detail="The demo account cannot join the leaderboard")
 
     # Upsert key is (user_id, ga_property_id). When ga_property_id is None we
     # fall back to a fresh row to avoid collapsing distinct unverified drafts.
