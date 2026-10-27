@@ -47,7 +47,10 @@ export async function getLiveNow(entryId: number): Promise<LiveNow> {
 
 const SLUG_OR_ID_RE = /^[a-z0-9-]{1,150}$/;
 
-/** Resolve a slug or numeric id to the entry id (5 minute cache). */
+/**
+ * Resolve a numeric id or the current slug to the entry id (5 minute cache). Both are looked
+ * up through the admin API, so an id that does not exist (or a retired slug) gives null.
+ */
 export async function resolveEntryId(idOrSlug: string): Promise<number | null> {
     if (!SLUG_OR_ID_RE.test(idOrSlug)) return null;
     const found = await cachedFetch<{ id: number | null }>(`lb-resolve:${idOrSlug}`, 300_000, async () => {
