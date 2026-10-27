@@ -60,3 +60,13 @@ Owner preview feedback, UI part. Checks run on worker1 (`scripts/dev/worker1.sh`
   "In another Google account?": add <session email> (Search Console → Settings → Users and permissions /
   GA Admin → Property access management) or connect another Google account (/dashboard/settings?tab=google,
   where tc/b3-accounts adds the button).
+
+## Verification (worker1, production build, 1 instance)
+- tsc OK, `npm test` 170/170, `check:rsc` 0 errors; ESLint clean on changed files.
+- Fold: first card row fully visible at 1280x720 (cards 290-562px) and 1440x900, light and dark; phone 390 too.
+- Equal heights: Pages and Sources cards 435px each (Overview and Traffic).
+- check-mobile (360/390/414, light+dark) on portfolio, 7d portfolio (alerts), Overview/Traffic/Pages of a full
+  site, GSC-only and GA4-only sites (demo), ga4only and gsconly users: all totals 0.
+- Shots + report: `/root/projects/tc-redesign-research/batch3/ui/` (mobile-check/ has the check-mobile reports).
+- Not done: saving a pick and "Check again" were not clicked end to end on worker1 (no real Google; demo PATCH
+  path untested in a browser). Long single last segments ("/blog/<long-slug>") still cut at the end of the slug.
