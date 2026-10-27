@@ -49,11 +49,12 @@ export function SiteOverview() {
                 )}
             </div>
             {hasGa4 && hasGsc ? <SearchVsTrafficCard /> : null}
-            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+            {/* Cards in a row share one height (the shorter one's list grows, "View all" at the bottom). */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                 {hasGa4 ? <PagesCard className="xl:col-span-2" action="open" withSearch={hasGsc} /> : <GscTopPagesCard className="xl:col-span-2" />}
                 {hasGa4 ? <SourcesCard /> : <SearchBreakdownCard />}
             </div>
-            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                 <GeoCard className="xl:col-span-2" />
                 {hasGa4 && hasGsc ? <SearchBreakdownCard /> : hasGa4 ? <TechCard /> : <AppearanceHint />}
             </div>
@@ -83,7 +84,7 @@ function AppearanceHint() {
     return (
         <SectionCard title="Link Analytics" description="Visitors, sources and devices">
             <p className="text-body-sm text-fg-secondary">This site only has Search Console. Link a GA4 property to see who visits, where they come from and what they do.</p>
-            <div className="mt-3"><Button asChild size="sm" variant="secondary"><Link href="/dashboard/settings?tab=sites">Link a GA4 property</Link></Button></div>
+            <div className="mt-3"><Button asChild size="sm" variant="secondary"><a href="#link-ga4">Link a GA4 property</a></Button></div>
             <p className="mt-3 text-meta text-fg-muted">Search breakdowns are in <Link className="underline" href={siteHref(site.host, 'search')}>Search</Link>.</p>
         </SectionCard>
     );

@@ -78,7 +78,38 @@ function saveLayout(v: PortfolioLayout) {
     }
 }
 
-function Subtitle({ data, range }: { data: PortfolioResponse | undefined; range: PortfolioRange }) {
+const TREND_KEY = 'tc-portfolio-trend';
+
+/** "Show trend" choice on this device; collapsed unless the person opened it. */
+function readTrend(): boolean {
+    try {
+        return window.localStorage.getItem(TREND_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function saveTrend(open: boolean) {
+    try {
+        window.localStorage.setItem(TREND_KEY, open ? '1' : '0');
+    } catch {
+        /* private mode */
+    }
+}
+
+/** Alerts live at the bottom of the page; the header link scrolls there. */
+const ALERTS_ID = 'portfolio-alerts-panel';
+
+function scrollToAlerts(e: React.MouseEvent<HTMLAnchorElement>) {
+    const el = document.getElementById(ALERTS_ID);
+    if (!el) return;
+    e.preventDefault();
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    el.focus({ preventScroll: true });
+}
+
+function Subtitle({ data, range, alerts = 0 }: { data: PortfolioResponse | undefined; range: PortfolioRange; alerts?: number }) {
     // [content, shown on phones]
     const parts: [React.ReactNode, boolean][] = [];
     if (data && data.sites.length) {
@@ -99,6 +130,14 @@ function Subtitle({ data, range }: { data: PortfolioResponse | undefined; range:
         parts.push([<span key="find" className="inline-flex items-center gap-1.5"><Loader2 aria-hidden size={12} className="animate-spin" />Finding your sites</span>, true]);
     }
     parts.push([`${RANGE_LABEL[range]} vs previous`, true]);
+    if (alerts > 0) {
+        parts.push([
+            <a key="alerts" href={`#${ALERTS_ID}`} onClick={scrollToAlerts} className="tap-area font-medium text-down underline-offset-2 hover:underline">
+                {fmtFull(alerts)} {alerts === 1 ? 'alert' : 'alerts'} ↓
+            </a>,
+            true,
+        ]);
+    }
     return (
         <span className="inline-flex flex-wrap items-center gap-x-1.5">
             {parts.map(([p, phone], i) => (
@@ -113,8 +152,8 @@ function Subtitle({ data, range }: { data: PortfolioResponse | undefined; range:
 
 /**
  * The Portfolio screen (DESIGN 5.1): header with search, sort and range,
- * totals strip with the combined chart, alerts, then the site cards (or the
- * table). Pure view: data and actions come from props, so the signed-in page
+ * a slim totals row (the combined chart behind "Show trend"), the site cards
+ * (or the table), then the alerts. Pure view: data and actions come from props, so the signed-in page
  * and the public demo share it.
  */
 export function PortfolioView(props: PortfolioViewProps) {
@@ -134,6 +173,8 @@ export function PortfolioView(props: PortfolioViewProps) {
     const [limitState, setLimitState] = useState({ key: limitKey, n: PAGE });
     const limit = limitState.key === limitKey ? limitState.n : PAGE;
     const [pairingSite, setPairingSite] = useState<PortfolioSite | null>(null);
+    const [trendOpen, setTrendOpen] = useState<boolean>(() => (typeof window === 'undefined' ? false : readTrend()));
+    const onTrendOpenChange = (open: boolean) => { setTrendOpen(open); saveTrend(open); };
 
     const sites = useMemo(() => data?.sites ?? [], [data]);
     const visibleCount = sites.filter((s) => !s.hidden).length;
@@ -204,7 +245,7 @@ export function PortfolioView(props: PortfolioViewProps) {
         <div className={className}>
             <PageHeader
                 title="Portfolio"
-                subtitle={firstLoad ? <span className="inline-block h-4 w-64 skeleton align-middle" aria-hidden /> : <Subtitle data={data} range={range} />}
+                subtitle={firstLoad ? <span className="inline-block h-4 w-64 skeleton align-middle" aria-hidden /> : <Subtitle data={data} range={range} alerts={readOnly || !data || data.state !== 'ready' ? 0 : data.alerts.length} />}
                 note={note}
                 actions={showControls ? (
                     <>
@@ -263,14 +304,9 @@ export function PortfolioView(props: PortfolioViewProps) {
                         comparisonLabel={comparisonLabel}
                         dimmed={refetching}
                         compact={isMobile}
+                        trendOpen={trendOpen}
+                        onTrendOpenChange={onTrendOpenChange}
                     />
-
-                    {readOnly ? null : (
-                        <AlertsPanel alerts={data.alerts} hrefFor={(slug) => hrefFor({ slug })} onOpen={(a) => {
-                            const s = data.sites.find((x) => x.key === a.siteKey);
-                            if (s) onOpenSite?.(s);
-                        }} />
-                    )}
 
                     <section aria-label="Sites" className="flex flex-col gap-4">
                         {/* Phones: the header row has no room for search, so it sits above the list. */}
@@ -384,6 +420,21 @@ export function PortfolioView(props: PortfolioViewProps) {
                             ) : null}
                         </div>
                     </section>
+
+                    {/* At the bottom so the site cards are visible right after sign-in; the header's
+                        "N alerts ↓" scrolls here and each card keeps its own alert chip. */}
+                    {readOnly ? null : (
+                        <AlertsPanel
+                            id={ALERTS_ID}
+                            className="scroll-mt-20 focus:outline-none"
+                            alerts={data.alerts}
+                            hrefFor={(slug) => hrefFor({ slug })}
+                            onOpen={(a) => {
+                                const s = data.sites.find((x) => x.key === a.siteKey);
+                                if (s) onOpenSite?.(s);
+                            }}
+                        />
+                    )}
                 </div>
             )}
 
@@ -417,7 +468,7 @@ function NoMatch({ query, onClear, filter, onAll }: { query: string; onClear: ()
 function LoadingSkeleton({ compact, withStrip = true, count = 6 }: { compact?: boolean; withStrip?: boolean; count?: number }) {
     return (
         <div className="flex flex-col gap-6" aria-busy="true" aria-label="Loading portfolio">
-            {withStrip ? <div className="h-[340px] rounded-card border border-border-subtle bg-surface p-4"><span className="block h-full w-full skeleton" /></div> : null}
+            {withStrip ? <div className="h-[60px] rounded-card border border-border-subtle bg-surface p-2"><span className="block h-full w-full skeleton" /></div> : null}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4">
                 {Array.from({ length: count }, (_, i) => <SiteCardSkeleton key={i} compact={compact} delay={0} />)}
             </div>

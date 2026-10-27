@@ -23,6 +23,8 @@ import type { DecayRow, Ga4BreakdownResponse, Ga4PageTrends, GscDetailResponse, 
 import { SiteHeader } from '../SiteHeader';
 import { sourceParts } from '../SourceIcon';
 import { AskButton, LoadError } from '../SiteStates';
+import { PagePath } from '../PagePath';
+import { pageLabel } from '../lib/pagePath';
 import { downloadCsv, useGa4, useGsc, useSite, useSiteRange } from '../useSiteData';
 import { useStringParam } from '../useTabParam';
 
@@ -97,16 +99,8 @@ export function PagesPage() {
     const columns: TableColumn<Row>[] = [
         {
             key: 'page', header: 'Page', width: '34%', sortable: true, firstSortDir: 'asc', sortValue: (r) => r.label,
-            cell: (r) => {
-                const title = titleBy.get(r.key);
-                return title ? (
-                    <span className="block w-[46vw] min-w-0 max-w-[30rem] md:w-auto" title={r.url ?? r.label}>
-                        <span className="block truncate font-medium text-fg">{title}</span>
-                        <span className="block truncate text-meta text-fg-muted">{r.label}</span>
-                    </span>
-                ) : <span className="block w-[46vw] min-w-0 max-w-[30rem] truncate md:w-auto" title={r.url ?? r.label}>{r.label}</span>;
-            },
-            // Rows with a title and trend bars read better without a heat bar; keep it for GSC-only sites.
+            cell: (r) => <PagePath path={r.label} title={titleBy.get(r.key)} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto" />,
+            // Rows with trend bars read better without a heat bar; keep it for GSC-only sites.
             heat: site.hasGa4 ? undefined : { metric: 'clicks', value: (r) => r.clicks },
         },
         ...(site.hasGa4 ? [{
@@ -183,22 +177,24 @@ export function PagesPage() {
                 )}
             />
             {(ga.data?.truncated || sc.data?.truncated) ? <p className="mt-2 text-meta text-fg-muted">Showing the top pages Google returned for this range.</p> : null}
-            <PageDrawer row={selected} pageKey={pageKey} loading={loading} onClose={() => void setPageKey(null)} />
+            <PageDrawer row={selected} pageKey={pageKey} knownTitle={pageKey ? titleBy.get(pageKey) ?? null : null} loading={loading} onClose={() => void setPageKey(null)} />
         </div>
     );
 }
 
 /** Page drawer: KPIs, views chart, queries for this page, sources, Ask. */
-function PageDrawer({ row, pageKey, loading, onClose }: { row: Row | null; pageKey: string | null; loading: boolean; onClose: () => void }) {
+function PageDrawer({ row, pageKey, knownTitle, loading, onClose }: { row: Row | null; pageKey: string | null; knownTitle: string | null; loading: boolean; onClose: () => void }) {
     const site = useSite();
     const { compareOn } = useSiteRange();
     const open = Boolean(pageKey);
-    const gaPage = useGa4<{ series: Record<string, number | string | null>[]; totals: { pageviews: number; users: number; engagement: number; conversions: number }; previous: { pageviews: number; users: number } | null; sources: { name: string; views: number }[] }>(
+    const gaPage = useGa4<{ series: Record<string, number | string | null>[]; totals: { pageviews: number; users: number; engagement: number; conversions: number }; previous: { pageviews: number; users: number } | null; sources: { name: string; views: number }[]; title?: string | null }>(
         open && row?.gaPath ? 'page' : null,
         { extra: row?.gaPath ? { path: row.gaPath, ...(row.gaHost ? { host: row.gaHost } : {}) } : undefined },
     );
     const scPage = useGsc<GscDetailResponse>(open && row?.url ? 'detail' : null, { extra: row?.url ? { page: row.url } : undefined });
     const title = row?.label ?? pageKey ?? '';
+    // The page's <title> from GA4: the top pages already have it, the drawer's own report has it for the rest.
+    const pageTitle = knownTitle ?? gaPage.data?.title ?? null;
     const prompt = row
         ? `How can I improve ${title} on ${site.siteHost ?? site.label}?${row.views !== null ? ` It had ${fmtFull(row.views)} views and ${fmtDuration(row.engagement ?? 0)} average engagement.` : ''}${row.clicks !== null ? ` In Google it got ${fmtFull(row.clicks)} clicks from ${fmtFull(row.impressions)} impressions at position ${fmtPosition(row.position)}.` : ''}`
         : '';
@@ -206,8 +202,8 @@ function PageDrawer({ row, pageKey, loading, onClose }: { row: Row | null; pageK
         <Drawer
             open={open}
             onOpenChange={(o) => { if (!o) onClose(); }}
-            title={<span className="[overflow-wrap:anywhere]">{title}</span>}
-            subtitle="Page"
+            title={<span className="[overflow-wrap:anywhere]">{pageLabel(title)}</span>}
+            subtitle={pageTitle ? <span className="[overflow-wrap:anywhere]">{pageTitle}</span> : 'Page'}
             width="wide"
             footer={row ? (
                 <div className="flex flex-wrap items-center gap-2">

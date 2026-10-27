@@ -95,12 +95,13 @@ export function TrafficOverviewTab() {
                 <MetricTile metric="pageviews" label="Views per session" format="position" better="up" value={t && t.sessions ? Math.round((t.pageviews / t.sessions) * 100) / 100 : null}
                     previous={prev === undefined ? undefined : prev && prev.sessions ? Math.round((prev.pageviews / prev.sessions) * 100) / 100 : null} loading={loading} comparisonLabel={compareText} />
             </div>
-            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+            {/* One height per row: the side lists grow and keep "View all" at the bottom. */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <SourcesCard />
                 <PagesCard action="filter" />
             </div>
             <GeoCard />
-            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <TechCard />
                 <PeakHoursCard className="lg:col-span-2" />
             </div>

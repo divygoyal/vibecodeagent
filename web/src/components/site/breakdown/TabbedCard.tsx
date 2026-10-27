@@ -70,7 +70,7 @@ export function TabbedCard<T extends string>({ id, title, tabs, footer, actions,
                 </div>
             </div>
             {active.meta ? <div className="mb-1 flex justify-end text-meta text-fg-muted">{active.meta}</div> : null}
-            <div role="tabpanel" id={`card-${id}-${active.value}`} className="min-w-0 flex-1">
+            <div role="tabpanel" id={`card-${id}-${active.value}`} className="flex min-w-0 flex-1 flex-col">
                 {active.content}
             </div>
             {footer ? <div className="mt-3">{footer}</div> : null}

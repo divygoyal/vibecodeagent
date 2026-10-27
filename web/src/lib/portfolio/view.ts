@@ -2,7 +2,7 @@
  * Client-side filtering and sorting of portfolio sites. Pure.
  */
 import { pctChange } from './build';
-import type { PortfolioSite } from './types';
+import type { Compared, PortfolioSite, TrafficTotals } from './types';
 
 export type SortKey = 'clicks' | 'impressions' | 'users' | 'growth' | 'drop' | 'position' | 'name';
 export type FilterKey = 'all' | 'gsc' | 'ga4' | 'starred';
@@ -81,4 +81,29 @@ export function sortSites(sites: PortfolioSite[], sort: SortKey): PortfolioSite[
     };
     const byName = (a: PortfolioSite, b: PortfolioSite) => a.label.localeCompare(b.label, 'en', { sensitivity: 'base', numeric: true });
     return [...sites].sort((a, b) => (Number(b.starred) - Number(a.starred)) || by[sort](a, b) || byName(a, b));
+}
+
+/**
+ * The portfolio's users total tile. It always shows a number once there is
+ * traffic: the exact per-site users added up, or, while those are still
+ * loading (or for a site Google would not give them for), the summed daily
+ * users with "≈" and a note. It never waits on the exact-users job: when that
+ * job could not start, the tile used to stay a skeleton forever.
+ */
+export function usersTotalTile(traffic: Compared<TrafficTotals> | null | undefined, opts: { usersPending: boolean; siteCount: number }): {
+    label: string;
+    approx: boolean;
+    hint: string | undefined;
+} {
+    const many = opts.siteCount > 1;
+    const label = many ? 'Users (sum of sites)' : 'Users';
+    const approx = Boolean(traffic && !traffic.cur.usersExact);
+    const notes: string[] = [];
+    if (many) notes.push('Summed across sites: a visitor of two sites counts twice');
+    if (approx) {
+        notes.push(opts.usersPending
+            ? 'Exact users are still loading; until then daily users are added up (a visitor on two days counts twice)'
+            : 'Includes daily users added up for sites without an exact count (a visitor on two days counts twice)');
+    }
+    return { label, approx, hint: notes.length ? notes.join('. ') : undefined };
 }

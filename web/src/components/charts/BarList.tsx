@@ -48,6 +48,11 @@ export interface BarListProps {
     loading?: boolean;
     empty?: ReactNode;
     className?: string;
+    /**
+     * Fill a stretched parent (a card in an equal-height row): the list grows and
+     * "View all" sits at the bottom. The parent must be a flex column.
+     */
+    fill?: boolean;
 }
 
 /**
@@ -55,7 +60,7 @@ export interface BarListProps {
  * pages, countries, devices, queries.
  */
 export function BarList({
-    items, metric, limit = 8, showShare, formatValue, valueFormat, onItemClick, labelHeader = 'Name', valueHeader, onViewAll, viewAllTitle = 'All rows', loading, empty, className,
+    items, metric, limit = 8, showShare, formatValue, valueFormat, onItemClick, labelHeader = 'Name', valueHeader, onViewAll, viewAllTitle = 'All rows', loading, empty, className, fill,
 }: BarListProps) {
     const [open, setOpen] = useState(false);
     const fmt = formatValue
@@ -68,8 +73,8 @@ export function BarList({
 
     if (loading) {
         return (
-            <div className={cn('flex flex-col gap-1', className)} aria-busy>
-                {Array.from({ length: Math.min(limit, 6) }, (_, i) => (
+            <div className={cn('flex flex-col gap-1', fill && 'flex-1', className)} aria-busy>
+                {Array.from({ length: fill ? limit : Math.min(limit, 6) }, (_, i) => (
                     <div key={i} className="flex h-8 items-center gap-3">
                         <Skeleton className="h-6 rounded-md" style={{ width: `${85 - i * 12}%` }} />
                         <Skeleton className="ml-auto h-3 w-10" />
@@ -81,7 +86,7 @@ export function BarList({
     if (items.length === 0) return <>{empty ?? <p className="py-6 text-center text-body text-fg-muted">No data</p>}</>;
 
     return (
-        <div className={className}>
+        <div className={cn(fill && 'flex flex-1 flex-col', className)}>
             <ul className="flex flex-col">
                 {shown.map((item) => {
                     const pct = max > 0 ? (item.value / max) * 100 : 0;
@@ -111,7 +116,7 @@ export function BarList({
                 })}
             </ul>
             {items.length > limit ? (
-                <div className="mt-2 flex justify-end">
+                <div className={cn('flex justify-end', fill ? 'mt-auto pt-2' : 'mt-2')}>
                     <Button variant="link" size="sm" onClick={() => (onViewAll ? onViewAll() : setOpen(true))}>
                         View all {fmtFull(items.length)} →
                     </Button>
