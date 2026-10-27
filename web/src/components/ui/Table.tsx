@@ -5,7 +5,8 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from 'luci
 
 import { cn } from '@/lib/cn';
 import { fmtFull } from '@/lib/format';
-import { METRICS, type MetricKey } from '@/lib/metrics';
+import type { MetricKey } from '@/lib/metrics';
+import { heatbarClass } from '@/components/charts/style';
 import { Button } from './Button';
 import { Card } from './Card';
 import { Select } from './Select';
@@ -225,7 +226,7 @@ export function Table<T>({
                                                     <div className="relative flex min-h-7 items-center">
                                                         <span
                                                             aria-hidden
-                                                            className={cn('absolute inset-y-0 left-[-6px] rounded-md transition-opacity duration-120 group-hover:opacity-80', c.heat.metric === 'neutral' ? 'heatbar-neutral' : METRICS[c.heat.metric].heatbar)}
+                                                            className={cn('absolute inset-y-0 left-[-6px] rounded-md transition-opacity duration-120 group-hover:opacity-80', heatbarClass(c.heat.metric))}
                                                             style={{ width: `calc(${pct}% + 6px)` }}
                                                         />
                                                         <span className="relative min-w-0 truncate">{c.cell(row, r)}</span>

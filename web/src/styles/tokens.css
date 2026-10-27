@@ -129,7 +129,8 @@
   --tc-chart-axis:   var(--tc-gray-200);
   --tc-chart-tick:   var(--tc-gray-500);
   --tc-chart-cursor: var(--tc-gray-300);
-  --tc-chart-fill-top: 16%;   /* area gradient start opacity */
+  --tc-chart-fill-top: 10%;   /* area gradient start opacity (16% before round 2: a slab under every line) */
+  --tc-spark-fill-top: 16%;   /* sparkline area (portfolio cards, KPI tiles) */
   --tc-heatbar:        12%;   /* table heat-bar opacity */
 
   /* Elevation */
@@ -163,9 +164,11 @@
   --tc-fg-faint:     var(--tc-night-500);  /* 3.1:1, disabled only */
   --tc-fg-inverse:   var(--tc-gray-900);
 
-  --tc-brand:         var(--tc-pine-300);
-  --tc-brand-hover:   var(--tc-pine-200);
-  --tc-brand-fg:      var(--tc-pine-950);  /* 9.2:1 on brand */
+  /* Filled brand states keep the deep pine of light mode (round 2, critique D1):
+     pastel mint (pine-300) was the loudest thing on every dark page. */
+  --tc-brand:         var(--tc-pine-600);
+  --tc-brand-hover:   var(--tc-pine-500);
+  --tc-brand-fg:      #ffffff;             /* 5.6:1 on brand */
   --tc-brand-text:    var(--tc-pine-300);  /* 10:1 */
   --tc-brand-soft:    rgb(120 211 177 / 0.12);
   --tc-brand-soft-fg: var(--tc-pine-200);
@@ -195,8 +198,9 @@
   --tc-chart-axis:   var(--tc-night-300);
   --tc-chart-tick:   var(--tc-night-600);
   --tc-chart-cursor: var(--tc-night-400);
-  --tc-chart-fill-top: 22%;
-  --tc-heatbar:        18%;
+  --tc-chart-fill-top: 12%;   /* 22% before round 2: a navy slab under every line */
+  --tc-spark-fill-top: 8%;
+  --tc-heatbar:        12%;   /* 18% before round 2: pink bars turned into maroon slabs */
 
   --tc-shadow-xs:         0 1px 2px rgb(0 0 0 / 0.4);
   --tc-shadow-card:       inset 0 1px 0 rgb(255 255 255 / 0.03);

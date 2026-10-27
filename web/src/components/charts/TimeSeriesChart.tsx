@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import {
     Area,
@@ -18,6 +18,7 @@ import { cn } from '@/lib/cn';
 import { fmtAxis, fmtDayLong, fmtDuration, fmtPercent, makeDateTickFormatter } from '@/lib/format';
 import { fmtMetric, METRICS, type MetricKey } from '@/lib/metrics';
 import { MetricDelta } from '@/components/ui/MetricDelta';
+import { AXIS_LINE, AXIS_TICK, CURSOR, dateTicks, GRID_STROKE, maxOf, niceAxis } from './axis';
 import { ChartTooltipCard, type ChartTooltipRow } from './ChartTooltip';
 
 export type TimeSeriesRow = { [key: string]: number | string | null | undefined };
@@ -63,10 +64,27 @@ export interface TimeSeriesChartProps {
 
 function axisFormatter(metric: MetricKey): (v: number) => string {
     const f = METRICS[metric].format;
-    if (f === 'percent') return (v) => fmtPercent(v);
+    if (f === 'percent') return (v) => fmtPercent(v, { tile: true });
     if (f === 'position') return (v) => String(Math.round(v));
-    if (f === 'duration') return (v) => fmtDuration(v);
+    if (f === 'duration') return (v) => (v === 0 ? '0' : fmtDuration(v));
     return (v) => fmtAxis(v);
+}
+
+/** Width of an element, kept current with a ResizeObserver (date ticks thin to fit). */
+function useWidth<T extends HTMLElement>(fallback: number) {
+    const ref = useRef<T>(null);
+    const [width, setWidth] = useState(fallback);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el || typeof ResizeObserver === 'undefined') return;
+        const ro = new ResizeObserver(([entry]) => {
+            const w = Math.round(entry.contentRect.width);
+            if (w > 0) setWidth((prev) => (Math.abs(prev - w) > 4 ? w : prev));
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+    return [ref, width] as const;
 }
 
 const MAX_ANNOTATIONS = 10;
@@ -124,8 +142,20 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
     }, [data, series, hasPartial, partialFrom]);
 
     const dates = useMemo(() => data.map((r) => String(r[dateKey] ?? '')), [data, dateKey]);
-    const tickFmt = useMemo(() => makeDateTickFormatter(dates), [dates]);
+    const [figureRef, figureWidth] = useWidth<HTMLElement>(640);
     const showY = height > 200;
+    // Evenly spaced dates anchored on the last day (axis.ts); the formatter's index is the tick's.
+    const xTicks = useMemo(() => dateTicks(dates, { width: figureWidth - (showY ? 52 : 16) }), [dates, figureWidth, showY]);
+    const tickFmt = useMemo(() => makeDateTickFormatter(dates), [dates]);
+    // Round Y steps per series (0 / 5K / 10K, never 4.5K / 9K); the comparison line shares its series' axis.
+    const yAxes = useMemo(() => {
+        const out: Record<string, ReturnType<typeof niceAxis>> = {};
+        for (const s of series) {
+            const format = METRICS[s.metric].format;
+            out[s.key] = niceAxis(maxOf(data, [s.key, withCompare ? s.compareKey : undefined]), { format: format === 'count' ? 'count' : format });
+        }
+        return out;
+    }, [data, series, withCompare]);
     const first = series[0];
     const allZero = first ? data.every((r) => !r[first.key]) : true;
     const anim = animate && !reduce;
@@ -162,6 +192,7 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
 
     return (
         <figure
+            ref={figureRef}
             aria-label={ariaLabel}
             // Mobile caps charts at 220px (DESIGN 3.7); the chart follows its box.
             className={cn('relative m-0 h-[var(--ts-h)] max-md:h-[min(var(--ts-h),220px)]', className)}
@@ -182,16 +213,16 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
                         </linearGradient>
                     ) : null}
                 </defs>
-                <CartesianGrid vertical={false} stroke="var(--color-chart-grid)" />
+                <CartesianGrid vertical={false} stroke={GRID_STROKE} />
                 <XAxis
                     dataKey={dateKey}
+                    ticks={xTicks}
+                    interval={0}
                     tickFormatter={(v, i) => tickFmt(String(v), i)}
-                    tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }}
+                    tick={AXIS_TICK}
                     tickLine={false}
-                    axisLine={{ stroke: 'var(--color-chart-axis)' }}
+                    axisLine={AXIS_LINE}
                     tickMargin={8}
-                    minTickGap={32}
-                    interval="preserveStartEnd"
                 />
                 {series.map((s, i) => {
                     const isPos = METRICS[s.metric].format === 'position';
@@ -204,19 +235,19 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
                             width={visible ? 44 : 0}
                             orientation="left"
                             reversed={isPos}
-                            domain={isPos ? [1, (max: number) => Math.ceil(max) + 1] : [0, 'auto']}
-                            allowDecimals={METRICS[s.metric].format !== 'count'}
+                            domain={yAxes[s.key].domain}
+                            ticks={yAxes[s.key].ticks}
+                            interval={0}
                             tickFormatter={axisFormatter(s.metric)}
-                            tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }}
+                            tick={AXIS_TICK}
                             tickLine={false}
                             axisLine={false}
-                            tickCount={5}
                         />
                     );
                 })}
                 <RTooltip
                     content={renderTooltip}
-                    cursor={{ stroke: 'var(--color-chart-cursor)', strokeWidth: 1 }}
+                    cursor={CURSOR}
                     isAnimationActive={false}
                     offset={12}
                 />
