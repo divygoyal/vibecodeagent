@@ -43,6 +43,11 @@ export interface ChartCardProps {
     tableView?: ReactNode;
     /** Extra menu items (DropdownMenuItem elements). */
     menuItems?: ReactNode;
+    /**
+     * No card chrome (border, padding, shadow, radius): for a chart that sits
+     * inside another card. Use this instead of `!p-0 !border-0` overrides.
+     */
+    bare?: boolean;
     children?: ReactNode;
     className?: string;
 }
@@ -63,16 +68,22 @@ export function ChartSkeleton({ height }: { height: number }) {
  */
 export function ChartCard({
     title, subtitle, actions, height = 'default', state = 'ready', empty, error, footer,
-    onDownloadCsv, onAddToDashboard, onAskAi, tableView, menuItems, children, className,
+    onDownloadCsv, onAddToDashboard, onAskAi, tableView, menuItems, bare, children, className,
 }: ChartCardProps) {
     const [tableOpen, setTableOpen] = useState(false);
     const h = typeof height === 'number' ? height : CHART_HEIGHTS[height];
     const hasMenu = Boolean(onDownloadCsv || onAddToDashboard || onAskAi || tableView || menuItems);
 
     return (
-        <Card className={cn('relative overflow-hidden', className)}>
+        // No overflow-hidden on the card: it clipped the footnote's first letter in the rounded
+        // corner when nested (critique #10) and cut chart tooltips at the card edge. The
+        // refetch bar clips itself.
+        <Card
+            padding={bare ? 'none' : 'md'}
+            className={cn('relative flex flex-col', bare && 'border-0 bg-transparent shadow-none', className)}
+        >
             {state === 'refetching' ? (
-                <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 overflow-hidden">
+                <span aria-hidden className={cn('absolute inset-x-0 top-0 h-0.5 overflow-hidden', !bare && 'rounded-t-card')}>
                     <span className="block h-full w-2/5 animate-progress bg-brand" />
                 </span>
             ) : null}
@@ -127,7 +138,8 @@ export function ChartCard({
                     <div className={cn('transition-opacity duration-120', state === 'refetching' && 'opacity-60')}>{children}</div>
                 )}
             </div>
-            {footer ? <p className="mt-3 text-meta text-fg-muted">{footer}</p> : null}
+            {/* mt-auto: in a row of stretched cards the footnotes line up at the bottom. */}
+            {footer ? <p className="mt-auto pt-3 text-meta text-fg-muted">{footer}</p> : null}
             {tableView ? (
                 <Drawer open={tableOpen} onOpenChange={setTableOpen} title={typeof title === 'string' ? title : 'Data'} subtitle="Table view" width="wide">
                     {tableView}
