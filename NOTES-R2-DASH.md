@@ -32,3 +32,16 @@ Shots: /root/projects/tc-redesign-research/round2/candidate/dash/.
 ## Dev data (instance r2dash)
 - /root/.trafficclaw-dev/r2dash/dashboards-r2.json: one dashboard per new template (shared) + site overview in
   each theme. Seeded with the scratch script seed-r2.mjs (POST /api/dashboards with templateId/themeId).
+- f3c4c01 variables ('variable' control, {{var:id}} in widget filters/text, URL f.<id>, editor section, chip;
+  Brand vs non-brand uses it) and click to filter (bars, table rows, map countries; URL x=dim:value; chip bar).
+- 184b1f9 inline editor query route accepts variable controls (strict schema); dash patterns per series in
+  High contrast / Paper (Recharts className tc-series-N, CSS only under [data-dash-palette="contrast"]).
+- 55d3743 lint clean on all changed files.
+
+## Checks
+- tsc clean; npm test 74/74 (tests/dashboardRound2.test.mjs 13 tests); tsx tests/builder/query.test.ts 11/11
+  (all 24 templates evaluate on demo data); check:rsc 0 errors; eslint clean on changed files.
+
+## Left / not done
+- chartTint (brand colour on single-series charts) and per-series point markers (only dash patterns).
+- Calculated metrics, scheduled email, server PDF (owner: no headless browser), annotations, widget library.

@@ -334,7 +334,8 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                         {status === 'saving' ? <Loader2 aria-hidden size={14} className="animate-spin" /> : status === 'saved' ? <Check aria-hidden size={14} /> : status === 'error' || status === 'conflict' ? <AlertTriangle aria-hidden size={14} /> : null}
                         {statusText}
                     </span>
-                    <Button variant="ghost" icon={Palette} onClick={() => { s.setPreview(false); s.select(null); s.selectControl(null); openAppearance(); }}>Theme</Button>
+                    <Tooltip content="Theme, branding and cover"><Button variant="ghost" icon={Palette} className="xl:hidden" iconOnly aria-label="Theme" onClick={() => { s.setPreview(false); s.select(null); s.selectControl(null); openAppearance(); }} /></Tooltip>
+                    <Button variant="ghost" icon={Palette} className="hidden xl:inline-flex" onClick={() => { s.setPreview(false); s.select(null); s.selectControl(null); openAppearance(); }}>Theme</Button>
                     <Button variant={preview ? 'primary' : 'secondary'} icon={preview ? EyeOff : Eye} onClick={() => s.setPreview(!preview)}>{preview ? 'Edit' : 'Preview'}</Button>
                     <Button variant="primary" icon={Share2} onClick={() => setShareOpen(true)}>Share</Button>
                     <DropdownMenu>
