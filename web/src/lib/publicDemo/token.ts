@@ -1,12 +1,16 @@
 /**
- * The demo session token: a NextAuth-format JWT (same encryption, same secret, same fields as
- * a Google sign-in, see lib/auth.ts and scripts/dev/login.mjs) for the shared demo user, plus
- * the claim `demo: true`. It lives in its own httpOnly cookie (`tc_demo`); middleware projects
- * it into the request's session cookie. Edge-safe (next-auth/jwt uses Web Crypto).
+ * Two tokens for the shared demo user (claims: the fields of a Google sign-in, see lib/auth.ts, plus `demo: true`):
+ *
+ *   tc_demo cookie   encrypted with its OWN salt (DEMO_COOKIE_SALT), so NextAuth cannot decode it: whatever a visitor
+ *                    does with the value (any cookie name, a Bearer header, any route), it is not a session.
+ *   projected token  the same claims with NextAuth's default salt and a 5-minute life, minted by middleware for one
+ *                    request and placed only in that request's Cookie header. It never reaches the browser, and
+ *                    the server still refuses it without the demo marker (sessionGuard.ts).
+ * Edge-safe (next-auth/jwt uses Web Crypto).
  */
 import { decode, encode, type JWT } from 'next-auth/jwt';
 
-import { DEMO_ACCESS_TOKEN, DEMO_MAX_AGE_S, DEMO_REFRESH_TOKEN, DEMO_USER_EMAIL, DEMO_USER_ID, DEMO_USER_NAME, isDemoToken } from './config';
+import { DEMO_ACCESS_TOKEN, DEMO_MAX_AGE_S, DEMO_REFRESH_TOKEN, DEMO_USER_ID, DEMO_USER_NAME, isDemoToken } from './config';
 
 /** The JWT claims of the demo session. */
 export function demoJwtClaims(): JWT {
@@ -14,13 +18,13 @@ export function demoJwtClaims(): JWT {
     const refreshToken = DEMO_REFRESH_TOKEN;
     return {
         name: DEMO_USER_NAME,
-        email: DEMO_USER_EMAIL,
+        email: null,
         picture: null,
         sub: DEMO_USER_ID,
         primaryProvider: 'google',
         primarySub: DEMO_USER_ID,
         primaryName: DEMO_USER_NAME,
-        primaryEmail: DEMO_USER_EMAIL,
+        primaryEmail: null,
         primaryImage: null,
         accessToken,
         refreshToken,
@@ -33,17 +37,29 @@ export function demoJwtClaims(): JWT {
     };
 }
 
-/** A fresh demo session JWT (expires after DEMO_MAX_AGE_S). */
+/** Salt of the tc_demo cookie token. Anything but NextAuth's default ('') makes it useless as a session. */
+export const DEMO_COOKIE_SALT = 'tc_demo';
+/** Life of a projected (default-salt) token: one request's worth. */
+export const PROJECTED_MAX_AGE_S = 5 * 60;
+
+/** A fresh tc_demo cookie value (expires after DEMO_MAX_AGE_S). Not a session token. */
 export async function mintDemoJwt(secret: string, maxAge: number = DEMO_MAX_AGE_S): Promise<string> {
     if (!secret) throw new Error('NEXTAUTH_SECRET is not set');
-    return encode({ token: demoJwtClaims(), secret, maxAge });
+    return encode({ token: demoJwtClaims(), secret, maxAge, salt: DEMO_COOKIE_SALT });
 }
 
-/** The decoded demo JWT, or null when it is missing, expired, forged or not a demo token. */
+/** The session-format token middleware puts into one demo request (never sent to the browser). */
+export async function mintProjectedSessionJwt(claims: JWT, secret: string): Promise<string> {
+    const { iat: _iat, exp: _exp, jti: _jti, ...rest } = claims as JWT & { iat?: number; exp?: number; jti?: string };
+    void _iat; void _exp; void _jti;
+    return encode({ token: rest, secret, maxAge: PROJECTED_MAX_AGE_S });
+}
+
+/** The decoded tc_demo cookie, or null when it is missing, expired, forged, default-salted or not a demo token. */
 export async function readDemoJwt(value: string | null | undefined, secret: string | undefined): Promise<JWT | null> {
     if (!value || !secret || value.length > 8000) return null;
     try {
-        const token = await decode({ token: value, secret });
+        const token = await decode({ token: value, secret, salt: DEMO_COOKIE_SALT });
         if (!token || token.demo !== true || token.sub !== DEMO_USER_ID) return null;
         return token;
     } catch {

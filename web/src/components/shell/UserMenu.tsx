@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/DropdownMenu';
 import { signOutAndClear } from './signOut';
 import { DEMO_EXIT_HREF, useDemoSession } from '@/components/demo/useDemoSession';
+import { DEMO_USER_LABEL } from '@/lib/publicDemo/config';
 
 type SessionUser = { id?: string; name?: string | null; email?: string | null; image?: string | null };
 
@@ -33,7 +34,7 @@ export function UserMenu({ collapsed = false, onNavigate }: { collapsed?: boolea
         <DropdownMenuContent align={collapsed ? 'start' : 'end'} side={collapsed ? 'right' : 'top'} className="w-60">
             <DropdownMenuLabel className="normal-case tracking-normal">
                 <span className="block truncate text-body-sm font-medium text-fg">{user.name}</span>
-                <span className="block truncate text-meta text-fg-muted">{user.email}</span>
+                <span className="block truncate text-meta text-fg-muted">{demo ? DEMO_USER_LABEL : user.email}</span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem icon={User} onSelect={() => go('/dashboard/settings')}>Account</DropdownMenuItem>
@@ -74,7 +75,7 @@ export function UserMenu({ collapsed = false, onNavigate }: { collapsed?: boolea
             <Avatar name={user.name} src={user.image} size={28} />
             <div className="min-w-0 flex-1">
                 <p className="truncate text-body-sm font-medium text-fg">{user.name}</p>
-                <p className="truncate text-meta text-fg-muted">{user.email}</p>
+                <p className="truncate text-meta text-fg-muted">{demo ? DEMO_USER_LABEL : user.email}</p>
             </div>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>

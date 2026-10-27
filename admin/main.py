@@ -1100,8 +1100,8 @@ async def create_user(
         if user_data.plan not in PLANS:
             raise HTTPException(status_code=400, detail=f"Invalid plan. Options: {list(PLANS.keys())}")
         
-        # Get available port
-        port = await get_next_available_port(db)
+        # Get available port (the public demo's shared user never runs a container: it takes no slot)
+        port = None if user_identifier == settings.PUBLIC_DEMO_USER_ID else await get_next_available_port(db)
         
         # Determine container name upfront
         container_name = docker_manager._get_container_name(user_identifier)

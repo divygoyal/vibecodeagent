@@ -195,6 +195,99 @@ async function httpChecks() {
     return { demoJwt, dashboards };
 }
 
+// ─── Security review fixes (round3/SECURITY-REVIEW.md F1-F7) ───
+const stateCookie = (user) => {
+    const f = inst ? path.join(inst.dir, user === 'demo' ? 'state.json' : `state-${user}.json`) : null;
+    if (!f || !fs.existsSync(f)) return null;
+    const st = JSON.parse(fs.readFileSync(f, 'utf8'));
+    return st.cookies.filter((c) => c.domain === 'localhost').map((c) => `${c.name}=${c.value}`).join('; ');
+};
+
+async function securityChecks(demoJwt) {
+    let r;
+    // F1: the tc_demo value is useless as a session token, under any name, as Bearer, on any route.
+    const vectors = {
+        'session cookie name': { cookie: `next-auth.session-token=${demoJwt}` },
+        'chunk .0': { cookie: `next-auth.session-token.0=${demoJwt}` },
+        'prefixed name': { cookie: `next-auth.session-tokenX=${demoJwt}` },
+        '__Secure- chunk': { cookie: `__Secure-next-auth.session-token.0=${demoJwt}` },
+        'Bearer': { headers: { Authorization: `Bearer ${demoJwt}` } },
+    };
+    const bad = [];
+    for (const [name, v] of Object.entries(vectors)) {
+        const opt = { cookie: v.cookie, headers: v.headers };
+        r = await http('POST', '/api/dashboards', { ...opt, body: { name: 'x', templateId: 'blank' } });
+        if (r.status !== 401) bad.push(`${name}: POST /api/dashboards ${r.status}`);
+        r = await http('GET', '/api/github', opt);
+        if (r.status !== 401) bad.push(`${name}: GET /api/github ${r.status}`);
+        r = await http('GET', '/api/ai-connections', opt);
+        if (r.status !== 401) bad.push(`${name}: GET /api/ai-connections ${r.status}`);
+        r = await http('GET', '/api/auth/session', opt);
+        if (r.data?.user || r.setCookies.some((c) => /session-token[^=]*=[^;]+/.test(c))) bad.push(`${name}: /api/auth/session ${r.text.slice(0, 80)} ${r.setCookies.join(' ')}`);
+        r = await http('GET', '/dashboard', opt);
+        if (!(r.status === 307 && /callbackUrl/.test(r.headers.get('location') || ''))) bad.push(`${name}: /dashboard ${r.status} ${r.headers.get('location')}`);
+        r = await http('POST', '/mcp', { ...opt, body: { jsonrpc: '2.0', id: 1, method: 'tools/list' }, headers: { ...(v.headers || {}), Accept: 'application/json, text/event-stream' } });
+        if (![401, 403, 404].includes(r.status)) bad.push(`${name}: POST /mcp ${r.status}`);
+        r = await http('POST', '/api/ai-connections/keys', { ...opt, body: { name: 'x' } });
+        if (r.status === 200 || r.status === 201) bad.push(`${name}: created an MCP key`);
+    }
+    check('F1: the tc_demo value is no session (cookie, .0 chunk, prefixed name, Bearer; API, pages, NextAuth renewal, /mcp)', bad.length === 0, bad.join('; '));
+    // F2: a forged marker header does nothing.
+    r = await http('GET', '/api/portfolio', { headers: { 'x-tc-demo-request': '1' } });
+    check('F2: a forged demo marker header gives nothing', r.status === 401, r.status);
+    // F5: no email on the demo identity.
+    r = await http('GET', '/api/auth/session', { cookie: `tc_demo=${demoJwt}` });
+    check('F5: the demo session has no email', r.data?.user?.id === DEMO_ID && !r.data.user.email, JSON.stringify(r.data?.user));
+    // F3: realtime is per user and checks the property.
+    const demoCookie = `tc_demo=${demoJwt}`;
+    r = await http('GET', '/api/analytics/realtime?property=properties/412300101', { cookie: demoCookie });
+    check('F3: demo realtime for a catalogue property works', r.status === 200, `${r.status} ${r.text.slice(0, 120)}`);
+    r = await http('GET', '/api/analytics/realtime?property=properties/123456789', { cookie: demoCookie });
+    check('F3: demo realtime for any other property is refused', r.status === 404, `${r.status} ${r.text.slice(0, 120)}`);
+    const owner = stateCookie('demo');
+    const other = stateCookie('demo2');
+    if (owner && other) {
+        r = await http('GET', '/api/analytics/realtime?property=properties/412300101', { cookie: owner });
+        check('F3: the owner reads their realtime', r.status === 200 && typeof r.data?.activeUsers === 'number', `${r.status} ${r.text.slice(0, 120)}`);
+        r = await http('GET', '/api/analytics/realtime?property=properties/412300101', { cookie: other });
+        check('F3: another signed-in user gets nothing for that property, even with the cache warm', r.status === 404, `${r.status} ${r.text.slice(0, 120)}`);
+    } else {
+        check('F3: dev user states for the cross-user realtime check', false, 'state.json / state-demo2.json missing');
+    }
+    // F4 / F7: demo site audit only for catalogue hosts, normalised (no query).
+    r = await http('GET', `/api/site/audit?url=${encodeURIComponent('https://unknown-host.example/')}`, { cookie: demoCookie });
+    check('F4: demo site audit refuses hosts outside the catalogue', r.status === 403, r.status);
+    r = await http('GET', `/api/site/audit?url=${encodeURIComponent(`https://${SITE}/pricing?utm=${Date.now()}#x`)}`, { cookie: demoCookie });
+    check('F4: demo site audit is normalised to origin + path', r.status === 200 && r.data?.meta?.canonical === `https://${SITE}/pricing`, `${r.status} ${r.data?.meta?.canonical}`);
+    if (owner) {
+        r = await http('GET', `/api/site/audit?url=${encodeURIComponent(`https://${SITE}/`)}`, { cookie: owner });
+        const sample = /sample data/.test(r.data?.meta?.description || '');
+        // Only meaningful on the production path (no TC_DEMO_DATA), where real users must never get the sample report.
+        if (inst?.DEMO_DATA === '0') check('F7: a real user does not get the sample report (production path)', !sample, `${r.status} ${r.data?.meta?.description}`);
+    }
+    // F6: a signed-in visitor sent from another site is asked first.
+    if (owner) {
+        r = await http('GET', '/demo', { cookie: owner, headers: { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate' } });
+        check('F6: cross-site /demo with a real session shows a confirm page and sets nothing', r.status === 200 && /Open the live demo\?/.test(r.text) && r.setCookies.length === 0, `${r.status} ${r.setCookies.join()}`);
+        r = await http('GET', '/demo', { cookie: owner, headers: { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'navigate' } });
+        check('F6: the same from our own page starts the demo', r.status === 307 && r.setCookies.some((c) => c.startsWith('tc_demo=')), r.status);
+    }
+    r = await http('GET', '/demo', { headers: { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate' } });
+    check('F6: cross-site /demo without a session starts the demo directly', r.status === 307, r.status);
+}
+
+/** Last, as it uses up this address's start budget: direct /api/demo/start is limited like /demo (F4). */
+async function startLimitCheck() {
+    const statuses = [];
+    for (let i = 0; i < 24; i++) {
+        const r = await http('GET', '/api/demo/start');
+        statuses.push(r.status === 307 ? r.headers.get('location') : String(r.status));
+    }
+    check('F4: direct /api/demo/start calls hit the per-address start limit', statuses.includes('/demo?static=1'), statuses.join(','));
+    const r = await http('GET', '/api/demo/start', { headers: { 'Sec-Fetch-Mode': 'cors' } });
+    check('F4: a script fetch of /api/demo/start starts nothing', r.status === 204 && r.setCookies.length === 0, r.status);
+}
+
 // ─── 2-4. Browser ───
 const ERROR_TEXT = /Something went wrong|This page could not be loaded|Application error|Unhandled Runtime Error|Internal Server Error/i;
 
@@ -386,7 +479,8 @@ async function ownerFlow(browser) {
 }
 
 const t0 = Date.now();
-const { dashboards } = await httpChecks();
+const { dashboards, demoJwt: firstDemoJwt } = await httpChecks();
+await securityChecks(firstDemoJwt);
 const browser = await launchBrowser();
 try {
     const variants = opts.quick
@@ -396,6 +490,7 @@ try {
     if (opts.walk) for (const v of picked) await walk(browser, { ...v, dashboards });
     await linkFlow(browser);
     await ownerFlow(browser);
+    await startLimitCheck();
 } finally {
     await browser.close();
 }

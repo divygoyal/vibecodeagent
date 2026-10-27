@@ -244,6 +244,8 @@ WEB_PORT=$(web_port "$i")
 ADMIN_PORT=$(admin_port "$i")
 WEB_URL=http://localhost:$(web_port "$i")
 ADMIN_URL=http://127.0.0.1:$(admin_port "$i")
+DEMO_DATA=${TC_W1_DEMO_DATA:-1}
+PUBLIC_DEMO=${TC_W1_PUBLIC_DEMO:-1}
 EOF
         start_admin "$name" "$i"
     done

@@ -8,9 +8,53 @@ interface CacheEntry<T> {
     data: T;
     timestamp: number;
     ttl: number;
+    /** Approximate size in bytes (JSON length), for the memory bound. */
+    size: number;
 }
 
+/**
+ * Bounds: the cache must not grow with what anonymous visitors (the public demo) or anyone else asks for.
+ * Past either bound, expired entries go first, then the oldest (Map keeps insertion order; a write re-inserts).
+ */
+export const API_CACHE_MAX_ENTRIES = 5_000;
+export const API_CACHE_MAX_BYTES = 64 * 1024 * 1024;
+
 const cache = new Map<string, CacheEntry<unknown>>();
+let cacheBytes = 0;
+
+function approxSize(value: unknown): number {
+    try {
+        return Math.max(64, (JSON.stringify(value) ?? '').length);
+    } catch {
+        return 1024;
+    }
+}
+
+function dropEntry(key: string) {
+    const e = cache.get(key);
+    if (!e) return;
+    cacheBytes -= e.size;
+    cache.delete(key);
+}
+
+function store(key: string, data: unknown, ttl: number, now: number) {
+    dropEntry(key);
+    const size = approxSize(data);
+    if (size > API_CACHE_MAX_BYTES / 8) return; // one huge answer is not worth evicting everything for
+    cache.set(key, { data, timestamp: now, ttl, size });
+    cacheBytes += size;
+    if (cache.size <= API_CACHE_MAX_ENTRIES && cacheBytes <= API_CACHE_MAX_BYTES) return;
+    for (const [k, e] of cache) if (now - e.timestamp > e.ttl) dropEntry(k);
+    for (const k of cache.keys()) {
+        if (cache.size <= API_CACHE_MAX_ENTRIES && cacheBytes <= API_CACHE_MAX_BYTES) break;
+        dropEntry(k);
+    }
+}
+
+/** Test / diagnostics: entry count and approximate bytes. */
+export function apiCacheStats(): { entries: number; bytes: number } {
+    return { entries: cache.size, bytes: cacheBytes };
+}
 const pendingFetches = new Map<string, Promise<unknown>>();
 
 /**
@@ -47,14 +91,14 @@ export async function cachedFetch<T>(
             ('error' in result && result.error != null && result.error !== false)
         );
         if (!isError) {
-            cache.set(key, { data: result, timestamp: fetchedAt, ttl: ttlMs });
+            store(key, result, ttlMs, fetchedAt);
         }
 
         // Lazy cleanup: remove expired entries when cache gets large
         if (cache.size > 200) {
             for (const [cacheKey, entry] of cache.entries()) {
                 if ((fetchedAt - entry.timestamp) > entry.ttl) {
-                    cache.delete(cacheKey);
+                    dropEntry(cacheKey);
                 }
             }
         }
@@ -78,13 +122,13 @@ export async function cachedFetch<T>(
  */
 export function invalidateCache(keyOrPrefix: string) {
     if (cache.has(keyOrPrefix)) {
-        cache.delete(keyOrPrefix);
+        dropEntry(keyOrPrefix);
         pendingFetches.delete(keyOrPrefix);
     } else {
         // Prefix match
         for (const key of cache.keys()) {
             if (key.startsWith(keyOrPrefix)) {
-                cache.delete(key);
+                dropEntry(key);
             }
         }
 
@@ -102,7 +146,7 @@ export function invalidateCache(keyOrPrefix: string) {
  */
 export function invalidateCacheContaining(fragment: string) {
     if (!fragment) return;
-    for (const key of cache.keys()) if (key.includes(fragment)) cache.delete(key);
+    for (const key of cache.keys()) if (key.includes(fragment)) dropEntry(key);
     for (const key of pendingFetches.keys()) if (key.includes(fragment)) pendingFetches.delete(key);
 }
 

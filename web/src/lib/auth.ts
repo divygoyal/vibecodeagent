@@ -3,6 +3,7 @@ import GithubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import { isEmailAllowed, parseAllowedEmails, PREVIEW_PRIVATE_PATH } from "@/lib/accessAllowlist";
 import { sessionCallback } from "@/lib/authSession";
+import { assertDemoSessionHere } from "@/lib/publicDemo/sessionGuard";
 import { cookies } from "next/headers";
 import {
     GOOGLE_CONSENT_COOKIE,
@@ -139,6 +140,11 @@ export const authOptions: NextAuthOptions = {
         session: sessionCallback,
 
         async jwt({ token, profile, account, user, trigger, session }) {
+            // The public demo identity is a session only inside a request middleware marked as a demo request
+            // (lib/publicDemo/sessionGuard.ts). Anywhere else (a leaked token under any cookie name or as Bearer,
+            // /api/auth/session renewal, the kill switch) throwing here makes NextAuth answer "no session" and
+            // clear the cookie instead of re-issuing it.
+            await assertDemoSessionHere(token);
             if (account) {
                 // Capture PRIMARY identity exactly once (the first provider this JWT signs in with).
                 // Later sign-ins for a different provider are treated as "connect a data source"

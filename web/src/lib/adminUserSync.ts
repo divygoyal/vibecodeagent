@@ -1,6 +1,7 @@
 import { authOptions } from '@/lib/auth';
 import type { ServerAuthUser } from '@/lib/authSession';
 import { nonEmptyToken } from '@/lib/googleConsent';
+import { DEMO_USER_ID } from '@/lib/publicDemo/config';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -90,6 +91,10 @@ export async function ensureAdminUserSynced(
     targetProvider?: 'github' | 'google',
     credentialOverrides: ProviderCredentialOverrides = {},
 ) {
+    // The public demo user is set up once by lib/publicDemo/seed.ts; page loads never write it back.
+    if (session?.user?.id === DEMO_USER_ID) {
+        return { synced: true, skipped: true, reason: 'public-demo' } as const;
+    }
     if (!ADMIN_API_KEY) {
         return {
             synced: false,

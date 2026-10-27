@@ -32,6 +32,7 @@ import { demoAccountSummaries, demoDataStreams, demoProperty, demoPropertyList }
 import { DemoApiError, demoMetadata, demoRunRealtimeReport, demoRunReport } from './ga4';
 import { demoGetSite, demoListSites, demoSearchAnalytics, demoSitemaps, demoUrlInspection } from './gsc';
 import { demoCruxRecord, demoPagespeed } from './pagespeed';
+import { isDemoMarker } from '../publicDemo/marker';
 import { DEMO_FAULT_COOKIE, demoFaultAfter, demoFaultBefore, parseDemoFaults, splitFaultToken, type DemoCallScope, type DemoFault } from './faults';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -319,7 +320,7 @@ function demoCodeExchange(form: URLSearchParams): Response {
 
 /** Model APIs: never answered from demo data, and refused while serving a demo request (no AI spend). */
 const MODEL_HOSTS = /^(generativelanguage|aiplatform|[a-z0-9-]+-aiplatform)\.googleapis\.com$|^api\.openai\.com$|^api\.anthropic\.com$/i;
-/** Request header middleware sets on requests it serves as the demo user (and strips from every other request). */
+/** Request header middleware sets on requests it serves as the demo user (and strips from every other request); its value is an HMAC. */
 export const DEMO_REQUEST_HEADER = 'x-tc-demo-request';
 /** The public demo user's id (lib/publicDemo/config.ts DEMO_USER_ID; kept here so this module has no app imports). */
 const PUBLIC_DEMO_USER_ID = 'tc-public-demo';
@@ -332,12 +333,15 @@ export interface PublicDemoDeps {
 }
 
 async function headerSaysDemo(): Promise<boolean> {
+    let value: string | null;
     try {
         const { headers } = await import('next/headers');
-        return (await headers()).get(DEMO_REQUEST_HEADER) === '1';
+        value = (await headers()).get(DEMO_REQUEST_HEADER);
     } catch {
         return false; // outside a request (schedulers, cron, instrumentation)
     }
+    // An HMAC only middleware can produce (lib/publicDemo/marker.ts); a forged or stripped header is not a demo request.
+    return isDemoMarker(value);
 }
 
 function requestUrl(input: RequestInfo | URL): string | null {

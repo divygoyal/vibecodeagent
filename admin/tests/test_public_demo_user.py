@@ -59,6 +59,14 @@ class PublicDemoUserTests(unittest.TestCase):
         status = self.c.get("/api/admin/status", headers=KEY).json()
         self.assertEqual(status["total_users"], len(ids))
 
+    def test_takes_no_container_port(self):
+        import sqlite3
+        db = sqlite3.connect(os.environ["DATABASE_URL"].split(":///", 1)[1])
+        ports = dict(db.execute("SELECT github_id, container_port FROM users").fetchall())
+        db.close()
+        self.assertIsNone(ports[DEMO], "the demo user must not hold one of the MAX_USERS container ports")
+        self.assertIsNotNone(ports["7001"])
+
     def test_cannot_join_leaderboard(self):
         body = {"startup_name": "Acme", "website_url": "https://acmeanalytics.example", "category": "SaaS", "ga_property_id": "properties/412300101"}
         r = self.c.post(f"/api/leaderboard/{DEMO}/join", headers=KEY, json=body)

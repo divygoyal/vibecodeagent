@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server';
 import { cachedFetch, invalidateCache } from '@/lib/apiCache';
 import { getDemoAuditReport } from '@/lib/demoWorkspaceData';
 import { demoDataAllowed } from '@/lib/demo/gate';
+import { getDemoSites } from '@/lib/demo/catalog';
 import { DEMO_HEADER, DEMO_READONLY_MESSAGE, DEMO_USER_ID, publicDemoEnabled } from '@/lib/publicDemo/config';
+import { normalizeHost } from '@/lib/sites/pairing';
 import { runSiteAudit, type AuditReport } from '@/lib/siteAudit';
 import { isBlockedUrl } from '@/lib/urlValidation';
 import { getSessionUserId, jsonError, NO_STORE } from '../_lib/context';
@@ -27,14 +29,28 @@ function normalize(raw: string | null | undefined): string | null {
 
 const isExampleHost = (url: string) => new URL(url).hostname.endsWith('.example');
 
+/** Hosts of the demo catalogue (lib/demo/catalog.ts), without www. */
+const CATALOGUE_HOSTS = new Set(getDemoSites().map((site) => normalizeHost(site.host)));
+
 /**
- * Demo data mode and the public live demo: the catalogue's *.example sites have no real pages to fetch.
- * (.example is a reserved TLD, so no real site is ever answered from here.)
+ * The public demo user audits catalogue pages only, as origin + path (no query, short path): the server never
+ * fetches anything for an anonymous visitor, and the cache cannot be filled with endless URL variants.
+ * null = refused.
  */
-function demoReport(url: string): AuditReport | null {
-    if (!demoDataAllowed() && !publicDemoEnabled()) return null;
-    const host = new URL(url).hostname;
+function demoUserUrl(url: string): string | null {
+    const u = new URL(url);
+    if (!CATALOGUE_HOSTS.has(normalizeHost(u.hostname)) || u.pathname.length > 200) return null;
+    return `${u.origin}${u.pathname}`;
+}
+
+/**
+ * The sample report for *.example pages (no real page to fetch): for the public demo user, and for everyone on a
+ * dev / test server with demo data (TC_DEMO_DATA). Real users in production never get it.
+ */
+function demoReport(userId: string, url: string): AuditReport | null {
     if (!isExampleHost(url)) return null;
+    if (!(userId === DEMO_USER_ID && publicDemoEnabled()) && !demoDataAllowed()) return null;
+    const host = new URL(url).hostname;
     const base = getDemoAuditReport(url);
     const label = host.replace(/^www\./, '');
     return {
@@ -45,15 +61,20 @@ function demoReport(url: string): AuditReport | null {
     };
 }
 
-/** The public demo user may only audit the sample sites: the server never fetches other pages for an anonymous visitor. */
-function demoRefused(userId: string, url: string): NextResponse | null {
-    if (userId !== DEMO_USER_ID || isExampleHost(url)) return null;
+function demoRefusal(): NextResponse {
     return NextResponse.json({ error: DEMO_READONLY_MESSAGE, demo: true }, { status: 403, headers: { ...NO_STORE, [DEMO_HEADER]: 'readonly' } });
+}
+
+/** The URL to audit for this user, or a refusal for the demo user outside the catalogue. */
+function auditTarget(userId: string, url: string): { url: string } | { refused: NextResponse } {
+    if (userId !== DEMO_USER_ID) return { url };
+    const safe = demoUserUrl(url);
+    return safe ? { url: safe } : { refused: demoRefusal() };
 }
 
 async function audit(userId: string, url: string): Promise<{ report: AuditReport } | { error: string }> {
     return cachedFetch(`site-audit:${userId}:${url}`, TTL_MS, async () => {
-        const demo = demoReport(url);
+        const demo = demoReport(userId, url);
         if (demo) return { report: demo };
         if (isBlockedUrl(url)) return { error: 'Only public websites can be audited.' };
         try {
@@ -77,9 +98,9 @@ export async function GET(req: Request) {
     if (!userId) return jsonError('Unauthorized', 401);
     const url = normalize(new URL(req.url).searchParams.get('url'));
     if (!url) return jsonError('Enter a full URL, like https://example.com.', 400);
-    const refused = demoRefused(userId, url);
-    if (refused) return refused;
-    const out = await audit(userId, url);
+    const target = auditTarget(userId, url);
+    if ('refused' in target) return target.refused;
+    const out = await audit(userId, target.url);
     if ('error' in out) return jsonError(out.error, 422);
     return NextResponse.json(out.report, { headers: NO_STORE });
 }
@@ -90,10 +111,10 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null) as { url?: string } | null;
     const url = normalize(body?.url);
     if (!url) return jsonError('Enter a full URL, like https://example.com.', 400);
-    const refused = demoRefused(userId, url);
-    if (refused) return refused;
-    invalidateCache(`site-audit:${userId}:${url}`);
-    const out = await audit(userId, url);
+    const target = auditTarget(userId, url);
+    if ('refused' in target) return target.refused;
+    invalidateCache(`site-audit:${userId}:${target.url}`);
+    const out = await audit(userId, target.url);
     if ('error' in out) return jsonError(out.error, 422);
     return NextResponse.json(out.report, { headers: NO_STORE });
 }
