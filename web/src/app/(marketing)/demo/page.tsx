@@ -34,7 +34,8 @@ export default function DemoPage() {
             </div>
             <FinalCta
                 title="See your own sites like this."
-                description="Connect Google once and every site you own lands here, with what changed and what to fix next. Read-only, nothing to install, no card."
+                description={<>Connect Google once and every site you own lands here, with what changed and what to fix next. <span className="whitespace-nowrap">Read-only</span>, nothing to install, no card.</>}
+                secondary={{ href: '/security', label: 'What we read and store' }}
             />
         </>
     );

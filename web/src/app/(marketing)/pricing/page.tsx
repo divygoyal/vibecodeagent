@@ -51,7 +51,7 @@ const productSchema = PAID_PLANS.map((p) => ({
 function CellView({ value }: { value: Cell }) {
     if (value === true) return <Check aria-label="Included" size={16} strokeWidth={2} className="mx-auto text-up" />;
     if (value === false) return <Minus aria-label="Not applicable" size={16} strokeWidth={1.75} className="mx-auto text-fg-faint" />;
-    return <span className="text-body tabular-nums text-fg">{value}</span>;
+    return <span className="inline-block text-body-sm tabular-nums text-fg sm:text-body">{value}</span>;
 }
 
 export default function PricingPage() {
@@ -104,23 +104,23 @@ export default function PricingPage() {
             <Section tone="surface" labelledBy="compare-title">
                 <SectionHeading id="compare-title" title="Compare plans" description="The only difference between plans is the number of Ask messages." />
                 <div className="mt-8 overflow-x-auto rounded-card border border-border-subtle bg-surface shadow-card">
-                    <table className="w-full min-w-[560px] text-left">
+                    <table className="w-full text-left sm:min-w-[560px]">
                         <caption className="sr-only">Features by plan</caption>
                         <thead className="sticky top-0 bg-surface-sunken">
                             <tr className="border-b border-border-subtle text-body-sm text-fg-muted">
-                                <th scope="col" className="px-4 py-3 font-medium">Feature</th>
-                                <th scope="col" className="w-[22%] px-4 py-3 text-center font-medium">Free</th>
-                                <th scope="col" className="w-[22%] px-4 py-3 text-center font-medium">{growth.name} · ${growth.priceUsd}</th>
-                                <th scope="col" className="w-[22%] px-4 py-3 text-center font-medium">{pro.name} · ${pro.priceUsd}</th>
+                                <th scope="col" className="px-3 py-3 font-medium sm:px-4">Feature</th>
+                                <th scope="col" className="w-[21%] px-1.5 py-3 text-center font-medium sm:w-[22%] sm:px-4">Free</th>
+                                <th scope="col" className="w-[21%] px-1.5 py-3 text-center font-medium sm:w-[22%] sm:px-4">{growth.name}<span className="hidden sm:inline"> · ${growth.priceUsd}</span></th>
+                                <th scope="col" className="w-[21%] px-1.5 py-3 text-center font-medium sm:w-[22%] sm:px-4">{pro.name}<span className="hidden sm:inline"> · ${pro.priceUsd}</span></th>
                             </tr>
                         </thead>
                         <tbody>
                             {ROWS.map((row) => (
                                 <tr key={row.label} className="border-b border-border-subtle last:border-b-0">
-                                    <th scope="row" className="px-4 py-3 text-body font-normal text-fg">{row.label}</th>
-                                    <td className="px-4 py-3 text-center"><CellView value={row.free} /></td>
-                                    <td className="px-4 py-3 text-center"><CellView value={row.growth} /></td>
-                                    <td className="px-4 py-3 text-center"><CellView value={row.pro} /></td>
+                                    <th scope="row" className="px-3 py-3 text-body-sm font-normal text-fg sm:px-4 sm:text-body">{row.label}</th>
+                                    <td className="px-1.5 py-3 text-center sm:px-4"><CellView value={row.free} /></td>
+                                    <td className="px-1.5 py-3 text-center sm:px-4"><CellView value={row.growth} /></td>
+                                    <td className="px-1.5 py-3 text-center sm:px-4"><CellView value={row.pro} /></td>
                                 </tr>
                             ))}
                         </tbody>

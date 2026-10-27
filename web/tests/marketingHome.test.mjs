@@ -34,7 +34,7 @@ test('the Actions preview uses the app rules on sample data, ranked by gain', ()
         assert.ok(a.gain >= 3, 'tasks below 3 clicks a month are dropped, like the app');
         assert.ok(['striking', 'low_ctr'].includes(a.type));
         if (a.type === 'striking') {
-            assert.match(a.title, /^Push ".+" onto the first page$/);
+            assert.match(a.title, /^Push “.+” onto the first page$/);
             assert.ok(a.position >= 8 && a.position <= 20, 'striking distance is position 8-20');
         }
     }

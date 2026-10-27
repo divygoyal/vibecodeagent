@@ -80,6 +80,7 @@ function SectionTitle({ id, children }: { id: string; children: React.ReactNode 
 export default function SecurityPage() {
     return (
         <ContentPage
+            wide
             crumb="Security and data"
             title="Security and data"
             lead={`Exactly what ${BRAND_NAME} reads from your Google account, what we keep and how, what we never do, and how to take it all back.`}

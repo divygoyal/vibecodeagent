@@ -25,7 +25,7 @@ export function FixNextPreview({ data, className }: { data: DemoActions; classNa
             </div>
             <ol className="mt-3 space-y-2">
                 {data.actions.map((a, i) => (
-                    <li key={a.id} className="rounded-control border border-border-subtle bg-surface px-3.5 py-3 shadow-xs">
+                    <li key={a.id} className={cn('rounded-control border border-border-subtle bg-surface px-3 py-3 shadow-xs sm:px-3.5', i >= 2 && 'hidden sm:block')}>
                         <div className="flex items-start gap-3">
                             <span className="mt-0.5 w-4 shrink-0 text-center text-meta font-medium tabular-nums text-fg-muted">{i + 1}</span>
                             <div className="min-w-0 flex-1">
@@ -35,8 +35,8 @@ export function FixNextPreview({ data, className }: { data: DemoActions; classNa
                                         <span aria-hidden className={cn('size-1.5 rounded-full', IMPACT[a.impact].dot)} />
                                         {IMPACT[a.impact].label}
                                     </span>
-                                    <span aria-hidden>·</span>
-                                    <span>{a.typeLabel}</span>
+                                    <span aria-hidden className="hidden sm:inline">·</span>
+                                    <span className="hidden sm:inline">{a.typeLabel}</span>
                                     <span aria-hidden>·</span>
                                     <span className="tabular-nums">position {a.position.toFixed(1)}</span>
                                     <span aria-hidden className="hidden sm:inline">·</span>

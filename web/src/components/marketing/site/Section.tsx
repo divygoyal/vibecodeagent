@@ -74,8 +74,8 @@ export function BrowserFrame({ url, children, className, bodyClassName }: { url:
                     <span className="size-2.5 rounded-full bg-border" />
                     <span className="size-2.5 rounded-full bg-border" />
                 </div>
-                <div className="mx-auto flex h-6 min-w-0 max-w-[360px] flex-1 items-center justify-center truncate rounded-full bg-subtle px-3 font-mono text-caption text-fg-muted">
-                    {url}
+                <div className="mx-auto flex h-6 min-w-0 max-w-[360px] flex-1 items-center justify-center rounded-full bg-subtle px-3 font-mono text-caption text-fg-muted">
+                    <span className="truncate">{url}</span>
                 </div>
                 <div aria-hidden className="w-[42px]" />
             </div>

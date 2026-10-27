@@ -312,7 +312,7 @@ function computeDemoActions(slug: string, limit: number, now: number, today: num
             const page = best.get(x.key)?.page ?? null;
             out.push({
                 id: `striking:${x.key}`, type: 'striking', typeLabel: ACTION_TYPE_LABEL.striking, impact: impactFor(gain, scale),
-                title: `Push "${x.key}" onto the first page`, page: page ? show(page) : null,
+                title: `Push “${x.key}” onto the first page`, page: page ? show(page) : null,
                 position: x.position, impressions: x.impressions, ctr: x.ctr, gain, score: gain,
             });
         });

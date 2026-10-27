@@ -261,7 +261,7 @@ export function HowItWorks({ portfolio, actions }: { portfolio: DemoPortfolio; a
             <SectionHeading
                 id="how-title"
                 eyebrow="How it works"
-                title="From Google sign-in to your first fix"
+                title={<>From Google <span className="whitespace-nowrap">sign-in</span> to your first fix</>}
                 description="Nothing to install and nothing to configure. TrafficClaw finds your sites and does the sums."
             />
             <ol className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
