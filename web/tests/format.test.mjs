@@ -95,6 +95,7 @@ test('fmtDelta: percent change, 1 decimal < 100, 0 decimals 100-999, >999%', () 
     assert.equal(fmtDelta(12400, 10473), '▲ 18.4%');
     assert.equal(fmtDelta(1282, 2548), '▼ 49.7%');
     assert.equal(fmtDelta(274, 100), '▲ 174%');
+    assert.equal(fmtDelta(109, 100), '▲ 9.0%'); // fixed decimal: a column never mixes 9% and 8.5%
     assert.equal(fmtDelta(20000, 10), '▲ >999%');
     assert.equal(fmtDelta(100, 0), 'new');
     assert.equal(fmtDelta(0, 0), '–');
@@ -104,7 +105,7 @@ test('fmtDelta: percent change, 1 decimal < 100, 0 decimals 100-999, >999%', () 
 
 test('rate deltas: percentage points', () => {
     assert.equal(fmtDeltaPoints(0.024, 0.025), '▼ 0.1 pt');
-    assert.equal(fmtDeltaPoints(0.45, 0.4), '▲ 5 pt');
+    assert.equal(fmtDeltaPoints(0.45, 0.4), '▲ 5.0 pt');
     assert.equal(fmtDeltaPoints(0.4, 0.4), '0 pt');
     const d = computeDelta(0.024, 0.025, { mode: 'points' });
     assert.equal(d.tone, 'bad');

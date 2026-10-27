@@ -182,10 +182,11 @@ function none(text: string, state: 'none' | 'new'): DeltaResult {
     };
 }
 
+/** Always 1 decimal under 100% (`9.0%`, `18.4%`) so a delta column never mixes `9%` with `8.5%`. */
 function fmtPercentChange(absPct: number): string {
     if (absPct >= 999.5) return '>999%';
     if (absPct >= 99.95) return `${Math.round(absPct)}%`;
-    return `${stripZeros(absPct.toFixed(1))}%`;
+    return `${absPct.toFixed(1)}%`;
 }
 
 export function computeDelta(current: Num, previous: Num, opts: DeltaOptions = {}): DeltaResult {
@@ -203,7 +204,7 @@ export function computeDelta(current: Num, previous: Num, opts: DeltaOptions = {
         if (abs < 0.05) {
             return { state: 'flat', direction: 'flat', tone: 'neutral', text: '0 pt', label: '0 pt', srText: 'no change', change: 0 };
         }
-        text = `${stripZeros(abs.toFixed(1))} pt`;
+        text = `${abs.toFixed(1)} pt`;
         spoken = `${stripZeros(abs.toFixed(1))} percentage points`;
     } else {
         if (previous === 0 && current === 0) return none(DASH, 'none');
