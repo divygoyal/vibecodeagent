@@ -81,12 +81,13 @@ test('fmtPosition: 1 decimal', () => {
     assert.equal(fmtPosition(null), '–');
 });
 
-test('fmtDuration: 53s · 1m 56s · 1h 4m', () => {
+test('fmtDuration: 53s · 1m 56s · 2m 05s · 1h 04m', () => {
     assert.equal(fmtDuration(53), '53s');
     assert.equal(fmtDuration(116), '1m 56s');
-    assert.equal(fmtDuration(3840), '1h 4m');
+    assert.equal(fmtDuration(125), '2m 05s');
+    assert.equal(fmtDuration(3840), '1h 04m');
     assert.equal(fmtDuration(0), '0s');
-    assert.equal(fmtDuration(59.6), '1m 0s');
+    assert.equal(fmtDuration(59.6), '1m 00s');
     assert.equal(fmtDuration(null), '–');
 });
 

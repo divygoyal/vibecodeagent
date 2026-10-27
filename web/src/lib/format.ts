@@ -113,13 +113,14 @@ export function fmtPosition(p: Num): string {
     return p.toFixed(1);
 }
 
-/** `53s` · `1m 56s` · `1h 4m`. */
+/** `53s` · `1m 56s` · `2m 05s` · `1h 04m`: the second unit is zero-padded so a column aligns. */
 export function fmtDuration(seconds: Num): string {
     if (!isNum(seconds)) return DASH;
     const t = Math.max(0, Math.round(seconds));
+    const pad = (n: number) => String(n).padStart(2, '0');
     if (t < 60) return `${t}s`;
-    if (t < 3600) return `${Math.floor(t / 60)}m ${t % 60}s`;
-    return `${Math.floor(t / 3600)}h ${Math.floor((t % 3600) / 60)}m`;
+    if (t < 3600) return `${Math.floor(t / 60)}m ${pad(t % 60)}s`;
+    return `${Math.floor(t / 3600)}h ${pad(Math.floor((t % 3600) / 60))}m`;
 }
 
 /** Format a value by its metric format. Counts are full unless `compact`. */
