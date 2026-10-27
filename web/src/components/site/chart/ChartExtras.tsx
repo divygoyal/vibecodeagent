@@ -178,8 +178,8 @@ export function ChartMarkers({ markers, start, end, notesKey, scope, onChanged, 
     notesFailed?: boolean;
 }) {
     return (
-        <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 border-t border-border-subtle pt-3">
-            {markers.length ? <span className="mr-0.5 text-meta text-fg-muted">Markers</span> : <span className="mr-0.5 text-meta text-fg-muted">No Google updates or notes in this period</span>}
+        <div className={cn('mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1.5', markers.length ? 'border-t border-border-subtle pt-3' : 'justify-end')}>
+            {markers.length ? <span className="mr-0.5 text-meta text-fg-muted">Markers</span> : null}
             {markers.map((m) => (
                 <Tooltip key={m.key} content={<span className="block max-w-xs">{m.detail}</span>}>
                     <button

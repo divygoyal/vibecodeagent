@@ -13,3 +13,26 @@ Data: GA4 Data API + Search Console API only (no tracker). Shots for the blind j
 - googleUpdates.ts: curated Google core/spam/helpful updates 2023-2026 from the Search Status Dashboard (source in comments).
 
 ## Log
+- 40be485 pure modules + tests (siteRound2.test.mjs).
+- 6c5a284 API: /api/site/ga4 takes `f=<key>:<value>` filters (summary, breakdowns, heatmap, pageTrends), `interval=day|week|month`
+  (summary buckets: isoYearIsoWeek / yearMonth, named by the first day inside the range), new reports `heatmap` (dayOfWeek x hour,
+  property time zone from GA4 metadata), `pageTrends` (top N pages with title, ±% and ≤14 trend bars; plus up to 300 titles),
+  `organic` (google / organic sessions per day, for the GSC overlay); countries breakdown adds countryId; realtime adds countryId and
+  `live` (aggregated minute x place x device x page rows; null if GA4 refuses). New charts (new files only): GeoChoropleth (reuses
+  the builder's world-atlas file, adds click/selection/markers/responsive), WeekHourHeatmap, DualAxisChart, CtrPositionChart,
+  TrendBars, chartScales, useElementWidth.
+- ebf50f9 Overview: tabbed Sources / Pages / Search cards, map card, Search clicks vs organic visits (dual axis), findings, interval.
+- 7b9ca12 Traffic: SiteFilterProvider + FilterBar (URL chips), tabbed cards, Locations map, Devices card, Peak hours; Sources tab
+  favicons + row filters; Audience map; Realtime map + "Recent activity" (aggregated, labelled) + Right now tabs; Search CTR vs
+  position card; period stepper in SiteHeader.
+- 64a6a0b Pages + Traffic > Pages: titles over paths, trend bars (top 25), delta chips.
+
+## Decisions
+- No code copied from any third party (Umami/bklit ideas only, own implementation), so no NOTICE file is needed.
+  The world-atlas data already ships with its licence in web/public/geo/.
+- Filters are GA4-only and apply on Traffic tabs Overview, Pages, Sources, Audience, Events. Realtime, Funnels, Journeys and
+  Retention say "Filters (not used on this tab)". Outside Traffic a row click opens Traffic with that filter.
+- Page filter key is `path` (not `page`: the Pages screen uses ?page= for its drawer).
+- Overlay chart compares GSC clicks with GA4 google / organic sessions (not all Organic Search) over the GSC days.
+- Notes are scoped to the GA4 property id (else the GSC site URL); Google updates are drawn at their rollout start.
+- Interval is one `?interval=` per page; week needs 14+ days, month 60+.
