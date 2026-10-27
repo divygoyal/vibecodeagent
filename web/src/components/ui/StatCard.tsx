@@ -140,12 +140,13 @@ export function KpiStrip({ items, selected, onSelect, comparisonLabel = 'previou
                             onKeyDown={(e) => onKey(e, i)}
                             title={it.hint}
                             className={cn(
-                                'relative min-w-[140px] flex-1 snap-start border-r border-border-subtle px-4 py-3.5 text-left last:border-r-0',
+                                // 168px: the value and its delta fit on one line ("12.5M ▲ 1.9%"); content sits at the top.
+                                'relative flex min-w-[168px] flex-1 snap-start flex-col items-start justify-start border-r border-border-subtle px-4 py-3.5 text-left last:border-r-0',
                                 'transition-colors duration-120 ease-standard focus-visible:-outline-offset-2',
                                 active ? 'bg-surface-sunken' : 'hover:bg-subtle/60',
                             )}
                         >
-                            <span className="flex items-center gap-2">
+                            <span className="flex w-full min-w-0 items-center gap-2">
                                 <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: m.color }} />
                                 <span className="truncate text-body-sm font-medium text-fg-secondary">{it.label ?? m.label}</span>
                                 {it.hint ? <span className="sr-only">({it.hint})</span> : null}

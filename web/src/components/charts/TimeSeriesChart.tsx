@@ -19,6 +19,7 @@ import { fmtAxis, fmtDayLong, fmtDuration, fmtPercent, makeDateTickFormatter } f
 import { fmtMetric, METRICS, type MetricKey } from '@/lib/metrics';
 import { MetricDelta } from '@/components/ui/MetricDelta';
 import { AXIS_LINE, AXIS_TICK, CURSOR, dateTicks, GRID_STROKE, maxOf, niceAxis } from './axis';
+import { dateAxisTick } from './AxisTick';
 import { ChartTooltipCard, type ChartTooltipRow } from './ChartTooltip';
 
 export type TimeSeriesRow = { [key: string]: number | string | null | undefined };
@@ -147,6 +148,7 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
     // Evenly spaced dates anchored on the last day (axis.ts); the formatter's index is the tick's.
     const xTicks = useMemo(() => dateTicks(dates, { width: figureWidth - (showY ? 52 : 16) }), [dates, figureWidth, showY]);
     const tickFmt = useMemo(() => makeDateTickFormatter(dates), [dates]);
+    const xTick = useMemo(() => dateAxisTick({ first: dates[0], last: dates[dates.length - 1], ticks: xTicks, format: tickFmt }), [dates, xTicks, tickFmt]);
     // Round Y steps per series (0 / 5K / 10K, never 4.5K / 9K); the comparison line shares its series' axis.
     const yAxes = useMemo(() => {
         const out: Record<string, ReturnType<typeof niceAxis>> = {};
@@ -218,8 +220,7 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
                     dataKey={dateKey}
                     ticks={xTicks}
                     interval={0}
-                    tickFormatter={(v, i) => tickFmt(String(v), i)}
-                    tick={AXIS_TICK}
+                    tick={xTick}
                     tickLine={false}
                     axisLine={AXIS_LINE}
                     tickMargin={8}

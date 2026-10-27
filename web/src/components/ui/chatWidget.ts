@@ -65,6 +65,8 @@ const state = {
     sheets: 0,
     /** openLiveChat() was called before the script was ready. */
     openOnReady: false,
+    /** The chat window is open (Tawk's isChatMaximized() lags right after maximize()). */
+    open: false,
 };
 
 function api(): TawkApi | undefined {
@@ -83,7 +85,7 @@ function safe(fn: () => void) {
 function sync() {
     const a = api();
     if (!state.ready || !a) return;
-    const chatting = Boolean(safe2(() => a.isChatMaximized?.()) || safe2(() => a.isChatOngoing?.()));
+    const chatting = state.open || Boolean(safe2(() => a.isChatOngoing?.()));
     const visible = state.sheets === 0 && (state.wanted || chatting);
     safe(() => (visible ? a.showWidget?.() : a.hideWidget?.()));
     decorate();
@@ -172,9 +174,15 @@ function load() {
         window.setTimeout(() => { watchFrames(); decorate(); }, 400);
         window.setTimeout(() => { watchFrames(); decorate(); }, 2000);
     };
-    a.onChatMaximized = () => markEngaged();
+    a.onChatMaximized = () => {
+        state.open = true;
+        markEngaged();
+    };
     a.onChatStarted = () => markEngaged();
-    a.onChatMinimized = () => sync();
+    a.onChatMinimized = () => {
+        state.open = false;
+        sync();
+    };
     a.onChatEnded = () => sync();
     const s = document.createElement('script');
     s.async = true;
@@ -194,6 +202,7 @@ export function setChatWanted(wanted: boolean) {
 /** "Chat with us": load if needed and open the chat window (any route, any width). */
 export function openLiveChat() {
     const a = api();
+    state.open = true;
     if (state.ready && a) {
         markEngaged();
         safe(() => a.showWidget?.());
