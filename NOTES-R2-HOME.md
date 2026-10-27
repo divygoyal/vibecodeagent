@@ -80,3 +80,20 @@ entries for /security and /changelog, the footer.
   support messages. Deletion is a manual request today (Settings › Danger zone → support inbox), so the admin must clear the rest
   by hand to meet the 30-day promise in the privacy policy and on /security.
 - Tawk.to is loaded only inside the app (AppShell) in this branch; WS1 moves it. /security just says the support chat runs on Tawk.to.
+
+## Verification (2026-10-27)
+- `npx tsc --noEmit` clean; `npm test` 66/66 (new tests/marketingHome.test.mjs: proof thresholds, Actions preview rules,
+  changelog entries); `npm run check:rsc` 0 errors; eslint clean on every changed file.
+- Mobile check (scripts/dev/check-mobile.mjs, 360/390/414, light, label `r2home-marketing`, run in small batches because box RAM
+  kept dropping under the 1.8 GB floor): /, /about, /changelog, /pricing, /security, /demo → 0 overflow, 0 offscreen, 0 errors,
+  0 small targets after fixes. Fixed on the way: trust-line link targets, /security scope URLs on 360px, /demo/[slug] back link.
+- Routes 200: /, /pricing, /demo, /demo/acme, /security, /changelog, /sitemap.xml (lists both new pages), /llms.txt (both new
+  pages), OG images for both.
+- Screenshots for the blind judge: /root/projects/tc-redesign-research/round2/candidate/home/cand_{home,pricing,demo}-{1440,390}.png
+  (match baseline/live_*), plus cand_{security,changelog}-{1440,390}.png (new pages, no baseline). Taken with
+  scratchpad shots.mjs: full page, scrolled once for lazy content; the home leaderboard preview and proof counts are served the
+  live public /api/leaderboard JSON (saved 2026-10-27) so the candidate shows what the live board would show; the dev origin in
+  text (NEXT_PUBLIC_SITE_URL=localhost, the MCP URL box) is replaced by https://trafficclaw.com, as production renders it.
+- Page heights: home 8,065 px desktop (live 6,784) / 13,303 px at 390 (live 10,955): the fifth card, the step visuals, What's new
+  and 5 more FAQ questions add height; pricing 3,497 / 5,366 (live 3,428 / 5,132); demo 2,674 / 5,017 (live 2,222 / 4,519, the
+  new closing CTA).
