@@ -5,6 +5,7 @@ import { Button, Favicon, MetricDelta } from '@/components/ui';
 import { SITE_URL } from '@/lib/brand';
 import { fmtFull } from '@/lib/format';
 import type { PortfolioResponse } from '@/lib/portfolio/types';
+import { ConnectGoogleButton } from '../site/ConnectGoogleButton';
 import { CopyField } from '../site/CopyField';
 import { Section, SectionHeading } from '../site/Section';
 import { ChatGptMark, ClaudeMark } from './BrandMarks';
@@ -42,9 +43,10 @@ export function McpSection({ portfolio }: { portfolio: PortfolioResponse }) {
                             <LogoChip mark={<span aria-hidden className="font-mono text-caption text-fg-muted">{'>_'}</span>} label="Claude Code, Cursor, VS Code" />
                         </ul>
                     </div>
-                    <div className="mt-8">
-                        <Button asChild variant="secondary" size="lg" trailingIcon={<ArrowRight aria-hidden size={18} strokeWidth={1.75} />}>
-                            <Link href="/ai">Set it up in ChatGPT or Claude</Link>
+                    <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <ConnectGoogleButton size="lg" mark callbackUrl="/dashboard/connect-ai" />
+                        <Button asChild variant="ghost" size="lg" trailingIcon={<ArrowRight aria-hidden size={18} strokeWidth={1.75} />}>
+                            <Link href="/ai">Setup guide</Link>
                         </Button>
                     </div>
                 </div>
@@ -61,9 +63,9 @@ export function McpSection({ portfolio }: { portfolio: PortfolioResponse }) {
                                 <p className="ml-auto max-w-[85%] rounded-[18px] rounded-br-md bg-subtle px-4 py-2.5 text-body text-fg">
                                     Which of my sites lost the most Google clicks this month?
                                 </p>
-                                <p className="inline-flex max-w-full items-center gap-2 rounded-full border border-border-subtle bg-surface px-3 py-1 font-mono text-caption text-fg-muted">
+                                <p className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface px-3 py-1 text-meta text-fg-muted">
                                     <Wrench aria-hidden size={12} strokeWidth={1.75} />
-                                    <span className="truncate">trafficclaw · top_movers · last 28 days</span>
+                                    Used <code className="font-mono text-fg-secondary">top_movers</code>
                                 </p>
                                 <div className="text-body text-fg">
                                     <p>
@@ -84,8 +86,8 @@ export function McpSection({ portfolio }: { portfolio: PortfolioResponse }) {
                                 </div>
                             </div>
                         </div>
-                        <figcaption className="mt-3 font-mono text-caption text-fg-muted">
-                            Example answer · {MCP_TOOLS} read-only tools · sample data
+                        <figcaption className="mt-3 text-meta text-fg-muted">
+                            Example answer from sample data · {MCP_TOOLS} read-only tools
                         </figcaption>
                     </figure>
                 ) : null}

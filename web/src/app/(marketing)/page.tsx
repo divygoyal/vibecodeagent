@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 
 import { FeatureTour, type TourStop } from '@/components/marketing/home/FeatureTour';
 import { HOME_FAQ } from '@/components/marketing/home/content';
-import { HeroCopy, InteractivePointer, PRIMARY_CTA, SECONDARY_CTA } from '@/components/marketing/home/Hero';
+import { HeroCopy, SECONDARY_CTA } from '@/components/marketing/home/Hero';
 import { HeroPortfolio } from '@/components/marketing/home/HeroPortfolio';
 import { buildHomeData } from '@/components/marketing/home/homeData';
 import { HOME_THEME_SCRIPT } from '@/components/marketing/home/homeTheme';
@@ -12,6 +13,7 @@ import { WhyFree } from '@/components/marketing/home/HomeSections';
 import { JobStory } from '@/components/marketing/home/JobStory';
 import { LeaderboardPreview } from '@/components/marketing/home/LeaderboardPreview';
 import { McpSection } from '@/components/marketing/home/McpSection';
+import { ConnectGoogleButton } from '@/components/marketing/site/ConnectGoogleButton';
 import { Faq } from '@/components/marketing/site/Faq';
 import { FinalCta } from '@/components/marketing/site/FinalCta';
 import { BrowserFrame, Section, SectionHeading } from '@/components/marketing/site/Section';
@@ -60,12 +62,11 @@ export default function HomePage() {
         {
             key: 'portfolio',
             tab: 'Portfolio',
-            title: 'Every site on one screen',
-            bullets: ['Clicks, visitors and change per site', 'Combined trend for all sites', 'Drops of 30% or more flagged'],
+            title: 'Hundreds of sites, one table',
+            bullets: ['Sort by clicks, users or change', 'Trend line for every site', 'Export to CSV'],
             href: tour.portfolio,
             cta: 'Open the portfolio',
-            url: 'trafficclaw.com/dashboard',
-            alt: 'TrafficClaw portfolio: totals for all sites, a combined clicks chart and a card per site',
+            alt: 'Portfolio in table view: every site with clicks, impressions, position, users, sessions and a trend line',
         },
         {
             key: 'site',
@@ -74,7 +75,6 @@ export default function HomePage() {
             bullets: ['GA4 and Search Console together', 'One-line summary on every chart', 'Notes and Google updates on charts'],
             href: tour.site,
             cta: 'Open a site page',
-            url: `trafficclaw.com/dashboard/s/${tour.slug}`,
             alt: `Site overview for ${tour.host}: users, sessions, clicks and impressions with daily charts`,
         },
         {
@@ -84,7 +84,6 @@ export default function HomePage() {
             bullets: ['Queries close to page one', 'Clicks each fix could bring', 'Suggested fix, step by step'],
             href: tour.fixes,
             cta: 'See what to fix',
-            url: `trafficclaw.com/dashboard/s/${tour.slug}/actions`,
             alt: 'Actions page: tasks ranked by impact, each with the evidence and a suggested fix',
         },
         {
@@ -94,7 +93,6 @@ export default function HomePage() {
             bullets: ['AI assistants as their own channel', 'Sources, pages, countries, devices', 'Realtime, funnels, journeys, retention'],
             href: tour.traffic,
             cta: 'Open Traffic',
-            url: `trafficclaw.com/dashboard/s/${tour.slug}/traffic`,
             alt: 'Traffic page with AI traffic per day and the key Analytics numbers',
         },
         {
@@ -104,7 +102,6 @@ export default function HomePage() {
             bullets: ['Templates, themes and dark mode', 'Public links, embeds, passwords', 'TV mode for the office screen'],
             href: tour.dashboards,
             cta: 'Open dashboards',
-            url: 'trafficclaw.com/dashboard/dashboards',
             alt: 'A shared dashboard with scorecards, a users chart, a devices donut and a top pages table',
         },
         {
@@ -114,18 +111,16 @@ export default function HomePage() {
             bullets: ['Numbers straight from Google', 'Only verified owners rank', 'You choose what is public'],
             href: '/leaderboard',
             cta: 'See the leaderboard',
-            url: 'trafficclaw.com/leaderboard',
             alt: 'The public leaderboard: sites ranked by visitors, with verified-owner badges and trends',
         },
         {
-            key: 'mcp',
+            key: 'ask',
             tab: 'Ask AI',
-            title: 'Your numbers inside ChatGPT and Claude',
-            bullets: ['One URL, 13 read-only tools', 'Pick which sites it sees', 'Free on every plan'],
-            href: tour.connectAi,
-            cta: 'Open Connect AI',
-            url: 'trafficclaw.com/dashboard/connect-ai',
-            alt: 'Connect AI page: the MCP server URL, setup steps per app and example questions',
+            title: 'Ask in plain English, get numbers',
+            bullets: ['Answers from your own data', 'Tables you can check', 'Or ask from ChatGPT and Claude'],
+            href: tour.ask,
+            cta: 'Try Ask in the demo',
+            alt: 'Ask: the question "Which of my sites grew the most this month?" answered with growing and falling sites',
         },
     ];
 
@@ -139,15 +134,9 @@ export default function HomePage() {
             <section aria-label="Introduction" className="bg-canvas">
                 <HeroCopy demoHref={tour.portfolio} />
                 <div className="mx-auto mt-10 max-w-[1200px] px-3 pb-16 sm:px-4 md:mt-14 md:px-6 md:pb-24">
-                    <div className="hidden md:block"><InteractivePointer /></div>
-                    <figure>
-                        <BrowserFrame url="trafficclaw.com/dashboard" className="shadow-[0_24px_64px_-24px_rgb(0_0_0/0.25)]">
-                            <HeroPortfolio byRange={byRange} />
-                        </BrowserFrame>
-                        <figcaption className="mt-3 text-center font-mono text-caption text-fg-muted">
-                            Fig. 1 · The real portfolio screen, {p28.totals.sites.total} sample sites. Sample data, refreshed daily.
-                        </figcaption>
-                    </figure>
+                    <BrowserFrame url="trafficclaw.com/dashboard" className="shadow-[0_24px_64px_-24px_rgb(0_0_0/0.25)]">
+                        <HeroPortfolio byRange={byRange} />
+                    </BrowserFrame>
                 </div>
             </section>
 
@@ -162,6 +151,7 @@ export default function HomePage() {
                 <div className="mt-10 md:mt-12">
                     <JobStory {...story} />
                 </div>
+                <CtaRow note="Read-only. Nothing to install. No card." demoHref={tour.portfolio} />
             </Section>
 
             <Section id="tour" labelledBy="tour-title">
@@ -175,6 +165,7 @@ export default function HomePage() {
                 <div className="mt-10">
                     <FeatureTour stops={stops} />
                 </div>
+                <CtaRow note="All of it, free, on your own sites." />
             </Section>
 
             <McpSection portfolio={p28} />
@@ -184,23 +175,44 @@ export default function HomePage() {
             <WhyFree />
 
             <Section id="faq" labelledBy="faq-title">
-                <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
+                <div className="mx-auto max-w-[800px]">
                     <SectionHeading
                         id="faq-title"
                         eyebrow="FAQ"
                         title="Before you connect"
                         description={<>More in <Link href="/security" className="text-brand-text underline underline-offset-4 hover:text-fg">Security and data</Link>, or <Link href="/contact" className="text-brand-text underline underline-offset-4 hover:text-fg">ask us</Link>.</>}
+                        align="center"
                     />
-                    <Faq items={HOME_FAQ_PICK.map((i) => HOME_FAQ[i]).filter(Boolean)} />
+                    <div className="mt-8">
+                        <Faq items={HOME_FAQ_PICK.map((i) => HOME_FAQ[i]).filter(Boolean)} />
+                    </div>
                 </div>
             </Section>
 
             <FinalCta
                 title="See all your sites in one place."
                 description={<>Free, <span className="whitespace-nowrap">read-only</span>, nothing to install, no card.</>}
-                primaryLabel={PRIMARY_CTA}
                 secondary={{ href: tour.portfolio, label: SECONDARY_CTA }}
+                className="pt-0 md:pt-0"
             />
         </>
+    );
+}
+
+/** Mid-page call to action: the filled Google button, the demo as a quiet second choice, one short line. */
+function CtaRow({ note, demoHref }: { note: string; demoHref?: string }) {
+    return (
+        <div className="mt-10 flex flex-col items-center gap-3 text-center md:mt-12">
+            <div className="flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
+                <ConnectGoogleButton size="lg" mark />
+                {demoHref ? (
+                    <Link href={demoHref} className="tap-area inline-flex h-11 items-center justify-center gap-1.5 px-4 text-body font-medium text-fg-secondary hover:text-fg">
+                        {SECONDARY_CTA}
+                        <ArrowRight aria-hidden size={16} strokeWidth={1.75} />
+                    </Link>
+                ) : null}
+            </div>
+            <p className="text-body-sm text-fg-muted">{note}</p>
+        </div>
     );
 }

@@ -4,10 +4,11 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
-import { SegmentedControl, Select } from '@/components/ui';
+import { MetricDelta, SegmentedControl, Select } from '@/components/ui';
 import { SiteCard } from '@/components/portfolio/SiteCard';
 import { TotalsStrip, totalsMetrics, type TotalsMetric } from '@/components/portfolio/TotalsStrip';
 import { cn } from '@/lib/cn';
+import { fmtMetric, METRICS } from '@/lib/metrics';
 import { RANGE_LABEL } from '@/lib/portfolio/ranges';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite } from '@/lib/portfolio/types';
 import { filterSites, SORT_OPTIONS, sortSites, type FilterKey, type SortKey } from '@/lib/portfolio/view';
@@ -15,7 +16,8 @@ import { useIsMobile } from '@/lib/useIsMobile';
 import { demoHref } from './demoLinks';
 
 const RANGES: PortfolioRange[] = ['7d', '28d', '3m', '12m'];
-const SHOWN = 6;
+/** One row of cards on desktop (3), two on tablets and phones; the rest are one click away in the demo. */
+const SHOWN = 3;
 
 /**
  * The hero's product frame: the app's own portfolio pieces (TotalsStrip, SiteCard, the sort and filter
@@ -63,7 +65,7 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
                 <div className="min-w-0">
                     <p className="text-title text-fg md:text-heading">Portfolio</p>
                     <p className="text-meta text-fg-muted">
-                        {total} sites · {RANGE_LABEL[range]} vs previous · <span className="font-medium text-fg-secondary">sample data</span>
+                        {total} sites · {RANGE_LABEL[range]} vs previous
                     </p>
                 </div>
                 <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
@@ -84,6 +86,23 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
                 </div>
             </div>
 
+            {/* Phones: the totals as a 2-column grid (the app's strip scrolls sideways, which reads as cut off here). */}
+            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-card border border-border-subtle bg-border-subtle md:hidden">
+                {phoneTotals(data).map((t) => (
+                    <div key={t.metric} className="bg-surface px-3 py-2.5">
+                        <dt className="flex items-center gap-1.5 text-meta text-fg-secondary">
+                            <span aria-hidden className="size-2 rounded-full" style={{ background: METRICS[t.metric].color }} />
+                            {METRICS[t.metric].label}
+                        </dt>
+                        <dd className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
+                            <span className="text-stat-sm text-fg tabular-nums">{fmtMetric(t.metric, t.cur ?? null, { compact: true, tile: true })}</span>
+                            {t.prev !== null && t.prev !== undefined ? <MetricDelta metric={t.metric} current={t.cur} previous={t.prev} /> : null}
+                        </dd>
+                    </div>
+                ))}
+            </dl>
+
+            <div className="max-md:hidden">
             <TotalsStrip
                 data={data}
                 metric={activeMetric}
@@ -93,27 +112,34 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
                 trendOpen={trendOpen}
                 onTrendOpenChange={setTrendOpen}
             />
+            </div>
 
-            <div className="-mx-3 flex overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
-                <SegmentedControl<FilterKey>
-                    variant="neutral"
-                    size="sm"
-                    ariaLabel="Show"
-                    value={filter}
-                    onChange={setFilter}
-                    options={[
-                        { value: 'all', label: <>All <Count n={counts.all} /></> },
-                        { value: 'gsc', label: <>Search Console <Count n={counts.gsc} /></> },
-                        { value: 'ga4', label: <>Analytics <Count n={counts.ga4} /></> },
-                        { value: 'starred', label: <>Starred <Count n={counts.starred} /></> },
-                    ]}
-                />
+            {/* Desktop: the app's segmented control; phones: the same choices as wrapping chips. */}
+            <div className="max-md:hidden">
+                <SegmentedControl<FilterKey> variant="neutral" size="sm" ariaLabel="Show" value={filter} onChange={setFilter} options={filterOptions(counts)} />
+            </div>
+            <div role="radiogroup" aria-label="Show" className="flex flex-wrap gap-2 md:hidden">
+                {filterOptions(counts).map((o) => (
+                    <button
+                        key={o.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={filter === o.value}
+                        onClick={() => setFilter(o.value)}
+                        className={cn(
+                            'tap-area inline-flex h-8 items-center rounded-full border px-3 text-body-sm font-medium',
+                            filter === o.value ? 'border-transparent bg-subtle text-fg' : 'border-border-subtle text-fg-secondary',
+                        )}
+                    >
+                        {o.label}
+                    </button>
+                ))}
             </div>
 
             {shown.length ? (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
                     {shown.slice(0, SHOWN).map((s, i) => (
-                        <div key={s.key} className={cn('flex min-w-0 [&>article]:flex-1', i >= 2 && 'max-md:hidden', i >= 4 && 'md:max-xl:hidden')}>
+                        <div key={s.key} className={cn('flex min-w-0 [&>article]:flex-1', i >= 2 && 'max-xl:hidden')}>
                             <SiteCard
                                 site={s}
                                 windows={data.windows}
@@ -134,7 +160,10 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
             )}
 
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border-subtle pt-3 md:pt-4">
-                <p className="text-meta text-fg-muted">Click a card to open that site in the live demo.</p>
+                <p className="text-meta text-fg-muted">
+                    <span className="mr-1.5 rounded-full bg-subtle px-2 py-0.5 font-medium text-fg-secondary">Sample data</span>
+                    Click a card to open it in the live demo.
+                </p>
                 <Link href={demoHref('/dashboard')} className="tap-area inline-flex items-center gap-1.5 text-body-sm font-medium text-brand-text hover:text-fg">
                     See all {total} sites in the live demo
                     <ArrowRight aria-hidden size={14} strokeWidth={1.75} />
@@ -142,6 +171,26 @@ export function HeroPortfolio({ byRange }: { byRange: Record<PortfolioRange, Por
             </div>
         </div>
     );
+}
+
+function filterOptions(counts: { all: number; gsc: number; ga4: number; starred: number }) {
+    return [
+        { value: 'all' as const, label: <>All <Count n={counts.all} /></> },
+        { value: 'gsc' as const, label: <>Search Console <Count n={counts.gsc} /></> },
+        { value: 'ga4' as const, label: <>Analytics <Count n={counts.ga4} /></> },
+        { value: 'starred' as const, label: <>Starred <Count n={counts.starred} /></> },
+    ];
+}
+
+function phoneTotals(data: PortfolioResponse) {
+    const s = data.totals.search;
+    const t = data.totals.traffic;
+    return [
+        { metric: 'clicks' as const, cur: s?.cur.clicks, prev: s?.prev?.clicks },
+        { metric: 'impressions' as const, cur: s?.cur.impressions, prev: s?.prev?.impressions },
+        { metric: 'users' as const, cur: t?.cur.users, prev: t?.prev?.users },
+        { metric: 'sessions' as const, cur: t?.cur.sessions, prev: t?.prev?.sessions },
+    ].filter((x) => x.cur !== undefined);
 }
 
 function Count({ n }: { n: number }) {

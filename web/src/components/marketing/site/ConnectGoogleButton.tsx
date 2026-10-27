@@ -40,7 +40,7 @@ function callbackFromLocation(fallback: string): string {
  * visitors get a link to the app instead.
  */
 export function ConnectGoogleButton({
-    label = 'Connect Google, free',
+    label = 'Connect Google — it\'s free',
     signedInLabel = 'Open dashboard',
     signedInHref = SIGN_IN_CALLBACK,
     callbackUrl = SIGN_IN_CALLBACK,

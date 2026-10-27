@@ -6,7 +6,8 @@ import { Button } from '@/components/ui';
 import { ConnectGoogleButton } from '../site/ConnectGoogleButton';
 import { AnalyticsMark, ChatGptMark, ClaudeMark, SearchConsoleMark } from './BrandMarks';
 
-export const PRIMARY_CTA = 'Continue with Google';
+/** The one sign-up label, everywhere (also ConnectGoogleButton's default and the demo bar's wording). */
+export const PRIMARY_CTA = 'Connect Google — it\'s free';
 export const SECONDARY_CTA = 'Explore the live demo';
 
 const WORKS_WITH = [
@@ -40,7 +41,7 @@ export function HeroCopy({ demoHref }: { demoHref: string }) {
                 className="group inline-flex h-8 max-w-full items-center gap-2 rounded-full border border-border-subtle bg-surface py-1 pr-3 pl-1 text-body-sm text-fg-secondary shadow-xs transition-colors duration-120 hover:border-border hover:text-fg"
             >
                 <span className="rounded-full bg-brand-soft px-2 py-0.5 text-meta font-medium text-brand-soft-fg">New</span>
-                <span className="truncate">Ask ChatGPT or Claude about your traffic</span>
+                <span className="truncate"><span className="sm:hidden">ChatGPT &amp; Claude connector</span><span className="max-sm:hidden">Ask ChatGPT or Claude about your traffic</span></span>
                 <ArrowRight aria-hidden size={14} strokeWidth={1.75} className="shrink-0 transition-transform duration-120 group-hover:translate-x-0.5" />
             </Link>
             <h1 className="mt-5 text-balance text-[2.5rem] leading-[1.05] font-semibold tracking-[-0.035em] text-fg sm:text-display md:text-display-lg">
@@ -65,28 +66,12 @@ export function HeroCopy({ demoHref }: { demoHref: string }) {
                     </li>
                 ))}
             </ul>
-            {/* One row; on phones it scrolls sideways with a fade instead of wrapping into a tall block. */}
-            <div className="-mx-4 mt-6 overflow-x-auto px-4 [mask-image:linear-gradient(to_right,black_85%,transparent)] [scrollbar-width:none] sm:mx-0 sm:overflow-visible sm:px-0 sm:[mask-image:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex w-max items-center gap-2 sm:mx-auto">
-                    <span className="mr-1 shrink-0 text-meta text-fg-muted">Works with</span>
-                    <ul aria-label="Works with" className="flex items-center gap-2">
-                        {WORKS_WITH.map((w) => <LogoChip key={w.label} mark={w.mark} label={w.label} />)}
-                    </ul>
-                </div>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                <span className="w-full text-meta text-fg-muted sm:mr-1 sm:w-auto">Works with</span>
+                <ul aria-label="Works with" className="flex flex-wrap items-center justify-center gap-2">
+                    {WORKS_WITH.map((w) => <LogoChip key={w.label} mark={w.mark} label={w.label} />)}
+                </ul>
             </div>
-        </div>
-    );
-}
-
-/** Small mono pointer above the live frame ("this is real, try it"), DataFast-style but plain. */
-export function InteractivePointer() {
-    return (
-        <div aria-hidden className="mb-2 flex items-end justify-end gap-2 pr-2 text-fg-muted md:pr-10">
-            <span className="font-mono text-caption">Interactive demo · try the range, sort and tiles</span>
-            <svg width="36" height="28" viewBox="0 0 36 28" fill="none" className="mb-[-14px] shrink-0">
-                <path d="M2 2c14 0 24 6 28 20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M24 18l6 5 3-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
         </div>
     );
 }

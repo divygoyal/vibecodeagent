@@ -84,7 +84,7 @@ export function MarketingHeader() {
 
                 <div className="ml-auto flex items-center gap-2 xl:ml-0">
                     {signedIn ? null : <span className="hidden sm:block"><SignInButton /></span>}
-                    <span className="hidden md:block"><ConnectGoogleButton size="md" mark label="Continue with Google" /></span>
+                    <span className="hidden md:block"><ConnectGoogleButton size="md" mark /></span>
                     <span className="xl:hidden">
                         <Button variant="ghost" iconOnly icon={Menu} aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)} />
                     </span>
@@ -98,7 +98,7 @@ export function MarketingHeader() {
                 className="xl:hidden"
                 footer={
                     <div className="flex flex-col gap-2">
-                        <ConnectGoogleButton size="lg" mark label="Continue with Google" className="w-full" onNavigate={() => setOpen(false)} />
+                        <ConnectGoogleButton size="lg" mark className="w-full" onNavigate={() => setOpen(false)} />
                         {signedIn ? null : <SignInButton className="w-full" onNavigate={() => setOpen(false)} />}
                     </div>
                 }

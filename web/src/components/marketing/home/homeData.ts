@@ -34,7 +34,7 @@ export interface HomeTourLinks {
     fixes: string;
     traffic: string;
     dashboards: string;
-    connectAi: string;
+    ask: string;
 }
 
 export interface HomeData {
@@ -109,7 +109,7 @@ export function buildTourLinks(portfolio: PortfolioResponse): HomeTourLinks {
         fixes: demoHref(`${base}/actions`),
         traffic: demoHref(`${base}/traffic`),
         dashboards: demoHref('/dashboard/dashboards'),
-        connectAi: demoHref('/dashboard/connect-ai'),
+        ask: demoHref('/dashboard/ask'),
     };
 }
 

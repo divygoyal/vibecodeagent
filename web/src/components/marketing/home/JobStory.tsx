@@ -67,15 +67,15 @@ export function JobStory({ totalSites, sites, drop, fix, fixHref }: StoryProps) 
     const beat = (n: number) => cn(
         'relative flex flex-col rounded-card border bg-surface p-5 shadow-card transition-[opacity,transform,border-color] duration-500 ease-standard motion-reduce:transition-none md:p-6',
         step >= n ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-40',
-        step === n ? 'border-brand/50' : 'border-border-subtle',
+        'border-border-subtle',
     );
 
     return (
         <div>
             <ol ref={ref} className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
                 <li className={beat(1)}>
-                    <BeatHead n={1} done={step > 1} title="Sign in with Google" />
-                    <div className="mt-4 flex-1 rounded-control border border-border-subtle bg-canvas p-3">
+                    <BeatHead n={1} active={step >= 1} title="Connect Google" />
+                    <div className="mt-4 rounded-control border border-border-subtle bg-canvas p-3">
                         <p className="flex items-center gap-2 text-meta text-fg-muted">
                             <GoogleMark size={14} /> TrafficClaw wants to
                         </p>
@@ -94,12 +94,12 @@ export function JobStory({ totalSites, sites, drop, fix, fixHref }: StoryProps) 
                             ))}
                         </ul>
                     </div>
-                    <p className="mt-3 text-meta text-fg-muted">Read-only. No script on your site.</p>
+                    <p className="mt-auto pt-3 text-meta text-fg-muted">Read-only. No script on your site.</p>
                 </li>
 
                 <li className={beat(2)}>
-                    <BeatHead n={2} done={step > 2} title="Every site shows up" />
-                    <ul className="mt-4 flex-1 divide-y divide-border-subtle rounded-control border border-border-subtle bg-canvas">
+                    <BeatHead n={2} active={step >= 2} title="Every site appears" />
+                    <ul className="mt-4 divide-y divide-border-subtle rounded-control border border-border-subtle bg-canvas">
                         {sites.map((s, i) => (
                             <li
                                 key={s.key}
@@ -108,17 +108,17 @@ export function JobStory({ totalSites, sites, drop, fix, fixHref }: StoryProps) 
                             >
                                 <Favicon host={s.host} size={16} />
                                 <span className="min-w-0 flex-1 truncate text-body-sm text-fg">{s.label}</span>
-                                <span className="text-body-sm tabular-nums text-fg">{fmtCompact(s.clicks)}</span>
+                                <span className="text-body-sm tabular-nums text-fg max-xl:hidden">{fmtCompact(s.clicks)}</span>
                                 <MetricDelta metric="clicks" current={s.clicks} previous={s.prevClicks} className="w-14 justify-end" />
                             </li>
                         ))}
                     </ul>
-                    <p className="mt-3 text-meta text-fg-muted">{totalSites} sites · clicks, last 28 days · sample data</p>
+                    <p className="mt-auto pt-3 text-meta text-fg-muted">{totalSites} sites · clicks, last 28 days · sample data</p>
                 </li>
 
                 <li className={beat(3)}>
-                    <BeatHead n={3} done={false} title="A drop gets flagged, with the fix" />
-                    <div className="mt-4 flex flex-1 flex-col gap-2">
+                    <BeatHead n={3} active={step >= 3} title="Drops come with a fix" />
+                    <div className="mt-4 flex flex-col gap-2">
                         {drop ? (
                             <div className={cn('flex items-center gap-2.5 rounded-control border border-down/30 bg-down-soft px-3 py-2 ring-down/25 transition-shadow duration-500', step >= 3 ? 'ring-4' : 'ring-0')}>
                                 <AlertTriangle aria-hidden size={16} strokeWidth={2} className="shrink-0 text-down" />
@@ -143,7 +143,7 @@ export function JobStory({ totalSites, sites, drop, fix, fixHref }: StoryProps) 
                             </div>
                         ) : null}
                     </div>
-                    <Link href={fixHref} className="tap-area mt-3 inline-flex items-center gap-1 self-start text-body-sm font-medium text-brand-text hover:text-fg">
+                    <Link href={fixHref} className="tap-area mt-auto inline-flex pt-3 items-center gap-1 self-start text-body-sm font-medium text-brand-text hover:text-fg">
                         See the full fix list <ArrowRight aria-hidden size={14} strokeWidth={1.75} />
                     </Link>
                 </li>
@@ -161,16 +161,16 @@ export function JobStory({ totalSites, sites, drop, fix, fixHref }: StoryProps) 
     );
 }
 
-function BeatHead({ n, title, done }: { n: number; title: string; done: boolean }) {
+function BeatHead({ n, title, active }: { n: number; title: string; active: boolean }) {
     return (
         <div className="flex items-center gap-3">
             <span className={cn(
                 'inline-flex size-7 shrink-0 items-center justify-center rounded-full text-body-sm font-semibold tabular-nums transition-colors duration-300',
-                done ? 'bg-brand text-brand-fg' : 'bg-brand-soft text-brand-soft-fg',
+                active ? 'bg-brand text-brand-fg' : 'bg-brand-soft text-brand-soft-fg',
             )}>
-                {done ? <Check aria-hidden size={14} strokeWidth={2.5} /> : n}
+                {n}
             </span>
-            <h3 className="text-title text-fg">{title}</h3>
+            <h3 className="min-w-0 text-title text-fg">{title}</h3>
         </div>
     );
 }
