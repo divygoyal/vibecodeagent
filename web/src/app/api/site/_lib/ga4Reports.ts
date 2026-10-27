@@ -462,6 +462,8 @@ export interface Ga4PageDetail {
     totals: { pageviews: number; users: number; engagement: number; conversions: number };
     previous: { pageviews: number; users: number; engagement: number; conversions: number } | null;
     sources: { name: string; views: number }[];
+    /** The page's most-viewed <title> in the range (null when GA4 has none). */
+    title: string | null;
 }
 
 export async function ga4PageDetail(userId: string, token: string, property: string, path: string, host: string | null, r: RangeParams): Promise<Ga4PageDetail> {
@@ -469,11 +471,15 @@ export async function ga4PageDetail(userId: string, token: string, property: str
     const exprs: Record<string, unknown>[] = [{ filter: { fieldName: 'pagePath', stringFilter: { matchType: 'EXACT', value: path, caseSensitive: false } } }];
     if (host) exprs.push({ filter: { fieldName: 'hostName', stringFilter: { matchType: 'ENDS_WITH', value: host, caseSensitive: false } } });
     const dimensionFilter = exprs.length > 1 ? { andGroup: { expressions: exprs } } : exprs[0];
-    const [daily, totals, sources] = await Promise.all([
+    const [daily, totals, sources, titles] = await Promise.all([
         ga4Report(userId, token, property, { dateRanges: ranges(r), dimensions: [{ name: 'date' }], metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }], dimensionFilter, limit: 2000 }),
         ga4Report(userId, token, property, { dateRanges: ranges(r), metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }, { name: 'userEngagementDuration' }, { name: 'keyEvents' }], dimensionFilter, limit: 5 }),
         ga4Report(userId, token, property, { dateRanges: [{ startDate: r.cur.start, endDate: r.cur.end }], dimensions: [{ name: 'sessionSource' }], metrics: [{ name: 'screenPageViews' }], dimensionFilter, orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }], limit: 15 }),
+        // The title is a nicety: a failure here must not lose the drawer.
+        ga4Report(userId, token, property, { dateRanges: [{ startDate: r.cur.start, endDate: r.cur.end }], dimensions: [{ name: 'pageTitle' }], metrics: [{ name: 'screenPageViews' }], dimensionFilter, orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }], limit: 1 })
+            .catch(() => null),
     ]);
+    const rawTitle = titles?.rows?.[0]?.dimensionValues?.[0]?.value?.trim() ?? '';
     const d = byRange(daily, 1, multi);
     const t = byRange(totals, 0, multi);
     const cur = new Map(d.cur.map((x) => [gaDate(x.dims[0]), x.m]));
@@ -497,5 +503,6 @@ export async function ga4PageDetail(userId: string, token: string, property: str
         totals: tot(t.cur[0]?.m),
         previous: multi ? tot(t.cmp[0]?.m) : null,
         sources: (sources.rows ?? []).map((row) => ({ name: row.dimensionValues?.[0]?.value || '(not set)', views: num(row.metricValues?.[0]?.value) })),
+        title: rawTitle && rawTitle !== '(not set)' ? rawTitle : null,
     };
 }

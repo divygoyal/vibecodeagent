@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { siteHref } from '@/components/shell/nav';
 import { useFilterClick } from '../filters/SiteFilters';
 import { displayPage, pageRef } from '../lib/rules';
+import { PagePath } from '../PagePath';
 import type { Ga4PageTrends, GscRowsResponse } from '../lib/types';
 import { LoadError } from '../SiteStates';
 import { useActiveFilters, useGa4, useGsc, useSite, useSiteRange } from '../useSiteData';
@@ -31,7 +32,7 @@ interface Row {
 }
 
 /**
- * Top pages as rows: title over path, trend bars across the range, views
+ * Top pages as rows: the path on one line (title on hover), trend bars across the range, views
  * with a ±% chip, and (when Search Console is linked) clicks and position.
  * `action` "open" links to the Pages drawer; "filter" filters Traffic by the page.
  */
@@ -89,7 +90,7 @@ export function PageRows({ limit = 8, action = 'open', withSearch = true }: { li
     if (loading) {
         return (
             <div className="flex flex-col gap-2" aria-busy>
-                {Array.from({ length: Math.min(limit, 6) }, (_, i) => <Skeleton key={i} className="h-10" />)}
+                {Array.from({ length: limit }, (_, i) => <Skeleton key={i} className="h-9" />)}
             </div>
         );
     }
@@ -110,10 +111,7 @@ export function PageRows({ limit = 8, action = 'open', withSearch = true }: { li
                     const prev = site.hasGa4 ? r.prevViews : r.prevClicks;
                     const inner = (
                         <>
-                            <span className="min-w-0">
-                                <span className="block truncate text-body-sm font-medium text-fg" title={r.title ?? r.path}>{r.title ?? r.path}</span>
-                                {r.title ? <span className="block truncate text-meta text-fg-muted" title={r.path}>{r.path}</span> : null}
-                            </span>
+                            <PagePath path={r.path} title={r.title} className="text-body-sm font-medium text-fg" />
                             {site.hasGa4 ? (
                                 <span className="flex flex-col items-end gap-0.5 sm:items-start">
                                     {r.trend && bars ? (
@@ -134,12 +132,12 @@ export function PageRows({ limit = 8, action = 'open', withSearch = true }: { li
                             {searchCols ? <span className={cn('text-right text-body-sm text-fg-secondary tabular-nums', site.hasGa4 && 'max-sm:hidden')}>{r.position ? fmtPosition(r.position) : '–'}</span> : null}
                         </>
                     );
-                    const rowCls = cn(cols, 'min-h-12 rounded-md px-2 py-1.5 text-left hover:bg-subtle/50');
+                    const rowCls = cn(cols, 'min-h-10 rounded-md px-2 py-1 text-left hover:bg-subtle/50');
                     return (
                         <li key={r.key} className="border-t border-border-subtle first:border-t-0">
                             {action === 'filter' && r.gaPath ? (
-                                pathFilter ? <div className={cols + ' min-h-12 px-2 py-1.5'}>{inner}</div> : (
-                                    <button type="button" className={cn(rowCls, 'w-full')} onClick={() => click('path', r.gaPath!)} title="Filter Traffic by this page">{inner}</button>
+                                pathFilter ? <div className={cols + ' min-h-10 px-2 py-1'}>{inner}</div> : (
+                                    <button type="button" className={cn(rowCls, 'w-full')} onClick={() => click('path', r.gaPath!)}>{inner}</button>
                                 )
                             ) : (
                                 <Link href={`${siteHref(site.host, 'pages')}?page=${encodeURIComponent(r.key)}`} className={rowCls}>{inner}</Link>

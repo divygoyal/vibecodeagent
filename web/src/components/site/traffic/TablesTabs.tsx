@@ -16,6 +16,7 @@ import { sourceMediumParts } from '../SourceIcon';
 import { displayPage, isAiSource, pageRef } from '../lib/rules';
 import type { Ga4BreakdownResponse, Ga4PageTrends, Ga4Row } from '../lib/types';
 import { LoadError } from '../SiteStates';
+import { PagePath } from '../PagePath';
 import { useGa4, useSite, useSiteRange } from '../useSiteData';
 import { ChannelsDonut, DevicesDonut, Flag, SimpleList } from './OverviewTab';
 
@@ -59,15 +60,7 @@ export function TrafficPagesTab() {
                 label={{
                     header: 'Page',
                     text: (x) => `${titleBy.get(x.ref.key) ?? ''} ${x.label}`,
-                    cell: (x) => {
-                        const title = titleBy.get(x.ref.key);
-                        return title ? (
-                            <span className="block w-[46vw] min-w-0 max-w-[30rem] md:w-auto" title={x.label}>
-                                <span className="block truncate font-medium text-fg">{title}</span>
-                                <span className="block truncate text-meta text-fg-muted">{x.label}</span>
-                            </span>
-                        ) : <span className="block w-[46vw] min-w-0 max-w-[30rem] truncate md:w-auto" title={x.label}>{x.label}</span>;
-                    },
+                    cell: (x) => <PagePath path={x.label} title={titleBy.get(x.ref.key)} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto" />,
                 }}
                 heat={{ metric: 'pageviews', value: (x) => v(x.r, 'screenPageViews') }}
                 loading={pages.state === 'loading'}
@@ -90,7 +83,7 @@ export function TrafficPagesTab() {
         <BreakdownTable
             rows={rows}
             rowKey={(x) => x.r.key}
-            label={{ header: 'Landing page', text: (x) => x.label }}
+            label={{ header: 'Landing page', text: (x) => x.label, cell: (x) => <PagePath path={x.label} className="w-[46vw] max-w-[30rem] md:w-auto" /> }}
             heat={{ metric: 'sessions', value: (x) => v(x.r, 'sessions') }}
             loading={pages.state === 'loading'}
             defaultSort="sessions"

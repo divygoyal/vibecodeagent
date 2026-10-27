@@ -16,6 +16,8 @@ import { deviceLabel } from '../lib/sources';
 import type { Ga4BreakdownResponse, Ga4Row, GscRowsResponse } from '../lib/types';
 import { PageRows } from '../pages/PageRows';
 import { LoadError } from '../SiteStates';
+import { PagePath } from '../PagePath';
+import { pageLabel } from '../lib/pagePath';
 import { FlagIcon, sourceParts } from '../SourceIcon';
 import { useGa4, useGsc, useSite } from '../useSiteData';
 import { gscToAlpha2 } from '@/lib/builder/countries';
@@ -68,8 +70,8 @@ export function SourcesCard({ className }: { className?: string }) {
 function LandingList() {
     const { siteHost } = useSite();
     const render = useMemo(() => (r: Ga4Row) => {
-        const label = displayPage(pageRef(r.dims.landingPage, siteHost), siteHost);
-        return { label, text: label };
+        const path = displayPage(pageRef(r.dims.landingPage, siteHost), siteHost);
+        return { label: <PagePath path={path} />, text: pageLabel(path) };
     }, [siteHost]);
     return (
         <Ga4List report="landing" dim="landingPage" metric="sessions" filterKey="landing" render={render} include={(r) => Boolean(r.dims.landingPage) && r.dims.landingPage !== '(not set)'}
@@ -77,7 +79,7 @@ function LandingList() {
     );
 }
 
-/** Top pages (title, trend, ±%) and landing pages. */
+/** Top pages (path, trend, ±%; title on hover) and landing pages. */
 export function PagesCard({ className, action = 'filter', withSearch = false }: { className?: string; action?: 'open' | 'filter'; withSearch?: boolean }) {
     const { host } = useSite();
     return (
