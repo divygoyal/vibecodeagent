@@ -1,145 +1,53 @@
-'use client';
-
-import { motion } from 'framer-motion';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-    FileText, BookOpen, Globe, Sparkles, GitCompareArrows, ArrowRight
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
-const fadeUp = {
-    hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const } }
+import { SectionHeading } from '@/components/marketing/site/Section';
+import { FREE_TOOLS } from '@/components/marketing/tools/catalog';
+import { BRAND_NAME } from '@/lib/brand';
+
+const TITLE = 'Free SEO tools';
+const DESCRIPTION = 'Free SEO tools, no sign-up: AI search readiness checker, robots.txt analyzer, readability checker, hreflang validator and comparison page builder.';
+
+export const metadata: Metadata = {
+    title: TITLE,
+    description: DESCRIPTION,
+    alternates: { canonical: '/tools' },
+    openGraph: { title: `${TITLE} | ${BRAND_NAME}`, description: DESCRIPTION, url: '/tools' },
+    twitter: { card: 'summary_large_image', title: `${TITLE} | ${BRAND_NAME}`, description: DESCRIPTION },
 };
-
-const stagger = {
-    visible: { transition: { staggerChildren: 0.1 } }
-};
-
-const tools = [
-    {
-        icon: FileText,
-        title: 'Robots.txt Analyzer',
-        description: 'Check your robots.txt for issues and AI crawler access',
-        href: '/tools/robots-analyzer',
-        gradient: 'from-blue-500/20 to-cyan-500/20',
-        iconColor: 'text-blue-400',
-    },
-    {
-        icon: BookOpen,
-        title: 'Readability Checker',
-        description: 'Analyze content readability with Flesch-Kincaid scoring',
-        href: '/tools/readability-checker',
-        gradient: 'from-emerald-500/20 to-green-500/20',
-        iconColor: 'text-emerald-400',
-    },
-    {
-        icon: Globe,
-        title: 'Hreflang Validator',
-        description: 'Validate international targeting with hreflang tag checks',
-        href: '/tools/hreflang-validator',
-        gradient: 'from-violet-500/20 to-purple-500/20',
-        iconColor: 'text-violet-400',
-    },
-    {
-        icon: Sparkles,
-        title: 'AI Search Readiness',
-        description: 'Check if your content is optimized for AI search engines',
-        href: '/tools/ai-search-readiness',
-        gradient: 'from-amber-500/20 to-orange-500/20',
-        iconColor: 'text-amber-400',
-    },
-    {
-        icon: GitCompareArrows,
-        title: 'Comparison Builder',
-        description: 'Generate professional comparison pages with schema markup',
-        href: '/tools/comparison-builder',
-        gradient: 'from-pink-500/20 to-rose-500/20',
-        iconColor: 'text-pink-400',
-    },
-];
 
 export default function ToolsIndexPage() {
     return (
-        <div className="min-h-screen pt-24 pb-20">
-            {/* Hero */}
-            <motion.div
-                initial="hidden"
-                animate="visible"
-                variants={stagger}
-                className="max-w-4xl mx-auto text-center px-6 mb-16"
-            >
-                <motion.h1
-                    variants={fadeUp}
-                    className="text-3xl sm:text-5xl font-bold tracking-tight mb-4"
-                >
-                    Free{' '}
-                    <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                        SEO Tools
-                    </span>
-                </motion.h1>
-                <motion.p
-                    variants={fadeUp}
-                    className="text-lg text-zinc-400 max-w-2xl mx-auto"
-                >
-                    No sign-up required. Analyze your site, check readability, validate
-                    hreflang tags, and test AI search readiness — all for free.
-                </motion.p>
-            </motion.div>
-
-            {/* Tools Grid */}
-            <motion.div
-                initial="hidden"
-                animate="visible"
-                variants={stagger}
-                className="max-w-4xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5"
-            >
-                {tools.map((tool) => (
-                    <motion.div key={tool.href} variants={fadeUp}>
+        <div className="mx-auto max-w-[1200px] px-4 pt-14 pb-12 md:px-6 md:pt-20 md:pb-16">
+            <SectionHeading
+                as="h1"
+                eyebrow="No sign-up"
+                title="Free SEO tools"
+                description="Check a robots.txt file, test a page for AI search, score readability, validate hreflang tags or build a comparison page. Free, in your browser."
+                align="center"
+            />
+            <ul className="mx-auto mt-12 grid max-w-[880px] gap-4 grid-cols-1 sm:grid-cols-2">
+                {FREE_TOOLS.map((tool) => (
+                    <li key={tool.slug}>
                         <Link
-                            href={tool.href}
-                            className={`group block rounded-2xl border border-white/[0.06] bg-gradient-to-br ${tool.gradient} p-4 sm:p-6 hover:border-white/[0.12] transition-all duration-300 hover:scale-[1.02]`}
+                            href={`/tools/${tool.slug}`}
+                            className="group tc-card flex h-full gap-4 rounded-card border border-border-subtle bg-surface p-5 shadow-card transition-[box-shadow,border-color,transform] duration-120 ease-standard hover:-translate-y-px hover:border-border hover:shadow-card-hover motion-reduce:hover:translate-y-0"
                         >
-                            <div className="flex items-start gap-4">
-                                <div className={`p-2.5 rounded-xl bg-white/[0.06] ${tool.iconColor}`}>
-                                    <tool.icon className="w-5 h-5" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-emerald-400 transition-colors">
-                                        {tool.title}
-                                    </h3>
-                                    <p className="text-sm text-zinc-400 leading-relaxed">
-                                        {tool.description}
-                                    </p>
-                                    <span className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-emerald-400 group-hover:gap-2 transition-all">
-                                        Use Tool <ArrowRight className="w-4 h-4" />
-                                    </span>
-                                </div>
-                            </div>
+                            <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-control bg-brand-soft text-brand-soft-fg">
+                                <tool.icon aria-hidden size={20} strokeWidth={1.75} />
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block text-title-sm text-fg">{tool.title}</span>
+                                <span className="mt-1 block text-body text-fg-secondary">{tool.short}</span>
+                                <span className="mt-3 inline-flex items-center gap-1 text-body-sm font-medium text-fg-secondary group-hover:text-fg">
+                                    Open <ArrowRight aria-hidden size={14} strokeWidth={1.75} />
+                                </span>
+                            </span>
                         </Link>
-                    </motion.div>
+                    </li>
                 ))}
-            </motion.div>
-
-            {/* Bottom CTA */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.6 }}
-                className="max-w-4xl mx-auto text-center px-6 mt-16"
-            >
-                <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 p-4 sm:p-8">
-                    <h2 className="text-xl sm:text-2xl font-bold mb-2">Want deeper insights?</h2>
-                    <p className="text-zinc-400 mb-5">
-                        Connect Google Analytics & Search Console for AI-powered recommendations.
-                    </p>
-                    <Link
-                        href="/pricing"
-                        className="inline-flex items-center gap-2 px-6 py-3 min-h-[44px] text-sm font-medium text-black bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-lg hover:opacity-90 transition-opacity"
-                    >
-                        Sign up for free <ArrowRight className="w-4 h-4" />
-                    </Link>
-                </div>
-            </motion.div>
+            </ul>
         </div>
     );
 }

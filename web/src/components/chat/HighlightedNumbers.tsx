@@ -43,7 +43,7 @@ const PATTERNS = [
 // rainbow colors. The previous emerald/cyan/amber palette read as "cheap" —
 // Claude/ChatGPT/Grok all use a monochrome treatment for numbers in answers
 // and let the bold weight do the work.
-const NUMBER_TOKEN_CLASS = 'text-white font-semibold tabular-nums';
+const NUMBER_TOKEN_CLASS = 'text-fg font-semibold tabular-nums';
 const TONE: Record<string, string> = {
     currency: NUMBER_TOKEN_CLASS,
     percent: NUMBER_TOKEN_CLASS,
@@ -118,7 +118,7 @@ export function highlightNumbersInChildren(children: ReactNode, keyPrefix = 'hn'
             // Pass elements through — don't recurse into <code> / <a> etc.
             // Specifically skip code blocks (numbers in code shouldn't be styled).
             if (isValidElement(child)) {
-                const type = (child as any).type;
+                const type = child.type;
                 const isCode = type === 'code' || (typeof type === 'string' && type.toLowerCase() === 'code');
                 if (isCode) return child;
                 return cloneElement(child, { key: child.key ?? `${keyPrefix}-${i}` });

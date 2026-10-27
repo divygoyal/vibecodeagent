@@ -1,8 +1,12 @@
 'use client';
 
+// MapLibre is imported at runtime and its classes are used untyped here.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useEffect, useRef, memo, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getGlobeAvatarUrl } from '@/lib/globeUtils';
+import { Button } from '@/components/ui/Button';
 
 // ─── Types ───
 export interface GlobeVisitor {
@@ -35,6 +39,84 @@ export interface RealtimeMapboxProps {
 export interface RealtimeMapboxHandle {
     toggleAutoPan: () => boolean;
     isAutoPanning: () => boolean;
+}
+
+/**
+ * Colours for the map, markers and popup. Light by default; dark only when the
+ * page is dark (embeds take ?theme=dark, DESIGN 2.1). No starfield in light.
+ */
+interface GlobePalette {
+    dark: boolean;
+    style: string;
+    sky: string;
+    land: string;
+    water: string;
+    border: string;
+    line: string;
+    label: string;
+    labelMinor: string;
+    halo: string;
+    markerRing: string;
+    markerShadow: string;
+    popupBg: string;
+    popupFg: string;
+    popupText: string;
+    popupMuted: string;
+    popupBorder: string;
+    popupDivider: string;
+    popupShadow: string;
+    closeHoverBg: string;
+}
+
+const LIGHT_PALETTE: GlobePalette = {
+    dark: false,
+    style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    sky: '#f6f7f9',
+    land: '#dde1e7',
+    water: '#ffffff',
+    border: '#c6ccd5',
+    line: '#e7eaee',
+    label: '#636b78',
+    labelMinor: '#8a919c',
+    halo: 'rgba(255,255,255,0.85)',
+    markerRing: 'rgba(255,255,255,0.95)',
+    markerShadow: '0 2px 8px rgba(16,19,26,0.18)',
+    popupBg: '#ffffff',
+    popupFg: '#171a20',
+    popupText: '#4b5361',
+    popupMuted: '#636b78',
+    popupBorder: '#e7eaee',
+    popupDivider: '#eff1f4',
+    popupShadow: '0 4px 8px -2px rgba(16,19,26,0.06), 0 12px 32px -8px rgba(16,19,26,0.16)',
+    closeHoverBg: '#eff1f4',
+};
+
+const DARK_PALETTE: GlobePalette = {
+    dark: true,
+    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    sky: '#0e1014',
+    land: '#292929',
+    water: '#1e1e1f',
+    border: '#3d3d42',
+    line: '#333336',
+    label: '#8a919c',
+    labelMinor: '#636b78',
+    halo: 'rgba(0,0,0,0.6)',
+    markerRing: 'rgba(255,255,255,0.25)',
+    markerShadow: '0 4px 16px rgba(0,0,0,0.5)',
+    popupBg: '#15171c',
+    popupFg: '#eef0f3',
+    popupText: '#c6ccd5',
+    popupMuted: '#8a919c',
+    popupBorder: 'rgba(255,255,255,0.08)',
+    popupDivider: 'rgba(255,255,255,0.06)',
+    popupShadow: '0 24px 64px -12px rgba(0,0,0,0.7)',
+    closeHoverBg: 'rgba(255,255,255,0.08)',
+};
+
+function readPalette(): GlobePalette {
+    if (typeof document === 'undefined') return LIGHT_PALETTE;
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? DARK_PALETTE : LIGHT_PALETTE;
 }
 
 function getWarmthColor(warmth: number): string {
@@ -184,7 +266,7 @@ function createStarLayer(mapInstance: any) {
             gl.bufferData(gl.ARRAY_BUFFER, attributes, gl.STATIC_DRAW);
         },
 
-        render(gl: WebGLRenderingContext, _matrix: any) {
+        render(gl: WebGLRenderingContext) {
             if (!program) return;
 
             const center = mapInstance.getCenter();
@@ -275,10 +357,10 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     const autoPanRef = useRef(autoPanProp);
     const autoPanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const autoPanDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const visitorsRef = useRef(visitors);
     const onAutoPanChangeRef = useRef(onAutoPanChange);
-    visitorsRef.current = visitors;
-    onAutoPanChangeRef.current = onAutoPanChange;
+    useEffect(() => { onAutoPanChangeRef.current = onAutoPanChange; }, [onAutoPanChange]);
+    // The page theme is fixed for the life of an embed (?theme=), so read it once.
+    const [palette] = useState<GlobePalette>(readPalette);
 
     const stopAutoPan = useCallback(() => {
         if (autoPanTimerRef.current) { clearInterval(autoPanTimerRef.current); autoPanTimerRef.current = null; }
@@ -305,11 +387,12 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     }));
 
     const initMap = useCallback(() => {
-        if (!containerRef.current) { setStatus('error'); setErrorMsg('Container not available'); return; }
+        // The container div always renders before this effect runs.
+        if (!containerRef.current) return;
 
         let map: any;
         let destroyed = false;
-        setStatus('loading');
+        const pal = palette;
 
         (async () => {
             try {
@@ -320,7 +403,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
                 map = new _MapClass({
                     container: containerRef.current,
-                    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+                    style: pal.style,
                     center: [30, 25],
                     zoom: initialZoom ?? 1.8,
                     attributionControl: false,
@@ -350,9 +433,9 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     try { map.setProjection({ type: 'globe' }); } catch (e) { console.warn('setProjection:', e); }
                     try {
                         map.setSky({
-                            'sky-color': '#06060e',
-                            'horizon-color': '#06060e',
-                            'fog-color': '#06060e',
+                            'sky-color': pal.sky,
+                            'horizon-color': pal.sky,
+                            'fog-color': pal.sky,
                             'fog-ground-blend': 1,
                             'horizon-fog-blend': 1,
                             'sky-horizon-blend': 0,
@@ -360,12 +443,14 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                         });
                     } catch { /**/ }
 
-                    // Star layer (behind everything)
-                    try {
-                        const layers = map.getStyle().layers;
-                        const firstId = layers?.[0]?.id;
-                        map.addLayer(createStarLayer(map), firstId);
-                    } catch { /**/ }
+                    // Star layer (behind everything): dark theme only
+                    if (pal.dark) {
+                        try {
+                            const layers = map.getStyle().layers;
+                            const firstId = layers?.[0]?.id;
+                            map.addLayer(createStarLayer(map), firstId);
+                        } catch { /**/ }
+                    }
 
                     // Make country labels visible at globe zoom (minzoom 0) + brighten
                     try {
@@ -379,13 +464,13 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                                         if (id.includes('country') || id.includes('continent')) {
                                             map.setLayerZoomRange(id, 0, 24);
                                             map.setLayoutProperty(id, 'text-transform', 'none');
-                                            map.setPaintProperty(id, 'text-color', '#5a5a62');
-                                            map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.6)');
+                                            map.setPaintProperty(id, 'text-color', pal.label);
+                                            map.setPaintProperty(id, 'text-halo-color', pal.halo);
                                             map.setPaintProperty(id, 'text-halo-width', 0.8);
                                         } else if (id.includes('city') || id.includes('capital') || id.includes('state')) {
                                             map.setLayoutProperty(id, 'text-transform', 'none');
-                                            map.setPaintProperty(id, 'text-color', '#4a4a52');
-                                            map.setPaintProperty(id, 'text-halo-color', 'rgba(0,0,0,0.5)');
+                                            map.setPaintProperty(id, 'text-color', pal.labelMinor);
+                                            map.setPaintProperty(id, 'text-halo-color', pal.halo);
                                             map.setPaintProperty(id, 'text-halo-width', 0.6);
                                         } else if (id.includes('village') || id.includes('suburb') || id.includes('hamlet') ||
                                                    id.includes('housenumber') || id.includes('poi') || id.includes('roadname_minor')) {
@@ -406,12 +491,12 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                             for (const layer of style.layers) {
                                 try {
                                     if (layer.type === 'background') {
-                                        map.setPaintProperty(layer.id, 'background-color', '#292929');
+                                        map.setPaintProperty(layer.id, 'background-color', pal.land);
                                     } else if (layer.type === 'fill') {
-                                        map.setPaintProperty(layer.id, 'fill-color', layer.id.includes('water') ? '#1E1E1F' : '#292929');
+                                        map.setPaintProperty(layer.id, 'fill-color', layer.id.includes('water') ? pal.water : pal.land);
                                     } else if (layer.type === 'line') {
                                         const isBorder = layer.id.includes('boundary') || layer.id.includes('border');
-                                        map.setPaintProperty(layer.id, 'line-color', isBorder ? '#3d3d42' : '#333336');
+                                        map.setPaintProperty(layer.id, 'line-color', isBorder ? pal.border : pal.line);
                                         map.setPaintProperty(layer.id, 'line-opacity', isBorder ? 0.5 : 0.35);
                                     }
                                 } catch { /**/ }
@@ -445,7 +530,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             if (map) { try { map.remove(); } catch { /**/ } }
             mapRef.current = null;
         };
-    }, [startAutoPan, stopAutoPan]);
+    }, [startAutoPan, stopAutoPan, palette, initialZoom]);
 
     useEffect(() => { const cleanup = initMap(); return cleanup; }, [initMap]);
 
@@ -464,7 +549,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         wrapper.style.cssText = 'position:relative;width:100%;height:100%;';
 
         const frame = document.createElement('div');
-        frame.style.cssText = `width:${inner}px;height:${inner}px;margin:${(sz - inner) / 2}px;border-radius:50%;background:${v.avatarColor};border:${isMobile ? 2 : 2.5}px solid rgba(255,255,255,0.25);box-shadow:0 4px 24px rgba(0,0,0,0.6), 0 0 12px ${warmthColor}40;overflow:hidden;`;
+        frame.style.cssText = `width:${inner}px;height:${inner}px;margin:${(sz - inner) / 2}px;border-radius:50%;background:${v.avatarColor};border:${isMobile ? 2 : 2.5}px solid ${palette.markerRing};box-shadow:${palette.markerShadow};overflow:hidden;`;
 
         const img = document.createElement('img');
         img.src = avatarUrl;
@@ -479,7 +564,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         wrapper.appendChild(frame);
 
         const dot = document.createElement('div');
-        dot.style.cssText = `position:absolute;top:0;right:0;width:${isMobile ? 11 : 14}px;height:${isMobile ? 11 : 14}px;border-radius:50%;background:${warmthColor};border:${isMobile ? 2 : 3}px solid rgba(8,12,24,0.95);z-index:2;box-shadow:0 0 8px ${warmthColor}80;`;
+        dot.style.cssText = `position:absolute;top:0;right:0;width:${isMobile ? 11 : 14}px;height:${isMobile ? 11 : 14}px;border-radius:50%;background:${warmthColor};border:${isMobile ? 2 : 3}px solid ${palette.popupBg};z-index:2;`;
         wrapper.appendChild(dot);
         el.appendChild(wrapper);
 
@@ -495,7 +580,6 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             if (activePopupRef.current) { try { activePopupRef.current.remove(); } catch { /**/ } }
 
             const warmthPct = Math.round(v.warmth * 100);
-            const warmthLabel = v.warmth > 0.6 ? 'Hot' : v.warmth > 0.4 ? 'Warm' : v.warmth > 0.25 ? 'Mild' : 'Cool';
             const warmthHex = getWarmthColor(v.warmth);
             const cityLabel = v.city && !v.city.startsWith('(') ? v.city : '';
             const deviceLabel = v.device || 'Desktop';
@@ -504,68 +588,42 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
             const estValue = v.estValue || `$${(v.warmth * 3.5).toFixed(2)}`;
             const confidence = v.confidence ?? Math.round(50 + v.warmth * 40);
             const convLikelihood = Math.round((confidence - 50) * 2.18);
-            // Deterministic session time from name hash
-            const nameHash = v.name.split('').reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0), 0);
-            const sessionMin = Math.abs(nameHash % 12) + 1;
-            const sessionSec = Math.abs((nameHash >> 4) % 60);
-            const totalVisits = Math.abs((nameHash >> 8) % 5) + 1;
+            const p = palette;
 
             const popupHTML = `
-                <div style="background:#13131D;border-radius:14px;min-width:260px;max-width:300px;font-family:system-ui,-apple-system,sans-serif;color:#e4e4e7;border:1px solid rgba(255,255,255,0.08);box-shadow:0 24px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.04);overflow:hidden;">
-                    <!-- Header -->
+                <div style="background:${p.popupBg};border-radius:12px;min-width:260px;max-width:300px;font-family:var(--font-geist-sans),system-ui,-apple-system,sans-serif;color:${p.popupFg};border:1px solid ${p.popupBorder};box-shadow:${p.popupShadow};overflow:hidden;">
                     <div style="padding:14px 16px 10px;display:flex;align-items:center;gap:12px;">
                         <div style="position:relative;flex-shrink:0;">
-                            <div style="width:48px;height:48px;border-radius:50%;background:${v.avatarColor};border:2.5px solid ${warmthHex}50;overflow:hidden;box-shadow:0 0 16px ${warmthHex}30;">
-                                <img src="${getGlobeAvatarUrl(v.name)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none';this.parentNode.style.display='flex';this.parentNode.style.alignItems='center';this.parentNode.style.justifyContent='center';this.parentNode.style.fontSize='17px';this.parentNode.style.fontWeight='700';this.parentNode.style.color='white';this.parentNode.textContent='${v.avatarInitial}';" />
+                            <div style="width:44px;height:44px;border-radius:50%;background:${v.avatarColor};overflow:hidden;">
+                                <img src="${getGlobeAvatarUrl(v.name)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none';this.parentNode.style.display='flex';this.parentNode.style.alignItems='center';this.parentNode.style.justifyContent='center';this.parentNode.style.fontSize='16px';this.parentNode.style.fontWeight='600';this.parentNode.style.color='white';this.parentNode.textContent='${v.avatarInitial}';" />
                             </div>
-                            <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;border-radius:50%;background:${warmthHex};border:2px solid #13131D;box-shadow:0 0 6px ${warmthHex}80;"></div>
+                            <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;border-radius:50%;background:${warmthHex};border:2px solid ${p.popupBg};"></div>
                         </div>
                         <div style="flex:1;min-width:0;">
-                            <div style="font-size:14px;font-weight:700;color:white;line-height:1.2;">${v.name}</div>
-                            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:4px;">
-                                <span style="font-size:11px;color:#a1a1aa;">📍 ${cityLabel ? cityLabel + ', ' : ''}${v.country}</span>
-                            </div>
-                            <div style="display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:3px;">
-                                <span style="font-size:10px;color:#71717a;">${deviceIcon} ${deviceLabel}</span>
-                            </div>
+                            <div style="font-size:14px;font-weight:600;color:${p.popupFg};line-height:1.25;">${v.name}</div>
+                            <div style="font-size:12px;color:${p.popupMuted};margin-top:3px;">${cityLabel ? cityLabel + ', ' : ''}${v.country}</div>
+                            <div style="font-size:12px;color:${p.popupMuted};margin-top:2px;">${deviceIcon} ${deviceLabel}</div>
                         </div>
                     </div>
-
-                    <!-- Divider -->
-                    <div style="height:1px;background:rgba(255,255,255,0.06);margin:0 16px;"></div>
-
-                    <!-- Stats rows -->
+                    <div style="height:1px;background:${p.popupDivider};margin:0 16px;"></div>
                     <div style="padding:8px 16px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
-                            <span style="font-size:11px;color:#71717a;">Current URL</span>
-                            <span style="font-size:11px;font-weight:500;color:#d4d4d8;font-family:ui-monospace,monospace;background:rgba(255,255,255,0.04);padding:1px 6px;border-radius:4px;">${pageLabel.length > 20 ? pageLabel.slice(0, 20) + '…' : pageLabel}</span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
-                            <span style="font-size:11px;color:#71717a;">Session time</span>
-                            <span style="font-size:11px;font-weight:500;color:#d4d4d8;">${sessionMin} min ${sessionSec} sec</span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
-                            <span style="font-size:11px;color:#71717a;">Total visits</span>
-                            <span style="font-size:11px;font-weight:500;color:#d4d4d8;">${totalVisits}</span>
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0;">
+                            <span style="font-size:12px;color:${p.popupMuted};">Current page</span>
+                            <span style="font-size:12px;font-weight:500;color:${p.popupText};font-family:var(--font-geist-mono),ui-monospace,monospace;">${pageLabel.length > 24 ? pageLabel.slice(0, 24) + '…' : pageLabel}</span>
                         </div>
                     </div>
-
-                    <!-- Divider -->
-                    <div style="height:1px;background:rgba(255,255,255,0.06);margin:0 16px;"></div>
-
-                    <!-- Conversion likelihood + estimated value -->
+                    <div style="height:1px;background:${p.popupDivider};margin:0 16px;"></div>
                     <div style="padding:10px 16px 12px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                            <span style="font-size:11px;color:#71717a;">Conversion likelihood</span>
-                            <span style="font-size:11px;font-weight:600;color:${warmthHex};">${convLikelihood > 0 ? '+' : ''}${convLikelihood}% <span style="color:#52525b;font-weight:400;">vs. avg</span></span>
+                            <span style="font-size:12px;color:${p.popupMuted};">Conversion likelihood (est.)</span>
+                            <span style="font-size:12px;font-weight:600;color:${p.popupFg};">${convLikelihood > 0 ? '+' : ''}${convLikelihood}% <span style="color:${p.popupMuted};font-weight:400;">vs. avg</span></span>
                         </div>
-                        <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;position:relative;">
-                            <div style="height:100%;width:${warmthPct}%;background:linear-gradient(90deg,${warmthHex},${warmthHex}cc);border-radius:99px;"></div>
-                            <div style="position:absolute;top:-3px;left:${Math.min(warmthPct, 95)}%;width:12px;height:12px;border-radius:50%;background:${warmthHex};border:2px solid #13131D;box-shadow:0 0 6px ${warmthHex}60;transform:translateX(-50%);"></div>
+                        <div style="height:6px;background:${p.popupDivider};border-radius:99px;overflow:hidden;">
+                            <div style="height:100%;width:${warmthPct}%;background:${warmthHex};border-radius:99px;"></div>
                         </div>
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
-                            <span style="font-size:11px;color:#71717a;">Estimated value</span>
-                            <span style="font-size:12px;font-weight:700;color:${warmthHex};">${estValue}</span>
+                            <span style="font-size:12px;color:${p.popupMuted};">Estimated value</span>
+                            <span style="font-size:12px;font-weight:600;color:${p.popupFg};">${estValue}</span>
                         </div>
                     </div>
                 </div>
@@ -587,7 +645,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
         };
 
         return el;
-    }, []);
+    }, [palette]);
 
     useEffect(() => {
         const map = mapRef.current;
@@ -645,6 +703,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
 
     const handleRetry = useCallback(() => {
         retryCountRef.current++;
+        setStatus('loading');
         if (containerRef.current) while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild);
         mapRef.current = null;
         markersRef.current = new Map();
@@ -652,7 +711,7 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
     }, [initMap]);
 
     return (
-        <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#06060e' }}>
+        <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: palette.sky }}>
             <style>{`
                 .maplibregl-ctrl-logo { display: none !important; }
                 .maplibregl-ctrl-attrib { display: none !important; }
@@ -667,10 +726,10 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     overflow: visible !important;
                 }
                 .tc-visitor-popup .maplibregl-popup-tip {
-                    border-top-color: #13131D !important;
+                    border-top-color: ${palette.popupBg} !important;
                 }
                 .tc-visitor-popup .maplibregl-popup-close-button {
-                    color: #52525b !important;
+                    color: ${palette.popupMuted} !important;
                     font-size: 16px !important;
                     right: 10px !important;
                     top: 10px !important;
@@ -684,24 +743,24 @@ const RealtimeMapboxInner = memo(forwardRef<RealtimeMapboxHandle, RealtimeMapbox
                     line-height: 1 !important;
                 }
                 .tc-visitor-popup .maplibregl-popup-close-button:hover {
-                    background: rgba(255,255,255,0.08) !important;
-                    color: #a1a1aa !important;
+                    background: ${palette.closeHoverBg} !important;
+                    color: ${palette.popupFg} !important;
                 }
             `}</style>
             <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
             {status === 'loading' && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, background: '#06060e' }}>
+                <div className="absolute inset-0 z-10 flex items-center justify-center" style={{ background: palette.sky }}>
                     <div className="flex flex-col items-center gap-3">
-                        <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
-                        <span className="text-zinc-500 text-sm">Loading globe...</span>
+                        <div className="size-6 animate-spin rounded-full border-2 border-border border-t-fg-muted" />
+                        <span className="text-body-sm text-fg-muted">Loading map…</span>
                     </div>
                 </div>
             )}
             {status === 'error' && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, background: '#06060e' }}>
-                    <div className="flex flex-col items-center gap-3 text-center px-4">
-                        <span className="text-zinc-400 text-sm">{errorMsg || 'Globe failed to load'}</span>
-                        <button onClick={handleRetry} className="px-4 py-2 text-sm bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition border border-emerald-500/20">Retry</button>
+                <div className="absolute inset-0 z-10 flex items-center justify-center" style={{ background: palette.sky }}>
+                    <div className="flex flex-col items-center gap-3 px-4 text-center">
+                        <span className="text-body-sm text-fg-muted">{errorMsg || 'The map did not load'}</span>
+                        <Button variant="secondary" size="sm" onClick={handleRetry}>Try again</Button>
                     </div>
                 </div>
             )}

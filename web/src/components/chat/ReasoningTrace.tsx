@@ -13,11 +13,9 @@ import { memo, useEffect, useState } from 'react';
  * Lines are passed in via props (parent owns the array — built up from SSE
  * events). Each line gets a soft fade-in so the trace feels alive.
  *
- * Visual:
- *   • Italic muted text on a subtle vertical guide (3px left rule)
- *   • Active line gets a blinking caret
- *   • Empty trace falls back to a cycling placeholder so the user always
- *     has something to watch
+ * Visual (DESIGN 5.11): three pulsing dots + the current step in muted
+ * body-sm text; earlier steps fade to the faint tone. An empty trace falls
+ * back to a cycling placeholder so the user always has something to watch.
  */
 
 const FALLBACK_PHRASES = [
@@ -46,60 +44,40 @@ export const ReasoningTrace = memo(function ReasoningTrace({ lines, active }: Re
     const [phase, setPhase] = useState(0);
     useEffect(() => {
         if (!active || lines.length > 0) return;
-        const t = setInterval(() => setPhase(p => (p + 1) % FALLBACK_PHRASES.length), 2200);
+        const t = setInterval(() => setPhase((p) => (p + 1) % FALLBACK_PHRASES.length), 2200);
         return () => clearInterval(t);
     }, [active, lines.length]);
 
-    // Show a fallback cycling phrase only when there are no real lines yet.
-    // Cap to LAST 3 lines so the trace doesn't grow into a wall of text on
-    // tool-heavy turns. Older lines slide off the top, opacity fades from
-    // 0.35 (oldest) → 1.0 (newest) — rolling-status-update pattern.
+    // Real lines once events arrive; a cycling placeholder before that. Only the
+    // last few lines stay on screen so a tool-heavy turn never becomes a wall of text.
+    const VISIBLE_MAX = 4;
     const hasLines = lines.length > 0;
-    // Bumped from 3 → 5 so multi-tool runs leave more breadcrumbs on screen
-    // for the user to follow.
-    const VISIBLE_MAX = 5;
     const visibleLines = hasLines
         ? lines.slice(-VISIBLE_MAX)
-        : [{ id: 'fb-' + phase, text: FALLBACK_PHRASES[phase] }];
+        : [{ id: `fb-${phase}`, text: FALLBACK_PHRASES[phase] }];
 
     return (
-        <div className="flex justify-start">
-            <div className="relative pl-3 my-1 max-w-[88%]">
-                {/* Vertical guide rule */}
-                <div className="absolute left-0 top-1 bottom-1 w-px bg-gradient-to-b from-zinc-600/0 via-zinc-500/40 to-zinc-600/0" />
-                <div className="space-y-1">
-                    {visibleLines.map((line, i) => {
-                        const isLast = i === visibleLines.length - 1;
-                        const N = visibleLines.length;
-                        // Linear fade: position 0 (oldest) = 0.35, last = 1.0.
-                        const opacity = hasLines && N > 1
-                            ? 0.35 + (0.65 * i) / (N - 1)
-                            : 1;
-                        return (
-                            <div
-                                key={line.id}
-                                className="text-[13px] text-zinc-400 leading-relaxed flex items-start gap-1.5"
-                                style={{
-                                    animation: 'tcReasoningFade 0.32s ease-out',
-                                    opacity,
-                                }}
-                            >
-                                <span className="mt-1 w-1 h-1 rounded-full bg-zinc-500 flex-shrink-0" />
-                                <span className="italic">{line.text}</span>
-                                {active && isLast && (
-                                    <span className="inline-block w-[2px] h-3.5 bg-zinc-400 align-middle ml-0.5 animate-pulse rounded-full" style={{ animationDuration: '1s' }} />
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-                <style jsx>{`
-                    @keyframes tcReasoningFade {
-                        from { opacity: 0; transform: translateY(2px); }
-                        to { opacity: 1; transform: translateY(0); }
-                    }
-                `}</style>
-            </div>
+        <div role="status" aria-live="polite" className="my-2 flex flex-col gap-1">
+            {visibleLines.map((line, i) => {
+                const isLast = i === visibleLines.length - 1;
+                return (
+                    <div
+                        key={line.id}
+                        className={`flex animate-fade-in items-center gap-2 text-body-sm ${isLast ? 'text-fg-secondary' : 'text-fg-faint'}`}
+                    >
+                        {isLast && active ? (
+                            <span aria-hidden className="flex w-4 shrink-0 items-center justify-center gap-0.5">
+                                {[0, 1, 2].map((d) => (
+                                    <span key={d} className="size-1 animate-pulse rounded-full bg-fg-muted" style={{ animationDelay: `${d * 160}ms` }} />
+                                ))}
+                            </span>
+                        ) : (
+                            <span aria-hidden className="size-1 w-4 shrink-0 text-center text-fg-faint">·</span>
+                        )}
+                        <span>{line.text}</span>
+                    </div>
+                );
+            })}
         </div>
     );
 });
@@ -142,7 +120,7 @@ export function narrateToolResult(name: string, result: unknown): string {
     if (!result) return 'Done.';
     if (typeof result === 'string') return 'Got the response.';
     if (typeof result === 'object') {
-        const r = result as any;
+        const r = result as Record<string, unknown> & { alerts?: unknown[]; note?: string; summary?: string };
         if (r.note && typeof r.note === 'string' && r.note.length < 120) return r.note;
         if (r.summary && typeof r.summary === 'string' && r.summary.length < 160) return r.summary;
         if (r.totalActiveUsers != null) return `${r.totalActiveUsers} active users right now.`;

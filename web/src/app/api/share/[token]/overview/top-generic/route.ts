@@ -6,11 +6,12 @@ import {
     getShareOverviewContext,
     parseOverviewRequest,
     SHARE_OVERVIEW_CACHE_TTL,
+    shareOverviewRoute,
 } from '@/lib/shareOverviewServer';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
+async function handleGet(
     req: Request,
     { params }: { params: Promise<{ token: string }> }
 ) {
@@ -49,3 +50,5 @@ export async function GET(
 
     return NextResponse.json(data);
 }
+
+export const GET = shareOverviewRoute(handleGet);

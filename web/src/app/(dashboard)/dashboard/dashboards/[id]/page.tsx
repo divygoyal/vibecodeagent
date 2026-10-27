@@ -1,326 +1,174 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, use } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Palette, Layers, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
-import type { DashboardLayout, GridLayouts, LayoutItem, DateRange } from '@/types/dashboard';
-import { getThemeCSS } from '@/lib/dashboardBuilder';
-import { useDashboardBuilderStore } from '@/stores/dashboardBuilderStore';
-import { useWidgetData } from '@/lib/useWidgetData';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import useSWR from 'swr';
+import { ArrowLeft, Copy, FileDown, LayoutTemplate, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Pill, Skeleton } from '@/components/ui';
+import { DashboardView, useUrlControls } from '@/components/dashboard-builder/DashboardView';
+import { DashboardBrandHeader } from '@/components/dashboard-builder/DashboardBrandHeader';
+import { ShareDialog } from '@/components/dashboard-builder/ShareDialog';
+import { fetchJson, ownerPageLoader, usePageResults } from '@/components/dashboard-builder/useWidgetData';
+import { canonicalJson } from '@/lib/builder/compile';
+import { presetLabel } from '@/lib/builder/dates';
 import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
-import DashboardGrid from '@/components/dashboard-builder/DashboardGrid';
-import DashboardToolbar from '@/components/dashboard-builder/DashboardToolbar';
-import WidgetPalette from '@/components/dashboard-builder/WidgetPalette';
-import WidgetConfigPanel from '@/components/dashboard-builder/WidgetConfigPanel';
-import ThemeCustomizer from '@/components/dashboard-builder/ThemeCustomizer';
-import ActiveFiltersBar from '@/components/dashboard-builder/ActiveFiltersBar';
-import { BRAND_NAME } from '@/lib/brand';
+import type { DashboardDocV2, DashboardRecord, FilterControl, ShareState } from '@/lib/builder/types';
 
-// ── Types ──
+function timeAgo(iso?: string | null): string {
+    if (!iso) return '';
+    const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+    return `${Math.round(s / 86400)} d ago`;
+}
 
-type SidePanel = 'widgets' | 'theme' | 'config';
+export default function DashboardViewPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = use(params);
+    const router = useRouter();
+    const sp = useSearchParams();
+    const { data, error, mutate } = useSWR<{ dashboard: DashboardRecord }>(`/api/dashboards/${id}`, (u: string) => fetchJson(u), { revalidateOnFocus: false });
+    const rec = data?.dashboard;
 
-const DATE_RANGE_OPTIONS: { value: DateRange; label: string }[] = [
-  { value: '7d', label: '7 days' },
-  { value: '14d', label: '14 days' },
-  { value: '30d', label: '30 days' },
-  { value: '90d', label: '90 days' },
-];
-
-// ── Page ──
-
-export default function DashboardEditorPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const router = useRouter();
-
-  const {
-    loadDashboard, resetEditor,
-    name, widgets, gridLayouts, theme, selectedWidgetId,
-    onLayoutChange, dashboardId,
-    activeFilters, handleInteraction, removeFilter, clearAllFilters,
-  } = useDashboardBuilderStore();
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isPreview, setIsPreview] = useState(false);
-  const [sidePanel, setSidePanel] = useState<SidePanel>('widgets');
-  const [dateRange, setDateRange] = useState<DateRange>('30d');
-  const gridContainerRef = useRef<HTMLDivElement>(null);
-
-  // Fetch dashboard config
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch(`/api/dashboards/${id}`);
-        if (!res.ok) {
-          setError(res.status === 404 ? 'Dashboard not found' : 'Failed to load dashboard');
-          return;
-        }
-        const data = await res.json();
-        if (data.dashboard) {
-          loadDashboard(data.dashboard as DashboardLayout);
-        }
-      } catch {
-        setError('Failed to load dashboard');
-      } finally {
-        setLoading(false);
-      }
+    if (error) {
+        return <EmptyState variant="page" title="Dashboard not found" description="It may have been deleted." actions={<Button asChild variant="secondary"><Link href="/dashboard/dashboards">All dashboards</Link></Button>} />;
     }
-    load();
-    return () => { resetEditor(); };
-  }, [id, loadDashboard, resetEditor]);
-
-  // Fetch widget data (only when dashboard is loaded and has widgets)
-  const {
-    widgetData,
-    isLoading: dataLoading,
-    error: dataError,
-    refresh: refreshData,
-  } = useWidgetData({
-    dashboardId: dashboardId || id,
-    range: dateRange,
-    enabled: !loading && !error && widgets.length > 0,
-  });
-
-  // Auto-switch to config panel when widget is selected
-  useEffect(() => {
-    if (selectedWidgetId) setSidePanel('config');
-  }, [selectedWidgetId]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.metaKey || e.ctrlKey) {
-        if (e.key === 's') {
-          e.preventDefault();
-          useDashboardBuilderStore.getState().save();
-        } else if (e.key === 'z' && !e.shiftKey) {
-          e.preventDefault();
-          useDashboardBuilderStore.getState().undo();
-        } else if (e.key === 'z' && e.shiftKey) {
-          e.preventDefault();
-          useDashboardBuilderStore.getState().redo();
-        }
-      }
-      if (e.key === 'Escape') {
-        useDashboardBuilderStore.getState().selectWidget(null);
-      }
+    if (!rec) {
+        return (
+            <div className="flex flex-col gap-4">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-9 w-80" />
+                <div className="grid grid-cols-4 gap-4">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-28" rounded="card" />)}</div>
+                <Skeleton className="h-72" rounded="card" />
+            </div>
+        );
     }
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, []);
+    return <Loaded rec={rec} onRecord={(r) => mutate({ dashboard: r }, { revalidate: false })} openShare={sp.get('share') === '1'} router={router} />;
+}
 
-  const handleLayoutChange = useCallback(
-    (layout: LayoutItem[], allLayouts: GridLayouts) => {
-      onLayoutChange(layout, allLayouts);
-    },
-    [onLayoutChange],
-  );
+function Loaded({ rec, onRecord, openShare, router }: { rec: DashboardRecord; onRecord: (r: DashboardRecord) => void; openShare: boolean; router: ReturnType<typeof useRouter> }) {
+    const doc = rec.doc;
+    const ctl = useUrlControls(doc, { date: true, compare: true, filters: true });
+    const [fresh, setFresh] = useState(false);
+    const key = `owner:${rec.id}:${rec.rev}:${canonicalJson(ctl.state)}`;
+    const page = usePageResults(key, ownerPageLoader(rec.id, ctl.state.pageId ?? doc.pages[0].id, ctl.state, fresh), doc.settings.autoRefreshSec * 1000);
+    const [share, setShare] = useState(openShare);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [wide, setWide] = useState(true);
+    const exportRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const mq = window.matchMedia('(min-width: 1024px)');
+        const f = () => setWide(mq.matches);
+        f();
+        mq.addEventListener('change', f);
+        return () => mq.removeEventListener('change', f);
+    }, []);
 
-  const handleWidgetInteraction = useCallback(
-    (widgetId: string, dimension: string, value: string) => {
-      handleInteraction({ sourceWidgetId: widgetId, dimension, value });
-    },
-    [handleInteraction],
-  );
+    const siteLabel = doc.defaultSource.type === 'site' ? doc.defaultSource.siteId : 'All sites';
+    const updatedAt = page.data ? Object.values(page.data.results).map((r) => (r.status === 'ok' ? r.fetchedAt : '')).filter(Boolean).sort()[0] : undefined;
 
-  const handleExportPDF = useCallback(async () => {
-    const el = gridContainerRef.current;
-    if (!el) return;
-    const rangeLabels: Record<DateRange, string> = {
-      '7d': 'Last 7 days',
-      '14d': 'Last 14 days',
-      '30d': 'Last 30 days',
-      '90d': 'Last 90 days',
+    const saveDoc = async (next: DashboardDocV2) => {
+        try {
+            const r = await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${rec.id}`, { method: 'PUT', headers: { 'If-Match': String(rec.rev) }, body: JSON.stringify({ doc: next }) });
+            onRecord(r.dashboard);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Could not save');
+        }
     };
-    await exportDashboardToPDF(el, {
-      dashboardName: name,
-      dateRangeLabel: rangeLabels[dateRange],
-      companyName: theme.companyName,
-      backgroundColor: theme.backgroundColor,
-    });
-  }, [name, dateRange, theme.companyName, theme.backgroundColor]);
+    const duplicate = async (asTemplate: boolean) => {
+        try {
+            const r = await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${rec.id}/duplicate${asTemplate ? '?asTemplate=1' : ''}`, { method: 'POST', body: JSON.stringify({}) });
+            toast.success(asTemplate ? 'Saved to My templates' : 'Copy created');
+            if (!asTemplate) router.push(`/dashboard/dashboards/${r.dashboard.id}`);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Could not duplicate');
+        }
+    };
+    const exportPdf = useCallback(async () => {
+        if (!exportRef.current) return;
+        const bg = getComputedStyle(document.body).backgroundColor;
+        const hex = (() => {
+            const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(bg);
+            return m ? `#${[m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('')}` : '#f6f7f9';
+        })();
+        toast.promise(exportDashboardToPDF(exportRef.current, { dashboardName: doc.name, dateRangeLabel: presetLabel(ctl.state.date.range), companyName: doc.theme.header.companyName, backgroundColor: hex }), { loading: 'Preparing PDF…', success: 'PDF downloaded', error: 'PDF export failed' });
+    }, [doc, ctl.state.date.range]);
+    const del = async () => {
+        await fetchJson(`/api/dashboards/${rec.id}`, { method: 'DELETE' });
+        toast.success('Dashboard deleted');
+        router.push('/dashboard/dashboards');
+    };
 
-  const themeCSS = getThemeCSS(theme);
-
-  if (loading) {
-    return (
-      <div className="h-[80vh] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="h-[80vh] flex flex-col items-center justify-center gap-3">
-        <p className="text-sm text-white/40">{error}</p>
-        <button
-          onClick={() => router.push('/dashboard/dashboards')}
-          className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-        >
-          Back to dashboards
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-[calc(100dvh-3.5rem)]" style={themeCSS as React.CSSProperties}>
-      {/* Toolbar */}
-      <DashboardToolbar
-        isPreview={isPreview}
-        onPreviewToggle={() => setIsPreview(!isPreview)}
-        onExportPDF={handleExportPDF}
-      />
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar (edit mode only) — hidden on mobile because the
-            240 px palette swallows the grid and HTML5 drag is awkward on
-            touch. Mobile users see the grid in single-column stack mode
-            (react-grid-layout's `sm: 0 → 1 col` breakpoint). */}
-        {!isPreview && (
-          <div className="hidden md:flex w-60 border-r border-white/[0.06] bg-zinc-950/50 flex-col flex-shrink-0">
-            {/* Panel tabs */}
-            <div className="flex border-b border-white/[0.06]">
-              <button
-                onClick={() => setSidePanel('widgets')}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-[10px] font-medium uppercase tracking-wider transition-colors ${
-                  sidePanel === 'widgets' ? 'text-[var(--db-primary)] border-b-2 border-[var(--db-primary)]' : 'text-white/30 hover:text-white/50'
-                }`}
-              >
-                <Layers className="w-3 h-3" /> Widgets
-              </button>
-              <button
-                onClick={() => setSidePanel('theme')}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-[10px] font-medium uppercase tracking-wider transition-colors ${
-                  sidePanel === 'theme' ? 'text-[var(--db-primary)] border-b-2 border-[var(--db-primary)]' : 'text-white/30 hover:text-white/50'
-                }`}
-              >
-                <Palette className="w-3 h-3" /> Theme
-              </button>
-            </div>
-
-            {/* Panel content */}
-            <div className="flex-1 overflow-y-auto p-3">
-              {sidePanel === 'widgets' && <WidgetPalette />}
-              {sidePanel === 'theme' && <ThemeCustomizer />}
-              {sidePanel === 'config' && <WidgetConfigPanel />}
-            </div>
-
-            {/* Back link */}
-            <div className="px-3 py-2 border-t border-white/[0.06]">
-              <button
-                onClick={() => router.push('/dashboard/dashboards')}
-                className="flex items-center gap-1.5 text-[10px] text-white/30 hover:text-white/50 transition-colors"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                All Dashboards
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Main grid area */}
-        <div
-          ref={gridContainerRef}
-          className="flex-1 overflow-auto p-6"
-          style={{ backgroundColor: 'var(--db-bg)', fontFamily: 'var(--db-font)' }}
-          onClick={() => {
-            if (!isPreview) useDashboardBuilderStore.getState().selectWidget(null);
-          }}
-        >
-          {/* Logo / branding header */}
-          {(theme.logoUrl || theme.companyName) && (
-            <div className={`flex items-center gap-3 mb-6 ${
-              theme.logoPosition === 'top-center' ? 'justify-center' :
-              theme.logoPosition === 'top-right' ? 'justify-end' : 'justify-start'
-            }`}>
-              {theme.logoUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={theme.logoUrl}
-                  alt="Logo"
-                  className="h-8 w-auto object-contain"
-                />
-              )}
-              {theme.companyName && (
-                <span className="text-sm font-semibold text-[var(--db-text)]">
-                  {theme.companyName}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Date range selector + data status bar (hidden in PDF) */}
-          <div className="flex items-center justify-between mb-4" data-pdf-ignore="true">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5 text-[var(--db-text)]/40" />
-              <div className="flex items-center bg-white/5 rounded-lg p-0.5">
-                {DATE_RANGE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setDateRange(opt.value)}
-                    className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
-                      dateRange === opt.value
-                        ? 'bg-[var(--db-primary)]/15 text-[var(--db-primary)]'
-                        : 'text-[var(--db-text)]/40 hover:text-[var(--db-text)]/60'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {dataError && (
-                <div className="flex items-center gap-1 text-amber-400/70">
-                  <AlertCircle className="w-3 h-3" />
-                  <span className="text-[10px]">Data unavailable</span>
+    const header = (
+        <div className="flex flex-col gap-3">
+            <Link href="/dashboard/dashboards" className="tap-area inline-flex w-fit items-center gap-1 text-body-sm text-fg-muted hover:text-fg"><ArrowLeft aria-hidden size={14} />Dashboards</Link>
+            <DashboardBrandHeader doc={doc} />
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h1 className="truncate text-heading text-fg">{doc.name}</h1>
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-body-sm text-fg-muted">
+                        <span>{siteLabel}</span>
+                        {updatedAt ? <span>· Updated {timeAgo(updatedAt)}</span> : null}
+                        {rec.share.enabled ? <Pill tone="brand" dot>Public link</Pill> : <Pill>Private</Pill>}
+                        {rec.schemaVersion === 1 ? <Pill tone="info">Older dashboard: opens in the new editor</Pill> : null}
+                    </p>
+                    {doc.description ? <p className="mt-1 max-w-[720px] text-body text-fg-secondary">{doc.description}</p> : null}
                 </div>
-              )}
-              <button
-                onClick={() => refreshData()}
-                disabled={dataLoading}
-                className="p-1.5 rounded-lg hover:bg-white/5 transition-colors disabled:opacity-30"
-                title="Refresh data"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 text-[var(--db-text)]/40 ${dataLoading ? 'animate-spin' : ''}`} />
-              </button>
+                <div className="flex items-center gap-2" data-pdf-ignore="true">
+                    <Button variant="ghost" size="md" icon={RefreshCw} iconOnly aria-label="Refresh data" onClick={() => { setFresh(true); void page.mutate().finally(() => setFresh(false)); }} />
+                    {wide ? <Button asChild variant="secondary" icon={Pencil}><Link href={`/dashboard/dashboards/${rec.id}/edit`}>Edit</Link></Button> : null}
+                    <Button variant="primary" icon={Share2} onClick={() => setShare(true)}>Share</Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" iconOnly icon={MoreHorizontal} aria-label="More actions" /></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem icon={Copy} onSelect={() => duplicate(false)}>Duplicate</DropdownMenuItem>
+                            <DropdownMenuItem icon={LayoutTemplate} onSelect={() => duplicate(true)}>Save as my template</DropdownMenuItem>
+                            <DropdownMenuItem icon={FileDown} onSelect={exportPdf}>Export PDF</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem icon={Trash2} destructive onSelect={() => setConfirmDelete(true)}>Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             </div>
-          </div>
-
-          {/* Active filters bar (hidden in PDF) */}
-          <div data-pdf-ignore="true">
-            <ActiveFiltersBar
-              filters={activeFilters}
-              onRemove={removeFilter}
-              onClearAll={clearAllFilters}
-            />
-          </div>
-
-          <DashboardGrid
-            widgets={widgets}
-            gridLayouts={gridLayouts}
-            widgetData={widgetData ?? undefined}
-            isLoading={dataLoading && !widgetData}
-            isEditing={!isPreview}
-            activeFilters={activeFilters}
-            onLayoutChange={handleLayoutChange}
-            onInteraction={handleWidgetInteraction}
-          />
-
-          {/* TrafficClaw branding footer */}
-          {theme.showTrafficClawBranding && (
-            <div className="mt-8 text-center">
-              <p className="text-[10px] text-[var(--db-text)]/20">
-                Built with {BRAND_NAME}
-              </p>
-            </div>
-          )}
+            {!wide ? <Banner variant="neutral">Editing works on larger screens.</Banner> : null}
         </div>
-      </div>
-    </div>
-  );
+    );
+
+    return (
+        <>
+            <DashboardView
+                doc={doc}
+                mode="view"
+                siteLabel={siteLabel}
+                state={ctl.state}
+                onPage={ctl.setPage}
+                onDate={ctl.setDate}
+                onFilter={ctl.setFilter}
+                allow={{ date: true, compare: true, filters: true }}
+                data={page.data}
+                loading={!page.data && !page.error}
+                refetching={page.isValidating && Boolean(page.data)}
+                onRetry={() => void page.mutate()}
+                options={{ load: (c: FilterControl, q: string) => fetchJson<{ options: Array<{ value: string; label: string }> }>(`/api/dashboards/options?dimension=${encodeURIComponent(c.dimension)}&q=${encodeURIComponent(q)}${doc.defaultSource.type === 'site' ? `&siteId=${encodeURIComponent(doc.defaultSource.siteId)}` : ''}`).then((r) => r.options) }}
+                header={header}
+                exportRef={exportRef}
+                onChooseSource={wide ? () => router.push(`/dashboard/dashboards/${rec.id}/edit`) : undefined}
+            />
+            {page.error ? <Banner variant="danger" className="mt-4">{page.error instanceof Error ? page.error.message : 'Could not load data'}</Banner> : null}
+            <ShareDialog
+                open={share}
+                onOpenChange={setShare}
+                dashboardId={rec.id}
+                doc={doc}
+                share={rec.share}
+                views={rec.views}
+                onShareChange={(s: ShareState) => onRecord({ ...rec, share: s })}
+                onDocChange={saveDoc}
+            />
+            <ConfirmModal open={confirmDelete} onOpenChange={setConfirmDelete} title="Delete this dashboard?" description="Its public link stops working. This cannot be undone." confirmLabel="Delete" onConfirm={del} />
+        </>
+    );
 }

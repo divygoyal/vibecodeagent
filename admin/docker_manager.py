@@ -1206,6 +1206,10 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
     
     def get_container_status(self, user_identifier: str) -> Dict[str, Any]:
         """Get container health and status"""
+        if self.client is None:
+            # Docker stub mode (no Docker socket, e.g. previews and local dev):
+            # containers are disabled, which is not an error.
+            return {"success": False, "status": "disabled", "health": "unknown", "error": None}
         container_name = self._get_container_name(user_identifier)
         
         try:
@@ -1328,6 +1332,9 @@ You are **TrafficClaw Bot** — an expert SEO & analytics assistant on Telegram.
     
     def get_all_containers(self) -> list:
         """Get all ClawBot containers"""
+        if self.client is None:
+            # Docker stub mode (e.g. local dev): no containers to report.
+            return []
         containers = self.client.containers.list(
             all=True,
             filters={"label": f"clawbot.user"}

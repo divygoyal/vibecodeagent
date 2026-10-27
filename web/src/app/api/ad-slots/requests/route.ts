@@ -12,47 +12,20 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { sendTransactional, isBrevoConfigured } from '@/lib/brevo';
-import { formatCents, billingPeriodSuffix } from '@/lib/adSlots';
+import { sendSlotRequestEmails } from '@/lib/leaderboard/notify';
+import { allow, clientIp } from '@/lib/leaderboard/rateLimit';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
-const SITE_URL = (process.env.NEXTAUTH_URL || 'https://trafficclaw.com').replace(/\/$/, '');
 
 export const dynamic = 'force-dynamic';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Public endpoint — throttle per IP so the publisher's inbox can't be flooded.
-const RATE_WINDOW_MS = 60 * 60 * 1000;
-const RATE_MAX = 10;
-const rateStore = new Map<string, number[]>();
-
-function checkRate(key: string): boolean {
-    const now = Date.now();
-    const recent = (rateStore.get(key) || []).filter((t) => t > now - RATE_WINDOW_MS);
-    if (recent.length >= RATE_MAX) {
-        rateStore.set(key, recent);
-        return false;
-    }
-    recent.push(now);
-    rateStore.set(key, recent);
-    return true;
-}
-
-function clientIp(req: Request): string {
-    const fwd = req.headers.get('x-forwarded-for') || '';
-    return fwd.split(',')[0].trim() || req.headers.get('x-real-ip') || 'unknown';
-}
-
-function escapeHtml(input: string): string {
-    return input
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
+// Public endpoint: same protections as the profile offer form
+// (/api/leaderboard/[id]/inquiry): a honeypot, per-IP and per-slot limits.
+const IP_MAX_PER_HOUR = 5;
+const SLOT_MAX_PER_DAY = 20;
 
 type AdminRequestResponse = {
     success?: boolean;
@@ -76,23 +49,32 @@ type AdminRequestResponse = {
 };
 
 export async function POST(req: Request) {
-    if (!checkRate(clientIp(req))) {
+    const perIp = allow(`slot-request:ip:${clientIp(req)}`, IP_MAX_PER_HOUR, 60 * 60 * 1000);
+    if (!perIp.ok) {
         return NextResponse.json(
             { error: 'Too many requests from this network. Try again later.' },
-            { status: 429 },
+            { status: 429, headers: { 'Retry-After': String(perIp.retryAfterSeconds) } },
         );
     }
 
-    let body: { slot_id?: number; buyer_email?: string; buyer_name?: string; message?: string };
+    let body: { slot_id?: number; buyer_email?: string; buyer_name?: string; message?: string; website?: unknown };
     try {
         body = await req.json();
     } catch {
         return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
+    // Honeypot: real people never fill the hidden "website" field. Pretend it worked.
+    if (typeof body.website === 'string' && body.website.trim() !== '') {
+        return NextResponse.json({ success: true });
+    }
+
     const slotId = Number(body.slot_id);
     if (!Number.isFinite(slotId) || slotId <= 0) {
         return NextResponse.json({ error: 'Pick a specific ad slot to request.' }, { status: 400 });
+    }
+    if (!allow(`slot-request:slot:${slotId}`, SLOT_MAX_PER_DAY, 24 * 60 * 60 * 1000).ok) {
+        return NextResponse.json({ error: 'This slot has received a lot of requests today. Try again tomorrow.' }, { status: 429 });
     }
 
     const buyerEmail = String(body.buyer_email || '').trim();
@@ -102,6 +84,9 @@ export async function POST(req: Request) {
 
     const buyerName = String(body.buyer_name || '').trim().slice(0, 120);
     const message = String(body.message || '').trim().slice(0, 2000);
+    if ((message.match(/https?:\/\//gi) || []).length >= 3) {
+        return NextResponse.json({ error: 'Too many links in the message.' }, { status: 400 });
+    }
 
     let data: AdminRequestResponse;
     let upstreamStatus = 200;
@@ -137,55 +122,24 @@ export async function POST(req: Request) {
         );
     }
 
-    // Notify both parties. Best-effort: BREVO_API_KEY / BREVO_SENDER_EMAIL are
-    // absent in local dev, so sendTransactional no-ops and the request still
-    // lands in the publisher's dashboard inbox.
+    // Notify both parties (best effort; see lib/leaderboard/notify.ts).
     const record = data.request;
     const publisher = data.publisher;
-    if (record && publisher && isBrevoConfigured()) {
-        const slotName = record.slot_name_at_request || 'an ad slot';
-        const priceLine = `${formatCents(record.price_cents_at_request)} ${billingPeriodSuffix(record.billing_period_at_request)}`;
-        const profileUrl = `${SITE_URL}/leaderboard/${publisher.slug || ''}`;
-        const safeSlot = escapeHtml(slotName);
-        const safePrice = escapeHtml(priceLine);
-        const safeSite = escapeHtml(publisher.startup_name);
-        const safeBuyer = escapeHtml(buyerName || buyerEmail);
-        const safeMessage = message ? escapeHtml(message).replace(/\n/g, '<br />') : '';
-
-        const sends: Promise<unknown>[] = [];
-
-        if (publisher.contact_email && EMAIL_RE.test(publisher.contact_email)) {
-            sends.push(
-                sendTransactional({
-                    toEmail: publisher.contact_email,
-                    toName: publisher.founder_name || publisher.startup_name,
-                    subject: `New ad slot request: ${slotName} on ${publisher.startup_name}`,
-                    htmlContent: `
-                        <p><strong>${safeBuyer}</strong> wants to book <strong>${safeSlot}</strong> on ${safeSite}.</p>
-                        <p>Listed at <strong>${safePrice}</strong> when they sent this.</p>
-                        ${safeMessage ? `<p><em>${safeMessage}</em></p>` : ''}
-                        <p>Reply to them directly at <a href="mailto:${escapeHtml(buyerEmail)}">${escapeHtml(buyerEmail)}</a>, then mark the deal accepted or paid in your TrafficClaw dashboard under Settings &rarr; Leaderboard.</p>
-                    `,
-                }).catch((err) => console.error('[ad-slot-requests] publisher email failed:', err)),
-            );
-        }
-
-        sends.push(
-            sendTransactional({
-                toEmail: buyerEmail,
-                toName: buyerName || undefined,
-                subject: `Your request for ${slotName} on ${publisher.startup_name}`,
-                htmlContent: `
-                    <p>We passed your request for <strong>${safeSlot}</strong> on ${safeSite} to the publisher.</p>
-                    <p>Listed at <strong>${safePrice}</strong>.</p>
-                    <p>They'll reply to you directly. Arrangement and payment happen between the two of you — TrafficClaw just makes the introduction.</p>
-                    ${publisher.slug ? `<p><a href="${profileUrl}">View the listing</a></p>` : ''}
-                `,
-            }).catch((err) => console.error('[ad-slot-requests] buyer email failed:', err)),
-        );
-
-        // Don't block the response on email delivery.
-        void Promise.allSettled(sends);
+    if (record && publisher) {
+        sendSlotRequestEmails({
+            slotName: record.slot_name_at_request || 'an ad slot',
+            priceCents: record.price_cents_at_request,
+            billingPeriod: record.billing_period_at_request,
+            buyerName,
+            buyerEmail,
+            message,
+            publisher: {
+                startup_name: publisher.startup_name,
+                contact_email: publisher.contact_email,
+                founder_name: publisher.founder_name,
+                slug: publisher.slug,
+            },
+        });
     }
 
     return NextResponse.json({ success: true, request: record });

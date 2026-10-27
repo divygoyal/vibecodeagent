@@ -50,6 +50,16 @@ export function resolveRange(range: string): { startDate: string; endDate: strin
             return rollingRange(60);
         case '90d':
             return rollingRange(90);
+        // Redesign presets (lib/dateRange.ts). Approximations of calendar
+        // months for the GA4 relative-date API.
+        case '24h':
+            return { startDate: 'yesterday', endDate: 'today' };
+        case '28d':
+            return rollingRange(28);
+        case '3m':
+            return rollingRange(91);
+        case '16m':
+            return rollingRange(487);
         case '6m':
             return rollingRange(180);
         case '12m':
@@ -109,6 +119,14 @@ export function resolvePrevRange(range: string): { startDate: string; endDate: s
             return previousRollingRange(60);
         case '90d':
             return previousRollingRange(90);
+        case '24h':
+            return { startDate: '3daysAgo', endDate: '2daysAgo' };
+        case '28d':
+            return previousRollingRange(28);
+        case '3m':
+            return previousRollingRange(91);
+        case '16m':
+            return previousRollingRange(487);
         case '6m':
             return previousRollingRange(180);
         case '12m':
@@ -1464,4 +1482,20 @@ export async function fetchJourneyData(
         landingPages,
         exitPages
     };
+}
+
+// ─── Dashboard builder v2 helpers (BUILDER.md 8.3) ───
+// Thin transports only: the builder engine plans, batches, caches and limits the calls
+// (lib/builder/server/engine.ts, lib/googleLimiter.ts). Going through gaFetch keeps the demo
+// shim (TC_DEMO_DATA) working.
+
+/** GA4 batchRunReports: up to 5 reports for ONE property in one HTTP call. */
+export async function runGABatch(token: string, propertyId: string, requests: Record<string, unknown>[], signal?: AbortSignal) {
+    if (requests.length > 5) throw new Error('runGABatch: at most 5 reports per batch');
+    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:batchRunReports`, token, { requests }, signal);
+}
+
+/** Search Console searchAnalytics.query with the full request body (filters, dataState, paging). */
+export async function runGSCSearchAnalytics(token: string, siteUrl: string, body: Record<string, unknown>, signal?: AbortSignal) {
+    return gaFetch(`${GSC_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, token, body, signal);
 }

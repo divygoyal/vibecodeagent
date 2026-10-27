@@ -19,7 +19,7 @@ export interface PDFExportOptions {
   dateRangeLabel?: string;
   /** Company name for the header (from theme branding) */
   companyName?: string;
-  /** Background color to force behind transparent areas (defaults to zinc-950) */
+  /** Background color to force behind transparent areas (defaults to the light canvas) */
   backgroundColor?: string;
   /** Paper orientation */
   orientation?: 'portrait' | 'landscape';
@@ -31,7 +31,7 @@ export interface PDFExportOptions {
 
 // ── Constants ──
 
-const DEFAULT_BG = '#09090b'; // zinc-950
+const DEFAULT_BG = '#f6f7f9'; // light canvas (--tc-gray-50)
 const PDF_MARGIN = 10; // mm
 const HEADER_HEIGHT = 14; // mm — space for name + date at top of page 1
 const FOOTER_HEIGHT = 8; // mm — space for "Page X of Y" + timestamp

@@ -86,14 +86,14 @@ function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
     const progress = (Math.min(score, 100) / 100) * circumference;
 
     let color: string;
-    if (score >= 70) color = '#34d399';
-    else if (score >= 50) color = '#fbbf24';
-    else color = '#f87171';
+    if (score >= 70) color = 'var(--tc-up)';
+    else if (score >= 50) color = 'var(--tc-warn)';
+    else color = 'var(--tc-down)';
 
     return (
         <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
             <svg width={size} height={size} className="-rotate-90">
-                <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+                <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--tc-subtle)" strokeWidth="8" />
                 <circle
                     cx={size / 2}
                     cy={size / 2}
@@ -108,8 +108,8 @@ function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
                 />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold" style={{ color }}>{Math.round(score)}</span>
-                <span className="text-xs text-zinc-500">/ 100</span>
+                <span className="text-3xl font-semibold" style={{ color }}>{Math.round(score)}</span>
+                <span className="text-xs text-fg-muted">/ 100</span>
             </div>
         </div>
     );
@@ -119,7 +119,7 @@ function Shimmer() {
     return (
         <div className="space-y-4 animate-pulse">
             {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-24 rounded-xl bg-white/[0.04]" />
+                <div key={i} className="h-24 rounded-control bg-surface-sunken" />
             ))}
         </div>
     );
@@ -161,43 +161,43 @@ export default function ReadabilityCheckerPage() {
 
     const ratingColor = useMemo(() => {
         if (!result) return '';
-        if (result.score >= 70) return 'text-emerald-400';
-        if (result.score >= 50) return 'text-amber-400';
-        return 'text-red-400';
+        if (result.score >= 70) return 'text-up';
+        if (result.score >= 50) return 'text-warn';
+        return 'text-down';
     }, [result]);
 
     return (
-        <div className="min-h-screen pt-24 pb-20 px-6">
+        <div className="px-4 pt-10 pb-16 md:px-6">
             <div className="max-w-3xl mx-auto">
-                <Link href="/tools" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors mb-8">
+                <Link href="/tools" className="inline-flex items-center gap-1.5 text-sm text-fg-secondary hover:text-fg transition-colors mb-8">
                     <ArrowLeft className="w-4 h-4" /> All Tools
                 </Link>
 
                 <motion.div initial="hidden" animate="visible" variants={fadeUp}>
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400">
+                        <div className="p-2.5 rounded-control bg-brand-soft text-brand-soft-fg">
                             <BookOpen className="w-5 h-5" />
                         </div>
-                        <h1 className="text-2xl sm:text-3xl font-bold">Readability Checker</h1>
+                        <h1 className="text-heading sm:text-heading-lg text-fg">Readability Checker</h1>
                     </div>
-                    <p className="text-sm sm:text-base text-zinc-400 mb-8">
+                    <p className="text-sm sm:text-base text-fg-secondary mb-8">
                         Analyze content readability using the Flesch-Kincaid scoring system.
                     </p>
                 </motion.div>
 
                 {/* Input */}
-                <motion.div initial="hidden" animate="visible" variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6 mb-8">
+                <motion.div initial="hidden" animate="visible" variants={fadeUp} className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6 mb-8">
                     {/* Tab toggle */}
-                    <div className="flex gap-1 p-1 rounded-lg bg-white/[0.04] w-fit mb-5">
+                    <div className="flex gap-1 p-1 rounded-lg bg-surface-sunken w-fit mb-5">
                         <button
                             onClick={() => setMode('url')}
-                            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${mode === 'url' ? 'bg-white/[0.1] text-white' : 'text-zinc-400 hover:text-white'}`}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${mode === 'url' ? 'bg-surface shadow-xs text-fg' : 'text-fg-secondary hover:text-fg'}`}
                         >
                             <Link2 className="w-3.5 h-3.5" /> URL
                         </button>
                         <button
                             onClick={() => setMode('text')}
-                            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${mode === 'text' ? 'bg-white/[0.1] text-white' : 'text-zinc-400 hover:text-white'}`}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${mode === 'text' ? 'bg-surface shadow-xs text-fg' : 'text-fg-secondary hover:text-fg'}`}
                         >
                             <Type className="w-3.5 h-3.5" /> Paste Text
                         </button>
@@ -211,12 +211,12 @@ export default function ReadabilityCheckerPage() {
                                     value={url}
                                     onChange={(e) => setUrl(e.target.value)}
                                     placeholder="https://example.com/blog-post"
-                                    className="flex-1 px-4 py-3 min-h-[44px] rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                                    className="flex-1 px-4 py-3 min-h-[44px] rounded-lg bg-surface border border-border shadow-xs text-fg placeholder-fg-faint focus:outline-none focus:border-focus transition-colors"
                                 />
                                 <button
                                     type="submit"
                                     disabled={loading || !url.trim()}
-                                    className="min-h-[44px] w-full sm:w-auto px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="min-h-[44px] w-full sm:w-auto px-5 py-2.5 rounded-lg bg-brand text-brand-fg font-medium text-sm hover:bg-brand-hover transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     <Search className="w-4 h-4" /> Analyze
                                 </button>
@@ -228,12 +228,12 @@ export default function ReadabilityCheckerPage() {
                                     onChange={(e) => setText(e.target.value)}
                                     placeholder="Paste your content here..."
                                     rows={6}
-                                    className="w-full px-4 py-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-colors resize-y"
+                                    className="w-full px-4 py-3 rounded-lg bg-surface border border-border shadow-xs text-fg placeholder-fg-faint focus:outline-none focus:border-focus transition-colors resize-y"
                                 />
                                 <button
                                     type="submit"
                                     disabled={!text.trim()}
-                                    className="mt-3 min-h-[44px] w-full sm:w-auto px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="mt-3 min-h-[44px] w-full sm:w-auto px-5 py-2.5 rounded-lg bg-brand text-brand-fg font-medium text-sm hover:bg-brand-hover transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     <Search className="w-4 h-4" /> Analyze
                                 </button>
@@ -245,7 +245,7 @@ export default function ReadabilityCheckerPage() {
                 {loading && <Shimmer />}
 
                 {error && (
-                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-red-400 text-sm">
+                    <div className="rounded-control border border-down/20 bg-down-soft p-4 text-down text-sm">
                         {error}
                     </div>
                 )}
@@ -253,13 +253,13 @@ export default function ReadabilityCheckerPage() {
                 {result && (
                     <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="space-y-6">
                         {/* Score + Rating */}
-                        <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
+                        <motion.div variants={fadeUp} className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6">
                             <div className="flex flex-col sm:flex-row items-center gap-6">
                                 <ScoreRing score={result.score} />
                                 <div className="text-center sm:text-left">
-                                    <p className={`text-2xl font-bold ${ratingColor}`}>{result.rating}</p>
-                                    <p className="text-sm text-zinc-400 mt-1">
-                                        Grade Level: <span className="text-white font-medium">{result.gradeLevel}</span>
+                                    <p className={`text-2xl font-semibold ${ratingColor}`}>{result.rating}</p>
+                                    <p className="text-sm text-fg-secondary mt-1">
+                                        Grade Level: <span className="text-fg font-medium">{result.gradeLevel}</span>
                                     </p>
                                 </div>
                             </div>
@@ -273,21 +273,21 @@ export default function ReadabilityCheckerPage() {
                                 { label: 'Avg Words/Sentence', value: result.avgWordsPerSentence },
                                 { label: 'Avg Syllables/Word', value: result.avgSyllablesPerWord },
                             ].map((stat) => (
-                                <div key={stat.label} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
-                                    <p className="text-xl font-bold text-white">{stat.value}</p>
-                                    <p className="text-xs text-zinc-500 mt-1">{stat.label}</p>
+                                <div key={stat.label} className="rounded-control border border-border-subtle bg-surface p-4 text-center">
+                                    <p className="text-xl font-semibold text-fg">{stat.value}</p>
+                                    <p className="text-xs text-fg-muted mt-1">{stat.label}</p>
                                 </div>
                             ))}
                         </motion.div>
 
                         {/* Recommendations */}
                         {result.recommendations.length > 0 && (
-                            <motion.div variants={fadeUp} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
+                            <motion.div variants={fadeUp} className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6">
                                 <h2 className="text-lg font-semibold mb-3">Recommendations</h2>
                                 <ul className="space-y-2">
                                     {result.recommendations.map((rec, i) => (
-                                        <li key={i} className="flex items-start gap-2.5 text-sm text-zinc-300">
-                                            <span className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                                        <li key={i} className="flex items-start gap-2.5 text-sm text-fg">
+                                            <span className="mt-1 w-1.5 h-1.5 rounded-full bg-up flex-shrink-0" />
                                             {rec}
                                         </li>
                                     ))}

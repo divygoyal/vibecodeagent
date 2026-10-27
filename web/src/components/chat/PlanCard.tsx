@@ -37,34 +37,35 @@ export function PlanCard({ plan }: PlanCardProps) {
     if (!plan || !plan.steps?.length) return null;
 
     return (
-        <div className="my-2 rounded-lg border border-cyan-500/20 bg-gradient-to-b from-cyan-500/[0.04] to-transparent overflow-hidden">
+        <div className="my-2 overflow-hidden rounded-control border border-border-subtle bg-surface-sunken">
             <button
                 onClick={() => setOpen(!open)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] hover:bg-cyan-500/[0.05] transition-colors"
+                aria-expanded={open}
+                className="flex w-full items-center gap-2 px-3 py-2 text-body-sm transition-colors hover:bg-subtle"
             >
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                <span className="font-semibold text-zinc-200">Plan</span>
-                <span className="text-zinc-500 truncate flex-1 text-left">{plan.summary}</span>
-                <span className="flex items-center gap-2 text-[10px] text-zinc-500 tabular-nums">
-                    <span className="flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />{plan.est_runtime_s}s</span>
+                <Sparkles aria-hidden className="size-3.5 shrink-0 text-fg-muted" strokeWidth={1.75} />
+                <span className="font-medium text-fg">Plan</span>
+                <span className="min-w-0 flex-1 truncate text-left text-fg-muted">{plan.summary}</span>
+                <span className="flex items-center gap-2 text-caption text-fg-muted tabular-nums">
+                    <span className="flex items-center gap-0.5"><Clock aria-hidden className="size-3" />{plan.est_runtime_s}s</span>
                     {plan.est_cost_cents > 0 && (
-                        <span className="flex items-center gap-0.5"><Coins className="w-2.5 h-2.5" />{plan.est_cost_cents.toFixed(1)}¢</span>
+                        <span className="flex items-center gap-0.5"><Coins aria-hidden className="size-3" />{plan.est_cost_cents.toFixed(1)}¢</span>
                     )}
                 </span>
-                {open ? <ChevronDown className="w-3 h-3 text-zinc-600" /> : <ChevronRight className="w-3 h-3 text-zinc-600" />}
+                {open ? <ChevronDown aria-hidden className="size-3.5 text-fg-faint" /> : <ChevronRight aria-hidden className="size-3.5 text-fg-faint" />}
             </button>
             {open && (
-                <ol className="px-3 pb-2 pt-1 border-t border-cyan-500/10 space-y-1.5">
+                <ol className="space-y-1.5 border-t border-border-subtle px-3 pb-2 pt-2">
                     {plan.steps.map((step, i) => (
-                        <li key={i} className="flex gap-2 text-[11px]">
-                            <span className="flex-shrink-0 mt-0.5 w-4 h-4 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 flex items-center justify-center text-[9px] font-bold">
+                        <li key={i} className="flex gap-2 text-meta">
+                            <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-subtle text-caption text-fg-secondary">
                                 {i + 1}
                             </span>
                             <div className="min-w-0 flex-1">
-                                <code className="text-cyan-300 text-[10px] font-mono">{step.tool}</code>
-                                <span className="text-zinc-400"> — {step.why}</span>
+                                <code className="font-mono text-caption text-fg">{step.tool}</code>
+                                <span className="text-fg-muted"> — {step.why}</span>
                                 {step.expected && (
-                                    <p className="text-zinc-600 text-[10px] mt-0.5">→ {step.expected}</p>
+                                    <p className="mt-0.5 text-caption text-fg-faint">→ {step.expected}</p>
                                 )}
                             </div>
                         </li>

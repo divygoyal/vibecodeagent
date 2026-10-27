@@ -33,6 +33,11 @@ const EMBEDDABLE_HEADERS = [
 const nextConfig: NextConfig = {
   output: 'standalone',
   trailingSlash: false,
+  // Local dev kit only (scripts/dev/up.sh): cap Turbopack's cache memory on the
+  // shared box. Unset everywhere else, so production builds are unchanged.
+  ...(process.env.TC_TURBOPACK_MEMORY_LIMIT_MB
+    ? { experimental: { turbopackMemoryLimit: Number(process.env.TC_TURBOPACK_MEMORY_LIMIT_MB) * 1024 * 1024 } }
+    : {}),
   // Allow external images (user avatars)
   images: {
     remotePatterns: [
@@ -50,8 +55,57 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Security + cache headers
+  // Removed and moved routes (redesign, DESIGN.md 4.3/4.4). Permanent, and the
+  // query string is kept. The old single-site pages (/dashboard/analytics/*,
+  // /dashboard/seo, /dashboard/audit) are NOT here: their target depends on the
+  // user's current site, so middleware.ts redirects them (307) using the tc_site
+  // cookie, with a client fallback in their layouts.
+  redirects: async () => [
+    // Telegram bot, bot blog, X / Reddit API pages, globe: removed from the app
+    ...['bot', 'setup-bot', 'blog', 'x-api', 'reddit-api', 'globe'].flatMap((p) => [
+      { source: `/dashboard/${p}`, destination: '/dashboard', permanent: true },
+      { source: `/dashboard/${p}/:path*`, destination: '/dashboard', permanent: true },
+    ]),
+    // Separate share studio: sharing lives in Dashboards now
+    { source: '/dashboard/share', destination: '/dashboard/dashboards', permanent: true },
+    { source: '/dashboard/share/:path*', destination: '/dashboard/dashboards', permanent: true },
+    // Weekly page became the weekly report email setting (DESIGN 4.1, 4.3)
+    { source: '/dashboard/weekly', destination: '/dashboard/settings?tab=notifications', permanent: true },
+    { source: '/dashboard/weekly/:path*', destination: '/dashboard/settings?tab=notifications', permanent: true },
+    // AI chat is "Ask"
+    { source: '/dashboard/ai-chat', destination: '/dashboard/ask', permanent: true },
+    { source: '/dashboard/ai-chat/:path*', destination: '/dashboard/ask/:path*', permanent: true },
+    // Product-spec names for the same pages
+    { source: '/dashboard/portfolio', destination: '/dashboard', permanent: true },
+    { source: '/dashboard/connect', destination: '/dashboard/connect-ai', permanent: true },
+    // Marketing and embeds for removed features
+    { source: '/x', destination: '/', permanent: true },
+    { source: '/reddit', destination: '/', permanent: true },
+    { source: '/globe', destination: '/', permanent: true },
+    { source: '/embed/x/:path*', destination: '/', permanent: true },
+    { source: '/embed/reddit/:path*', destination: '/', permanent: true },
+    { source: '/demo/telegram', destination: '/demo', permanent: true },
+    { source: '/demo/telegram-video', destination: '/demo', permanent: true },
+    { source: '/demo/telegram/:path*', destination: '/demo', permanent: true },
+    { source: '/share-popup-preview', destination: '/', permanent: true },
+    // Features were folded into the home page (DESIGN 4.4)
+    { source: '/features', destination: '/#product', permanent: true },
+    { source: '/features/:path*', destination: '/#product', permanent: true },
+    // Leaderboard settings moved out of Settings into their own page
+    {
+      source: '/dashboard/settings',
+      has: [{ type: 'query', key: 'tab', value: 'leaderboard' }],
+      destination: '/dashboard/leaderboard',
+      permanent: true,
+    },
+  ],
+  // Security + cache headers. TC_NOINDEX=1 (private previews, read at build
+  // time) adds X-Robots-Tag: noindex, nofollow to every response; robots.ts
+  // and sitemap.ts also check it at request time.
   headers: async () => [
+    ...(process.env.TC_NOINDEX === '1'
+      ? [{ source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] }]
+      : []),
     {
       // Cache static assets (videos, images, fonts) for 1 year
       source: '/:path*.(mp4|webm|jpg|jpeg|png|gif|svg|ico|woff|woff2)',

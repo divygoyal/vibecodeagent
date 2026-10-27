@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
+    title: 'Shared dashboard',
     robots: {
         index: false,
         follow: false,

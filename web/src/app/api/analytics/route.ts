@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { getToken } from "next-auth/jwt"
 import { authOptions } from "@/lib/auth"
 import { cachedFetch, CACHE_TTL } from '@/lib/apiCache'
+import { googleErrorResponse } from '@/lib/googleErrors'
 import { isDemoRequest } from '@/lib/demoWorkspace'
 import { getDemoAnalyticsDashboard } from '@/lib/demoWorkspaceData'
 import { getValidAccessToken, listAnalyticsProperties, fetchAnalyticsDashboard, fetchGoogleTokensFromDb } from '@/lib/googleApi'
@@ -321,8 +322,7 @@ export async function GET(req: Request) {
             if (mode === 'list') {
                 const properties = await fetchPropertyList()
                 if (!Array.isArray(properties)) {
-                    const statusCode = properties.error.includes('timed out') ? 504 : 502
-                    return NextResponse.json({ error: properties.error }, { status: statusCode })
+                    return googleErrorResponse(properties.error)
                 }
                 return NextResponse.json(properties)
             }
@@ -332,8 +332,7 @@ export async function GET(req: Request) {
             if (!propertyId) {
                 const properties = await fetchPropertyList()
                 if (!Array.isArray(properties)) {
-                    const statusCode = properties.error.includes('timed out') ? 504 : 502
-                    return NextResponse.json({ error: properties.error }, { status: statusCode })
+                    return googleErrorResponse(properties.error)
                 }
                 if (properties.length > 0) {
                     propertyId = properties[0].property
@@ -364,7 +363,7 @@ export async function GET(req: Request) {
             )
 
             if (dashboardData?.__error) {
-                return NextResponse.json({ error: dashboardData.__error }, { status: 502 })
+                return googleErrorResponse(dashboardData.__error)
             }
             return NextResponse.json(dashboardData, {
                 headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' },

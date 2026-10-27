@@ -1,0 +1,159 @@
+# Robustness notes (tc/integrate, dev instance `integrate` 3101/8101)
+
+Goal: no "Something went wrong", nothing cut off on a phone, a clear state for every Google failure.
+Reports and screenshots: `/root/projects/tc-redesign-research/robust/`. Shared worktree: commits use
+`git commit -- <paths>` only.
+
+## Checks (all in scripts/dev, see README §7–8)
+| command | what |
+|---|---|
+| `cd web && npm run check:rsc` | TypeScript-API scan of every Server Component module (app entries + non-client imports, per binding through barrels): JSX props to Client Components / host elements that are functions, `.bind`, class instances (URL, RegExp, Error, Intl, user classes) or contain one. Client references and JSX are fine; Date/Map/Set are notes. Fixture test `tests/check-rsc-props.test.mjs`. Catches both earlier crashes on their parent commits (25cbc9b Button icons, 6db24d7 BarList formatValue). |
+| `node scripts/dev/check-mobile.mjs 3101` | every route at 360/390/414, touch, light + dark (`/dashboard`); sideways scroll, elements past the edge (outermost; scroll containers exempt), text/controls cut by overflow:hidden, own text clipped without ellipsis, tap targets < 32px (pseudo-element hit areas count; tabindex-only tooltip spans do not), fixed elements over the tab bar and content behind it at the page end, error boundary, NaN/undefined/Infinity/[object Object]/Invalid Date on screen, spinners still up after 20 s, /api 5xx or non-JSON errors. `--paths`, `--cookie tc_demo_faults=…`, `--user`, `--state none`. Retries a page when the dev server restarts. |
+| `node scripts/dev/check-scenarios.mjs 3101` | logs in as each scenario user and runs check-mobile on 18 app pages; `cookie:<spec>` users run public pages logged out with the fault cookie. Table: `robust/scenarios.md`. |
+| `node scripts/dev/check-api.mjs 3101` | GET every /api route (side-effect GETs skipped) under each fault; flags HTML/empty answers, 5xx without a message, hangs. `robust/api-<user>.md`. |
+| `node scripts/dev/seed-dashboards.mjs 3101 --user u` | one dashboard per template + the every-widget showcase via the app API; prints paths for `check-mobile --paths`. |
+| `cd web && npm run check:all -- --base http://localhost:3101 [--full]` | tsc, ESLint on files changed since the work/live merge-base (fails only on errors the branch added, per file and rule), npm test, check:rsc, check-mobile (key routes at 360/390; all with --full). |
+
+## Demo faults and scenario users
+`web/src/lib/demo/faults.ts`: `TC_DEMO_FAULTS` env, `tc_demo_faults` cookie, or a `~spec` suffix on a demo token.
+Faults 403, 429, 500, timeout[:ms], empty, revoked, huge; scopes ga4, gsc, psi, list, all (default: every data call,
+lists still work). The token refresh keeps the suffix. Unit tests: `tests/demoFaults.test.mjs`.
+New demo accounts in catalog.ts: empty, one, ga4only, gsconly, many (200 generated sites outside getDemoSites(), some
+with 90-character hosts). login.mjs users: those plus nogoogle (GitHub sign-in, no token stored), nocredits, f403 f429
+f500 ftimeout fempty frevoked fhuge (the demo account's sites with that fault).
+
+## Fixed (commit, what)
+- e4473a3, ddb59dc Home hero cards, leaderboard, MCP and dashboard sections overflowed at 360–390px: single-column grids
+  had an implicit `auto` track sized by the widest unbreakable content (cards, BarList values, buttons) and
+  `main{overflow-x:clip}` / BrowserFrame `overflow:hidden` cut them. `grid-cols-1` (minmax(0,1fr)) + `min-w-0`.
+- 64997fe Leaderboard profile breakdowns ran 60px off a 360px screen (same cause), `md:grid-cols-[3fr_2fr]` →
+  minmax(0,…). Touch-only (`pointer-coarse:`) hit areas, no desktop change: Switch, Checkbox, table sort headers,
+  SegmentedControl, link buttons ("View all"), stat/scorecard info icons, Suggested fix, brand link, offer pills; pill
+  Tabs 32px; footer and similar-site links 32px rows.
+- bdfbaa9 Error boundaries in the new design via `components/app/ErrorScreen.tsx`: dashboard (inside the shell),
+  site segment `/dashboard/s/[host]` (new), marketing, global-error (light canvas + brand). Reload (full load), Go home /
+  Go to Portfolio, Error ID; each hit logs to the console, Clarity and the server log (`POST /api/client-error`,
+  4 KB cap, 20/min per IP): `[client-error] scope=… digest=… path=… message=…`.
+- 1ad06b9 Portfolio: a Google account with 0 properties stayed on "Finding your sites" forever (needsSync([]) is
+  always true, so every poll started a sync and `syncing` never cleared); an inventory that failed at Google did the
+  same while re-listing on every poll. Now: "no sites" after an empty sync (re-check after 10 min or Check again),
+  "Couldn't reach Google" + Try again after a failed one (retry after 60 s).
+- 8b2ae64 Portfolio with a property Google refuses (403) re-ran the whole sync every 2 s while the page was open (18
+  Google calls per poll, spinner forever): never-synced `no_access` assets had no back-off in isDue(). Now 30 min (Sync
+  now forces). The exact-users report backs off 5 min after a failed run (429/5xx) instead of restarting per poll.
+- 7f67727 Search tab: with a failed summary (429/403/500) the four metric tiles kept skeletons forever; now a dash (the
+  chart shows the error and Try again).
+- 7ebd3f4 ChunkLoadError (a tab opened before a deploy asks for chunks the new build no longer has) showed "Something went
+  wrong"; the error screen now reloads once (60 s guard in sessionStorage) for chunk-load errors.
+- cce8bdc Dashboards: the pie widget's donut and legend were cut top and bottom on phones (legend below needs more
+  height than the cell); the donut leaves room for 3 legend rows and the rest folds into "Other".
+- f716de8 Site filter chips (Striking distance, Declining, …) 32px on touch.
+- c652a0d check-mobile: timeouts on every page call (a page call hung the dashboards run for 20 min).
+- 890b76d `shot.mjs`/`crawl.mjs --dark` produced light pages (theme is `localStorage['tc-theme']`); pw.newContext sets it.
+
+## Server log audit (integrate + preview web.log)
+| signature | count | cause | status |
+|---|---|---|---|
+| `Functions cannot be passed directly to Client Components` `{formatValue: function}` / `render: function ArrowRight` | 26 dev, 42 preview | BarList formatValue and Button icons from Server Components | fixed 6db24d7, 25cbc9b; guarded by check:rsc |
+| `ChunkLoadError` / `Cannot find module .next/server/chunks/ssr/…` / `Could not find the module … in the React Client Manifest` (preview) | ~300 | `.next` was rebuilt under a running `next start`; the old process asks for chunk files that no longer exist | process: stop the preview, build, start (or build into a fresh dir). Production (Coolify image) is not affected |
+| `"next start" does not work with "output: standalone"` (preview) | 4 | preview runs `next start` on a standalone build | harmless for a preview; production uses the standalone server |
+| `[AUDIENCE] Gemini topics failed: 403 … Gemini API has not been used in project …` (preview) | 2 | the preview's Gemini key belongs to a GCP project with the Generative Language API disabled | config: enable the API on that project or use the production key; AI features fall back meanwhile |
+| `Element type is invalid … got: object` (SSR) / `Lazy element type must resolve to a class or function` (browser) on `GET /?…` (dev) | 42+ | dev server only, still there after a clean `.next`: the home page 500s for some query-string lengths (`?foo=/xxxxxxxxxxxxxxxx` 16–20 chars fails, 15 or 24+ passes; `?callbackUrl=/dashboard` fails, `/dash` passes). Depends only on the URL length, not on the param or the sign-in banner, and only on `/` (a copy of the page at another path never fails): a byte-offset bug in dev streaming of the 430 KB page | production build unaffected (`/` is static; preview returns 200 and the banner renders). Watch item; the marketing boundary shows Reload/Go home if it ever happens |
+| `Module … ShareConversionBar.tsx [app-ssr] was instantiated … deleted in an HMR update` (dev) | 1 | HMR race while the sweep branch was merged | harmless (dev only) |
+| `Server is approaching the used memory threshold, restarting` (dev) | 11 | full crawls compile every route (child reaches ~4.5 GB) | dev only; check scripts wait and retry |
+| `middleware file convention is deprecated` / `inferred your workspace root` | 15 | Next 16 rename / lockfile in /root | harmless (README) |
+| MCP `{"evt":"mcp_tool",…"status":"error:rate_limited|site_not_in_grant|…"}` | ~25 | structured logs of the MCP tests' expected refusals | harmless |
+
+## Results (robust/ reports)
+- Mobile, all routes, 360/390/414, light + dark app routes: `mobile-demo.md` (baseline, after the home fixes) and
+  `mobile-final.md` (65 route/theme pairs re-run before the stop; the rest of the marketing/share/tools routes were
+  clean in the baseline). Baseline real issues: leaderboard profile 99 elements off-screen, every dashboard with a pie
+  widget 12 clipped; home before ddb59dc 48 off-screen + 18 clipped. Final: 0 overflow / off-screen / clipped / text
+  clipped / tab-bar overlaps; tap targets under 32px 1542 -> 343 on the same pages (summed over 3 widths).
+- Scenarios (`scenarios.md`, 390px, 18 app pages × 14 users + 4 cookie runs × 10 public pages): no error boundary, no
+  NaN/undefined. Remaining flags are explained: L on f403/f429 = before 8b2ae64/7f67727 (re-checked by hand after:
+  syncing false, tiles show a dash), L on ftimeout/many = a real first sync still running (15 s timeouts, 200 sites),
+  E on ga4only/ftimeout = dev-server restart / HMR ChunkLoadError (now auto-reloads), A on frevoked dashboards = HTML
+  500s during the Turbopack crash, j = JSON 5xx with a message (fine).
+- Dashboards: 9 templates + every-widget showcase, light/dark, 3 widths (`mobile-dash-none.md`, stopped at 14/20 by a
+  hung page call, now guarded) and 390px under 403/429/500/empty/huge/revoked/timeout (`mobile-dash-*.md`): every
+  widget shows data, an empty state or an error with Try again. The builder's 60 s circuit breaker shows "Google is
+  rate limiting this property" for a minute after 3 server errors (by design).
+- Leaderboard: all 13 public profiles + embeds (light, 5 dark), join, advertise, unknown slug: `mobile-leaderboard.md`.
+- Not finished (stopped for the usage limit): `check-api.mjs` over every GET route × faults, the re-run of the fixed
+  scenario pages, and the last ~16 routes of `mobile-final`. Run: `node scripts/dev/check-api.mjs 3101`,
+  `node scripts/dev/check-scenarios.mjs 3101 --users f403,f429,ftimeout`, `node scripts/dev/check-mobile.mjs 3101 --label final`.
+
+## Open (severity)
+- ~~Medium~~ fixed, see "Fixed after robustness": `/api/share/<token>/overview/stats` answers 500 with an empty body when Google
+  fails (429/500 cookie runs on /share/<token>); should be JSON 4xx/5xx with a message.
+- ~~Low~~ fixed, see "Polish pass": with counts × 10M (`cookie:huge`) public share/view pages show 81 text-spill spots (numbers wider than their
+  box, not clipped); check `mobile-scen-cookie-huge.md`.
+- ~~Medium~~ fixed, see "Fixed after robustness": a sync interrupted by a restart or deploy leaves assets `syncing`; the portfolio then reports `syncing` and
+  polls every 2 s for up to 15 min (SYNC_STUCK_S in build.ts/sync.ts) before a new sync runs. With one web process,
+  "syncing in the store but no sync running in this process" means interrupted and could resync at once; not changed
+  here because it assumes a single instance.
+- Low: the Tawk.to greeting ("Hi! How can we help?" + two buttons) opens over half of a phone screen on every app page
+  and hides content (seen in every mobile screenshot). Tawk dashboard setting: turn the greeting off on mobile.
+- ~~Low~~ fixed, see "Fixed after robustness": `/api/analytics?mode=list` and `/api/seo?mode=list` answer 502 with the raw Google JSON inside `error`
+  (`Google API error 401: {"error":…}`), also for a revoked token where 401 + "Reconnect Google" would be right. JSON,
+  not shown in the UI.
+- ~~Low~~ fixed, see "Polish pass": standalone text links are 18–20px tall ("Open the full demo", "See pricing", breadcrumbs) and the marketing logo
+  link 28px; footer, toggles, tabs, table headers, segmented controls and pills are fixed (touch only).
+- Low (dev only): `/` 500s for some URL lengths (see the log table). Prod build unaffected.
+- ~~Info~~ fixed, see "Polish pass": ~70 responsive grids still have no `grid-cols-1` base; none overflowed with the tested data (90-character hosts
+  at 390px, counts × 10M at 360px), but unusual content could. Fix as found: `grid-cols-1` / `minmax(0,…)`.
+- Info: the synthetic `nogoogle` user (GitHub session without a token) gets 503 from /api/auth/register-provider
+  (`missing-session-data`, handled as degraded); a real GitHub sign-in carries a token.
+
+## Fixed after robustness
+Checked on :3101 (demo data, fault cookie / `f…` users). Tests: `web/tests/robustErrors.test.mjs`; `tsc --noEmit` and `npm test` (59) pass.
+
+1. **Stale "syncing" (was up to 15 min).** `SYNC_STUCK_S` is now 2 min (one constant in `portfolio/ranges.ts`, used by
+   build.ts and sync.ts). `sync_started_at` is a heartbeat: set when the sync marks assets, bumped after every backfill
+   chunk. `isDue()` treats `syncing` with no heartbeat for 2 min as interrupted and re-runs it at once (before, only a
+   never-synced asset restarted; one with data waited for its 6 h age). A `finally` in `runSync` puts assets still
+   `syncing` after a throw back to `error` ("Sync interrupted. Will retry."). Evidence: all 18 assets of the demo user set
+   to `syncing`, started 5 min ago, nothing running. Before: `/api/portfolio` → `syncing:true`, 11 sites `syncing`, still
+   the same 6 s later and in the DB. After: first load `syncing:true` (new sync started), 8 s later `syncing:false`, 11
+   `synced`, log `due=18 synced=18 … in 561ms`. Not changed: a sync queued behind a long run is only refreshed per chunk,
+   so with >2 min of queue another process could start a duplicate (harmless, upserts); single process today.
+2. **Share overview routes answered 500 with an empty body when Google failed.** `stats` and `journey` threw. All 11
+   Google-backed `/api/share/<token>/overview/*` routes are wrapped in `shareOverviewRoute()` (shareOverviewServer.ts):
+   JSON `{error, message}`, 503 for quota/timeout/revoked, 502 otherwise, no reconnect wording for viewers. Before (429,
+   500, revoked cookies): `stats`/`journey` 500, length 0. After: 429 → 503 `google_rate_limited`; 500 → 502
+   `google_error`; revoked → 503 `google_unavailable`. `/share/<token>` shows its normal "Could not load the chart" panel
+   with the message (client `fetchJson` now prefers `message`). `meta`, `data` and `umami/*` already answered JSON.
+3. **`/api/analytics` and `/api/seo` passed Google's raw body through** (`Google API error 401: {…}`, also for revoked
+   tokens). New `lib/googleErrors.ts` maps every Google failure in both routes (list mode, the list fallback and the
+   dashboard data): revoked / invalid grant / 401 → 401 `{error:'google_reauth', message}`; timeout → 504
+   `google_timeout`; 429 → 502 `google_rate_limited`; 403 → 502 `google_forbidden`; else 502 `google_error`.
+   Before: `frevoked` `?mode=list` 502 with raw JSON; data calls 502 raw for 403/429/500/504. After: 401 `google_reauth`
+   (list and data), `list:500|429|timeout` 502/502/504 with short messages. `useDashboardData` fetcher prefers `message`.
+
+## Polish pass (before launch)
+Commits: 38403f4 (touch), cc91799 (grids), 1e16ceb (share numbers), plus the small touch follow-up below. `tsc --noEmit` and `npm test` (59) pass.
+
+1. **Tap targets on coarse pointers.** Two utilities in `globals.css`: `tap-area` (invisible 44px hit area via `::after`, only under
+   `pointer: coarse`, only grows an axis that is under 44px, no layout change; skipped for absolute/fixed/sticky elements) and
+   `tap-inline` (padding + negative margin, for an inline link inside an `overflow:hidden` / `truncate` box where a pseudo-element
+   would be clipped). Used by Button (every variant but `link`, which got a taller `after`: 20px text -> 44px), Select trigger,
+   StatusPill button, Tabs (pill tabs get room inside the scroll box; narrow routing tabs such as "Top" get +20px sideways),
+   SegmentedControl, table sort headers, page back arrow, and the standalone text links (Open Traffic, Ask AI, breadcrumbs, cross links,
+   site path cells, marketing CTAs, brand links, Built/Made with TrafficClaw, contact links). DropdownMenu and Select items are 44px tall on
+   touch (they are inside a popover, so the layout change is fine). `/ai` FAQ and the leaderboard Preview `<summary>` have `min-h-11` on touch.
+   Real bug found on the way: the audit URL input had `flex-1` inside a `flex-col` form, so it was squeezed to 23px tall; now `sm:flex-1`.
+   Checker: `check-mobile` now resolves a stretched link's `::after` against the nearest positioned ancestor (`after:absolute after:inset-0`
+   covers the whole card: 14 of the 30 "small" targets on /leaderboard were this, tappable all along).
+   Not done: popover content is only measured when open (not by the checker); `Badge` is not interactive anywhere (no change).
+   Numbers (390px, light, targets under 32px): /dashboard 11 -> 0, /dashboard/s/acmeanalytics.example/search 1 -> 0, /dashboard/dashboards 0 -> 0,
+   /leaderboard 16 -> 0 (14 checker-only), / 2 -> 0: **30 -> 0** (16 real fixes). Share page under the `huge` cookie 21 -> 0. Extra routes
+   (/dashboard/plan, /pricing, /ai, /contact, /tools, /dashboard/dashboards/new, /dashboard/leaderboard) 0. The old 343 (3 widths, all routes)
+   was not re-run in full; the 111 at 390px in `mobile-final` included the filter chips fixed in f716de8 and the ones above.
+2. **Grid base columns.** 64 responsive grids had `sm:/md:/lg:/xl:grid-cols-N` and no base column: `grid-cols-1` added (strings with a
+   `grid` token; `cn()` conditionals got it on the base string). The dashboard-builder canvas (react-grid-layout) is untouched.
+   BoardRows' container-query grid is not a grid below `@3xl`, so it needs none. No overflow or off-screen on the routes re-run.
+3. **Huge numbers on share/view pages.** Breakdown table value cells (64-72px) use exact numbers up to 999,999 and `fmtCompact` (339B)
+   above, with `min-w-0 truncate tabular-nums` and the exact value in the title; KPI tile values in the openpanel, umami and shared dashboard
+   clients got `min-w-0 truncate tabular-nums`; the home leaderboard preview value column is `min-w-20` (50K-100K spilled 5px).
+   Cookie `tc_demo_faults=huge` at 390 and 360px on /share/<token>, /view/<token>, /: text spills 81 -> 0.

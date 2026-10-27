@@ -104,14 +104,12 @@ export interface AdSlotRequestRecord {
 export const REQUEST_STATUS_FLOW: ReadonlyArray<{
     value: AdSlotRequestStatus;
     label: string;
-    /** Tailwind classes matching the existing dark palette. */
-    className: string;
 }> = [
-    { value: 'new', label: 'New', className: 'border-[#14C4E1]/25 bg-[#14C4E1]/10 text-[#7AD9DA]' },
-    { value: 'accepted', label: 'Accepted', className: 'border-amber-400/25 bg-amber-400/10 text-amber-300' },
-    { value: 'paid', label: 'Paid', className: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300' },
-    { value: 'declined', label: 'Declined', className: 'border-white/[0.1] bg-white/[0.03] text-zinc-400' },
-    { value: 'cancelled', label: 'Cancelled', className: 'border-white/[0.1] bg-white/[0.03] text-zinc-500' },
+    { value: 'new', label: 'New' },
+    { value: 'accepted', label: 'Accepted' },
+    { value: 'paid', label: 'Paid' },
+    { value: 'declined', label: 'Declined' },
+    { value: 'cancelled', label: 'Cancelled' },
 ];
 
 export function requestStatusMeta(status: string) {

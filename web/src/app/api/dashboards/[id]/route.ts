@@ -1,135 +1,85 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { sessionUserId } from '@/lib/builder/server/access';
+import { jsonError } from '@/lib/builder/server/service';
+import { deleteDashboard, getDashboard, propertyIdFor, StoreError, toRecord, updateDashboard } from '@/lib/builder/server/store';
+import { validateDoc } from '@/lib/builder/schema';
 
 export const dynamic = 'force-dynamic';
 
-const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:8000';
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+type Ctx = { params: Promise<{ id: string }> };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Session = { user?: { id: string; [key: string]: any } } | null;
-
-/**
- * GET /api/dashboards/[id] — Get a single dashboard by ID
- */
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const session = await getServerSession(authOptions) as Session;
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+/** GET /api/dashboards/[id]: the record with its v2 doc (v1 rows migrated in memory). */
+export async function GET(_req: Request, { params }: Ctx) {
+    const userId = await sessionUserId();
+    if (!userId) return jsonError(401, 'Unauthorized');
     const { id } = await params;
-    const userId = session.user.id;
-
-    const res = await fetch(
-      `${ADMIN_API_URL}/api/custom-dashboards/${id}?user_identifier=${userId}`,
-      { headers: { 'X-API-Key': ADMIN_API_KEY } },
-    );
-
-    if (!res.ok) {
-      const status = res.status;
-      if (status === 404) {
-        return NextResponse.json({ error: 'Dashboard not found' }, { status: 404 });
-      }
-      console.error('Admin API get dashboard error:', status, await res.text());
-      return NextResponse.json({ error: 'Failed to fetch dashboard' }, { status });
+    try {
+        const row = await getDashboard(userId, id);
+        if (!row) return jsonError(404, 'Dashboard not found');
+        const rec = toRecord(row);
+        return NextResponse.json({ dashboard: rec }, { headers: { 'Cache-Control': 'no-store', ETag: `"${rec.rev}"` } });
+    } catch (err) {
+        console.error('[dashboards] get failed', err);
+        return jsonError(err instanceof StoreError ? err.status : 500, 'Failed to load dashboard');
     }
-
-    const dashboard = await res.json();
-    return NextResponse.json({ dashboard });
-  } catch (err) {
-    console.error('Get dashboard error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
 }
 
 /**
- * PUT /api/dashboards/[id] — Update a dashboard
- * Body: { name?, description?, widgets?, gridLayouts?, theme?, isPublic?, embedEnabled? }
+ * PUT /api/dashboards/[id]: save the v2 doc. Optimistic concurrency: send the rev you edited
+ * as `If-Match: <rev>` (or body.rev); a newer save elsewhere returns 412 with the current rev.
+ * Body: { doc, rev?, versionLabel? } or { name } for a rename, { isTemplate }.
  */
-export async function PUT(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const session = await getServerSession(authOptions) as Session;
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+export async function PUT(req: Request, { params }: Ctx) {
+    const userId = await sessionUserId();
+    if (!userId) return jsonError(401, 'Unauthorized');
     const { id } = await params;
-    const body = await req.json();
-    const userId = session.user.id;
-
-    // Build snake_case payload, JSON-stringify nested objects for admin API
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const payload: Record<string, any> = {};
-    if (body.name !== undefined) payload.name = body.name;
-    if (body.description !== undefined) payload.description = body.description;
-    if (body.widgets !== undefined) payload.widgets = typeof body.widgets === 'string' ? body.widgets : JSON.stringify(body.widgets);
-    if (body.gridLayouts !== undefined) payload.grid_layouts = typeof body.gridLayouts === 'string' ? body.gridLayouts : JSON.stringify(body.gridLayouts);
-    if (body.theme !== undefined) payload.theme = typeof body.theme === 'string' ? body.theme : JSON.stringify(body.theme);
-    if (body.isPublic !== undefined) payload.is_public = body.isPublic;
-    if (body.embedEnabled !== undefined) payload.embed_enabled = body.embedEnabled;
-
-    const res = await fetch(`${ADMIN_API_URL}/api/custom-dashboards/${id}?user_identifier=${userId}`, {
-      method: 'PUT',
-      headers: { 'X-API-Key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('Admin API update dashboard error:', res.status, errText);
-      return NextResponse.json({ error: 'Failed to update dashboard' }, { status: res.status });
+    let body: Record<string, unknown>;
+    try {
+        body = (await req.json()) as Record<string, unknown>;
+    } catch {
+        return jsonError(400, 'Invalid JSON');
     }
+    const ifMatch = req.headers.get('if-match')?.replace(/"/g, '');
+    const expectedRev = ifMatch && /^\d+$/.test(ifMatch) ? Number(ifMatch) : typeof body.rev === 'number' ? body.rev : undefined;
 
-    const dashboard = await res.json();
-    return NextResponse.json({ dashboard });
-  } catch (err) {
-    console.error('Update dashboard error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+    try {
+        if (body.doc !== undefined) {
+            const v = validateDoc(body.doc);
+            if (!v.ok) return jsonError(422, v.error);
+            const ids = propertyIdFor(v.value);
+            const r = await updateDashboard(userId, id, { doc: v.value, ...ids, versionLabel: typeof body.versionLabel === 'string' ? body.versionLabel.slice(0, 80) : undefined }, expectedRev);
+            if (!r.ok) return jsonError(412, 'This dashboard changed in another tab.', { rev: r.rev });
+            return NextResponse.json({ dashboard: toRecord(r.row) });
+        }
+        if (typeof body.name === 'string' || typeof body.isTemplate === 'boolean') {
+            const row = await getDashboard(userId, id);
+            if (!row) return jsonError(404, 'Dashboard not found');
+            const rec = toRecord(row);
+            if (typeof body.name === 'string' && body.name.trim()) rec.doc.name = body.name.trim().slice(0, 200);
+            const r = await updateDashboard(userId, id, {
+                doc: rec.schemaVersion === 2 || typeof body.name === 'string' ? rec.doc : undefined,
+                isTemplate: typeof body.isTemplate === 'boolean' ? body.isTemplate : undefined,
+            }, expectedRev);
+            if (!r.ok) return jsonError(412, 'This dashboard changed in another tab.', { rev: r.rev });
+            return NextResponse.json({ dashboard: toRecord(r.row) });
+        }
+        return jsonError(422, 'Nothing to update');
+    } catch (err) {
+        console.error('[dashboards] update failed', err);
+        return jsonError(err instanceof StoreError ? err.status : 500, 'Failed to save dashboard');
+    }
 }
 
-/**
- * DELETE /api/dashboards/[id] — Soft-delete a dashboard
- */
-export async function DELETE(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    const session = await getServerSession(authOptions) as Session;
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+/** DELETE /api/dashboards/[id]: soft delete. */
+export async function DELETE(_req: Request, { params }: Ctx) {
+    const userId = await sessionUserId();
+    if (!userId) return jsonError(401, 'Unauthorized');
     const { id } = await params;
-    const userId = session.user.id;
-
-    const res = await fetch(
-      `${ADMIN_API_URL}/api/custom-dashboards/${id}?user_identifier=${userId}`,
-      {
-        method: 'DELETE',
-        headers: { 'X-API-Key': ADMIN_API_KEY },
-      },
-    );
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('Admin API delete dashboard error:', res.status, errText);
-      return NextResponse.json({ error: 'Failed to delete dashboard' }, { status: res.status });
+    try {
+        await deleteDashboard(userId, id);
+        return NextResponse.json({ success: true });
+    } catch (err) {
+        console.error('[dashboards] delete failed', err);
+        return jsonError(err instanceof StoreError ? err.status : 500, 'Failed to delete dashboard');
     }
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error('Delete dashboard error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
 }

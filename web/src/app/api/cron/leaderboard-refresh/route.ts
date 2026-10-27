@@ -1,25 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
-import { getValidAccessToken } from '@/lib/googleApi';
-import { verifyPropertyDomain } from '@/lib/leaderboardVerify';
-import { collectAudience, summarizeAudienceForLog } from '@/lib/audienceFetch';
+import { refreshEntry } from '@/lib/leaderboard/refresh';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
-const GA_DATA_BASE = 'https://analyticsdata.googleapis.com/v1beta';
-
-// Country lookups: GA4 returns full country names. Map a small set to ISO-2 for the country filter.
-const COUNTRY_TO_ISO2: Record<string, string> = {
-    'United States': 'US', 'United Kingdom': 'GB', 'India': 'IN', 'Canada': 'CA',
-    'Germany': 'DE', 'France': 'FR', 'Australia': 'AU', 'Brazil': 'BR',
-    'Japan': 'JP', 'Spain': 'ES', 'Italy': 'IT', 'Netherlands': 'NL',
-    'Mexico': 'MX', 'Indonesia': 'ID', 'Pakistan': 'PK', 'Bangladesh': 'BD',
-    'Nigeria': 'NG', 'South Africa': 'ZA', 'Vietnam': 'VN', 'Philippines': 'PH',
-    'Singapore': 'SG', 'Sweden': 'SE', 'Norway': 'NO', 'Poland': 'PL',
-    'Ukraine': 'UA', 'Russia': 'RU', 'Turkey': 'TR', 'Argentina': 'AR',
-};
+// Entries refreshed in parallel. Each is a different GA4 property, so this stays far
+// under the per-property limit (10 concurrent) while keeping the daily run short.
+const CONCURRENCY = 3;
 
 function verifyCronSecret(header: string | null): boolean {
     const secret = process.env.CRON_SECRET;
@@ -33,171 +23,26 @@ function verifyCronSecret(header: string | null): boolean {
     return header.length === expected.length && timingSafeEqual(a, b);
 }
 
-function cleanPropertyId(id: string): string {
-    if (!id.startsWith('properties/') && /^\d+$/.test(id)) {
-        return `properties/${id}`;
-    }
-    return id;
-}
-
 function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchWithRetry(input: string, init: RequestInit): Promise<Response> {
-    const first = await fetch(input, init);
-    if (first.ok || first.status < 500) return first;
-    await sleep(500);
-    return fetch(input, init);
+interface RefreshListEntry {
+    user_id: number;
+    entry_id: number;
+    ga_property_id: string | null;
+    website_url: string | null;
+    access_token: string;
+    refresh_token: string | null;
+    gsc_site_url?: string | null;
 }
 
 /**
- * Pull the last 30 days of GA4 daily metrics and bulk-upsert them into
- * leaderboard_stats_history via the admin backfill endpoint. Idempotent so
- * the cron can re-run it freely without duplicating rows.
+ * Daily refresh. For every active, unpaused listing: re-check Search Console
+ * ownership (and the GA4 stream), pull GA4 + Search Console numbers for 7d / 28d / 3m
+ * and the daily series, and refresh the audience breakdowns. Works unchanged in demo
+ * mode (TC_DEMO_DATA=1), where Google is answered by the demo generator.
  */
-async function backfillHistory(entryId: number, gaPropertyId: string, token: string) {
-    const pid = cleanPropertyId(gaPropertyId);
-    const reportRes = await fetchWithRetry(`${GA_DATA_BASE}/${pid}:runReport`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            dateRanges: [{ startDate: '29daysAgo', endDate: 'today' }],
-            dimensions: [{ name: 'date' }],
-            metrics: [
-                { name: 'activeUsers' },
-                { name: 'screenPageViews' },
-                { name: 'engagementRate' },
-                { name: 'bounceRate' },
-                { name: 'averageSessionDuration' },
-            ],
-            orderBys: [{ dimension: { dimensionName: 'date' } }],
-            limit: 60,
-        }),
-        signal: AbortSignal.timeout(15000),
-    });
-    if (!reportRes.ok) return;
-
-    type GA4Row = { dimensionValues?: Array<{ value: string }>; metricValues?: Array<{ value: string }> };
-    const data = (await reportRes.json()) as { rows?: GA4Row[] };
-    const rows = data.rows || [];
-    if (rows.length === 0) return;
-
-    const days = rows.map((r) => {
-        const m = r.metricValues || [];
-        return {
-            date: r.dimensionValues?.[0]?.value || '',
-            monthly_visitors: parseInt(m[0]?.value || '0', 10) || 0,
-            monthly_pageviews: parseInt(m[1]?.value || '0', 10) || 0,
-            engagement_rate: +(((parseFloat(m[2]?.value || '0') || 0) * 100).toFixed(1)),
-            bounce_rate: +(((parseFloat(m[3]?.value || '0') || 0) * 100).toFixed(1)),
-            avg_session_duration: Math.round(parseFloat(m[4]?.value || '0') || 0),
-        };
-    });
-
-    await fetchWithRetry(`${ADMIN_API_URL}/api/leaderboard/${entryId}/history/backfill`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
-        body: JSON.stringify({ days }),
-    });
-}
-
-type LeaderboardStats = {
-    monthly_visitors: number;
-    monthly_pageviews: number;
-    engagement_rate: number;
-    bounce_rate: number;
-    avg_session_duration: number;
-    visitor_trend: number;
-    primary_country?: string;
-};
-
-async function fetchLeaderboardStats(token: string, propertyId: string): Promise<LeaderboardStats> {
-    const pid = cleanPropertyId(propertyId);
-
-    const [currentRes, prevRes, countryRes] = await Promise.all([
-        fetchWithRetry(`${GA_DATA_BASE}/${pid}:runReport`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                dateRanges: [{ startDate: '28daysAgo', endDate: 'today' }],
-                metrics: [
-                    { name: 'activeUsers' },
-                    { name: 'screenPageViews' },
-                    { name: 'engagementRate' },
-                    { name: 'bounceRate' },
-                    { name: 'averageSessionDuration' },
-                ],
-            }),
-            signal: AbortSignal.timeout(15000),
-        }),
-        fetchWithRetry(`${GA_DATA_BASE}/${pid}:runReport`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                dateRanges: [{ startDate: '56daysAgo', endDate: '29daysAgo' }],
-                metrics: [{ name: 'activeUsers' }],
-            }),
-            signal: AbortSignal.timeout(15000),
-        }),
-        fetchWithRetry(`${GA_DATA_BASE}/${pid}:runReport`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                dateRanges: [{ startDate: '28daysAgo', endDate: 'today' }],
-                dimensions: [{ name: 'country' }],
-                metrics: [{ name: 'activeUsers' }],
-                orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }],
-                limit: 1,
-            }),
-            signal: AbortSignal.timeout(15000),
-        }),
-    ]);
-
-    if (!currentRes.ok) {
-        const err = await currentRes.text();
-        throw new Error(`GA4 API error ${currentRes.status}: ${err}`);
-    }
-
-    const currentData = await currentRes.json();
-    const prevData = prevRes.ok ? await prevRes.json() : null;
-    const countryData = countryRes.ok ? await countryRes.json() : null;
-
-    const row = currentData.rows?.[0];
-    if (!row) {
-        return {
-            monthly_visitors: 0,
-            monthly_pageviews: 0,
-            engagement_rate: 0,
-            bounce_rate: 0,
-            avg_session_duration: 0,
-            visitor_trend: 0,
-        };
-    }
-
-    const mv = row.metricValues;
-    const currentUsers = parseInt(mv[0].value) || 0;
-    const prevUsers = prevData?.rows?.[0]?.metricValues?.[0]?.value
-        ? parseInt(prevData.rows[0].metricValues[0].value)
-        : 0;
-    const trend = prevUsers > 0
-        ? +((currentUsers - prevUsers) / prevUsers * 100).toFixed(1)
-        : 0;
-
-    const topCountryName: string | undefined = countryData?.rows?.[0]?.dimensionValues?.[0]?.value;
-    const primaryCountry = topCountryName ? COUNTRY_TO_ISO2[topCountryName] : undefined;
-
-    return {
-        monthly_visitors: currentUsers,
-        monthly_pageviews: parseInt(mv[1].value) || 0,
-        engagement_rate: +((parseFloat(mv[2].value) || 0) * 100).toFixed(1),
-        bounce_rate: +((parseFloat(mv[3].value) || 0) * 100).toFixed(1),
-        avg_session_duration: Math.round(parseFloat(mv[4].value) || 0),
-        visitor_trend: trend,
-        primary_country: primaryCountry,
-    };
-}
-
 export async function GET(req: NextRequest) {
     if (!verifyCronSecret(req.headers.get('authorization'))) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -210,131 +55,60 @@ export async function GET(req: NextRequest) {
         const refreshRes = await fetch(`${ADMIN_API_URL}/api/leaderboard/refresh`, {
             method: 'POST',
             headers: { 'X-API-Key': ADMIN_API_KEY },
-            signal: AbortSignal.timeout(10000),
+            signal: AbortSignal.timeout(15_000),
         });
-
         if (!refreshRes.ok) {
             console.error('[CRON] Failed to get refresh list:', await refreshRes.text());
             return NextResponse.json({ error: 'Failed to get refresh list' }, { status: 500 });
         }
 
-        const { entries, total } = await refreshRes.json();
+        const { entries, total } = (await refreshRes.json()) as { entries: RefreshListEntry[]; total: number };
         console.log(`[CRON] Refreshing ${total} leaderboard entries`);
 
-        let successCount = 0;
-        let failCount = 0;
-        let verifiedCount = 0;
-        let mismatchCount = 0;
-        let audienceCount = 0;
+        const demo = process.env.TC_DEMO_DATA === '1';
+        const counts = { successCount: 0, failCount: 0, ownerCount: 0, ga4OnlyCount: 0, unverifiedCount: 0, checkFailedCount: 0, audienceCount: 0 };
+        let next = 0;
 
-        for (const entry of entries) {
-            try {
+        const worker = async () => {
+            while (next < entries.length) {
+                const entry = entries[next++];
                 if (!entry.ga_property_id) {
                     console.log(`[CRON] Skipping entry ${entry.entry_id}: no GA property ID`);
-                    failCount++;
+                    counts.failCount++;
                     continue;
                 }
-
-                const token = await getValidAccessToken(entry.access_token, entry.refresh_token);
-
-                const stats = await fetchLeaderboardStats(token, entry.ga_property_id);
-
-                // Recheck domain ownership while we already have a token + property handle.
-                let verificationStatus: string | undefined;
-                let verifiedHost: string | undefined;
-                if (entry.website_url) {
-                    try {
-                        const verify = await verifyPropertyDomain(
-                            entry.ga_property_id,
-                            entry.website_url,
-                            entry.access_token,
-                            entry.refresh_token,
-                        );
-                        verificationStatus = verify.status;
-                        if (verify.ok) {
-                            verifiedHost = verify.matchedHost;
-                            verifiedCount++;
-                        } else if (verify.status === 'host_mismatch' || verify.status === 'no_web_stream') {
-                            mismatchCount++;
-                        }
-                    } catch (verifyErr) {
-                        console.warn(`[CRON] Verification recheck failed for entry ${entry.entry_id}:`, verifyErr);
-                    }
-                }
-
-                const patchBody: Record<string, unknown> = { ...stats };
-                if (verificationStatus) patchBody.verification_status = verificationStatus;
-                if (verifiedHost) patchBody.verified_host = verifiedHost;
-
-                const updateRes = await fetchWithRetry(
-                    `${ADMIN_API_URL}/api/leaderboard/${entry.entry_id}/stats`,
-                    {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
-                        body: JSON.stringify(patchBody),
-                    },
-                );
-
-                if (updateRes.ok) {
-                    successCount++;
-                    console.log(`[CRON] ✓ Updated entry ${entry.entry_id}: ${stats.monthly_visitors} visitors${stats.primary_country ? ` (${stats.primary_country})` : ''}${verificationStatus ? `, ${verificationStatus}` : ''}`);
-                    // Re-seed the per-day history so any entry that missed
-                    // the join-time backfill (or had a stale window) gets
-                    // caught up. Backfill is idempotent on (entry_id, date).
-                    backfillHistory(entry.entry_id, entry.ga_property_id, token).catch((err) =>
-                        console.warn(`[CRON] History backfill failed for entry ${entry.entry_id}:`, err),
+                try {
+                    const result = await refreshEntry({
+                        entryId: entry.entry_id,
+                        gaPropertyId: entry.ga_property_id,
+                        websiteUrl: entry.website_url,
+                        accessToken: entry.access_token,
+                        refreshToken: entry.refresh_token || undefined,
+                        gscSiteUrl: entry.gsc_site_url ?? null,
+                    });
+                    if (result.ok) counts.successCount++;
+                    else counts.failCount++;
+                    if (result.audience) counts.audienceCount++;
+                    const v = result.verification;
+                    if (v?.transient) counts.checkFailedCount++;
+                    else if (v?.level === 'owner') counts.ownerCount++;
+                    else if (v?.level === 'ga4') counts.ga4OnlyCount++;
+                    else if (v) counts.unverifiedCount++;
+                    console.log(
+                        `[CRON] ${result.ok ? '✓' : '✗'} entry ${entry.entry_id}: ${v ? v.level : 'unchecked'}, ${result.days} days${result.gsc ? ', GSC' : ''}${result.error ? `, ${result.error}` : ''}`,
                     );
-
-                    // Audience intelligence (countries, channels, pages, GSC
-                    // queries, topics). Awaited so the per-entry jitter below
-                    // still paces GA4/GSC quota, but never affects successCount.
-                    try {
-                        const audience = await collectAudience({
-                            token,
-                            gaPropertyId: entry.ga_property_id,
-                            websiteUrl: entry.website_url ?? null,
-                        });
-                        const audienceRes = await fetchWithRetry(
-                            `${ADMIN_API_URL}/api/leaderboard/${entry.entry_id}/audience`,
-                            {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json', 'X-API-Key': ADMIN_API_KEY },
-                                body: JSON.stringify(audience),
-                            },
-                        );
-                        if (audienceRes.ok) {
-                            audienceCount++;
-                            console.log(`[CRON] ✓ Audience for entry ${entry.entry_id}: ${summarizeAudienceForLog(audience)}`);
-                        } else {
-                            console.warn(`[CRON] Audience upsert failed for entry ${entry.entry_id}: ${audienceRes.status}`);
-                        }
-                    } catch (audienceErr) {
-                        console.warn(`[CRON] Audience collection failed for entry ${entry.entry_id}:`, audienceErr);
-                    }
-                } else {
-                    failCount++;
-                    console.error(`[CRON] ✗ Failed to update entry ${entry.entry_id}: ${updateRes.status}`);
+                } catch (err) {
+                    counts.failCount++;
+                    console.error(`[CRON] ✗ Error processing entry ${entry.entry_id}:`, err);
                 }
-
-                // Jitter between entries so we don't burst GA4 quota.
-                await sleep(Math.floor(Math.random() * 2000));
-            } catch (err) {
-                failCount++;
-                console.error(`[CRON] ✗ Error processing entry ${entry.entry_id}:`, err);
+                // Jitter so a big run does not burst Google quota. Skipped in demo mode.
+                if (!demo) await sleep(Math.floor(Math.random() * 1500));
             }
-        }
-
-        const summary = {
-            success: true,
-            timestamp,
-            total,
-            successCount,
-            failCount,
-            verifiedCount,
-            mismatchCount,
-            audienceCount,
         };
-        console.log(`[CRON] Leaderboard refresh complete:`, summary);
+        await Promise.all(Array.from({ length: Math.min(CONCURRENCY, entries.length) }, worker));
+
+        const summary = { success: true, timestamp, total, ...counts };
+        console.log('[CRON] Leaderboard refresh complete:', summary);
         return NextResponse.json(summary);
     } catch (err) {
         console.error('[CRON] Leaderboard refresh error:', err);

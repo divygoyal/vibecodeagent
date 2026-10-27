@@ -16,8 +16,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Sparkles, X } from 'lucide-react';
-import { LogoIcon } from '@/components/Logo';
-import { BRAND_NAME } from '@/lib/brand';
+import { Button, buttonClasses } from '@/components/ui/Button';
+import { BrandMark, Wordmark } from '@/components/shell/BrandMark';
 
 interface SharePromoPopupProps {
     /** Force open immediately on mount (preview / debug). */
@@ -159,86 +159,51 @@ export default function SharePromoPopup({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.22 }}
-                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4 backdrop-blur-md"
+                    transition={{ duration: 0.18 }}
+                    className="tc-root fixed inset-0 z-[100] flex items-end justify-center bg-overlay p-4 sm:items-center"
                     onClick={handleBackdrop}
                     role="dialog"
                     aria-modal="true"
-                    aria-label={`Try ${BRAND_NAME}`}
+                    aria-labelledby="share-promo-title"
                 >
                     <motion.div
                         key="modal"
-                        initial={{ opacity: 0, y: 14, scale: 0.96 }}
+                        initial={{ opacity: 0, y: 12, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.97 }}
-                        transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+                        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                        transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
                         onClick={(e) => e.stopPropagation()}
-                        className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/[0.08] bg-[#0a0d12] shadow-[0_40px_120px_-20px_rgba(0,0,0,0.7)]"
+                        className="relative w-full max-w-md overflow-hidden rounded-modal border border-border-subtle bg-surface-raised text-fg shadow-modal"
                     >
-                        {/* Cyan glow behind the header for the premium "lit-from-within" feel */}
-                        <div
-                            aria-hidden
-                            className="pointer-events-none absolute inset-x-0 -top-32 mx-auto h-64 w-72 rounded-full bg-[radial-gradient(circle,_rgba(20,196,225,0.42)_0%,_transparent_70%)] blur-3xl"
-                        />
-                        {/* Subtle highlight border at top — emphasises the rim */}
-                        <div
-                            aria-hidden
-                            className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.18] to-transparent"
-                        />
-
-                        {/* X close: zinc-700 was too low-contrast against the
-                            #0a0d12 background — viewers couldn't find it. Bumped
-                            to zinc-500 + a subtle background pill so it reads as
-                            a button without becoming a click-magnet. Esc and
-                            backdrop still work as redundant exits. */}
-                        <button
-                            type="button"
+                        <Button
+                            variant="ghost"
+                            iconOnly
+                            icon={X}
                             onClick={handleCloseButton}
-                            className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.04] text-zinc-500 ring-1 ring-inset ring-white/[0.06] transition hover:bg-white/[0.1] hover:text-zinc-100 hover:ring-white/[0.12]"
                             aria-label="Close"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
+                            className="absolute top-3 right-3 z-10"
+                        />
 
-                        <div className="relative px-7 pb-7 pt-8">
-                            <div className="mb-6 flex items-center gap-2">
-                                <LogoIcon size={28} />
-                                <span className="text-base font-bold tracking-tight">
-                                    <span className="text-white">Traffic</span>
-                                    <span className="text-[#7AD9DA]">Claw</span>
-                                </span>
+                        <div className="px-6 pt-6 pb-6">
+                            <div className="mb-5 flex items-center gap-2">
+                                <BrandMark size={24} />
+                                <Wordmark />
                             </div>
 
-                            <h2 className="mb-2 text-[26px] font-bold leading-[1.18] tracking-tight text-white sm:text-[28px]">
-                                Like this dashboard?{' '}
-                                <span className="bg-gradient-to-r from-[#14C4E1] to-[#7AD9DA] bg-clip-text text-transparent">
-                                    Build yours.
-                                </span>
+                            <h2 id="share-promo-title" className="mb-1.5 text-heading text-fg">
+                                Like this dashboard? Build yours.
                             </h2>
-                            {/* Subhead now does two jobs: tells them setup is trivial
-                                (first two sentences) AND introduces the AI chat as the
-                                payoff (third sentence). Without the third sentence, the
-                                demo card below feels orphaned — the viewer is sold a
-                                "dashboard" then surprised by a chat exchange they didn't
-                                know was part of it. */}
-                            <p className="mb-5 text-sm leading-relaxed text-zinc-400">
-                                60 seconds. Connect Google.{' '}
-                                <span className="text-zinc-200">Then just ask:</span>
+                            <p className="mb-4 text-body text-fg-muted">
+                                60 seconds. Connect Google. Then just ask:
                             </p>
 
-                            {/* Visualises the AI chat with a concrete example. The
-                                "Then ask it anything:" line above leads directly into
-                                this exchange, so the eyebrow inside the card would
-                                just repeat itself — dropped in favour of cleaner
-                                question + answer layout that reads as a continuation
-                                of the sentence above. */}
-                            <div className="mb-7 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+                            {/* A concrete example of asking the AI about your own numbers. */}
+                            <div className="mb-6 rounded-control border border-border-subtle bg-surface-sunken p-4">
                                 <div className="flex items-start gap-2.5">
-                                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
-                                    <div className="text-[13px] leading-relaxed">
-                                        <div className="text-zinc-100">&ldquo;Why did traffic drop last week?&rdquo;</div>
-                                        <div className="mt-1.5 text-zinc-400">
-                                            <span className="text-cyan-300/70">→ </span>
+                                    <Sparkles aria-hidden className="mt-0.5 size-4 shrink-0 text-fg-muted" strokeWidth={1.75} />
+                                    <div className="text-body-sm">
+                                        <div className="text-fg">&ldquo;Why did traffic drop last week?&rdquo;</div>
+                                        <div className="mt-1.5 text-fg-secondary">
                                             /blog/seo-guide lost 1,240 sessions after Aug 14.
                                         </div>
                                     </div>
@@ -250,13 +215,13 @@ export default function SharePromoPopup({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={handleCtaClick}
-                                className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full bg-gradient-to-r from-[#14C4E1] to-[#0891B2] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_-10px_rgba(20,196,225,0.45)] transition hover:from-[#22d3ee] hover:to-[#14C4E1]"
+                                className={buttonClasses({ variant: 'primary', size: 'lg', className: 'w-full' })}
                             >
-                                <span>Build mine free</span>
-                                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                                Build mine free
+                                <ArrowRight aria-hidden size={18} strokeWidth={1.75} />
                             </a>
 
-                            <p className="mt-3 text-center text-[11px] text-zinc-600">
+                            <p className="mt-3 text-center text-meta text-fg-muted">
                                 Free · No credit card · 5 free AI questions
                             </p>
                         </div>

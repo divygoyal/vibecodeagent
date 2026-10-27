@@ -1,11 +1,11 @@
 {
   "name": "TrafficClaw",
   "short_name": "TrafficClaw",
-  "description": "AI-powered SEO & analytics platform",
+  "description": "All your sites. One screen. Free.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#f6f7f9",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/icon.svg",

@@ -1,37 +1,34 @@
 'use client';
 
 /**
- * Sticky banner shown on every dashboard page when the user has marked
- * workspace setup as completed but hasn't picked any data sources yet
- * ("Skip for now" path). Per-route inline banners (SEO needs GSC, AI
- * chat needs GA4, etc.) still fire — this is the global reminder.
+ * App-wide notice for a signed-in user with no Google connection at all (for
+ * example an older GitHub sign-in). Nothing else has to be "completed" in the
+ * new app, so in every other case this renders nothing.
  */
-import Link from 'next/link';
-import { AlertTriangle, ArrowRight } from 'lucide-react';
-import { useWorkspace } from '@/app/(dashboard)/dashboard/layout';
+import { signIn } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
 
-export default function WorkspaceIncompleteBanner() {
-    const { selectedSite, selectedProperty, isDemoWorkspace, isWorkspaceLoaded } = useWorkspace();
+import { Banner, Button, GoogleMark } from '@/components/ui';
+import { useWorkspace } from '@/components/shell/workspaceContext';
+import { useConnections } from '@/lib/useDashboardData';
 
-    // Only show when we know the workspace is empty AND not in demo mode.
-    if (!isWorkspaceLoaded) return null;
-    if (isDemoWorkspace) return null;
-    if (selectedSite || selectedProperty) return null;
+export default function WorkspaceIncompleteBanner({ className }: { className?: string }) {
+    const pathname = usePathname() ?? '';
+    const { isDemoWorkspace } = useWorkspace();
+    const { hasGoogleConnection, isLoading } = useConnections();
 
+    // The portfolio home has its own "Connect Google" state.
+    if (pathname === '/dashboard' || isLoading || isDemoWorkspace || hasGoogleConnection) return null;
+
+    const connect = () => void signIn('google', { callbackUrl: pathname || '/dashboard' }, { prompt: 'select_account consent' });
     return (
-        <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
-            <AlertTriangle className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
-            <div className="min-w-0 flex-1 text-[12.5px] text-amber-100/90 leading-relaxed">
-                <span className="font-semibold text-amber-200">Your workspace is missing data sources.</span>{' '}
-                Add a Search Console site or GA4 property to unlock everything.
-            </div>
-            <Link
-                href="/dashboard/setup"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-200 hover:text-amber-50 text-[11px] font-semibold transition-colors flex-shrink-0"
-            >
-                Complete setup
-                <ArrowRight className="w-3 h-3" />
-            </Link>
-        </div>
+        <Banner
+            variant="info"
+            title="Connect Google to see your sites"
+            actions={<Button variant="google" size="sm" onClick={connect}><GoogleMark />Connect Google</Button>}
+            className={className}
+        >
+            Read-only access to Analytics and Search Console. Every site you can see in Google shows up here.
+        </Banner>
     );
 }

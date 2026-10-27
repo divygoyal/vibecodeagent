@@ -5,7 +5,18 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
-import { ArrowLeft, ExternalLink, Search, X } from 'lucide-react';
+import { ArrowLeft, ExternalLink, MousePointerClick, X } from 'lucide-react';
+
+import { cn } from '@/lib/cn';
+import { fmtCompact, fmtFull } from '@/lib/format';
+import { Banner } from '@/components/ui/Banner';
+import { buttonClasses } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SearchInput } from '@/components/ui/SearchInput';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { Tabs } from '@/components/ui/Tabs';
+import { SHARE_CONTAINER, SharePage, ShareFooter, ShareHeader } from '@/components/share/ShareChrome';
 import {
     useShareOverviewState,
     type ShareOverviewEventTab,
@@ -28,15 +39,11 @@ const EVENT_WIDGETS: Array<{ key: ShareOverviewEventTab; label: string }> = [
     { key: 'link_out', label: 'Link out' },
 ];
 
-function cx(...values: Array<string | false | null | undefined>) {
-    return values.filter(Boolean).join(' ');
-}
-
 function fetchJson<T>(url: string): Promise<T> {
     return fetch(url).then(async (response) => {
         if (!response.ok) {
             const body = await response.json().catch(() => ({}));
-            throw new Error(body.error || `Request failed (${response.status})`);
+            throw new Error(body.message || body.error || `Request failed (${response.status})`);
         }
 
         return response.json();
@@ -69,12 +76,6 @@ function buildSearch({
     });
 
     return search.toString();
-}
-
-function shortNumber(value: number) {
-    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-    if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-    return value.toLocaleString('en-US');
 }
 
 function SharedEventsReportPage({
@@ -138,80 +139,61 @@ function SharedEventsReportPage({
 
     const maxCount = Math.max(...filteredItems.map((item) => item.count), 1);
     const overviewHref = `/share/${token}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+    const unsupported =
+        (eventTab === 'conversions' && query.data && !query.data.supported.conversions)
+        || (eventTab === 'link_out' && query.data && !query.data.supported.linkOut);
 
     return (
-        <div className="min-h-screen bg-[#080b0e] text-zinc-100">
-            <div className="border-b border-white/[0.06] bg-[#07090c]">
-                <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
-                    <div className="min-w-0">
-                        <div className="text-sm font-semibold text-zinc-100">TrafficClaw Shared Events</div>
-                        <div className="text-xs text-zinc-500">
-                            {siteUrl ? `Analytics for ${siteUrl}` : 'Share-safe event report'}
-                        </div>
-                    </div>
-                    <Link
-                        href={overviewHref}
-                        className="inline-flex items-center gap-2 rounded-md border border-white/[0.08] px-3 py-2 text-xs text-zinc-300 transition hover:bg-white/[0.05] hover:text-zinc-100"
-                    >
-                        <ArrowLeft className="h-3.5 w-3.5" />
+        <SharePage>
+            <ShareHeader
+                siteUrl={siteUrl}
+                label="Shared events"
+                actions={(
+                    <Link href={overviewHref} className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
+                        <ArrowLeft aria-hidden size={14} strokeWidth={1.75} />
                         Back to overview
                     </Link>
-                </div>
-            </div>
+                )}
+            />
 
-            <div className="mx-auto max-w-6xl p-4">
-                <div className="mb-4 rounded-xl border border-white/[0.08] bg-[#0d1014]">
-                    <div className="border-b border-white/[0.06] px-3 py-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                            {EVENT_WIDGETS.map((tab) => {
-                                const disabled =
+            <main className={cn(SHARE_CONTAINER, 'py-4 md:py-6')}>
+                <Card padding="none" className="overflow-hidden">
+                    <div className="flex flex-col gap-3 border-b border-border-subtle p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <Tabs
+                            variant="pills"
+                            ariaLabel="Event lists"
+                            value={eventTab}
+                            onValueChange={(value) => setEventTab(value)}
+                            items={EVENT_WIDGETS.map((tab) => ({
+                                value: tab.key,
+                                label: tab.label,
+                                disabled:
                                     (tab.key === 'conversions' && !query.data?.supported.conversions)
-                                    || (tab.key === 'link_out' && !query.data?.supported.linkOut);
-
-                                return (
-                                    <button
-                                        key={tab.key}
-                                        type="button"
-                                        disabled={disabled}
-                                        onClick={() => setEventTab(tab.key)}
-                                        className={cx(
-                                            'rounded-md px-2 py-1 text-xs transition',
-                                            eventTab === tab.key && disabled ? 'cursor-not-allowed border border-amber-500/20 bg-amber-500/[0.08] text-amber-200' : '',
-                                            eventTab === tab.key && !disabled ? 'bg-white/[0.08] text-white' : '',
-                                            eventTab !== tab.key && disabled ? 'cursor-not-allowed text-zinc-700' : '',
-                                            eventTab !== tab.key && !disabled ? 'text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200' : '',
-                                        )}
-                                    >
-                                        {tab.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    <div className="border-b border-white/[0.04] px-3 py-2">
-                        <label className="flex items-center gap-2 rounded-md border border-white/[0.08] bg-[#0b0f14] px-3 py-2 text-xs text-zinc-400">
-                            <Search className="h-3.5 w-3.5" />
-                            <input
-                                value={searchQuery}
-                                onChange={(event) => setSearchQuery(event.target.value)}
-                                placeholder="Search events"
-                                className="w-full bg-transparent text-xs text-zinc-100 outline-none placeholder:text-zinc-600"
-                            />
-                        </label>
+                                    || (tab.key === 'link_out' && !query.data?.supported.linkOut),
+                            }))}
+                        />
+                        <SearchInput
+                            value={searchQuery}
+                            onValueChange={setSearchQuery}
+                            placeholder="Search events"
+                            size="sm"
+                            aria-label="Search events"
+                        />
                     </div>
 
                     {eventNames.length ? (
-                        <div className="flex flex-wrap gap-2 border-b border-white/[0.04] px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2 border-b border-border-subtle px-4 py-2.5">
+                            <span className="text-meta text-fg-muted">Filtered to</span>
                             {eventNames.map((eventName) => (
                                 <button
                                     key={eventName}
                                     type="button"
                                     onClick={() => removeEventName(eventName)}
-                                    className="inline-flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-2 py-1 text-[11px] text-emerald-100 transition hover:bg-emerald-500/[0.12]"
+                                    aria-label={`Remove filter ${eventName}`}
+                                    className="inline-flex h-6 items-center gap-1 rounded-full bg-brand-soft px-2.5 text-meta font-medium text-brand-soft-fg transition-opacity duration-120 hover:opacity-80"
                                 >
                                     <span>{eventName}</span>
-                                    <X className="h-3 w-3 text-emerald-300/70" />
+                                    <X aria-hidden size={12} strokeWidth={1.75} />
                                 </button>
                             ))}
                         </div>
@@ -219,60 +201,80 @@ function SharedEventsReportPage({
 
                     <div className="min-h-[420px]">
                         {query.isLoading ? (
-                            <div className="flex h-[420px] items-center justify-center text-sm text-zinc-500">Loading events…</div>
+                            <div aria-busy className="flex flex-col gap-1 p-4">
+                                {Array.from({ length: 8 }, (_, i) => (
+                                    <div key={i} className="flex h-9 items-center gap-3">
+                                        <Skeleton className="h-7 rounded-md" style={{ width: `${85 - i * 8}%` }} />
+                                        <Skeleton className="ml-auto h-3 w-10" />
+                                    </div>
+                                ))}
+                            </div>
                         ) : query.error ? (
-                            <div className="flex h-[420px] items-center justify-center px-4 text-center text-sm text-red-400/80">{query.error.message}</div>
+                            <div className="p-4">
+                                <Banner variant="danger">{query.error.message}</Banner>
+                            </div>
                         ) : !filteredItems.length ? (
-                            <div className="flex h-[420px] items-center justify-center text-sm text-zinc-500">No events available</div>
+                            <EmptyState
+                                variant="card"
+                                icon={MousePointerClick}
+                                title={searchQuery.trim() ? 'No events match your search' : 'No events in this period'}
+                                description={unsupported
+                                    ? 'This list is not available for this share.'
+                                    : searchQuery.trim() ? 'Try another name.' : 'Try a longer date range on the overview.'}
+                            />
                         ) : (
                             <>
-                                <div className="grid grid-cols-[minmax(0,1fr)_90px] gap-3 border-b border-white/[0.04] px-4 py-2 text-[10px] uppercase tracking-[0.14em] text-zinc-600">
-                                    <div>Event</div>
-                                    <div className="text-right">Count</div>
+                                <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-2 text-caption tracking-[0.04em] text-fg-muted uppercase">
+                                    <span>Event</span>
+                                    <span>Count</span>
                                 </div>
-                                {filteredItems.map((item) => {
-                                    const selected = eventNames.includes(item.name);
-
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setEventNames(
-                                                    selected
-                                                        ? eventNames.filter((value) => value !== item.name)
-                                                        : [...eventNames, item.name],
-                                                );
-                                            }}
-                                            className={cx(
-                                                'group relative grid w-full grid-cols-[minmax(0,1fr)_90px] gap-3 overflow-hidden border-b border-white/[0.04] px-4 py-2 text-left transition hover:bg-white/[0.03]',
-                                                selected ? 'bg-emerald-500/[0.08]' : '',
-                                            )}
-                                        >
-                                            <div
-                                                className={cx(
-                                                    'absolute left-0 top-0 h-full transition group-hover:bg-white/[0.05]',
-                                                    selected ? 'bg-emerald-500/[0.18]' : 'bg-white/[0.03]',
-                                                )}
-                                                style={{ width: `${(item.count / maxCount) * 100}%` }}
-                                            />
-                                            <div className={cx('relative z-10 flex min-w-0 items-center gap-2', selected ? 'text-white' : 'text-zinc-100')}>
-                                                <span className="h-2 w-2 rounded-full bg-[#3ba974]" />
-                                                <span className="truncate">{item.name}</span>
-                                                {eventTab === 'link_out' ? <ExternalLink className="h-3 w-3 text-zinc-500" /> : null}
-                                            </div>
-                                            <div className={cx('relative z-10 text-right font-mono text-xs', selected ? 'text-white' : 'text-zinc-200')}>
-                                                {shortNumber(item.count)}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
+                                <ul className="flex flex-col p-2">
+                                    {filteredItems.map((item) => {
+                                        const selected = eventNames.includes(item.name);
+                                        return (
+                                            <li key={item.id}>
+                                                <button
+                                                    type="button"
+                                                    aria-pressed={selected}
+                                                    onClick={() => {
+                                                        setEventNames(
+                                                            selected
+                                                                ? eventNames.filter((value) => value !== item.name)
+                                                                : [...eventNames, item.name],
+                                                        );
+                                                    }}
+                                                    className={cn(
+                                                        'group flex h-9 w-full items-center gap-3 rounded-md px-2 text-left transition-colors duration-120',
+                                                        selected ? 'bg-brand-soft' : 'hover:bg-subtle/40',
+                                                    )}
+                                                >
+                                                    <span className="relative flex h-7 min-w-0 flex-1 items-center gap-2 pl-2">
+                                                        <span
+                                                            aria-hidden
+                                                            className="absolute inset-y-0 left-0 rounded-md heatbar-neutral"
+                                                            style={{ width: `${Math.max((item.count / maxCount) * 100, 0.5)}%` }}
+                                                        />
+                                                        <span className={cn('relative min-w-0 truncate text-body', selected ? 'font-medium text-brand-soft-fg' : 'text-fg')}>{item.name}</span>
+                                                        {eventTab === 'link_out' ? <ExternalLink aria-hidden size={12} strokeWidth={1.75} className="relative shrink-0 text-fg-muted" /> : null}
+                                                    </span>
+                                                    <span className="shrink-0 text-body text-fg tabular-nums" title={fmtFull(item.count)}>
+                                                        {fmtCompact(item.count)}
+                                                    </span>
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                                <p className="border-t border-border-subtle px-4 py-3 text-meta text-fg-muted">
+                                    Select events to filter the overview by them.
+                                </p>
                             </>
                         )}
                     </div>
-                </div>
-            </div>
-        </div>
+                </Card>
+            </main>
+            <ShareFooter />
+        </SharePage>
     );
 }
 

@@ -1,4 +1,7 @@
-import { getValidAccessToken } from '@/lib/googleApi';
+import { getValidAccessToken, listSearchConsoleSites } from '@/lib/googleApi';
+import { normalizeHost as pairingHost, siteKind } from '@/lib/sites/pairing';
+import { buildFix, decideLevel, ga4StreamIsOwned, gscCoverage, type GscSiteEntry } from '@/lib/leaderboard/ownership';
+import type { OwnershipOutcome, VerificationDetail, VerificationLevel } from '@/lib/leaderboard/types';
 
 const GA_ADMIN_BASE = 'https://analyticsadmin.googleapis.com/v1beta';
 
@@ -131,5 +134,124 @@ export async function verifyPropertyDomain(
         expectedHost,
         actualHosts,
         matchedHost,
+    };
+}
+
+// ─── v3: Search Console ownership (PRODUCT.md 3) ─────────────────────────────
+
+function googleStatus(err: unknown): number | null {
+    const m = /Google API error (\d{3})/.exec(err instanceof Error ? err.message : '');
+    return m ? Number(m[1]) : null;
+}
+
+export interface CheckOwnershipInput {
+    websiteUrl: string;
+    gaPropertyId?: string | null;
+    accessToken?: string;
+    refreshToken?: string;
+}
+
+/**
+ * Run both checks. Search Console ownership decides the level; the GA4 data-stream
+ * match is the second signal. A check that could not run (token, quota, network)
+ * comes back `transient: true` so the caller keeps the stored level.
+ */
+export type OwnershipCheck = OwnershipOutcome & { gscSiteUrl: string | null; verifiedHost: string | null };
+
+export async function checkOwnership(input: CheckOwnershipInput): Promise<OwnershipCheck> {
+    const checkedAt = new Date().toISOString();
+    const host = pairingHost(input.websiteUrl || '');
+    const detail: VerificationDetail = { expected_host: host || undefined };
+
+    const transient = (message: string): OwnershipCheck => ({
+        level: 'none',
+        checkedAt,
+        detail: { ...detail, error: message },
+        message,
+        fix: ['Reconnect Google if this keeps happening, then press Re-check.'],
+        transient: true,
+        gscSiteUrl: null,
+        verifiedHost: null,
+    });
+
+    if (!host || !host.includes('.')) {
+        return {
+            level: 'none', checkedAt, detail, transient: false, gscSiteUrl: null, verifiedHost: null,
+            message: 'Add a valid website address so we can check it.',
+            fix: ['Enter the site address (for example example.com).'],
+        };
+    }
+
+    let token: string;
+    try {
+        token = await getValidAccessToken(input.accessToken, input.refreshToken);
+    } catch (err) {
+        return transient(`Could not reach Google with your saved sign-in: ${err instanceof Error ? err.message : 'unknown error'}.`);
+    }
+
+    // Search Console ownership.
+    let sites: GscSiteEntry[] = [];
+    let ownerSite: GscSiteEntry | null = null;
+    try {
+        sites = (await listSearchConsoleSites(token, AbortSignal.timeout(15_000))) as GscSiteEntry[];
+        const cov = gscCoverage(sites, host);
+        ownerSite = cov.ok ? cov.site : null;
+        detail.gsc = {
+            ok: cov.ok,
+            reason: cov.reason,
+            site_url: cov.site?.siteUrl ?? null,
+            permission: cov.site?.permissionLevel ?? null,
+            kind: cov.site ? siteKind(cov.site.siteUrl) : undefined,
+        };
+    } catch (err) {
+        const status = googleStatus(err);
+        if (status === 403 && /scope|insufficient/i.test(err instanceof Error ? err.message : '')) {
+            detail.gsc = { ok: false, reason: 'no_scope', site_url: null, permission: null };
+        } else {
+            return transient(`Search Console did not answer${status ? ` (HTTP ${status})` : ''}. Try again in a minute.`);
+        }
+    }
+
+    // GA4 data stream (second signal).
+    if (input.gaPropertyId) {
+        const ga = await verifyPropertyDomain(input.gaPropertyId, input.websiteUrl, input.accessToken || token, input.refreshToken);
+        if (ga.ok) {
+            detail.ga4 = { ok: true, reason: 'ok', hosts: ga.actualHosts };
+        } else if (ga.status === 'failed') {
+            // Could not read the property at all. Keep the Search Console result but note it.
+            detail.ga4 = { ok: false, reason: 'api_error', hosts: [] };
+        } else if (ga.status === 'host_mismatch' && ga4StreamIsOwned(ga.actualHosts || [], ownerSite)) {
+            // The stream is for a subdomain the verified Search Console property covers.
+            detail.ga4 = { ok: true, reason: 'ok', hosts: ga.actualHosts || [] };
+        } else {
+            detail.ga4 = { ok: false, reason: ga.status, hosts: ga.actualHosts || [] };
+        }
+    }
+
+    const level: VerificationLevel = decideLevel(detail);
+    const fix = level === 'owner' ? [] : buildFix(detail);
+    let message: string;
+    if (level === 'owner') {
+        message = `Verified: you are an owner of ${detail.gsc?.site_url} in Search Console.`;
+        if (detail.ga4 && !detail.ga4.ok) message += ' The Google Analytics property could not be matched, so the GA4 badge is off.';
+    } else if (detail.gsc?.ok) {
+        message = `You own ${detail.gsc.site_url} in Search Console, but the Google Analytics property tracks ${detail.ga4?.hosts.join(', ') || 'a different site'}, not ${host}. The numbers must come from this site's own property.`;
+    } else if (level === 'ga4') {
+        message = `Google Analytics matches ${host}, but we could not confirm you own it in Search Console. Only verified owners are ranked.`;
+    } else {
+        message = `We could not verify ${host}. It is not listed publicly until it is verified.`;
+    }
+    detail.message = message;
+    detail.fix = fix;
+
+    return {
+        level,
+        checkedAt,
+        detail,
+        message,
+        fix,
+        transient: false,
+        gscSiteUrl: detail.gsc?.site_url ?? null,
+        verifiedHost: level === 'owner' ? host : null,
     };
 }
