@@ -45,3 +45,10 @@ Data: GA4 Data API + Search Console API only (no tracker). Shots for the blind j
   commit, re-check); "loading" hits were slow dev server under low RAM (re-check Traffic > Pages alone).
 - Next: up.sh r2site 3112 8112 -> login -> check-mobile for the 12 site paths (in parts) -> check-scenarios for
   ga4only,gsconly,f403,f429,f500,fempty on /dashboard/s/** -> retake 20 shots (scratchpad shots.sh) -> down.sh -> report.
+
+## Resumed (2026-10-27 ~10:00 UTC), final checks
+- Mobile check, 11 site paths x 360/390/414 x light/dark: all zero (checks/mobile-r2site.md).
+- Scenarios ga4only, gsconly, f403, f429, f500, fempty on Overview/Traffic/Search/Pages: all ok; one hit is a 502 from
+  /api/connections under fempty (shell route, not WS2) (checks/scenarios.md).
+- 20 candidate shots retaken at 10:09-10:14 into round2/candidate/site/ (same names as critique-site-*), ?range=28d&compare=prev.
+- Server down, web/.next removed.
