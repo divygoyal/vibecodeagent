@@ -92,7 +92,9 @@ export interface PercentOptions {
 
 /**
  * A ratio as a percent. `3.4%`, `<0.1%` for tiny non-zero values, `0%`.
- * Trailing `.0` is dropped (`5%`). With `tile`, values >= 10% have no decimal.
+ * Always 1 decimal (`5.0%`, `23.0%`), so a table column never mixes `23%`
+ * with `24.8%` (round 2 critique 2.2). With `tile` (KPI tiles, axis ticks),
+ * values >= 10% have no decimal and a trailing `.0` is dropped (`5%`).
  */
 export function fmtPercent(ratio: Num, opts: PercentOptions = {}): string {
     if (!isNum(ratio)) return DASH;
@@ -101,7 +103,8 @@ export function fmtPercent(ratio: Num, opts: PercentOptions = {}): string {
     const abs = Math.abs(pct);
     if (abs < 0.1) return pct < 0 ? '>-0.1%' : '<0.1%';
     if (opts.tile && abs >= 9.95) return `${Math.round(pct)}%`;
-    return `${stripZeros(pct.toFixed(1))}%`;
+    if (opts.tile) return `${stripZeros(pct.toFixed(1))}%`;
+    return `${pct.toFixed(1)}%`;
 }
 
 /** GSC average position, 1 decimal: `23.2`, `3.0`. */

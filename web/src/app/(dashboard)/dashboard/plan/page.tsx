@@ -81,7 +81,7 @@ function PlanContent() {
     const renewal = subscriptionEnd ? fmtDayYear(subscriptionEnd) : null;
 
     return (
-        <div className="mx-auto max-w-[1040px]">
+        <div className="max-w-[1040px]">
             <PageHeader title="Plan" subtitle="Everything in TrafficClaw is free. Paid plans add more messages in Ask." />
 
             <div className="flex flex-col gap-6">
@@ -358,7 +358,7 @@ function Faq() {
 
 function PlanSkeleton() {
     return (
-        <div aria-hidden className="mx-auto max-w-[1040px]">
+        <div aria-hidden className="max-w-[1040px]">
             <div className="mb-6 flex flex-col gap-2"><Skeleton className="h-7 w-24" /><Skeleton className="h-4 w-80" /></div>
             <Skeleton className="mb-6 h-44 w-full" rounded="card" />
             <div className="grid gap-4 grid-cols-1 md:grid-cols-3">

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 
@@ -31,9 +31,36 @@ export interface TabsProps<T extends string = string> {
     panelIdPrefix?: string;
 }
 
+/** True while a horizontal scroller has more content to its right (for the edge fade). */
+function useMoreToTheRight() {
+    const ref = useRef<HTMLDivElement>(null);
+    const [more, setMore] = useState(false);
+    const check = useCallback(() => {
+        const el = ref.current;
+        if (!el) return;
+        setMore(el.scrollWidth - el.clientWidth - el.scrollLeft > 2);
+    }, []);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        check();
+        const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(check);
+        ro?.observe(el);
+        el.addEventListener('scroll', check, { passive: true });
+        return () => {
+            ro?.disconnect();
+            el.removeEventListener('scroll', check);
+        };
+    }, [check]);
+    return [ref, more] as const;
+}
+
 /**
  * Tabs (DESIGN 3.11). Routing tabs are links; in-page tabs are a tablist with
- * arrow keys. Overflow scrolls horizontally, never wraps.
+ * arrow keys. Overflow scrolls horizontally, never wraps; a fade on the right
+ * edge shows there is more (so a cut label reads as intentional). Page-level
+ * (underline) tabs are text only, like Linear and Vercel (critique 2.8): an
+ * item's icon shows in pills only.
  */
 export function Tabs<T extends string = string>({ items, value, onValueChange, variant = 'underline', ariaLabel, className, panelIdPrefix }: TabsProps<T>) {
     const id = useId();
@@ -57,14 +84,17 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
     };
 
     const underline = variant === 'underline';
+    const [scrollRef, more] = useMoreToTheRight();
     return (
         <div
+            ref={scrollRef}
             role={isRouting ? undefined : 'tablist'}
             aria-label={ariaLabel}
             className={cn(
                 'flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
                 // pills: room inside the scroll box for the 44px touch hit area (overflow clips it otherwise)
                 underline ? 'gap-5 border-b border-border-subtle' : 'gap-1 pointer-coarse:-my-1.5 pointer-coarse:py-1.5',
+                more && '[mask-image:linear-gradient(to_right,#000_calc(100%-40px),transparent)]',
                 className,
             )}
         >
@@ -83,7 +113,7 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
                 );
                 const inner = (
                     <>
-                        {Icon ? <Icon aria-hidden size={16} strokeWidth={1.75} /> : null}
+                        {Icon && !underline ? <Icon aria-hidden size={16} strokeWidth={1.75} /> : null}
                         <span>{t.label}</span>
                         {t.count !== undefined && t.count !== null ? <span className="text-meta text-fg-muted tabular-nums">{t.count}</span> : null}
                         {underline && active ? (

@@ -38,7 +38,7 @@ const SECTIONS: Section[] = [
 
 export default function DocsPage() {
     return (
-        <div className="mx-auto max-w-[1040px]">
+        <div className="max-w-[1040px]">
             <PageHeader title="Docs" subtitle={`How ${BRAND_NAME} works, one part at a time`} />
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">

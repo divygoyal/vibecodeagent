@@ -165,7 +165,7 @@ export default function SupportPage() {
     };
 
     return (
-        <div className="mx-auto max-w-[1040px]">
+        <div className="max-w-[1040px]">
             <PageHeader title="Support" subtitle="Ask us anything. We read every message and usually reply within 24 hours." />
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">

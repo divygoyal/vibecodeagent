@@ -102,7 +102,7 @@ function Settings() {
     }, [connected, router, refreshContainer]);
 
     return (
-        <div className="mx-auto max-w-[960px]">
+        <div className="max-w-[960px]">
             <PageHeader
                 title="Settings"
                 subtitle="Your account, Google connection and preferences"
@@ -122,7 +122,7 @@ function Settings() {
 
 function SettingsSkeleton() {
     return (
-        <div aria-hidden className="mx-auto max-w-[960px]">
+        <div aria-hidden className="max-w-[960px]">
             <div className="mb-6 flex flex-col gap-2"><Skeleton className="h-7 w-32" /><Skeleton className="h-4 w-72" /></div>
             <Skeleton className="mb-4 h-9 w-full max-w-xl" />
             <Skeleton className="h-48 w-full" rounded="card" />

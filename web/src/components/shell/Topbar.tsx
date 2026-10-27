@@ -41,7 +41,7 @@ function useCrumbs(): Crumb[] {
 /** Sticky topbar: menu (mobile/tablet), breadcrumb, search, Ask AI, alerts (DESIGN 3.1). */
 export function Topbar() {
     const pathname = usePathname() ?? '';
-    const { setNavOpen } = useShell();
+    const { setNavOpen, pageAsk } = useShell();
     const crumbs = useCrumbs();
     const [scrolled, setScrolled] = useState(false);
     const onAsk = pathname.startsWith('/dashboard/ask') || pathname.startsWith('/dashboard/ai-chat');
@@ -82,7 +82,8 @@ export function Topbar() {
                 <Tooltip content="Search ⌘K">
                     <Button variant="ghost" iconOnly icon={Search} aria-label="Search" onClick={openCommandPalette} />
                 </Tooltip>
-                {onAsk ? null : (
+                {/* One Ask AI per screen: pages whose header has its own (site pages) hide this one. */}
+                {onAsk || pageAsk ? null : (
                     <Button asChild variant="secondary" size="sm" icon={Sparkles} className="max-sm:hidden">
                         <Link href="/dashboard/ask">Ask AI</Link>
                     </Button>

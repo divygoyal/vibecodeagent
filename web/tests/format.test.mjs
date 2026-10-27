@@ -61,12 +61,14 @@ test('fmtAxis: compact, max 1 decimal', () => {
     assert.equal(fmtAxis(null), '–');
 });
 
-test('fmtPercent: CTR 1 decimal, <0.1% for tiny, 0%, tiles round rates >= 10%', () => {
+test('fmtPercent: CTR always 1 decimal, <0.1% for tiny, 0%, tiles round rates >= 10%', () => {
     assert.equal(fmtPercent(0.034), '3.4%');
     assert.equal(fmtPercent(0.0025), '0.3%');
     assert.equal(fmtPercent(0.0004), '<0.1%');
     assert.equal(fmtPercent(0), '0%');
-    assert.equal(fmtPercent(0.05), '5%');
+    assert.equal(fmtPercent(0.05), '5.0%');
+    assert.equal(fmtPercent(0.23), '23.0%');
+    assert.equal(fmtPercent(0.05, { tile: true }), '5%');
     assert.equal(fmtPercent(0.4412), '44.1%');
     assert.equal(fmtPercent(0.4412, { tile: true }), '44%');
     assert.equal(fmtPercent(0.034, { tile: true }), '3.4%');

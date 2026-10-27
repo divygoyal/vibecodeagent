@@ -1,8 +1,25 @@
+'use client';
+
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { isValidElement, useEffect, type ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
+import { useOptionalShell } from './ShellContext';
+
+/**
+ * True when the actions hold an Ask AI action: an AskButton (a `prompt` and a
+ * `site`) or a link into /dashboard/ask. Walks fragments and asChild wrappers.
+ */
+export function hasAskAction(node: ReactNode, depth = 0): boolean {
+    if (depth > 5 || node === null || node === undefined || typeof node !== 'object') return false;
+    if (Array.isArray(node)) return node.some((n) => hasAskAction(n, depth + 1));
+    if (!isValidElement(node)) return false;
+    const props = node.props as { prompt?: unknown; site?: unknown; href?: unknown; children?: ReactNode };
+    if (typeof props.prompt === 'string' && props.site !== undefined) return true;
+    if (typeof props.href === 'string' && props.href.startsWith('/dashboard/ask')) return true;
+    return hasAskAction(props.children, depth + 1);
+}
 
 export interface PageHeaderProps {
     /** Page title (one h1 per page). Site pages pass the host. */
@@ -32,6 +49,15 @@ export interface PageHeaderProps {
  * shrinks and the actions become one horizontally scrolling row.
  */
 export function PageHeader({ title, subtitle, icon, badges, actions, secondaryActions, tabs, backHref, note, className }: PageHeaderProps) {
+    // One Ask AI per screen (critique #7): a header with its own Ask hides the topbar's.
+    const shell = useOptionalShell();
+    const setPageAsk = shell?.setPageAsk;
+    const ownAsk = hasAskAction(actions) || hasAskAction(secondaryActions);
+    useEffect(() => {
+        if (!setPageAsk || !ownAsk) return;
+        setPageAsk(true);
+        return () => setPageAsk(false);
+    }, [setPageAsk, ownAsk]);
     return (
         <header className={cn('mb-6', className)}>
             <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-4">
@@ -43,16 +69,19 @@ export function PageHeader({ title, subtitle, icon, badges, actions, secondaryAc
                             </Link>
                         ) : null}
                         {icon ? <span className="flex shrink-0">{icon}</span> : null}
-                        <h1 className="min-w-0 truncate text-title text-fg md:text-heading">{title}</h1>
-                        {badges ? <div className="flex shrink-0 flex-wrap items-center gap-1.5">{badges}</div> : null}
+                        <h1 className="min-w-0 truncate text-title text-fg md:text-heading" title={typeof title === 'string' ? title : undefined}>{title}</h1>
+                        {/* Phones: no badges, so they never squeeze the title (critique #8). */}
+                        {badges ? <div className="flex shrink-0 flex-wrap items-center gap-1.5 max-sm:hidden">{badges}</div> : null}
                     </div>
-                    {subtitle ? <p className="mt-1 text-body-sm text-fg-muted">{subtitle}</p> : null}
+                    {subtitle ? <p className="mt-1 text-body-sm text-pretty text-fg-muted">{subtitle}</p> : null}
                     {note ? <p className="mt-0.5 text-meta text-fg-faint italic">{note}</p> : null}
                 </div>
                 {actions || secondaryActions ? (
-                    <div className="-mx-4 flex min-w-0 flex-col gap-2 px-4 md:mx-0 md:items-end md:px-0">
+                    <div className="flex min-w-0 flex-col gap-2 md:items-end">
                         {actions ? (
-                            <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] max-md:flex-row-reverse max-md:justify-end md:flex-wrap md:justify-end md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden">
+                            // Phones: the last action (the date range) leads, and the row wraps
+                            // upwards instead of running off the screen (critique #8).
+                            <div className="flex flex-wrap items-center gap-2 max-md:flex-row-reverse max-md:flex-wrap-reverse max-md:justify-end md:justify-end">
                                 {actions}
                             </div>
                         ) : null}

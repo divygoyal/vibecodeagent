@@ -468,6 +468,7 @@ export default function AskPage() {
                     <AskEmpty
                         siteLabel={siteLabel}
                         disabled={!canAsk}
+                        hidePrompts={aiUnavailable}
                         onPick={(q) => void sendMessage(q)}
                     />
                 ) : (

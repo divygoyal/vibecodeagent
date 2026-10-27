@@ -38,6 +38,17 @@ export interface TableColumn<T> {
     heat?: { metric: MetricKey | 'neutral'; value: (row: T) => number | null | undefined };
     className?: string;
     headerClassName?: string;
+    /**
+     * Role in the phone list (< 768px, critique #8): 'title' (line 1, left),
+     * 'primary' (line 1, right, the number that matters), 'meta' (line 2,
+     * muted "Label value" pairs), 'trailing' (end of line 1: menus, buttons)
+     * or 'hidden'. Default: first column title, the sorted (else the first
+     * right-aligned) column primary, a last column with no text header
+     * trailing, up to 4 other columns meta.
+     */
+    mobile?: 'title' | 'primary' | 'meta' | 'trailing' | 'hidden';
+    /** Label for the phone list's line 2 when the header is not plain text. */
+    mobileLabel?: string;
 }
 
 export interface TablePagination {
@@ -77,11 +88,48 @@ export interface TableProps<T> {
     stickyFirstColumn?: boolean;
     /** Wrap in a Card (default true). */
     card?: boolean;
+    /**
+     * Phones show each row as a two-line list item (title + main number, then
+     * the other numbers) instead of a table that scrolls its numbers off
+     * screen (default true). false keeps the scrolling table.
+     */
+    mobileList?: boolean;
     className?: string;
 }
 
-const ROW_H = { compact: 'h-9', default: 'h-10', comfortable: 'h-12' };
+// Desktop rows 36px by default (critique 2.4); 44px touch rows on phones.
+const ROW_H = { compact: 'h-9', default: 'h-11 md:h-9', comfortable: 'h-12' };
 const ALIGN = { left: 'text-left', right: 'text-right', center: 'text-center' };
+
+function headerText<T>(c: TableColumn<T>): string | null {
+    if (c.mobileLabel) return c.mobileLabel;
+    if (typeof c.header === 'string' || typeof c.header === 'number') return String(c.header);
+    return null;
+}
+
+type MobileRole = NonNullable<TableColumn<unknown>['mobile']>;
+
+/** Which column plays which part in the phone list (see TableColumn.mobile). */
+function mobileRoles<T>(columns: TableColumn<T>[], sortKey: string | undefined): Map<string, MobileRole> {
+    const roles = new Map<string, MobileRole>();
+    const hiddenByClass = (c: TableColumn<T>) => /(^|\s)max-md:hidden(\s|$)/.test(c.className ?? '');
+    for (const c of columns) if (c.mobile) roles.set(c.key, c.mobile);
+    const free = (c: TableColumn<T>) => !roles.has(c.key);
+    const title = columns.find((c) => roles.get(c.key) === 'title') ?? columns.find(free);
+    if (title && free(title)) roles.set(title.key, 'title');
+    const last = columns[columns.length - 1];
+    if (last && free(last) && headerText(last) === null && columns.length > 1) roles.set(last.key, 'trailing');
+    if (![...roles.values()].includes('primary')) {
+        const sorted = columns.find((c) => c.key === sortKey && free(c) && c.align === 'right');
+        const primary = sorted ?? columns.find((c) => free(c) && c.align === 'right' && !hiddenByClass(c));
+        if (primary) roles.set(primary.key, 'primary');
+    }
+    // Line 2: the columns a phone table showed first, then the ones it hid; at most 4.
+    const rest = columns.filter(free);
+    const ordered = [...rest.filter((c) => !hiddenByClass(c)), ...rest.filter(hiddenByClass)];
+    ordered.forEach((c, i) => roles.set(c.key, i < 4 ? 'meta' : 'hidden'));
+    return roles;
+}
 
 function compare(a: unknown, b: unknown): number {
     if (a === b) return 0;
@@ -98,7 +146,7 @@ function compare(a: unknown, b: unknown): number {
  */
 export function Table<T>({
     columns, rows, rowKey, sort: sortProp, onSortChange, defaultSort, onRowClick, density = 'default', loading, empty, toolbar,
-    pagination, footer, caption, stickyFirstColumn = true, card = true, className,
+    pagination, footer, caption, stickyFirstColumn = true, card = true, mobileList = true, className,
 }: TableProps<T>) {
     const [innerSort, setInnerSort] = useState<SortState | null>(defaultSort ?? null);
     const sort = sortProp !== undefined ? sortProp : innerSort;
@@ -143,7 +191,7 @@ export function Table<T>({
     const stickyCell = (i: number) => (stickyFirstColumn && i === 0 ? 'sticky left-0 z-[1] bg-surface' : '');
 
     const table = (
-        <div className="relative overflow-x-auto">
+        <div className={cn('relative overflow-x-auto', mobileList && 'max-md:hidden')}>
             <table className="w-full border-collapse text-body tabular-nums">
                 {caption ? <caption className="sr-only">{caption}</caption> : null}
                 <thead>
@@ -169,10 +217,16 @@ export function Table<T>({
                                         <button
                                             type="button"
                                             onClick={() => toggleSort(c)}
-                                            className={cn('relative inline-flex items-center gap-1 rounded hover:text-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-x-2.5 pointer-coarse:after:-inset-y-2.5', active && 'text-fg', c.align === 'right' && 'flex-row-reverse')}
+                                            className={cn('group/sort relative inline-flex items-center gap-1 rounded hover:text-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-x-2.5 pointer-coarse:after:-inset-y-2.5', active && 'text-fg', c.align === 'right' && 'flex-row-reverse')}
                                         >
                                             {c.header}
-                                            <SortIcon aria-hidden size={12} className={active ? 'text-fg' : 'text-fg-faint'} />
+                                            {/* The arrow shows on the sorted column only, and on hover/focus (critique 2.2). */}
+                                            <SortIcon
+                                                aria-hidden
+                                                size={12}
+                                                strokeWidth={1.75}
+                                                className={active ? 'text-fg' : 'text-fg-faint opacity-0 transition-opacity duration-120 group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100'}
+                                            />
                                         </button>
                                     ) : c.header}
                                 </th>
@@ -242,6 +296,94 @@ export function Table<T>({
         </div>
     );
 
+    const roles = mobileList ? mobileRoles(columns, sort?.key) : null;
+    const byRole = (role: MobileRole) => columns.filter((c) => roles?.get(c.key) === role);
+    const titleCol = roles ? byRole('title')[0] : undefined;
+    const primaryCol = roles ? byRole('primary')[0] : undefined;
+    const metaCols = roles ? byRole('meta') : [];
+    const trailingCols = roles ? byRole('trailing') : [];
+    const sortable = columns.filter((c) => c.sortable && headerText(c) !== null);
+
+    const list = roles ? (
+        <div className="md:hidden">
+            {sortable.length > 1 && !loading && visible.length > 1 ? (
+                <div className="flex items-center justify-end border-b border-border-subtle px-3 py-2">
+                    <Select
+                        size="sm"
+                        label="Sort:"
+                        ariaLabel="Sort rows"
+                        value={sort?.key ?? ''}
+                        placeholder="Sort"
+                        onValueChange={(key) => {
+                            const col = columns.find((c) => c.key === key);
+                            if (!col) return;
+                            const next: SortState = { key, dir: col.firstSortDir ?? 'desc' };
+                            if (onSortChange) onSortChange(next);
+                            if (sortProp === undefined) setInnerSort(next);
+                        }}
+                        options={sortable.map((c) => ({ value: c.key, label: headerText(c) as string }))}
+                    />
+                </div>
+            ) : null}
+            {loading ? (
+                <ul aria-busy className="divide-y divide-border-subtle">
+                    {Array.from({ length: 6 }, (_, r) => (
+                        <li key={`sk-${r}`} className="flex flex-col gap-2 px-4 py-3">
+                            <span className="flex items-center gap-3"><Skeleton className="h-3.5 w-3/5" /><Skeleton className="ml-auto h-3.5 w-12" /></span>
+                            <Skeleton className="h-3 w-2/5" />
+                        </li>
+                    ))}
+                </ul>
+            ) : visible.length === 0 ? (
+                empty ?? <p className="py-6 text-center text-body text-fg-muted">No data</p>
+            ) : (
+                <ul className="divide-y divide-border-subtle">
+                    {visible.map((row, r) => {
+                        const hv = titleCol?.heat ? titleCol.heat.value(row) ?? 0 : 0;
+                        const pct = titleCol?.heat && heatMax > 0 ? Math.max(0, Math.min(100, (hv / heatMax) * 100)) : 0;
+                        const meta = metaCols.map((c) => ({ c, label: headerText(c) }));
+                        return (
+                            <li
+                                key={rowKey(row, r)}
+                                tabIndex={onRowClick ? 0 : undefined}
+                                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                                onKeyDown={onRowClick ? (e) => onRowKey(e, row) : undefined}
+                                className={cn('flex min-h-11 flex-col justify-center gap-0.5 px-4 py-2', onRowClick && 'cursor-pointer active:bg-subtle/60 focus-visible:-outline-offset-2')}
+                            >
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <div className="relative flex min-h-7 min-w-0 flex-1 items-center">
+                                        {titleCol?.heat ? (
+                                            <span
+                                                aria-hidden
+                                                className={cn('absolute inset-y-0 left-[-6px] rounded-md', heatbarClass(titleCol.heat.metric))}
+                                                style={{ width: `calc(${pct}% + 6px)` }}
+                                            />
+                                        ) : null}
+                                        <span className="relative min-w-0 truncate text-body text-fg">{titleCol ? titleCol.cell(row, r) : null}</span>
+                                    </div>
+                                    {primaryCol ? (
+                                        <span className="shrink-0 text-body font-medium text-fg tabular-nums">{primaryCol.cell(row, r)}</span>
+                                    ) : null}
+                                    {trailingCols.map((c) => <span key={c.key} className="shrink-0" onClick={(e) => e.stopPropagation()}>{c.cell(row, r)}</span>)}
+                                </div>
+                                {meta.length ? (
+                                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-meta tabular-nums">
+                                        {meta.map(({ c, label }) => (
+                                            <span key={c.key} className="inline-flex min-w-0 items-center gap-1 whitespace-nowrap">
+                                                {label ? <span className="text-fg-muted">{label}</span> : null}
+                                                <span className="text-fg-secondary">{c.cell(row, r)}</span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : null}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    ) : null;
+
     const pager = pagination && total > Math.min(...(pagination.pageSizes ?? [pagination.pageSize])) ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle p-3">
             <span className="text-meta text-fg-muted tabular-nums">
@@ -268,6 +410,7 @@ export function Table<T>({
         <>
             {toolbar ? <div className="flex flex-wrap items-center gap-2 border-b border-border-subtle p-3">{toolbar}</div> : null}
             {table}
+            {list}
             {pager}
             {footer ? <div className="border-t border-border-subtle p-3 text-meta text-fg-muted">{footer}</div> : null}
         </>
