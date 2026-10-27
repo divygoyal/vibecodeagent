@@ -168,6 +168,7 @@ start_web() {
         # production path, where only the narrow public-demo shim answers Google (demo tokens only).
         local demo_env=(TC_DEMO_DATA=1 TC_ALLOW_DEMO_IN_PROD_BUILD=1)
         [ "${TC_W1_DEMO_DATA:-1}" = 0 ] && demo_env=(TC_PUBLIC_DEMO=1)
+        [ "${TC_W1_PUBLIC_DEMO:-1}" = 0 ] && demo_env+=(TC_PUBLIC_DEMO=0)
         env -i PATH="$SAFE_PATH" HOME="$HOME" TMPDIR="$TMPDIR" LANG=C.UTF-8 TZ=UTC "${demo_env[@]}" \
             NODE_ENV=production \
             NODE_OPTIONS="--max-old-space-size=2048" NEXT_TELEMETRY_DISABLED=1 \

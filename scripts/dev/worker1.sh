@@ -80,9 +80,10 @@ cmd_up() {
     push_runner
     local t0; t0="$(now)"
     # TC_W1_DEMO_DATA=0: web without TC_DEMO_DATA, i.e. the production path (only the narrow public-demo shim
-    # answers Google, for demo tokens; see web/src/lib/demo/fetchShim.ts).
-    if [ "${TC_W1_DEMO_DATA:-1}" = 0 ]; then
-        "${SSH[@]}" "env TC_W1_DEMO_DATA=0 bash '$RROOT/bin/worker1-remote.sh' up $name $n $first"
+    # answers Google, for demo tokens; see web/src/lib/demo/fetchShim.ts). TC_W1_PUBLIC_DEMO=0: the live demo's
+    # kill switch (TC_PUBLIC_DEMO=0).
+    if [ "${TC_W1_DEMO_DATA:-1}" = 0 ] || [ "${TC_W1_PUBLIC_DEMO:-1}" = 0 ]; then
+        "${SSH[@]}" "env TC_W1_DEMO_DATA=${TC_W1_DEMO_DATA:-1} TC_W1_PUBLIC_DEMO=${TC_W1_PUBLIC_DEMO:-1} bash '$RROOT/bin/worker1-remote.sh' up $name $n $first"
     else
         remote up "$name" "$n" "$first"
     fi

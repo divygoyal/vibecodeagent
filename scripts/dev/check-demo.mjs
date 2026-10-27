@@ -12,7 +12,8 @@
  *    Dashboards -> a dashboard -> Leaderboard -> Connect AI -> Ask (sample answer). No console errors, no 5xx,
  *    no error screens, no horizontal overflow, the demo bar is there. Screenshots.
  * 3. Write actions in the UI (star a site, a builder save, Connect AI key) show the demo toast and change nothing.
- * 4. Exit demo -> home page, no demo cookie.
+ * 4. Exit demo -> home page, no demo cookie. A next/link to /demo on a marketing page: its prefetch starts nothing,
+ *    a click lands in the demo.
  * 5. A signed-in dev user (login.mjs state.json) visits /demo, sees the demo with "Back to your sites", goes back:
  *    the real session cookie is byte-for-byte the same and /api/auth/session is the real user again.
  * Writes <out>/demo-check.{json,md}. Exit 0 = every check passed.
@@ -309,6 +310,23 @@ async function walk(browser, { mobile, dark, full, dashboards }) {
     await context.close();
 }
 
+// ─── Marketing link: prefetch starts nothing, a click lands in the demo ───
+async function linkFlow(browser) {
+    const context = await newContext(browser, {});
+    const page = await context.newPage();
+    await page.goto(`${base}/changelog`, { waitUntil: 'networkidle', timeout: 90_000 });
+    const link = page.getByRole('link', { name: /live demo/i }).first();
+    await link.scrollIntoViewIfNeeded().catch(() => {});
+    await link.hover().catch(() => {}); // next/link prefetches on hover / in viewport
+    await page.waitForTimeout(2500);
+    const early = (await context.cookies(base)).some((c) => c.name === 'tc_demo');
+    check('a next/link to /demo on a marketing page does not start the demo by prefetching', !early);
+    await link.click();
+    await page.waitForURL((u) => new URL(u).pathname.startsWith('/dashboard'), { timeout: 60_000 }).catch(() => {});
+    check('clicking that link lands in the demo app', new URL(page.url()).pathname === '/dashboard' && (await context.cookies(base)).some((c) => c.name === 'tc_demo'), page.url());
+    await context.close();
+}
+
 // ─── 5. Signed-in owner ───
 async function ownerFlow(browser) {
     const stateFile = inst ? path.join(inst.dir, 'state.json') : null;
@@ -376,6 +394,7 @@ try {
         : [{ mobile: false, dark: false, full: true }, { mobile: false, dark: true, full: false }, { mobile: true, dark: false, full: true }, { mobile: true, dark: true, full: false }];
     const picked = opts.variants ? variants.filter((v) => opts.variants.includes(`${v.mobile ? '390' : '1440'}-${v.dark ? 'dark' : 'light'}`)) : variants;
     if (opts.walk) for (const v of picked) await walk(browser, { ...v, dashboards });
+    await linkFlow(browser);
     await ownerFlow(browser);
 } finally {
     await browser.close();
