@@ -24,6 +24,8 @@ export interface PublicSessionUser {
     // Read by client-side guards to gate /dashboard/* before /dashboard/setup is done.
     // Refreshed via NextAuth's update() trigger after the setup PATCH.
     workspaceSetupCompleted: boolean;
+    // The shared read-only public demo user (lib/publicDemo). Present (true) only for that session.
+    demo?: boolean;
 }
 
 /**
@@ -64,6 +66,7 @@ export function publicSessionUser(
         hasGoogle: Boolean(token.googleAccessToken || token.googleRefreshToken),
         hasGithub: Boolean(token.githubAccessToken),
         workspaceSetupCompleted: Boolean(token.workspaceSetupCompleted),
+        ...(token.demo === true ? { demo: true } : {}),
     };
 }
 
