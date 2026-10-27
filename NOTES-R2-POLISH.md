@@ -69,3 +69,15 @@ Candidate screenshots: /root/projects/tc-redesign-research/round2/candidate/poli
   Favicon letter tiles are now >= 11px.
 - **WS4 (marketing)**: the Tawk bubble now shows on marketing pages at desktop width (it did not before); Badge is
   sentence case everywhere.
+
+## Status at PAUSE (2026-10-27 ~08:10 UTC)
+- Committed: everything above. Candidate shots: desktop light + dark (26/26) are final in
+  round2/candidate/polish/. The 390 shots there are from an earlier run (before the one-decimal delta commit
+  9ef666e and a dev-server self-restart) and must be retaken.
+- Next: (1) up.sh r2polish 3111 8111 (the instance already runs on the integrate DB copy; dashboard id
+  0f718155-64ed-48b9-adf2-05b6084928e3), then `node <scratch>/ws1/batchshot.mjs <scratch>/ws1/appB.json` for the
+  390 light/dark set (job files: /tmp/claude-0/-root/b497b626-1524-45cc-9ce3-b9467df6997d/scratchpad/ws1/app{A,B}.json);
+  (2) check-mobile.mjs 3111 --only on the key routes; (3) review shots, final report; down.sh + rm -rf web/.next.
+- Open question noted while reviewing: the dashboard Devices donut now lays its legend to the right at 1440 dark
+  (baseline: below). That choice is the builder's width rule in dashboard-builder/widgets/Charts.tsx, not a WS1
+  change; confirm the width it measured did not change because of a shared component before the final report.
