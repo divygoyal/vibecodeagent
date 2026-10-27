@@ -142,6 +142,8 @@ async function doRefresh(opts: RefreshOptions): Promise<RefreshSummary> {
                     websiteUrl: entry.website_url,
                     accessToken: entry.access_token,
                     refreshToken: entry.refresh_token || undefined,
+                    // Admin numeric user id: routes a linked Google account's property to its token.
+                    userIdentifier: String(entry.user_id),
                     gscSiteUrl: entry.gsc_site_url ?? null,
                 });
                 if (result.ok) counts.successCount++;

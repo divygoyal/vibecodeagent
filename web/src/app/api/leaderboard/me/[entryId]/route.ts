@@ -57,6 +57,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ entryI
             websiteUrl: before.website_url,
             accessToken: user.accessToken,
             refreshToken: user.refreshToken,
+            userIdentifier: user.userId,
             skipVerify: before.verification.level === 'owner' && !before.verification.grace,
             gscSiteUrl: before.gsc_site_url,
         }).catch((err) => console.error('[Leaderboard] refresh on publish failed:', err));

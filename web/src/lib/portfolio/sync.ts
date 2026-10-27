@@ -1,7 +1,8 @@
 /**
  * Server-only portfolio sync for one user:
  *
- *   1. list the Google inventory (fetchInventory, cached 10 min) and pair it
+ *   1. list the Google inventory of every connection (the primary and any linked Google
+ *      account, lib/googleAccounts.ts; each listing cached 10 min) and pair it
  *      (pairSites + the user's overrides), store it in portfolio_assets;
  *   2. for each visible asset that is due, fetch only the missing or stale
  *      days with ONE report per chunk (GA4 runReport by date / GSC
@@ -20,8 +21,10 @@
  * failed get two more rounds a few seconds apart (they stay "syncing" meanwhile). Only a failure
  * that survives all of that is stored as an error, and then with a plain message, never "HTTP 502".
  */
-import { fetchInventory, type FetchLike, type Inventory } from '@/lib/sites/fetchInventory';
+import { connectionTokenResolver, listLinkedGoogleConnections, loadUserInventory, type GoogleAccess } from '@/lib/googleAccounts';
+import type { FetchLike } from '@/lib/sites/fetchInventory';
 import { normalizeHost, pairSites } from '@/lib/sites/pairing';
+import { PRIMARY_CONNECTION, type UserInventory } from '@/lib/sites/unionInventory';
 import { AdminStoreError, adminStore, type AssetUpsert, type StatusUpdate } from './adminStore';
 import { addDays, HISTORY_DAYS, STALE_AFTER_S, SYNC_STUCK_S, syncEndDay } from './ranges';
 import { ga4DailyRequest, ga4RangeUsersRequest, gscDailyRequest, parseGa4Daily, parseGa4RangeUsers, parseGscDaily } from './rows';
@@ -230,8 +233,41 @@ async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<v
     }));
 }
 
+const linkedId = (connectionId: string | undefined) => (connectionId && connectionId !== PRIMARY_CONNECTION ? connectionId : null);
+
+/**
+ * Assets a linked Google account listed last time but could not list now (Needs reconnect, an
+ * outage): kept in the inventory as stored, so they are not marked missing and keep their pairing.
+ */
+export function carryOverFailedConnections(inv: UserInventory, current: StoreAsset[]): UserInventory {
+    const failed = new Map<string, { ga4: boolean; gsc: boolean }>();
+    for (const c of inv.connections) {
+        if (c.primary) continue;
+        const down = c.state !== 'ok';
+        failed.set(c.connectionId, { ga4: down || Boolean(c.errors.ga4), gsc: down || Boolean(c.errors.gsc) });
+    }
+    if (![...failed.values()].some((f) => f.ga4 || f.gsc)) return inv;
+    const haveProps = new Set(inv.properties.map((p) => p.property));
+    const haveSites = new Set(inv.sites.map((s) => s.siteUrl));
+    const properties = [...inv.properties];
+    const sites = [...inv.sites];
+    for (const a of current) {
+        const cid = a.connection_id;
+        if (!cid || a.missing) continue;
+        const f = failed.get(cid);
+        if (!f) continue;
+        if (a.asset_kind === 'ga4' && f.ga4 && !haveProps.has(a.asset_id)) {
+            properties.push({ property: a.asset_id, displayName: a.display_name || a.asset_id, streamUris: a.host ? [`https://${a.host}`] : [], accountName: a.account_name ?? undefined, connectionId: cid });
+        } else if (a.asset_kind === 'gsc' && f.gsc && !haveSites.has(a.asset_id)) {
+            sites.push({ siteUrl: a.asset_id, permissionLevel: a.permission_level ?? undefined, connectionId: cid });
+        }
+    }
+    return { ...inv, properties, sites };
+}
+
 /** Pair the inventory with the stored overrides and store it. Returns the stored assets. */
-async function storeInventory(identifier: string, inv: Inventory, current: StoreAsset[]): Promise<StoreAsset[]> {
+async function storeInventory(identifier: string, invIn: UserInventory, current: StoreAsset[]): Promise<StoreAsset[]> {
+    const inv = carryOverFailedConnections(invIn, current);
     const pairs = pairSites(inv.properties, inv.sites, pairingOverridesFrom(current));
     const upserts: AssetUpsert[] = [];
     for (const pair of pairs) {
@@ -240,13 +276,15 @@ async function storeInventory(identifier: string, inv: Inventory, current: Store
             upserts.push({
                 kind: 'ga4', asset_id: pair.ga4.property, display_name: pair.ga4.displayName,
                 host: normalizeHost(pair.ga4.streamUris[0] ?? '') || null, account_name: p?.accountName ?? null,
-                paired_with: pair.gsc?.siteUrl ?? null,
+                paired_with: pair.gsc?.siteUrl ?? null, connection_id: linkedId(p?.connectionId),
             });
         }
         if (pair.gsc) {
+            const s = inv.sites.find((x) => x.siteUrl === pair.gsc!.siteUrl);
             upserts.push({
                 kind: 'gsc', asset_id: pair.gsc.siteUrl, display_name: pair.host, host: pair.host,
                 permission_level: pair.gsc.permissionLevel ?? null, paired_with: pair.ga4?.property ?? null,
+                connection_id: linkedId(s?.connectionId),
             });
         }
     }
@@ -258,7 +296,7 @@ async function storeInventory(identifier: string, inv: Inventory, current: Store
 
 /** Re-pair after an override change, without fetching any data. */
 export async function repairPairs(identifier: string, accessToken: string): Promise<StoreAsset[]> {
-    const inv = await fetchInventory(accessToken, { cacheKey: identifier });
+    const inv = await loadUserInventory(identifier, { primary: { ok: true, token: accessToken } });
     if (inv.errors.ga4 && inv.errors.gsc) throw new GoogleError(inv.errors.ga4.status, inv.errors.ga4.message);
     return storeInventory(identifier, inv, await adminStore.getAssets(identifier));
 }
@@ -330,7 +368,10 @@ async function runSync(opts: SyncOptions): Promise<SyncResult> {
         if (!(err instanceof AdminStoreError && err.status === 404) || !opts.ensureUser || !(await opts.ensureUser())) throw err;
         current = await adminStore.getAssets(identifier);
     }
-    const inv = await fetchInventory(accessToken, { cacheKey: identifier, fetch: fetchFn, refresh: opts.refreshInventory });
+    // Every Google connection of the user: the primary plus linked accounts (lib/googleAccounts.ts).
+    const linked = await listLinkedGoogleConnections(identifier);
+    const tokenFor = connectionTokenResolver(identifier, accessToken, linked);
+    const inv = await loadUserInventory(identifier, { primary: { ok: true, token: accessToken }, linked, fetch: fetchFn, refresh: opts.refreshInventory });
     result.properties = inv.properties.length;
     result.sites = inv.sites.length;
     if (inv.errors.ga4 && inv.errors.gsc) {
@@ -357,7 +398,13 @@ async function runSync(opts: SyncOptions): Promise<SyncResult> {
         kind: a.asset_kind, asset_id: a.asset_id, status: 'syncing', last_error: a.last_error, sync_started_at: nowS,
     })));
 
-    let authFailed = false;
+    /** Connections whose token Google refused during this run (the rest keep syncing). */
+    const authFailed = new Set<string>();
+    const reconnectMessage = (cid: string) => {
+        if (cid === PRIMARY_CONNECTION) return 'Google access expired. Reconnect Google.';
+        const email = linked.find((c) => c.sub === cid)?.email;
+        return `Google access expired. Reconnect ${email ?? 'this Google account'} in Settings.`;
+    };
     // Assets marked "syncing" above that have not reached a final status. If this run dies on the way
     // (a throw inside mapLimit), they are put back to an error below instead of staying "syncing".
     const unfinished = new Set<StoreAsset>(due);
@@ -366,8 +413,10 @@ async function runSync(opts: SyncOptions): Promise<SyncResult> {
 
     /** 'retry' = a transient Google failure that may still clear: the asset stays "syncing" for another round. */
     const processAsset = async (a: StoreAsset, round: number, finalRound: boolean): Promise<'done' | 'retry'> => {
-        if (authFailed) {
-            await adminStore.updateStatus(identifier, [{ kind: a.asset_kind, asset_id: a.asset_id, status: 'error', last_error: 'Google access expired. Reconnect Google.' }]);
+        const cid = a.connection_id || PRIMARY_CONNECTION;
+        const access: GoogleAccess = authFailed.has(cid) ? { ok: false, reason: 'refresh_failed' } : await tokenFor(cid);
+        if (!access.ok) {
+            await adminStore.updateStatus(identifier, [{ kind: a.asset_kind, asset_id: a.asset_id, status: 'error', last_error: reconnectMessage(cid) }]);
             unfinished.delete(a);
             result.failed += 1;
             return 'done';
@@ -376,7 +425,7 @@ async function runSync(opts: SyncOptions): Promise<SyncResult> {
         try {
             for (let i = stored.get(a) ?? 0; i < chunks.length; i++) {
                 const [s, e] = chunks[i];
-                const rows = await fetchDaily(fetchFn, accessToken, a.asset_kind, a.asset_id, s, e, round === 0 ? retryTuning.call : retryTuning.later);
+                const rows = await fetchDaily(fetchFn, access.token, a.asset_kind, a.asset_id, s, e, round === 0 ? retryTuning.call : retryTuning.later);
                 await adminStore.upsertMetrics(identifier, rows);
                 stored.set(a, i + 1);
                 const last = i === chunks.length - 1;
@@ -394,11 +443,13 @@ async function runSync(opts: SyncOptions): Promise<SyncResult> {
         } catch (err) {
             if (!finalRound && isTransientGoogleError(err)) return 'retry';
             const status = err instanceof GoogleError ? err.status : 0;
-            if (status === 401) authFailed = true;
-            const message = plainGoogleMessage(err);
+            if (status === 401) authFailed.add(cid);
+            const message = status === 401 ? reconnectMessage(cid) : plainGoogleMessage(err);
             if (status === 403) result.noAccess += 1;
             else result.failed += 1;
-            if (status === 401) result.googleError = { status, message };
+            // The page-wide "Reconnect Google" banner is for the sign-in account; a linked account's
+            // assets say which account to reconnect, and Settings shows it.
+            if (status === 401 && cid === PRIMARY_CONNECTION) result.googleError = { status, message };
             await adminStore.updateStatus(identifier, [{
                 kind: a.asset_kind, asset_id: a.asset_id, status: status === 403 ? 'no_access' : 'error', last_error: message,
             }]).catch(() => undefined);
@@ -491,9 +542,26 @@ async function runRangeUsers(opts: { identifier: string; accessToken: string; ra
     const w = opts.window;
     let failed = 0;
     let stored = 0;
+    // Each property with the token of the Google connection it was listed from.
+    let tokenOf: (property: string) => Promise<string | null> = async () => opts.accessToken;
+    const linked = await listLinkedGoogleConnections(opts.identifier);
+    if (linked.length > 0) {
+        const assets = await adminStore.getAssets(opts.identifier).catch(() => [] as StoreAsset[]);
+        const cidOf = new Map(assets.filter((a) => a.asset_kind === 'ga4').map((a) => [a.asset_id, a.connection_id]));
+        const resolve = connectionTokenResolver(opts.identifier, opts.accessToken, linked);
+        tokenOf = async (property) => {
+            const access = await resolve(cidOf.get(property));
+            return access.ok ? access.token : null;
+        };
+    }
     await mapLimit(opts.properties, SYNC_CONCURRENCY, async (property) => {
         try {
-            const report = await googlePost(fetchFn, `${GA_DATA}/${property}:runReport`, opts.accessToken,
+            const token = await tokenOf(property);
+            if (!token) {
+                failed += 1;
+                return;
+            }
+            const report = await googlePost(fetchFn, `${GA_DATA}/${property}:runReport`, token,
                 ga4RangeUsersRequest({ start: w.cur_start, end: w.cur_end }, { start: w.prev_start, end: w.prev_end }));
             const u = parseGa4RangeUsers(report as never);
             // Store each property as it lands so cards fill in while the rest load.

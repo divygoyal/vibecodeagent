@@ -23,6 +23,8 @@ export {
     demoAccessToken,
     demoRefreshToken,
     accountKeyFromToken,
+    demoAccountSub,
+    demoAuthCode,
     DEMO_DEFAULT_ACCOUNT,
     type DemoSite,
     type DemoShape,

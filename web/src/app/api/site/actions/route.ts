@@ -21,8 +21,11 @@ export async function GET(req: Request) {
     const property = parseProperty(sp.get('property'));
     if (!siteUrl && !property) return jsonError('A Search Console site or GA4 property is required.', 400);
     const label = (sp.get('label') ?? '').slice(0, 120) || 'this site';
-    const ctx = await getSiteContext(req);
+    // GA4 and Search Console of one site can sit in different Google accounts: one token each.
+    const ctx = await getSiteContext(req, siteUrl ? { kind: 'gsc', id: siteUrl } : { kind: 'ga4', id: property! });
     if (ctx instanceof NextResponse) return ctx;
+    const gaCtx = siteUrl && property ? await getSiteContext(req, { kind: 'ga4', id: property }) : ctx;
+    if (gaCtx instanceof NextResponse) return gaCtx;
 
     const search = parseRange(sp, 2);
     const t = new URLSearchParams();
@@ -36,7 +39,7 @@ export async function GET(req: Request) {
         const data = await cachedResult(
             `site-actions:${ctx.userId}:${siteUrl ?? ''}:${property ?? ''}:${label}:${rangeKey(search)}:${rangeKey(traffic)}`,
             5 * 60_000,
-            () => buildActions({ userId: ctx.userId, token: ctx.token, label, siteUrl, property, search, traffic }),
+            () => buildActions({ userId: ctx.userId, token: ctx.token, gaToken: gaCtx.token, label, siteUrl, property, search, traffic }),
         );
         return NextResponse.json(data, { headers: PRIVATE_CACHE });
     } catch (e) {

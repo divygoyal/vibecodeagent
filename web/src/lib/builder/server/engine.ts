@@ -52,6 +52,11 @@ export interface EngineDeps {
     userId: string;
     /** Owner's Google access token, fetched lazily (null = not connected). */
     getToken: () => Promise<string | null>;
+    /**
+     * Token for one GA4 property / Search Console site when the owner has extra Google accounts linked
+     * (the account that lists it, lib/googleAccounts.ts). Absent or null = getToken's token.
+     */
+    getTokenFor?: (asset: { kind: 'ga4' | 'gsc'; id: string }) => Promise<string | null>;
     /** Site directory override (tests). */
     loadDirectory?: (token: string) => Promise<SiteDirectory>;
     /** 'public' = share-link traffic: min TTL, no `fresh`, per-owner budget for uncached calls. */
@@ -567,6 +572,18 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
         for (const w of dataWidgets) results[w.widget.id] = errResult('NOT_CONNECTED');
         return response();
     }
+    const tokenMemo = new Map<string, Promise<string>>();
+    /** The token of the Google connection that lists the asset (memoised per evaluation). */
+    const tokenFor = (kind: 'ga4' | 'gsc', id: string): Promise<string> => {
+        if (!deps.getTokenFor) return Promise.resolve(token);
+        const k = `${kind}|${id}`;
+        let p = tokenMemo.get(k);
+        if (!p) {
+            p = deps.getTokenFor({ kind, id }).then((t) => t ?? token, () => token);
+            tokenMemo.set(k, p);
+        }
+        return p;
+    };
     let dir: SiteDirectory;
     try {
         dir = deps.loadDirectory ? await deps.loadDirectory(token) : await loadSiteDirectory(deps.userId, token);
@@ -756,9 +773,10 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             outcomes.set(c.key, { data: hit.value as LeafData, fetchedAt: hit.fetchedAt, cache: 'stale' });
             // Background refresh (single-flight); errors keep the stale entry.
             void singleFlight(`refresh:${c.key}`, async () => {
+                const t = await tokenFor(c.family, c.asset);
                 const r = c.family === 'ga4'
-                    ? (await fetchGa4Batch(token, deps.userId, c.asset, [c], { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 })).get(c.key)
-                    : await fetchGsc(token, deps.userId, c, { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 });
+                    ? (await fetchGa4Batch(t, deps.userId, c.asset, [c], { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 })).get(c.key)
+                    : await fetchGsc(t, deps.userId, c, { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 });
                 if (r && !(r instanceof LeafError)) cacheSet(c.key, r, policyFor(c.family, c.range.end, today));
             }).catch(() => undefined);
             continue;
@@ -796,10 +814,14 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     };
     await Promise.all([
         ...[...ga4ByProp.entries()].map(async ([prop, list]) => {
-            const res = await singleFlight(`ga4batch:${list.map((l) => l.key).join(',')}`, () => fetchGa4Batch(token, deps.userId, prop, list, stats));
+            const t = await tokenFor('ga4', prop);
+            const res = await singleFlight(`ga4batch:${list.map((l) => l.key).join(',')}`, () => fetchGa4Batch(t, deps.userId, prop, list, stats));
             for (const c of list) settle(c, res.get(c.key));
         }),
-        ...gscMisses.map(async (c) => settle(c, await singleFlight(c.key, () => fetchGsc(token, deps.userId, c, stats)))),
+        ...gscMisses.map(async (c) => {
+            const t = await tokenFor('gsc', c.asset);
+            settle(c, await singleFlight(c.key, () => fetchGsc(t, deps.userId, c, stats)));
+        }),
     ]);
 
     // 4. Assemble each widget.

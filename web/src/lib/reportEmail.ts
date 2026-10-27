@@ -16,6 +16,7 @@
 
 import { sendTransactional } from './brevo';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from './googleApi';
+import { accessForAsset, credentialsForAsset } from './googleAccounts';
 import { computePeriod, fetchReportData, type ReportPeriod, type ReportRawData } from './reportDataFetcher';
 import { analyzeReportData, type ReportAnalysis } from './reportAnalysis';
 import { synthesizeWithGemini } from './reportGeminiSynth';
@@ -801,7 +802,9 @@ export async function sendUserReportEmail(input: SendUserReportEmailInput): Prom
         return { ok: false, error: 'No GA4 property + GSC site available for this user (and none provided).' };
     }
 
-    const tokens = await fetchGoogleTokensFromDb(userId);
+    // The token of the Google connection that lists each asset (sign-in or a linked account).
+    const primary = async () => (await fetchGoogleTokensFromDb(userId)) ?? {};
+    const tokens = await credentialsForAsset(userId, { kind: 'gsc', id: siteUrl }, primary);
     if (!tokens?.refreshToken && !tokens?.accessToken) {
         return { ok: false, error: 'User has not connected Google Analytics.' };
     }
@@ -819,7 +822,8 @@ export async function sendUserReportEmail(input: SendUserReportEmailInput): Prom
     let analysis: ReportAnalysis;
     let pdfBuffer: Uint8Array;
     try {
-        rawData = await fetchReportData(accessToken, propertyId, siteUrl, reportPeriod);
+        const gaAccess = await accessForAsset(userId, { kind: 'ga4', id: propertyId }, primary);
+        rawData = await fetchReportData(accessToken, propertyId, siteUrl, reportPeriod, gaAccess.ok ? gaAccess.token : undefined);
         analysis = analyzeReportData(rawData);
         const gemini = await synthesizeWithGemini(analysis, reportPeriod, siteUrl, rawData);
         pdfBuffer = await generateReportPdf({ analysis, gemini, period: reportPeriod, siteUrl });

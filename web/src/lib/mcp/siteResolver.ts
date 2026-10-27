@@ -6,6 +6,7 @@
  * the portfolio store (lib/sites/pairingStore.ts), the same ones the app shows.
  */
 import { fetchInventory, type Inventory } from '@/lib/sites/fetchInventory';
+import { loadUserInventory } from '@/lib/googleAccounts';
 import { normalizeHost, pairSites, type PairingOverrides } from '@/lib/sites/pairing';
 import { loadPairingOverrides } from '@/lib/sites/pairingStore';
 import type { McpPrincipal } from './auth';
@@ -57,11 +58,10 @@ export function buildSiteRecords(inv: Pick<Inventory, 'properties' | 'sites'>, o
 }
 
 export async function loadCatalog(p: McpPrincipal, google: GoogleClient, opts: { refresh?: boolean } = {}): Promise<SiteCatalog> {
-    const inv = await fetchInventory(google.demo ? '' : google.token, {
-        demo: google.demo,
-        cacheKey: google.demo ? 'mcp-demo' : `u${p.userId}`,
-        refresh: opts.refresh,
-    });
+    // Every Google connection of the user (sign-in account + linked accounts), each asset once.
+    const inv = google.demo || !p.userIdentifier
+        ? await fetchInventory(google.demo ? '' : google.token, { demo: google.demo, cacheKey: google.demo ? 'mcp-demo' : `u${p.userId}`, refresh: opts.refresh })
+        : await loadUserInventory(p.userIdentifier, { primary: { ok: true, token: google.token }, cacheKey: `u${p.userId}`, refresh: opts.refresh });
     if (inv.errors.ga4?.status === 401 || inv.errors.gsc?.status === 401) {
         throw new ToolError('google_reauth_required', 'The Google connection expired or was revoked', 'Ask the user to open TrafficClaw > Connect AI and press "Re-connect Google".');
     }

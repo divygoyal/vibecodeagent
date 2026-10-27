@@ -9,12 +9,16 @@ export interface DirectoryError {
 export interface DirectorySite {
     siteUrl: string;
     permissionLevel?: string;
+    /** Extra Google account (its Google sub) the site was listed from; absent = the sign-in account. */
+    connectionId?: string;
 }
 
 export interface DirectoryProperty {
     property: string;
     displayName: string;
     parent?: string;
+    /** Extra Google account the property was listed from; absent = the sign-in account. */
+    connectionId?: string;
 }
 
 export interface DirectoryPayload {

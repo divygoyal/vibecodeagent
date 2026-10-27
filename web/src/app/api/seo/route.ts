@@ -6,7 +6,7 @@ import { googleErrorResponse } from '@/lib/googleErrors'
 import { isDemoRequest } from '@/lib/demoWorkspace'
 import { getDemoSeoDashboard } from '@/lib/demoWorkspaceData'
 import { getValidAccessToken, listSearchConsoleSites, fetchSeoDashboard } from '@/lib/googleApi'
-import { getGoogleCredentialsForRequest } from '@/lib/serverAuth'
+import { getGoogleCredentialsForAsset, linkedAwareSiteList } from '@/lib/serverAuth'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 const SEARCH_CONSOLE_SITE_LIST_TIMEOUT_MS = 10000
@@ -175,7 +175,9 @@ export async function GET(req: Request) {
             const userId = session.user.id
 
             // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
-            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId))
+            // The token of the Google connection that lists the site (sign-in or a linked account).
+            const requestedSite = searchParams.get('siteUrl')
+            const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForAsset(req, String(userId), requestedSite ? { kind: 'gsc', id: requestedSite } : null)
 
             if (!googleAccess && !googleRefresh) {
                 return NextResponse.json({ error: "Google not connected", code: "GOOGLE_NOT_CONNECTED" }, { status: 400 })
@@ -198,6 +200,8 @@ export async function GET(req: Request) {
                 CACHE_TTL.PROPERTY_LIST,
                 async () => {
                     try {
+                        const union = await linkedAwareSiteList(req, String(userId))
+                        if (union) return union
                         return await listSearchConsoleSites(
                             token,
                             AbortSignal.timeout(SEARCH_CONSOLE_SITE_LIST_TIMEOUT_MS)

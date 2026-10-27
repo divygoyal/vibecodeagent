@@ -64,6 +64,8 @@ export interface AssetUpsert {
     account_name?: string | null;
     permission_level?: string | null;
     paired_with?: string | null;
+    /** Linked Google account (sub) the asset was listed from; null = the primary connection. */
+    connection_id?: string | null;
 }
 
 export interface StatusUpdate {

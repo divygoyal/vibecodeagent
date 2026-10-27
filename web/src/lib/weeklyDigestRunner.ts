@@ -12,7 +12,8 @@
  * preserved verbatim per the "don't break anything" mandate.
  */
 import { buildEnrichedSnapshot, type IsoWeekRange, getCompletedIsoWeekRange } from '@/lib/chatSnapshot';
-import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
+import { getValidAccessToken } from '@/lib/googleApi';
+import { storedCredentialsForAsset } from '@/lib/googleAccounts';
 import { BRAND_NAME } from '@/lib/brand';
 import {
     getGoogleGenAIClient,
@@ -274,7 +275,8 @@ export async function runWeeklyDigestForUser(
         let validGoogleToken: string | null = null;
         let tokenFetchErr: string | null = null;
         try {
-            const tokens = await fetchGoogleTokensFromDb(userIdentifier);
+            // The digest is built from the selected site: its own Google account's token.
+            const tokens = await storedCredentialsForAsset(userIdentifier, siteUrl ? { kind: 'gsc', id: siteUrl } : null);
             if (tokens?.accessToken || tokens?.refreshToken) {
                 validGoogleToken = await getValidAccessToken(tokens?.accessToken, tokens?.refreshToken);
             } else {

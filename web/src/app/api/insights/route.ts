@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { getValidAccessToken, listSearchConsoleSites, listAnalyticsProperties } from '@/lib/googleApi'
-import { getGoogleCredentialsForRequest } from '@/lib/serverAuth'
+import { getGoogleAccessTokenForAsset, getGoogleCredentialsForAsset } from '@/lib/serverAuth'
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || ""
 
@@ -232,7 +232,11 @@ export async function GET(req: Request) {
         const userId = session!.user.id;
 
         // Server-only: Google tokens from the session JWT, then the admin DB (lib/serverAuth.ts).
-        const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForRequest(req, String(userId));
+        const { searchParams } = new URL(req.url);
+        const requestedSiteUrl = searchParams.get('siteUrl');
+        const requestedPropertyId = searchParams.get('propertyId');
+        // Search Console part: the token of the connection that lists the site (sign-in or linked account).
+        const { accessToken: googleAccess, refreshToken: googleRefresh } = await getGoogleCredentialsForAsset(req, String(userId), requestedSiteUrl ? { kind: 'gsc', id: requestedSiteUrl } : null);
 
         if (!googleAccess && !googleRefresh) {
             return NextResponse.json({ insights: [], message: "Connect Google to get SEO & analytics insights" });
@@ -246,9 +250,6 @@ export async function GET(req: Request) {
         }
 
         // Use requested site/property or fall back to first available
-        const { searchParams } = new URL(req.url);
-        const requestedSiteUrl = searchParams.get('siteUrl');
-        const requestedPropertyId = searchParams.get('propertyId');
 
         const insights: Insight[] = [];
 
@@ -269,8 +270,10 @@ export async function GET(req: Request) {
             ? requestedPropertyId.replace('properties/', '')
             : (properties.length > 0 ? properties[0].property.replace('properties/', '') : null);
         if (propId) {
+            // GA4 part: the property may sit in another linked Google account than the site.
+            const gaAccess = requestedPropertyId ? await getGoogleAccessTokenForAsset(req, String(userId), { kind: 'ga4', id: requestedPropertyId }) : null;
             const gaData = await fetchGAReport(
-                token, propId, daysAgo(28), daysAgo(1),
+                gaAccess?.ok ? gaAccess.token : token, propId, daysAgo(28), daysAgo(1),
                 ['pagePath'], ['sessions', 'bounceRate']
             );
             insights.push(...generateAnalyticsInsights(gaData));
