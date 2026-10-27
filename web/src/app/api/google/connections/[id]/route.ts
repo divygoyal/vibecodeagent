@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { invalidateCache, invalidateCacheContaining } from '@/lib/apiCache';
 import { invalidateGoogleConnections, PRIMARY_CONNECTION } from '@/lib/googleAccounts';
 import { appOrigin } from '@/lib/googleLink';
 import { invalidatePairingOverrides } from '@/lib/sites/pairingStore';
@@ -39,6 +40,9 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
         });
         invalidateGoogleConnections();
         invalidatePairingOverrides();
+        // Lists, site contexts (tokens) and report data read through the account: not served again.
+        invalidateCacheContaining(`:${user.id}`);
+        invalidateCache('site-ctx:');
         if (res.status === 404) return NextResponse.json({ error: 'That Google account is not connected.' }, { status: 404 });
         if (!res.ok) return NextResponse.json({ error: 'Could not disconnect it. Try again.' }, { status: 502 });
         const data = await res.json().catch(() => ({})) as { hidden_assets?: number };

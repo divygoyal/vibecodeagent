@@ -4,7 +4,7 @@
 #   worker1-remote.sh deps  <name>              npm ci once per lockfile hash (cached node_modules) + admin venv
 #   worker1-remote.sh build <name>              production `next build`
 #   worker1-remote.sh up    <name> [N]          N instances (default 4): web 3201.. + admin 8201.., fresh DB, demo users
-#   worker1-remote.sh check <name> [what] [out] crawl|mobile|scenarios|golden|all, results into <out>
+#   worker1-remote.sh check <name> [what] [out] crawl|mobile|scenarios|golden|multi|all, results into <out>
 #   worker1-remote.sh down  <name>
 #   worker1-remote.sh status
 #   worker1-remote.sh clean [--all]
@@ -286,6 +286,7 @@ job_crawl() {   # k n port
 }
 job_mobile() { chk "$RES/mobile-p$1.log" "$KIT/check-mobile.mjs" "$3" --label "p$1" --out "$RES/mobile" --part "$1/$2" --no-shots $(skip_args); }
 job_scen() { chk "$RES/scen-$1.log" "$KIT/check-scenarios.mjs" "$3" --users "$4" --out "$RES/scenarios/u$1"; }
+job_multi() { chk "$RES/multi.log" "$KIT/check-multi-account.mjs" "$1" --out "$RES/multi"; }   # port (linked Google accounts e2e)
 job_golden() { chk "$RES/golden-capture-$1.log" "$KIT/dash-golden.mjs" capture "$2" "$RES/golden/cand$1"; }
 
 cmd_check() {
@@ -328,6 +329,12 @@ cmd_check() {
             [ -n "$mine" ] || continue
             phase_job job_scen "$((idx + 1))" "$n" "$(web_port "${insts[$idx]}")" "$mine"
         done
+        phase_end
+    fi
+    if [ "$all" = 1 ] || [ "$what" = multi ]; then
+        # "Connect another Google account" end to end as the `multi` user (one instance is enough).
+        phase_start multi
+        phase_job job_multi "$(web_port "${insts[0]}")"
         phase_end
     fi
     if [ "$all" = 1 ] || [ "$what" = golden ]; then

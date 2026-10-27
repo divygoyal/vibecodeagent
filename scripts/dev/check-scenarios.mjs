@@ -8,7 +8,7 @@
  *   node scripts/dev/check-scenarios.mjs <webPort> [--users empty,one,…] [--only /dashboard,…]
  *        [--out dir] [--settle ms] [--skip-login]
  *
- * Users (see login.mjs): empty one ga4only gsconly many nogoogle nocredits
+ * Users (see login.mjs): empty one ga4only gsconly many nogoogle nocredits multi
  *                        f403 f429 f500 ftimeout fempty frevoked fhuge
  * Plus cookie runs on public pages: --users cookie:429,cookie:empty (tc_demo_faults cookie,
  * logged out) for the marketing / leaderboard / embed / demo pages.
@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { fillRoute, findInstance } from './routes.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const ALL_USERS = ['empty', 'one', 'ga4only', 'gsconly', 'many', 'nogoogle', 'nocredits', 'f403', 'f429', 'f500', 'ftimeout', 'fempty', 'frevoked', 'fhuge'];
+const ALL_USERS = ['empty', 'one', 'ga4only', 'gsconly', 'many', 'nogoogle', 'nocredits', 'multi', 'f403', 'f429', 'f500', 'ftimeout', 'fempty', 'frevoked', 'fhuge'];
 const HOST = { many: 'site-001.example', default: 'acmeanalytics.example' };
 const APP_ROUTES = [
     '/dashboard', '/dashboard/s/[host]', '/dashboard/s/[host]/traffic', '/dashboard/s/[host]/search', '/dashboard/s/[host]/pages',

@@ -11,7 +11,7 @@ cd /root/projects/worktrees/tc-<you>
 scripts/dev/worker1.sh sync  .                 # rsync code (no node_modules/.next/.git/.env*), npm ci once per lockfile hash
 scripts/dev/worker1.sh build <name>            # production `next build` (~50 s)
 scripts/dev/worker1.sh up    <name> [N]        # N instances (default 4): web 3201.., admin 8201.., fresh SQLite, demo users seeded (~15 s)
-scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden] [--golden-base dirA,dirB]
+scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden|multi] [--golden-base dirA,dirB]
 scripts/dev/worker1.sh down  <name>
 scripts/dev/worker1.sh run   . [what] [N]      # sync + build + up + check + down
 scripts/dev/worker1.sh status                  # load, memory, running instances, disk
@@ -31,6 +31,9 @@ What `check` does, on the N running instances at once (the slowest job is the ph
 - **mobile**: `check-mobile.mjs --part k/N --no-shots` (360/390/414, light + dark).
 - **scenarios**: `check-scenarios.mjs`, the 9 users of the main-VPS final gate spread over the instances
   (`TC_W1_SCEN_USERS=a,b,c` changes the list).
+- **multi**: `check-multi-account.mjs` on the first instance: the `multi` user (two Google accounts, the second
+  linked as a data connection) end to end: Settings list and screenshots, union directory and portfolio, account-2
+  data, Disconnect in the UI, the demo link flow (added / same / cancelled / forged state), a revoked extra account.
 - **golden**: two captures of the same build in parallel (a stability sample), then `compare` against the
   baselines given with `--golden-base` (exact pixels; a shot passes if it equals any baseline). It also compares the
   two captures with each other.
