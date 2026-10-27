@@ -1,3 +1,4 @@
+import { clientKey } from '@/lib/clientIp';
 /**
  * Small in-memory sliding-window limiter (per process, like the other public
  * endpoints in this app). Keys should include the route name.
@@ -19,7 +20,7 @@ export function allow(key: string, max: number, windowMs: number): { ok: boolean
     return { ok: true, retryAfterSeconds: 0 };
 }
 
+/** Rate-limit key of the caller (lib/clientIp.ts). */
 export function clientIp(req: Request): string {
-    const fwd = req.headers.get('x-forwarded-for') || '';
-    return fwd.split(',')[0].trim() || req.headers.get('x-real-ip') || 'unknown';
+    return clientKey(req.headers);
 }

@@ -585,6 +585,26 @@ async def get_next_available_port(db: AsyncSession) -> int:
     raise HTTPException(status_code=503, detail="No available ports - max users reached")
 
 
+# Port value for the public demo user, which never gets a container. users.container_port has been nullable since
+# the first schema (models.User, created by Base.metadata.create_all; no migration changes it), so it is NULL. A
+# database whose column is NOT NULL anyway gets 0: outside the BASE_PORT range get_next_available_port hands out,
+# never bound (containers only start for users with a Telegram bot token), and falsy wherever code checks
+# `if not user.container_port`.
+DEMO_PORT_SENTINEL = 0
+
+
+async def demo_user_port(db: AsyncSession) -> Optional[int]:
+    try:
+        rows = (await db.execute(text("PRAGMA table_info(users)"))).fetchall()
+        for row in rows:
+            # (cid, name, type, notnull, dflt_value, pk)
+            if row[1] == "container_port" and row[3]:
+                return DEMO_PORT_SENTINEL
+    except Exception:
+        pass  # not SQLite: keep NULL
+    return None
+
+
 async def get_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[User]:
     """
     Find user by github_id OR any connected OAuth provider_account_id OR email.
@@ -1101,7 +1121,7 @@ async def create_user(
             raise HTTPException(status_code=400, detail=f"Invalid plan. Options: {list(PLANS.keys())}")
         
         # Get available port (the public demo's shared user never runs a container: it takes no slot)
-        port = None if user_identifier == settings.PUBLIC_DEMO_USER_ID else await get_next_available_port(db)
+        port = await demo_user_port(db) if user_identifier == settings.PUBLIC_DEMO_USER_ID else await get_next_available_port(db)
         
         # Determine container name upfront
         container_name = docker_manager._get_container_name(user_identifier)

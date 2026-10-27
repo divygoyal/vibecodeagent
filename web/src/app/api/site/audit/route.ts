@@ -33,14 +33,14 @@ const isExampleHost = (url: string) => new URL(url).hostname.endsWith('.example'
 const CATALOGUE_HOSTS = new Set(getDemoSites().map((site) => normalizeHost(site.host)));
 
 /**
- * The public demo user audits catalogue pages only, as origin + path (no query, short path): the server never
- * fetches anything for an anonymous visitor, and the cache cannot be filled with endless URL variants.
- * null = refused.
+ * The public demo user audits catalogue sites only, always at the site root (the sample report is the same for
+ * every page): the server never fetches anything for an anonymous visitor, and there is one cache entry per
+ * sample site, not one per URL variant. null = refused.
  */
 function demoUserUrl(url: string): string | null {
     const u = new URL(url);
-    if (!CATALOGUE_HOSTS.has(normalizeHost(u.hostname)) || u.pathname.length > 200) return null;
-    return `${u.origin}${u.pathname}`;
+    if (!CATALOGUE_HOSTS.has(normalizeHost(u.hostname))) return null;
+    return `${u.origin}/`;
 }
 
 /**

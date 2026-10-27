@@ -258,7 +258,7 @@ async function securityChecks(demoJwt) {
     r = await http('GET', `/api/site/audit?url=${encodeURIComponent('https://unknown-host.example/')}`, { cookie: demoCookie });
     check('F4: demo site audit refuses hosts outside the catalogue', r.status === 403, r.status);
     r = await http('GET', `/api/site/audit?url=${encodeURIComponent(`https://${SITE}/pricing?utm=${Date.now()}#x`)}`, { cookie: demoCookie });
-    check('F4: demo site audit is normalised to origin + path', r.status === 200 && r.data?.meta?.canonical === `https://${SITE}/pricing`, `${r.status} ${r.data?.meta?.canonical}`);
+    check('F4/N2: demo site audit is normalised to the site root', r.status === 200 && r.data?.meta?.canonical === `https://${SITE}/`, `${r.status} ${r.data?.meta?.canonical}`);
     if (owner) {
         r = await http('GET', `/api/site/audit?url=${encodeURIComponent(`https://${SITE}/`)}`, { cookie: owner });
         const sample = /sample data/.test(r.data?.meta?.description || '');

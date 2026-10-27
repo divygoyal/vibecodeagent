@@ -4,10 +4,10 @@
  * customer's whole block), and when the table is full the oldest windows are dropped, never everyone's.
  * Edge-safe and Node-safe.
  *
- * The address comes from Cloudflare's cf-connecting-ip. That is only trustworthy while the origin answers
- * Cloudflare alone (an infra setting for the owner: firewall the origin to Cloudflare's ranges or use
- * authenticated origin pulls).
+ * The address comes from lib/clientIp.ts: CF-Connecting-IP only when the TCP peer is a Cloudflare edge, else the
+ * peer itself, so a forged header sent straight to the origin does not pick the key.
  */
+import { clientKey } from '@/lib/clientIp';
 
 export const DEMO_API_LIMIT_PER_MIN = 300;   // a busy page fires ~30 calls; this is ten pages a minute
 export const DEMO_START_LIMIT_PER_MIN = 20;  // /demo itself
@@ -42,25 +42,9 @@ export function demoRateTracked(key: string): boolean {
     return hits.has(key);
 }
 
-/** An IPv6 address's /64 prefix ('2001:db8:1:2::/64'); IPv4 and anything else unchanged. */
-export function addressKey(ip: string): string {
-    const raw = ip.trim().replace(/^\[|\]$/g, '').split('%')[0];
-    if (!raw.includes(':')) return raw;
-    const v4tail = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(raw);
-    if (v4tail) return v4tail[1];
-    const [head, tail = ''] = raw.split('::');
-    const h = head ? head.split(':') : [];
-    const t = raw.includes('::') ? (tail ? tail.split(':') : []) : [];
-    const groups = raw.includes('::') ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
-    if (groups.length < 4) return raw.toLowerCase();
-    return `${groups.slice(0, 4).map((g) => (parseInt(g || '0', 16) || 0).toString(16)).join(':')}::/64`;
-}
+export { addressKey } from '@/lib/clientIp';
 
-/** The client address key, as the proxies in front of us report it (Cloudflare first). */
+/** The client address key (lib/clientIp.ts: CF-Connecting-IP only from a Cloudflare peer; IPv6 by /64). */
 export function clientIp(headers: Headers): string {
-    const ip = headers.get('cf-connecting-ip')
-        || headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-        || headers.get('x-real-ip')
-        || 'unknown';
-    return addressKey(ip);
+    return clientKey(headers);
 }

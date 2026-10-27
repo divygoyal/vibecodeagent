@@ -67,6 +67,24 @@ class PublicDemoUserTests(unittest.TestCase):
         self.assertIsNone(ports[DEMO], "the demo user must not hold one of the MAX_USERS container ports")
         self.assertIsNotNone(ports["7001"])
 
+    def test_demo_port_sentinel_for_a_not_null_schema(self):
+        import asyncio
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+        from sqlalchemy.orm import sessionmaker
+
+        async def run(ddl):
+            eng = create_async_engine(f"sqlite+aiosqlite:///{tempfile.mkdtemp()}/s.db")
+            async with eng.begin() as conn:
+                await conn.exec_driver_sql(ddl)
+            async with sessionmaker(eng, class_=AsyncSession)() as db:
+                out = await main.demo_user_port(db)
+            await eng.dispose()
+            return out
+
+        self.assertIsNone(asyncio.run(run("CREATE TABLE users (id INTEGER PRIMARY KEY, container_port INTEGER)")))
+        self.assertEqual(asyncio.run(run("CREATE TABLE users (id INTEGER PRIMARY KEY, container_port INTEGER NOT NULL)")), 0)
+        self.assertLess(main.DEMO_PORT_SENTINEL, main.settings.BASE_PORT)
+
     def test_cannot_join_leaderboard(self):
         body = {"startup_name": "Acme", "website_url": "https://acmeanalytics.example", "category": "SaaS", "ga_property_id": "properties/412300101"}
         r = self.c.post(f"/api/leaderboard/{DEMO}/join", headers=KEY, json=body)

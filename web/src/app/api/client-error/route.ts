@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { clientKey } from '@/lib/clientIp';
 
 /**
  * One server-log line per error-boundary hit in a browser (see
@@ -15,7 +16,7 @@ const clean = (v: unknown, max: number): string | undefined =>
     typeof v === 'string' && v ? v.replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, max) : undefined;
 
 export async function POST(req: Request) {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'local';
+    const ip = clientKey(req.headers);
     const now = Date.now();
     const h = hits.get(ip);
     if (h && now - h.t < WINDOW_MS) {

@@ -254,7 +254,8 @@ test('cookie projection swaps only the session cookies, in the request header', 
     assert.equal(out, 'theme=dark; tc_site=acme; next-auth.csrf-token=c; next-auth.session-token=DEMOJWT; __Secure-next-auth.session-token=DEMOJWT');
     assert.equal(projectDemoCookieHeader('', 'J'), 'next-auth.session-token=J; __Secure-next-auth.session-token=J');
     assert.ok(isSessionCookieName('next-auth.session-token.3'));
-    assert.ok(!isSessionCookieName('next-auth.session-token.x'));
+    assert.ok(isSessionCookieName('next-auth.session-token.x'), 'NextAuth joins any name starting with the session name');
+    assert.ok(isSessionCookieName('__Secure-next-auth.session-tokenZ'));
     assert.ok(!isSessionCookieName('next-auth.csrf-token'));
     assert.deepEqual(ownSessionCookie(header), { value: 'REAL', present: true });
     assert.deepEqual(ownSessionCookie('__Secure-next-auth.session-token.0=A'), { value: null, present: true });
@@ -284,8 +285,9 @@ test('per-visitor demo rate limit: fixed one-minute windows', async () => {
     assert.equal(demoRateOk('k1', 5, t + 10), false);
     assert.equal(demoRateOk('k2', 5, t + 10), true, 'other visitors are not affected');
     assert.equal(demoRateOk('k1', 5, t + 60_001), true, 'a new minute starts fresh');
-    assert.equal(clientIp(new Headers({ 'cf-connecting-ip': '1.2.3.4', 'x-forwarded-for': '9.9.9.9' })), '1.2.3.4');
-    assert.equal(clientIp(new Headers({ 'x-forwarded-for': '5.6.7.8, 10.0.0.1' })), '5.6.7.8');
+    // Through Cloudflare (peer = a Cloudflare edge): the visitor's address. Direct to the origin: the peer.
+    assert.equal(clientIp(new Headers({ 'cf-connecting-ip': '1.2.3.4', 'x-real-ip': '162.158.1.1' })), '1.2.3.4');
+    assert.equal(clientIp(new Headers({ 'cf-connecting-ip': '1.2.3.4', 'x-real-ip': '9.9.9.9' })), '9.9.9.9');
     assert.equal(clientIp(new Headers()), 'unknown');
 });
 
@@ -297,7 +299,7 @@ test('F4: IPv6 is limited per /64, IPv4 per address', async () => {
     assert.equal(addressKey('[2001:db8::5]'), '2001:db8:0:0::/64');
     assert.equal(addressKey('::ffff:1.2.3.4'), '1.2.3.4');
     assert.equal(addressKey('1.2.3.4'), '1.2.3.4');
-    assert.equal(clientIp(new Headers({ 'cf-connecting-ip': '2001:db8:1:2:3:4:5:6' })), clientIp(new Headers({ 'cf-connecting-ip': '2001:db8:1:2:ffff::9' })));
+    assert.equal(clientIp(new Headers({ 'x-real-ip': '2001:db8:1:2:3:4:5:6' })), clientIp(new Headers({ 'x-real-ip': '2001:db8:1:2:ffff::9' })));
 });
 
 test('F4: a full rate table drops the oldest windows, not everyone', async () => {
@@ -310,4 +312,23 @@ test('F4: a full rate table drops the oldest windows, not everyone', async () =>
     assert.ok(!demoRateTracked('rot-0'), 'the oldest window was dropped');
     // Nothing was reset wholesale: the newest keys are still counted.
     assert.equal(demoRateOk(newest, 1, t + RATE_MAX_KEYS + 9), false);
+});
+
+test('N5: the projection removes every cookie NextAuth would join into the session', () => {
+    const out = projectDemoCookieHeader('a=1; __Secure-next-auth.session-tokenZ=X; next-auth.session-token.7=Y; next-auth.csrf-token=c', 'J');
+    assert.equal(out, 'a=1; next-auth.csrf-token=c; next-auth.session-token=J; __Secure-next-auth.session-token=J');
+});
+
+test('N1: the middleware runs on gated paths even when they end in an asset extension', async () => {
+    const { config } = await import('../src/middleware.ts');
+    const { createRequire } = await import('node:module');
+    const require = createRequire(import.meta.url);
+    const { getMiddlewareMatchers } = require('next/dist/build/analysis/get-page-static-info.js');
+    const res = getMiddlewareMatchers(config.matcher, {}).map((m) => new RegExp(m.regexp));
+    const runs = (p) => res.some((re) => re.test(p));
+    for (const p of ['/dashboard', '/dashboard/s/foo.png', '/dashboard/dashboards/x.js', '/api/dashboards/x.js', '/api/portfolio', '/admin/a.css',
+        '/superadmin/x.svg', '/demo', '/demo/acme.map', '/mcp', '/oauth/authorize/decision', '/share/abc', '/leaderboard/x']) {
+        assert.ok(runs(p), `middleware should run on ${p}`);
+    }
+    for (const p of ['/_next/static/chunks/a.js', '/_next/image', '/logo.png', '/favicon.ico']) assert.ok(!runs(p), `middleware should skip ${p}`);
 });

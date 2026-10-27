@@ -306,6 +306,10 @@ async function demoDashboard(request: NextRequest, token: JWT, cookieValue: stri
 }
 
 export const config = {
-    // Every path but static assets: the demo marker header is stripped everywhere (see passThrough).
-    matcher: ['/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpe?g|gif|svg|webp|avif|ico|mp4|webm|woff2?|ttf|css|js|map)$).*)'],
+    // The gated areas explicitly (so a dynamic path that ends in .png or .js cannot skip the gate), plus every other
+    // path but static assets, so the demo marker header is stripped everywhere (see passThrough).
+    matcher: [
+        '/dashboard/:path*', '/api/:path*', '/admin/:path*', '/superadmin/:path*', '/demo/:path*',
+        '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpe?g|gif|svg|webp|avif|ico|mp4|webm|woff2?|ttf|css|js|map)$).*)',
+    ],
 };

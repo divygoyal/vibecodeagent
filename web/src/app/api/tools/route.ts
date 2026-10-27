@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { BRAND_NAME } from '@/lib/brand';
+import { clientKey } from '@/lib/clientIp';
 
 // ── Rate Limiting ──────────────────────────────────────────────────────────────
 
@@ -29,9 +30,7 @@ setInterval(() => {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function getIp(req: NextRequest): string {
-    return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-        req.headers.get('x-real-ip') ||
-        '127.0.0.1';
+    return clientKey(req.headers);
 }
 
 async function fetchWithTimeout(url: string, timeout = 10000): Promise<Response> {
