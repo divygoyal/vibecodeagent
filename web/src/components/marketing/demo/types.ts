@@ -68,3 +68,27 @@ export interface DemoSiteDashboard {
         pages: NamedValue[];
     };
 }
+
+/** One "what to fix next" task for the home page preview (same rules as the app's Actions page). */
+export interface DemoAction {
+    id: string;
+    type: 'striking' | 'low_ctr';
+    /** "Striking distance" | "Low CTR", as on the Actions page. */
+    typeLabel: string;
+    impact: 'high' | 'medium' | 'low';
+    title: string;
+    /** Page path the task is about (null when unknown). */
+    page: string | null;
+    position: number;
+    impressions: number;
+    ctr: number;
+    /** Extra clicks a month if the task is done (the app's expected impact). */
+    gain: number;
+}
+
+/** The home page's Actions preview: one demo site's top tasks. */
+export interface DemoActions {
+    site: { slug: string; label: string; host: string };
+    window: { start: string; end: string };
+    actions: DemoAction[];
+}

@@ -3,13 +3,14 @@ import Link from 'next/link';
 import { ArrowRight, Check } from 'lucide-react';
 
 import { Button } from '@/components/ui';
-import { buildMarketingDemoPortfolio, buildMarketingDemoSiteDashboard } from '@/components/marketing/demo/data';
+import { buildMarketingDemoActions, buildMarketingDemoPortfolio, buildMarketingDemoSiteDashboard } from '@/components/marketing/demo/data';
 import { DashboardPreview } from '@/components/marketing/home/DashboardPreview';
 import { HOME_FAQ } from '@/components/marketing/home/content';
 import { HomeHero, HowItWorks, Pillars, WhyFree } from '@/components/marketing/home/HomeSections';
 import { LeaderboardPreview } from '@/components/marketing/home/LeaderboardPreview';
 import { McpSection } from '@/components/marketing/home/McpSection';
 import { PortfolioPreview } from '@/components/marketing/home/PortfolioPreview';
+import { WhatsNew } from '@/components/marketing/home/WhatsNew';
 import { Faq } from '@/components/marketing/site/Faq';
 import { FinalCta } from '@/components/marketing/site/FinalCta';
 import { Section, SectionHeading } from '@/components/marketing/site/Section';
@@ -22,7 +23,7 @@ export const revalidate = 3600;
 
 const TITLE = `${BRAND_NAME}: All your sites. One screen. Free.`;
 const DESCRIPTION =
-    'Every Google Analytics 4 property and Search Console site you own on one free screen. Build dashboards you can share, show verified traffic on a public leaderboard, and ask ChatGPT or Claude about your numbers.';
+    'Every Google Analytics 4 property and Search Console site you own on one free screen, with what changed and what to fix next. Read-only, nothing to install. Share dashboards, show verified traffic on a public leaderboard, and ask ChatGPT or Claude about your numbers.';
 
 export const metadata: Metadata = {
     title: { absolute: TITLE },
@@ -49,6 +50,7 @@ const appSchema = {
 export default function HomePage() {
     const portfolio = buildMarketingDemoPortfolio('28d');
     const dashboard = buildMarketingDemoSiteDashboard('acme', '28d');
+    const actions = buildMarketingDemoActions('acme', 3);
 
     return (
         <>
@@ -62,7 +64,7 @@ export default function HomePage() {
                 </div>
             </section>
 
-            <Pillars />
+            <Pillars actions={actions} />
 
             {dashboard ? (
                 <Section id="dashboards" tone="surface" labelledBy="dash-title">
@@ -101,17 +103,19 @@ export default function HomePage() {
 
             <McpSection portfolio={portfolio} />
 
-            <HowItWorks />
+            <HowItWorks portfolio={portfolio} actions={actions} />
 
             <WhyFree />
+
+            <WhatsNew />
 
             <Section id="faq" tone="surface" labelledBy="faq-title">
                 <div className="grid gap-10 grid-cols-1 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
                     <SectionHeading
                         id="faq-title"
                         eyebrow="FAQ"
-                        title="Questions, answered"
-                        description={<>Something else? <Link href="/contact" className="text-brand-text underline underline-offset-4 hover:text-fg">Send us a message</Link>.</>}
+                        title="Questions before you connect"
+                        description={<>Something else? <Link href="/contact" className="text-brand-text underline underline-offset-4 hover:text-fg">Send us a message</Link>, or read <Link href="/security" className="text-brand-text underline underline-offset-4 hover:text-fg">Security and data</Link>.</>}
                     />
                     <Faq items={HOME_FAQ} />
                 </div>

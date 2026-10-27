@@ -14,10 +14,14 @@ import { demoRunReport } from '@/lib/demo/ga4';
 import { demoSearchAnalytics } from '@/lib/demo/gsc';
 import { buildDemoPortfolio } from '@/lib/portfolio/demo';
 import type { PortfolioSite } from '@/lib/portfolio/types';
+import { ACTION_TYPE_LABEL, impactFor, per28 } from '@/components/site/lib/actionText';
+import { displayPage, isLowCtr, isStriking, lowCtrPotential, median, pageRef, strikingPotential } from '@/components/site/lib/rules';
 
 import {
     DEMO_RANGES,
     type DateWindow,
+    type DemoAction,
+    type DemoActions,
     type DemoPortfolio,
     type DemoRange,
     type DemoSiteDashboard,
@@ -252,3 +256,96 @@ function computeSiteDashboard(slug: string, range: DemoRange, now: number, today
     return { site: card, range, traffic, search };
 }
 
+
+/* ─── "What to fix next" preview (home page) ─── */
+
+/**
+ * The top tasks of one demo site's Actions page, computed with the app's own
+ * rules (components/site/lib/rules.ts) from the demo generator: striking-distance
+ * queries and low-CTR pages over the portfolio's 28-day Search Console window,
+ * ranked like buildActions() (impact first, repeated types damped by 0.8^n).
+ * The app adds more task types (decay, drops, cannibalization, audit); the preview
+ * only needs the search ones, so its numbers match the app's cards for these tasks.
+ */
+export function buildMarketingDemoActions(slug = 'acme', limit = 3, now: number = Date.now()): DemoActions | null {
+    const today = Math.floor(now / DAY_MS);
+    return memoised(`actions:${slug}:${limit}:${today}`, () => computeDemoActions(slug, limit, now, today));
+}
+
+function computeDemoActions(slug: string, limit: number, now: number, today: number): DemoActions | null {
+    const site = getDemoSites().find((s) => s.key === slug);
+    if (!site?.gsc) return null;
+    const portfolio = buildMarketingDemoPortfolio('28d', now);
+    const card = portfolio.sites.find((s) => s.slug === slug);
+    if (!card) return null;
+    const siteUrl = site.gsc.siteUrl;
+    const w = portfolio.windows.search ? windowDays(portfolio.windows.search) : dayWindow(today - GSC_LAG_DAYS, 28);
+    const days = w.curEnd - w.curStart + 1;
+    const range = { startDate: iso(w.curStart), endDate: iso(w.curEnd) };
+
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const rowsOf = (dimensions: string[], rowLimit: number): any[] => (demoSearchAnalytics(siteUrl, { ...range, dimensions, rowLimit }, { now })?.rows ?? []) as any[];
+    const metricsOf = (r: any) => ({ clicks: Number(r.clicks) || 0, impressions: Number(r.impressions) || 0, ctr: Number(r.ctr) || 0, position: Number(r.position) || 0 });
+    const queries = rowsOf(['query'], 2500).map((r) => ({ key: String(r.keys?.[0] ?? ''), ...metricsOf(r) })).filter((r) => r.key);
+    const pages = rowsOf(['page'], 2500).map((r) => ({ key: String(r.keys?.[0] ?? ''), ...metricsOf(r) })).filter((r) => r.key);
+    const best = new Map<string, { page: string; impressions: number }>();
+    for (const r of rowsOf(['query', 'page'], 5000)) {
+        const q = String(r.keys?.[0] ?? '');
+        const p = String(r.keys?.[1] ?? '');
+        const imp = Number(r.impressions) || 0;
+        const b = best.get(q);
+        if (q && (!b || imp > b.impressions)) best.set(q, { page: p, impressions: imp });
+    }
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    const host = card.host;
+    const show = (url: string) => displayPage(pageRef(url), host);
+    const scale = per28(card.search?.cur.clicks ?? 0, days);
+    const out: Array<DemoAction & { score: number }> = [];
+
+    const med = median(queries.filter((x) => x.impressions > 0).map((x) => x.impressions));
+    queries.filter((x) => isStriking(x, med))
+        .map((x) => ({ x, gain: per28(strikingPotential(x), days) }))
+        .filter((o) => o.gain >= 3)
+        .sort((a, b) => b.gain - a.gain).slice(0, 10)
+        .forEach(({ x, gain }) => {
+            const page = best.get(x.key)?.page ?? null;
+            out.push({
+                id: `striking:${x.key}`, type: 'striking', typeLabel: ACTION_TYPE_LABEL.striking, impact: impactFor(gain, scale),
+                title: `Push "${x.key}" onto the first page`, page: page ? show(page) : null,
+                position: x.position, impressions: x.impressions, ctr: x.ctr, gain, score: gain,
+            });
+        });
+
+    pages.filter((x) => isLowCtr(x, 200))
+        .map((x) => ({ x, gain: per28(lowCtrPotential(x), days) }))
+        .filter((o) => o.gain >= 3)
+        .sort((a, b) => b.gain - a.gain).slice(0, 8)
+        .forEach(({ x, gain }) => {
+            const p = show(x.key);
+            out.push({
+                id: `low_ctr:${x.key}`, type: 'low_ctr', typeLabel: ACTION_TYPE_LABEL.low_ctr, impact: impactFor(gain, scale),
+                title: `Rewrite the title and description of ${p}`, page: p,
+                position: x.position, impressions: x.impressions, ctr: x.ctr, gain, score: gain,
+            });
+        });
+
+    const nth = new Map<string, number>();
+    const rank = { high: 3, medium: 2, low: 1 };
+    const actions = out
+        .sort((a, b) => b.score - a.score)
+        .map((a) => {
+            const n = nth.get(a.type) ?? 0;
+            nth.set(a.type, n + 1);
+            return { a, adj: a.score * 0.8 ** n };
+        })
+        .sort((x, y) => rank[y.a.impact] - rank[x.a.impact] || y.adj - x.adj)
+        .slice(0, limit)
+        .map(({ a }) => {
+            const { score: _score, ...rest } = a;
+            void _score;
+            return rest;
+        });
+
+    return { site: { slug, label: card.label, host }, window: { start: iso(w.curStart), end: iso(w.curEnd) }, actions };
+}
