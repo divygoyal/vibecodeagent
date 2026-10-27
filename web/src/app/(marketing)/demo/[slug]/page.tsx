@@ -39,7 +39,7 @@ export default async function DemoSitePage({ params }: { params: Promise<{ slug:
     return (
         <div className="mx-auto max-w-[1200px] space-y-6 px-4 pt-6 pb-16 md:px-6 md:pt-8 md:pb-24">
             <DemoBanner sites={demoSiteSlugs().length} />
-            <Link href="/demo" className="inline-flex items-center gap-1.5 text-body-sm font-medium text-fg-secondary hover:text-fg">
+            <Link href="/demo" className="tap-area inline-flex items-center gap-1.5 text-body-sm font-medium text-fg-secondary hover:text-fg">
                 <ArrowLeft aria-hidden size={14} strokeWidth={1.75} />
                 All sample sites
             </Link>
