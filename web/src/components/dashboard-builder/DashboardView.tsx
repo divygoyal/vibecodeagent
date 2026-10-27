@@ -112,10 +112,12 @@ export interface DashboardViewProps {
     appMode?: Mode;
     /** TV mode: no header, cover or page tabs; filters hide unless settings.tv says otherwise. */
     tv?: boolean;
+    /** TV mode: the height one page must fit (rows stretch or shrink). */
+    fitHeight?: number;
 }
 
 export function DashboardView({
-    doc, mode, siteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv,
+    doc, mode, siteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv, fitHeight,
 }: DashboardViewProps) {
     const [ref, width] = useElementWidth<HTMLDivElement>();
     const bp: Bp = bpForWidth(width || 1200);
@@ -196,6 +198,7 @@ export function DashboardView({
                         width={width}
                         mode={mode}
                         renderWidget={render}
+                        fitHeight={tv && fitHeight ? fitHeight - (showControls ? 52 : 0) : undefined}
                         empty={<EmptyState icon={undefined} title="This page is empty" description={mode === 'view' ? 'Open the editor to add widgets.' : undefined} />}
                     />
                 ) : null}

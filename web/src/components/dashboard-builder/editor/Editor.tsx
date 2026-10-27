@@ -14,7 +14,7 @@ import useSWR from 'swr';
 import { toast } from 'sonner';
 import {
     ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, LayoutTemplate, Loader2, Monitor, MoreHorizontal, Pencil,
-    Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson, ClipboardPaste, MonitorPlay,
+    Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson, ClipboardPaste, MonitorPlay, Palette,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -38,7 +38,7 @@ import { fetchJson, useInlineResult, QueryHttpError, type InlineCtx } from '../u
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
 import { LeftPanel } from './LeftPanel';
 import { VersionsDialog } from './VersionsDialog';
-import { PropertiesPanel } from './PropertiesPanel';
+import { openAppearance, PropertiesPanel } from './PropertiesPanel';
 import type { SiteOption } from './Fields';
 
 const VIEWPORT_W: Record<Viewport, number | null> = { desktop: null, tablet: 768, phone: 390 };
@@ -334,6 +334,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                         {status === 'saving' ? <Loader2 aria-hidden size={14} className="animate-spin" /> : status === 'saved' ? <Check aria-hidden size={14} /> : status === 'error' || status === 'conflict' ? <AlertTriangle aria-hidden size={14} /> : null}
                         {statusText}
                     </span>
+                    <Button variant="ghost" icon={Palette} onClick={() => { s.setPreview(false); s.select(null); s.selectControl(null); openAppearance(); }}>Theme</Button>
                     <Button variant={preview ? 'primary' : 'secondary'} icon={preview ? EyeOff : Eye} onClick={() => s.setPreview(!preview)}>{preview ? 'Edit' : 'Preview'}</Button>
                     <Button variant="primary" icon={Share2} onClick={() => setShareOpen(true)}>Share</Button>
                     <DropdownMenu>

@@ -163,8 +163,8 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
         return (
             <TvFrame doc={doc} pageId={ctl.state.pageId} onPage={ctl.setPage} onExit={() => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); ctl.setTv(false); }}
                 resolved={page.data?.resolved} updatedAt={updatedAt} themeAttrs={tv.attrs} themeStyle={tv.style} themeClass={tv.className}>
-                <DashboardView doc={doc} mode="public" siteLabel={siteLabel} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter} allow={allow}
-                    data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)} onRetry={() => void page.mutate()} options={{}} shell="inherit" tv />
+                {(fit) => <DashboardView fitHeight={fit} doc={doc} mode="public" siteLabel={siteLabel} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter} allow={allow}
+                    data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)} onRetry={() => void page.mutate()} options={{}} shell="inherit" tv />}
             </TvFrame>
         );
     }

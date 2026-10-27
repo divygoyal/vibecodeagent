@@ -157,11 +157,11 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
         return (
             <TvFrame doc={doc} pageId={ctl.state.pageId} onPage={ctl.setPage} onExit={() => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); ctl.setTv(false); }}
                 resolved={page.data?.resolved} updatedAt={updatedAt} themeAttrs={r?.attrs ?? { 'data-theme': tvMode }} themeStyle={r?.style} themeClass={r?.className}>
-                <DashboardView
-                    doc={doc} mode="view" siteLabel={siteLabel} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter}
+                {(fit) => <DashboardView
+                    fitHeight={fit} doc={doc} mode="view" siteLabel={siteLabel} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter}
                     allow={{ date: true, compare: true, filters: true }} data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)}
                     onRetry={() => void page.mutate()} options={{}} shell="inherit" tv
-                />
+                />}
             </TvFrame>
         );
     }

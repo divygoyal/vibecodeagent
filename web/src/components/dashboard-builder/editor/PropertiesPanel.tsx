@@ -5,7 +5,7 @@
  * widget, filter-control settings for a selected control, Dashboard settings when nothing is
  * selected. Every change goes through the editor store (undoable, coalesced while typing).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Copy, Lock, Trash2 } from 'lucide-react';
 
 import { Banner, Button, Tabs } from '@/components/ui';
@@ -22,6 +22,14 @@ import { RulesEditor } from './RulesEditor';
 import { WidgetFilters } from './WidgetFilters';
 
 type Patch = (w: WidgetDef) => WidgetDef;
+
+/** Window event that opens Dashboard settings on the Appearance tab. */
+export const APPEARANCE_EVENT = 'tc:dash-appearance';
+export function openAppearance() {
+    (window as { __tcDashTab?: string }).__tcDashTab = 'appearance';
+    window.dispatchEvent(new Event(APPEARANCE_EVENT));
+    setTimeout(() => { (window as { __tcDashTab?: string }).__tcDashTab = undefined; }, 500);
+}
 
 function useWidgetEdit(widget: WidgetDef) {
     const apply = useEditorStore((s) => s.apply);
@@ -356,12 +364,27 @@ function ControlProps({ control, doc }: { control: FilterControl; doc: Dashboard
 function DashboardSettings({ doc, sites }: { doc: DashboardDocV2; sites: SiteOption[] }) {
     const apply = useEditorStore((s) => s.apply);
     const appMode = useResolvedTheme();
+    const [tab, setTab] = useState<'general' | 'appearance'>(() => (typeof window !== 'undefined' && (window as { __tcDashTab?: string }).__tcDashTab === 'appearance' ? 'appearance' : 'general'));
+    useEffect(() => {
+        // The editor toolbar's Theme button opens this tab (see APPEARANCE_EVENT).
+        const open = () => setTab('appearance');
+        window.addEventListener(APPEARANCE_EVENT, open);
+        return () => window.removeEventListener(APPEARANCE_EVENT, open);
+    }, []);
     const dc = doc.controls.find((c) => c.type === 'date');
     const set = (fn: (d: DashboardDocV2) => DashboardDocV2, key?: string) => apply(fn, { coalesce: key ? `doc:${key}` : undefined });
     const setDate = (patch: Record<string, unknown>) => set((d) => ({ ...d, controls: d.controls.map((c) => (c.type === 'date' ? ({ ...c, ...patch } as ControlDef) : c)) }));
     return (
         <>
-            <div className="border-b border-border-subtle px-4 py-3"><p className="text-caption uppercase tracking-[0.04em] text-fg-muted">Dashboard settings</p></div>
+            <div className="border-b border-border-subtle px-4 pb-2 pt-3">
+                <p className="text-caption uppercase tracking-[0.04em] text-fg-muted">Dashboard settings</p>
+                <Tabs variant="pills" ariaLabel="Dashboard settings" value={tab} onValueChange={(v) => setTab(v as 'general' | 'appearance')} items={[{ value: 'general', label: 'General' }, { value: 'appearance', label: 'Appearance' }]} className="mt-2" />
+            </div>
+            {tab === 'appearance' ? (
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                    <AppearanceSettings theme={doc.theme} mode={appMode} pages={doc.pages.filter((p) => !p.hidden).length} onChange={(t) => set((d) => ({ ...d, theme: t }), 'theme')} />
+                </div>
+            ) : (
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
                 <Field label="Name"><TextInput value={doc.name} onChange={(v) => set((d) => ({ ...d, name: v.slice(0, 200) || d.name }), 'name')} /></Field>
                 <Field label="Description"><TextInput multiline rows={2} value={doc.description ?? ''} onChange={(v) => set((d) => ({ ...d, description: v.slice(0, 2000) || undefined }), 'desc')} /></Field>
@@ -391,11 +414,8 @@ function DashboardSettings({ doc, sites }: { doc: DashboardDocV2; sites: SiteOpt
                     </Field>
                     <Toggle label="Hide filters in TV mode" checked={doc.settings.tv?.hideControls ?? true} onChange={(v) => set((d) => ({ ...d, settings: { ...d.settings, tv: { rotateSec: d.settings.tv?.rotateSec ?? 30, hideControls: v } } }))} />
                 </div>
-                <div className="space-y-3 border-t border-border-subtle pt-4">
-                    <p className="text-caption uppercase tracking-[0.04em] text-fg-muted">Appearance</p>
-                    <AppearanceSettings theme={doc.theme} mode={appMode} pages={doc.pages.filter((p) => !p.hidden).length} onChange={(t) => set((d) => ({ ...d, theme: t }), 'theme')} />
-                </div>
             </div>
+            )}
         </>
     );
 }

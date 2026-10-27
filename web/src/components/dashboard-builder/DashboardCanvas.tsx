@@ -74,6 +74,8 @@ export interface DashboardCanvasProps {
     renderWidget: (widget: WidgetDef, heightPx: number, bp: Bp) => ReactNode;
     edit?: CanvasEditProps;
     empty?: ReactNode;
+    /** TV mode: stretch or shrink the rows so the page fits this many CSS px of height. */
+    fitHeight?: number;
 }
 
 function toRgl(items: LayoutItem[], doc: DashboardDocV2, bp: Bp, editing: boolean): RglItem[] {
@@ -88,10 +90,13 @@ function toRgl(items: LayoutItem[], doc: DashboardDocV2, bp: Bp, editing: boolea
     });
 }
 
-export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit, empty }: DashboardCanvasProps) {
+export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit, empty, fitHeight }: DashboardCanvasProps) {
     const editing = mode === 'edit' && Boolean(edit);
-    const { rowH, gap } = gridMetrics(doc);
+    const metrics = gridMetrics(doc);
     const items = useMemo(() => layoutFor(doc, page, bp), [doc, page, bp]);
+    const gap = metrics.gap;
+    const rows = items.reduce((m, l) => Math.max(m, l.y + l.h), 0);
+    const rowH = fitHeight && rows && bp !== 'sm' ? Math.max(14, Math.min(96, Math.floor((fitHeight + gap) / rows - gap))) : metrics.rowH;
     const layout = useMemo(() => toRgl(items, doc, bp, editing), [items, doc, bp, editing]);
 
     const commit = useCallback((l: Layout) => {

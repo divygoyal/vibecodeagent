@@ -4,7 +4,9 @@
  * Full-screen TV mode (round 2, C4): `?tv=1` on the owner view or a share link, or "Present"
  * in the dashboard menu. No app chrome; a slim top bar with the name, page, dates and a clock;
  * pages rotate every settings.tv.rotateSec; data refreshes on its own (at least every 5 min);
- * the content is zoomed to fit the screen; the screen stays awake; the cursor hides after 3 s.
+ * the grid rows stretch or shrink so one page fills the screen height, and big screens (wider than
+ * 1440 px) zoom in so text stays readable from a distance; the screen stays awake; the cursor
+ * hides after 3 s.
  * Keys: ← → change page, Space pauses rotation, F full screen, Esc exits.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -63,7 +65,8 @@ export function TvFrame({ doc, pageId, onPage, onExit, resolved, updatedAt, them
     themeAttrs?: Record<string, string>;
     themeStyle?: React.CSSProperties;
     themeClass?: string;
-    children: ReactNode;
+    /** Render the dashboard for the height (in CSS px, after zoom) one page must fit. */
+    children: (fitHeight: number) => ReactNode;
 }) {
     const pages: PageDef[] = doc.pages.filter((p) => !p.hidden);
     const idx = Math.max(0, pages.findIndex((p) => p.id === pageId));
@@ -71,7 +74,7 @@ export function TvFrame({ doc, pageId, onPage, onExit, resolved, updatedAt, them
     const [paused, setPaused] = useState(false);
     const [idle, setIdle] = useState(false);
     const [full, setFull] = useState(false);
-    const [zoom, setZoom] = useState(1);
+    const [box, setBox] = useState({ zoom: 1, height: 0 });
     const clock = useClock();
     const bodyRef = useRef<HTMLDivElement>(null);
     const innerRef = useRef<HTMLDivElement>(null);
@@ -125,26 +128,21 @@ export function TvFrame({ doc, pageId, onPage, onExit, resolved, updatedAt, them
         return () => window.removeEventListener('keydown', k);
     }, [go, onExit, toggleFull]);
 
-    // Fit to screen: zoom the content so one page fills the height (0.5x to 1.75x, keeping the
-    // 12-column layout, which needs 900 CSS px of width).
+    // Big screens zoom in (text readable across a room); the grid then fits the remaining height.
     useEffect(() => {
         const body = bodyRef.current;
-        const inner = innerRef.current;
-        if (!body || !inner) return;
+        if (!body) return;
         const fit = () => {
-            const availH = body.clientHeight - 16;
-            const availW = body.clientWidth;
-            const natural = inner.scrollHeight;
-            if (!natural || !availH) return;
-            const z = Math.max(0.5, Math.min(1.75, availH / natural, availW / 900));
-            setZoom((cur) => (Math.abs(cur - z) / cur > 0.02 ? Math.round(z * 100) / 100 : cur));
+            const w = body.clientWidth;
+            const zoom = w > 1500 ? Math.min(1.75, Math.round((w / 1440) * 100) / 100) : 1;
+            const height = Math.max(240, Math.floor((body.clientHeight - 20) / zoom));
+            setBox((cur) => (cur.zoom === zoom && Math.abs(cur.height - height) < 4 ? cur : { zoom, height }));
         };
         const ro = new ResizeObserver(fit);
         ro.observe(body);
-        ro.observe(inner);
         fit();
         return () => ro.disconnect();
-    }, [pageId]);
+    }, []);
 
     return (
         <div data-tv-root="" data-tv-idle={idle ? '1' : '0'} {...themeAttrs} style={themeStyle}
@@ -179,7 +177,7 @@ export function TvFrame({ doc, pageId, onPage, onExit, resolved, updatedAt, them
                 </div>
             </header>
             <div ref={bodyRef} className="min-h-0 flex-1 overflow-hidden px-5 pt-4">
-                <div ref={innerRef} style={{ zoom }}>{children}</div>
+                <div ref={innerRef} style={box.zoom !== 1 ? { zoom: box.zoom } : undefined}>{box.height ? children(box.height) : null}</div>
             </div>
             {rotate && pages.length > 1 && !paused ? (
                 <div aria-hidden className="h-0.5 shrink-0 bg-border-subtle">
