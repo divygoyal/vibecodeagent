@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Favicon } from '@/components/ui/Favicon';
 import { DateRangeControl, useDateRange } from '@/components/shell/DateRangeControl';
 import { PageHeader } from '@/components/shell/PageHeader';
+import { PeriodStepper } from './chart/ChartExtras';
 import { useSite } from './useSiteData';
 
 export interface SiteHeaderProps {
@@ -52,7 +53,12 @@ export function SiteHeader({ section, source, search, actions, tabs, noRange, ba
             actions={actions || !noRange ? (
                 <>
                     {actions}
-                    {noRange ? null : <DateRangeControl searchOnly={search} />}
+                    {noRange ? null : (
+                        <span className="flex shrink-0 items-center gap-1">
+                            <PeriodStepper search={search} />
+                            <DateRangeControl searchOnly={search} />
+                        </span>
+                    )}
                 </>
             ) : undefined}
             tabs={tabs}

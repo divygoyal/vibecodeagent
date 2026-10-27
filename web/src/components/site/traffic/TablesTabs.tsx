@@ -8,9 +8,13 @@ import { channelColor } from '@/lib/metrics';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { siteHref } from '@/components/shell/nav';
 import { BreakdownTable } from '../BreakdownTable';
+import { GeoCard } from '../breakdown/GeoCard';
+import { useFilterClick } from '../filters/SiteFilters';
 import { flagForName } from '../lib/geo';
+import { sourceMediumInfo } from '../lib/sources';
+import { sourceMediumParts } from '../SourceIcon';
 import { displayPage, isAiSource, pageRef } from '../lib/rules';
-import type { Ga4BreakdownResponse, Ga4Row } from '../lib/types';
+import type { Ga4BreakdownResponse, Ga4PageTrends, Ga4Row } from '../lib/types';
 import { LoadError } from '../SiteStates';
 import { useGa4, useSite, useSiteRange } from '../useSiteData';
 import { ChannelsDonut, DevicesDonut, Flag, SimpleList } from './OverviewTab';
@@ -34,6 +38,8 @@ export function TrafficPagesTab() {
         return { r, ref, label: displayPage(ref, site.siteHost) };
     }).filter((x) => x.label && !x.label.includes('(not set)')), [pages.data, view, site.siteHost]);
     const open = (key: string) => router.push(`${siteHref(site.host, 'pages')}?page=${encodeURIComponent(key)}`);
+    const trends = useGa4<Ga4PageTrends>(view === 'pages' ? 'pageTrends' : null, { extra: { limit: '25' } });
+    const titleBy = useMemo(() => new Map((trends.data?.titles ?? []).map((t) => [pageRef(t.path, t.host || site.siteHost).key, t.title])), [trends.data, site.siteHost]);
     const toggle = (
         <SegmentedControl
             ariaLabel="Page report"
@@ -50,7 +56,19 @@ export function TrafficPagesTab() {
             <BreakdownTable
                 rows={rows}
                 rowKey={(x) => x.r.key}
-                label={{ header: 'Page', text: (x) => x.label }}
+                label={{
+                    header: 'Page',
+                    text: (x) => `${titleBy.get(x.ref.key) ?? ''} ${x.label}`,
+                    cell: (x) => {
+                        const title = titleBy.get(x.ref.key);
+                        return title ? (
+                            <span className="block w-[46vw] min-w-0 max-w-[30rem] md:w-auto" title={x.label}>
+                                <span className="block truncate font-medium text-fg">{title}</span>
+                                <span className="block truncate text-meta text-fg-muted">{x.label}</span>
+                            </span>
+                        ) : <span className="block w-[46vw] min-w-0 max-w-[30rem] truncate md:w-auto" title={x.label}>{x.label}</span>;
+                    },
+                }}
                 heat={{ metric: 'pageviews', value: (x) => v(x.r, 'screenPageViews') }}
                 loading={pages.state === 'loading'}
                 defaultSort="views"
@@ -98,6 +116,12 @@ function ChannelDot({ name }: { name: string }) {
 /** Traffic > Sources: channels, then source / medium (and AI assistants). */
 export function TrafficSourcesTab() {
     const { compareOn } = useSiteRange();
+    const click = useFilterClick();
+    const filterSource = (r: Ga4Row) => {
+        const v = r.dims.sessionSourceMedium ?? '';
+        const i = v.lastIndexOf(' / ');
+        click('source', i >= 0 ? v.slice(0, i) : v);
+    };
     const channels = useBreakdown('channels');
     const sources = useBreakdown('sources');
     const [onlyAi, setOnlyAi] = useState<'all' | 'ai'>('all');
@@ -126,6 +150,7 @@ export function TrafficSourcesTab() {
                             exportName="channels"
                             pageSize={12}
                             searchPlaceholder="Search channels"
+                            onRowClick={(r) => click('channel', r.dims.sessionDefaultChannelGroup)}
                             columns={trafficCols}
                         />
                     )}
@@ -137,7 +162,15 @@ export function TrafficSourcesTab() {
                     rows={srcRows}
                     rowKey={(r) => r.key}
                     loading={sources.state === 'loading'}
-                    label={{ header: 'Source / medium', text: (r) => r.dims.sessionSourceMedium }}
+                    label={{
+                        header: 'Source / medium',
+                        text: (r) => `${sourceMediumInfo(r.dims.sessionSourceMedium).text} ${r.dims.sessionSourceMedium}`,
+                        cell: (r) => {
+                            const parts = sourceMediumParts(r.dims.sessionSourceMedium);
+                            return <span className="flex min-w-0 items-center gap-2" title={r.dims.sessionSourceMedium}><span className="flex size-4 shrink-0 items-center justify-center">{parts.icon}</span><span className="truncate">{parts.label}</span></span>;
+                        },
+                    }}
+                    onRowClick={filterSource}
                     heat={{ metric: onlyAi === 'ai' ? 'ai' : 'sessions', value: (r) => v(r, 'sessions') }}
                     defaultSort="sessions"
                     exportName="sources"
@@ -156,6 +189,7 @@ export function TrafficSourcesTab() {
 /** Traffic > Audience: geography, devices, technology, language, new vs returning. */
 export function TrafficAudienceTab() {
     const { compareOn } = useSiteRange();
+    const click = useFilterClick();
     const [geo, setGeo] = useState<'countries' | 'cities'>('countries');
     const countries = useBreakdown(geo);
     const nvr = useBreakdown('newReturning');
@@ -163,6 +197,7 @@ export function TrafficAudienceTab() {
     const totalUsers = nvrRows.reduce((a, r) => a + v(r, 'activeUsers'), 0);
     return (
         <div className="flex flex-col gap-4">
+            <GeoCard />
             {countries.state === 'error' ? <LoadError error={countries.error} onRetry={countries.mutate} /> : (
                 <BreakdownTable
                     caption={geo === 'countries' ? 'Countries' : 'Cities'}
@@ -176,6 +211,7 @@ export function TrafficAudienceTab() {
                     defaultSort="users"
                     exportName={geo}
                     searchPlaceholder={geo === 'countries' ? 'Search countries' : 'Search cities'}
+                    onRowClick={(r) => (geo === 'countries' ? click('country', r.dims.country) : click('city', r.dims.city))}
                     toolbarExtra={(
                         <SegmentedControl ariaLabel="Geography" size="sm" variant="neutral" value={geo} onChange={setGeo}
                             options={[{ value: 'countries', label: 'Countries' }, { value: 'cities', label: 'Cities' }]} />

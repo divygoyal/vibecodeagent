@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import useSWR, { type SWRConfiguration } from 'swr';
 
 import type { ChartState } from '@/components/charts/ChartCard';
 import { useDateRange } from '@/components/shell/DateRangeControl';
 import { useCurrentSite } from '@/components/shell/useCurrentSite';
+import { filtersToParams, hasFilters, type SiteFilters } from './lib/filters';
 import { bareHost } from './lib/rules';
 
 export class FetchError extends Error {
@@ -106,13 +107,43 @@ function useSiteSWR<T>(key: string | null, opts?: SWRConfiguration): SiteQuery<T
     };
 }
 
+/**
+ * Click-to-filter state of the page (Traffic provides it; other pages have none).
+ * GA4 reports that support filters pick it up automatically in useGa4.
+ */
+export const SiteFiltersContext = createContext<SiteFilters>({});
+
+export function useActiveFilters(): SiteFilters {
+    return useContext(SiteFiltersContext);
+}
+
+/** GA4 reports that accept `f=` filters (see /api/site/ga4). */
+const FILTERABLE = new Set([
+    'summary', 'heatmap', 'pageTrends', 'channels', 'sources', 'referrers', 'pages', 'landing', 'countries', 'cities',
+    'languages', 'devices', 'browsers', 'os', 'events', 'newReturning',
+]);
+
 /** GA4 report for the current site and range: useGa4<Ga4Summary>('summary'). */
-export function useGa4<T>(report: string | null, opts: { extra?: Record<string, string>; noRange?: boolean; swr?: SWRConfiguration } = {}): SiteQuery<T> {
+export function useGa4<T>(report: string | null, opts: {
+    extra?: Record<string, string>;
+    noRange?: boolean;
+    /** Use the Search Console days (ends 2 days ago) so the series lines up with GSC data. */
+    searchRange?: boolean;
+    /** Ignore the page's click-to-filter state. */
+    unfiltered?: boolean;
+    swr?: SWRConfiguration;
+} = {}): SiteQuery<T> {
     const { ga4 } = useSite();
-    const { ga4Query } = useSiteRange();
-    const extra = opts.extra ? new URLSearchParams(opts.extra).toString() : '';
+    const { ga4Query, gscQuery } = useSiteRange();
+    const filters = useActiveFilters();
+    const p = new URLSearchParams(opts.extra ?? {});
+    if (report && FILTERABLE.has(report) && !opts.unfiltered && hasFilters(filters)) {
+        for (const f of filtersToParams(filters)) p.append('f', f);
+    }
+    const extra = p.toString();
+    const range = opts.searchRange ? gscQuery : ga4Query;
     const key = ga4 && report
-        ? `/api/site/ga4?property=${encodeURIComponent(ga4)}&report=${report}${opts.noRange ? '' : `&${ga4Query}`}${extra ? `&${extra}` : ''}`
+        ? `/api/site/ga4?property=${encodeURIComponent(ga4)}&report=${report}${opts.noRange ? '' : `&${range}`}${extra ? `&${extra}` : ''}`
         : null;
     return useSiteSWR<T>(key, opts.swr);
 }

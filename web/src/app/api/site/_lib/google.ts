@@ -98,6 +98,7 @@ export interface GaReport {
     rowCount?: number;
     dimensionHeaders?: { name: string }[];
     metricHeaders?: { name: string }[];
+    metadata?: { timeZone?: string; currencyCode?: string };
 }
 
 export function ga4Report(userId: string, token: string, property: string, body: Record<string, unknown>, ttl: number = TTL.ga4): Promise<GaReport> {

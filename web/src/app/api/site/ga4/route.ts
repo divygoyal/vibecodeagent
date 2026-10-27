@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server';
 
+import { ga4DimensionFilter, parseFilterParams } from '@/components/site/lib/filters';
+import { isInterval } from '@/components/site/lib/intervals';
 import { getSiteContext, googleErrorResponse, jsonError, NO_STORE, PRIVATE_CACHE } from '../_lib/context';
-import { ga4Breakdown, ga4PageDetail, ga4RealtimeSnapshot, ga4Retention, ga4Summary, isBreakdown } from '../_lib/ga4Reports';
+import {
+    ga4Breakdown, ga4Heatmap, ga4OrganicSeries, ga4PageDetail, ga4PageTrends, ga4RealtimeSnapshot, ga4Retention, ga4Summary, isBreakdown,
+} from '../_lib/ga4Reports';
 import { parseProperty, parseRange } from '../_lib/params';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/site/ga4?property=properties/123&report=summary|<breakdown>|page|realtime|retention
+ * GET /api/site/ga4?property=properties/123&report=summary|<breakdown>|page|realtime|retention|heatmap|pageTrends|organic
  *   &start=YYYY-MM-DD&end=YYYY-MM-DD[&cmpStart=&cmpEnd=][&mode=daily|weekly|monthly]
+ *   [&f=<key>:<value> ...]  click-to-filter (components/site/lib/filters.ts): summary, breakdowns, heatmap, pageTrends
+ *   [&interval=day|week|month]  summary buckets
+ *   [&limit=1-30]  pageTrends rows
  *
  * One small cached GA4 report per call (summary = 3), so each tab and card
  * fetches only what it shows. Read-only.
@@ -31,8 +38,20 @@ export async function GET(req: Request) {
             return NextResponse.json(await ga4Retention(ctx.userId, ctx.token, property, mode), { headers: PRIVATE_CACHE });
         }
         const range = parseRange(sp);
+        const filter = ga4DimensionFilter(parseFilterParams(sp.getAll('f')));
         if (report === 'summary') {
-            return NextResponse.json(await ga4Summary(ctx.userId, ctx.token, property, range), { headers: PRIVATE_CACHE });
+            const iv = sp.get('interval');
+            return NextResponse.json(await ga4Summary(ctx.userId, ctx.token, property, range, { filter, interval: isInterval(iv) ? iv : 'day' }), { headers: PRIVATE_CACHE });
+        }
+        if (report === 'heatmap') {
+            return NextResponse.json(await ga4Heatmap(ctx.userId, ctx.token, property, range, filter), { headers: PRIVATE_CACHE });
+        }
+        if (report === 'pageTrends') {
+            const limit = Number(sp.get('limit')) || 10;
+            return NextResponse.json(await ga4PageTrends(ctx.userId, ctx.token, property, range, filter, limit), { headers: PRIVATE_CACHE });
+        }
+        if (report === 'organic') {
+            return NextResponse.json(await ga4OrganicSeries(ctx.userId, ctx.token, property, range), { headers: PRIVATE_CACHE });
         }
         if (report === 'page') {
             const path = sp.get('path') ?? '';
@@ -42,7 +61,7 @@ export async function GET(req: Request) {
             return NextResponse.json(await ga4PageDetail(ctx.userId, ctx.token, property, path, okHost, range), { headers: PRIVATE_CACHE });
         }
         if (isBreakdown(report)) {
-            return NextResponse.json(await ga4Breakdown(ctx.userId, ctx.token, property, report, range), { headers: PRIVATE_CACHE });
+            return NextResponse.json(await ga4Breakdown(ctx.userId, ctx.token, property, report, range, filter), { headers: PRIVATE_CACHE });
         }
         return jsonError('Unknown report.', 400);
     } catch (e) {
