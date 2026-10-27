@@ -9,11 +9,14 @@ export function FinalCta({
     title = 'See every site you own on one screen.',
     description = <>Connect Google once. <span className="whitespace-nowrap">Read-only</span>, nothing to install, no card, no site limit.</>,
     secondary = { href: '/demo', label: 'See the live demo' },
+    primaryLabel,
 }: {
     title?: string;
     description?: ReactNode;
     /** The outline link next to Connect Google (the demo page points elsewhere). */
     secondary?: { href: string; label: string };
+    /** Label of the Google button (default: ConnectGoogleButton's own). */
+    primaryLabel?: string;
 }) {
     return (
         <section aria-labelledby="final-cta-title" className="bg-canvas py-16 md:py-24">
@@ -28,6 +31,7 @@ export function FinalCta({
                             size="xl"
                             variant="google"
                             mark
+                            label={primaryLabel}
                             className="w-full border-transparent sm:w-auto"
                         />
                         <Link

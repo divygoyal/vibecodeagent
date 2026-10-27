@@ -117,8 +117,8 @@ export function LeaderboardPreview() {
                     <SectionHeading
                         id="lb-title"
                         eyebrow="Leaderboard"
-                        title="Show off verified traffic"
-                        description="Add a site to the public leaderboard. The numbers come straight from Google, you choose what is public, and only owners verified in Search Console can rank."
+                        title="Real traffic, straight from Google"
+                        description="Numbers straight from Google. Only verified owners rank."
                     />
                     {proof.length ? (
                         <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4" aria-label="Leaderboard right now">
@@ -131,10 +131,10 @@ export function LeaderboardPreview() {
                         </dl>
                     ) : null}
                     <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                        <Button asChild variant="primary" size="lg">
+                        <Button asChild variant="secondary" size="lg">
                             <Link href="/leaderboard/join">Add your site, free</Link>
                         </Button>
-                        <Button asChild variant="secondary" size="lg" trailingIcon={ArrowRight}>
+                        <Button asChild variant="ghost" size="lg" trailingIcon={ArrowRight}>
                             <Link href="/leaderboard">See the full leaderboard</Link>
                         </Button>
                     </div>

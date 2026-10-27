@@ -62,3 +62,48 @@ test('changelog entries are dated, anchored and non-empty', () => {
     assert.equal(HOME_HIGHLIGHTS.length, 3);
     for (const h of HOME_HIGHLIGHTS) assert.ok(ids.has(h.href.split('#')[1]), `${h.href} points at a release`);
 });
+
+// Round 3 home page: demo deep links, the theme rule, and the server data built from the demo generator.
+const { demoHref } = await import('../src/components/marketing/home/demoLinks.ts');
+const { resolveHomeTheme } = await import('../src/components/marketing/home/homeTheme.ts');
+const { buildHomeData, HOME_RANGES } = await import('../src/components/marketing/home/homeData.ts');
+const { getDemoSites } = await import('../src/lib/demo/catalog.ts');
+
+test('demo deep links follow the /demo?to=<path> contract and stay readable', () => {
+    assert.equal(demoHref(), '/demo?to=/dashboard');
+    assert.equal(demoHref('/dashboard/s/acmeanalytics.example/actions'), '/demo?to=/dashboard/s/acmeanalytics.example/actions');
+    // A query inside the target is encoded so it stays part of `to`.
+    const href = demoHref('/dashboard/s/x/traffic?tab=realtime&r=1');
+    assert.equal(new URL(href, 'https://t.example').searchParams.get('to'), '/dashboard/s/x/traffic?tab=realtime&r=1');
+});
+
+test('the home page theme: saved dark wins, saved light wins, otherwise the OS setting', () => {
+    assert.equal(resolveHomeTheme('dark', false), 'dark');
+    assert.equal(resolveHomeTheme('light', true), 'light');
+    assert.equal(resolveHomeTheme(null, true), 'dark');
+    assert.equal(resolveHomeTheme(null, false), 'light');
+    assert.equal(resolveHomeTheme('system', true), 'dark');
+    assert.equal(resolveHomeTheme('bogus', true), 'light');
+});
+
+test('home data: every range, a story with real numbers, tour links into the demo on catalogue hosts', () => {
+    const now = Date.UTC(2026, 9, 27, 12);
+    const { byRange, story, tour } = buildHomeData(now);
+    assert.deepEqual(Object.keys(byRange).sort(), [...HOME_RANGES].sort());
+    for (const r of HOME_RANGES) assert.ok(byRange[r].sites.length >= 8, `${r} has the sample sites`);
+
+    assert.equal(story.sites.length, 4);
+    for (let i = 1; i < story.sites.length; i++) assert.ok(story.sites[i - 1].clicks >= story.sites[i].clicks, 'sites by clicks');
+    assert.ok(story.drop && story.drop.changePct < 0, 'a drop is flagged');
+    assert.ok(story.fix && story.fix.gain > 0 && story.fix.title.length > 0, 'the drop comes with a fix');
+    assert.match(story.fixHref, /^\/demo\?to=\/dashboard\/s\/[^/]+\/actions$/);
+
+    const hosts = new Set(getDemoSites().map((s) => s.host.replace(/^www\./, '')));
+    assert.ok(hosts.has(tour.host), 'tour host comes from the catalogue');
+    assert.ok(byRange['28d'].sites.some((s) => s.slug === tour.slug), 'tour slug is a real app slug');
+    for (const k of ['portfolio', 'site', 'fixes', 'traffic', 'dashboards', 'connectAi']) {
+        assert.match(tour[k], /^\/demo\?to=\/dashboard(\/|$)/, `${k} deep-links into the demo`);
+    }
+    // Deterministic for the same day.
+    assert.deepEqual(buildHomeData(now).story, story);
+});
