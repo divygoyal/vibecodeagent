@@ -120,3 +120,20 @@ account listing is.
 - The board's `updated_at` is the newest `last_refreshed` of any entry; per-row staleness is not shown.
 - `useSiteList` / `usePropertyList` are no longer used by the shell (the Ask page still uses `usePropertyList`; same server cache).
 - The old `/api/portfolio/pairs` route stays (nothing in the shell calls it any more).
+
+## STATUS at PAUSE (coordinator, usage limit; resume after 09:50 UTC)
+Done and committed: fixes 1, 2 and 3 above, tests (tsc clean, `npm test` 97 pass, check:rsc 0 errors), screenshots in
+round2/candidate/fix/. Dev server taken down, `web/.next` deleted.
+
+Not done (both dev slots were held by other workstreams for ~50 min, then RAM was short; the server came up only at the pause):
+1. Cold-server-cache checks of the new directory flow with a slow Google (`list:latency:4000`): a host that is NOT in the
+   portfolio store must wait for the live list and never flash "We couldn't find"; an unknown host shows "We couldn't find"
+   only after the live answer. (Warm-cache runs were fine: no flash, unknown host answered at 2.4 s.) To prepare: delete one
+   GSC row of the demo user from portfolio_assets, restart the server, warm a second user's pages, then run a Playwright
+   timeline (request start/end per API call + "Search tiles show numbers") on /dashboard/s/<host>/search with the cookie
+   `tc_demo_faults=list:latency:4000,gsc:latency:500,ga4:latency:500`.
+2. Regression pass after the WorkspaceProvider change on other pages: `/dashboard`, `/dashboard/setup`, site switcher, users
+   `empty`, `nogoogle`, `frevoked`, `f500` (`node scripts/dev/check-scenarios.mjs 3115 --users empty,nogoogle,frevoked,f500`, or
+   `check-mobile.mjs --paths /dashboard,/dashboard/setup,/leaderboard --cookie tc_demo_faults=list:500`).
+3. Look at the 390 px leaderboard once more for the `@max-3xl:hidden` class (last code commit; an invalid class would only mean an
+   empty zero-height div on phones for rows without offers).
