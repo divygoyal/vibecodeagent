@@ -84,7 +84,7 @@ const SHOTS = [
         name: 'site',
         path: `/dashboard/s/${SITE}`,
         // From the Traffic and Search headings down: both sides' KPI tiles, no empty band under the page controls.
-        crop: { from: { desktop: 'text=Google Analytics 4 · property', mobile: 'main' }, offset: -44, height: { desktop: 470, mobile: 600 } },
+        crop: { from: 'text=Google Analytics 4 · property', offset: -44, height: { desktop: 470, mobile: 560 } },
     },
     {
         name: 'fixes',
