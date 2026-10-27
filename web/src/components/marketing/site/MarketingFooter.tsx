@@ -36,7 +36,10 @@ export function MarketingFooter() {
                 </div>
                 <div className="mt-12 flex flex-col gap-2 border-t border-border-subtle pt-6 text-meta text-fg-muted sm:flex-row sm:items-center sm:justify-between">
                     <p>© {new Date().getFullYear()} {BRAND_NAME}</p>
-                    <p>Google Analytics and Search Console are trademarks of Google LLC. Not affiliated with Google.</p>
+                    <p className="sm:max-w-[640px] sm:text-right">
+                        Google Analytics and Search Console are trademarks of Google LLC. ChatGPT, Claude and Cursor belong to their
+                        owners. {BRAND_NAME} is not affiliated with any of them.
+                    </p>
                 </div>
             </div>
         </footer>
