@@ -29,6 +29,7 @@ for (let i = 0; i < argv.length; i++) {
     else if (argv[i] === '--shots') opts.shots = argv[++i];
     else if (argv[i] === '--quick') opts.quick = true;
     else if (argv[i] === '--no-walk') opts.walk = false;
+    else if (argv[i] === '--variants') opts.variants = argv[++i].split(',');
     else if (/^\d+$/.test(argv[i])) opts.port = Number(argv[i]);
     else { console.error(`check-demo: unknown argument ${argv[i]}`); process.exit(2); }
 }
@@ -89,9 +90,11 @@ async function httpChecks() {
     check('/demo/acme -> the Acme site page', r.headers.get('location') === `/dashboard/s/${SITE}`, r.headers.get('location'));
     r = await http('GET', '/demo/creativeprints');
     check('/demo/creativeprints -> its GA4-only site page', r.headers.get('location') === '/dashboard/s/ga4-412300108', r.headers.get('location'));
-    r = await http('GET', '/demo', { headers: { rsc: '1', 'next-router-prefetch': '1' } });
+    r = await http('GET', '/demo', { headers: { 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' } });
     check('a router prefetch of /demo starts nothing (204, no cookie)', r.status === 204 && r.setCookies.length === 0, `${r.status} ${r.setCookies.join()}`);
-    r = await http('GET', '/demo/exit', { headers: { rsc: '1' }, cookie: 'tc_demo=x' });
+    r = await http('GET', '/demo', { headers: { 'sec-fetch-mode': 'navigate', 'sec-purpose': 'prefetch;prerender' } });
+    check('a speculative prerender of /demo starts nothing (204)', r.status === 204 && r.setCookies.length === 0, `${r.status}`);
+    r = await http('GET', '/demo/exit', { headers: { 'sec-fetch-mode': 'cors' }, cookie: 'tc_demo=x' });
     check('a router fetch of /demo/exit ends nothing (204, no cookie)', r.status === 204 && r.setCookies.length === 0, `${r.status} ${r.setCookies.join()}`);
     r = await http('GET', '/demo?static=1');
     check('/demo?static=1 -> the marketing demo page (200)', r.status === 200 && /<html/i.test(r.text), r.status);
@@ -181,7 +184,7 @@ async function walk(browser, { mobile, dark, full, dashboards }) {
     const page = await context.newPage();
     const consoleErrors = [];
     const serverErrors = [];
-    page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(`${page.url()} :: ${m.text()}`); });
+    page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(`${page.url()} :: ${m.text()}${m.location()?.url ? ` [${m.location().url}]` : ''}`); });
     page.on('pageerror', (e) => consoleErrors.push(`${page.url()} :: pageerror ${e.message}`));
     page.on('response', (res) => { if (res.status() >= 500 && res.url().startsWith(base)) serverErrors.push(`${res.status()} ${res.request().method()} ${res.url()}`); });
 
@@ -352,7 +355,8 @@ try {
     const variants = opts.quick
         ? [{ mobile: false, dark: false, full: true }]
         : [{ mobile: false, dark: false, full: true }, { mobile: false, dark: true, full: false }, { mobile: true, dark: false, full: true }, { mobile: true, dark: true, full: false }];
-    if (opts.walk) for (const v of variants) await walk(browser, { ...v, dashboards });
+    const picked = opts.variants ? variants.filter((v) => opts.variants.includes(`${v.mobile ? '390' : '1440'}-${v.dark ? 'dark' : 'light'}`)) : variants;
+    if (opts.walk) for (const v of picked) await walk(browser, { ...v, dashboards });
     await ownerFlow(browser);
 } finally {
     await browser.close();

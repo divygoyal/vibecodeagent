@@ -105,10 +105,14 @@ function demoEntry(request: NextRequest): NextResponse {
         const res = NextResponse.next();
         return hasCookie ? clearDemoCookie(res) : res;
     }
-    // A client-router fetch (next/link prefetch or soft navigation) must never start or end the demo: a prefetch
-    // of a /demo link on the home page would otherwise set the cookie behind the visitor's back. Answering with a
-    // non-RSC response makes the router fall back to a full page load for a real click (prefetches just fail).
-    if (request.headers.has('rsc') || request.headers.has('next-router-prefetch') || searchParams.has('_rsc')) {
+    // A script fetch (next/link prefetch or soft navigation, fetch()) must never start or end the demo: a prefetch
+    // of a /demo link on the home page would otherwise set the cookie behind the visitor's back. Next strips its
+    // own RSC headers before middleware, so this keys on the browser's Sec-Fetch-Mode (only a real page load is
+    // "navigate"; scripts cannot forge it). A non-RSC answer makes the router fall back to a full page load for a
+    // real click; prefetches just fail. Clients without Sec-Fetch headers (curl, old browsers) count as page loads.
+    const mode = request.headers.get('sec-fetch-mode');
+    const speculative = /prefetch|prerender/i.test(`${request.headers.get('sec-purpose') ?? ''} ${request.headers.get('purpose') ?? ''} ${request.headers.get('x-moz') ?? ''}`);
+    if ((mode && mode !== 'navigate') || speculative) {
         return new NextResponse(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
     }
     const rewrite = (to: string, params: Record<string, string> = {}) => {
