@@ -43,7 +43,43 @@ export interface Ga4SeriesPoint {
 export interface Ga4Summary {
     totals: Ga4Totals;
     previous: Ga4Totals | null;
+    /** One point per day, week or month (`date` = first day of the bucket inside the range). */
     series: Ga4SeriesPoint[];
+    interval?: 'day' | 'week' | 'month';
+    /** The GA4 property's reporting time zone. */
+    timeZone?: string;
+}
+
+export interface Ga4Heatmap {
+    /** [dayOfWeek 0 = Sunday][hour 0-23], in the property's time zone. */
+    sessions: number[][];
+    users: number[][];
+    timeZone: string | null;
+    days: number;
+}
+
+export interface Ga4PageTrendRow {
+    host: string;
+    /** GA4 pagePath as reported. */
+    path: string;
+    title: string | null;
+    views: number;
+    /** Comparison views (absent with compare off, null when unknown). */
+    prevViews?: number | null;
+    /** Views per bar across the range (oldest first); null when the trend report failed. */
+    trend: number[] | null;
+}
+
+export interface Ga4PageTrends {
+    rows: Ga4PageTrendRow[];
+    bars: number;
+    /** Days per bar. */
+    barDays: number;
+}
+
+export interface Ga4OrganicSeries {
+    /** Sessions from google / organic per day. */
+    series: { date: string; sessions: number }[];
 }
 
 export type Ga4Breakdown =
@@ -72,9 +108,22 @@ export interface RealtimeResponse {
     /** Users per minute, index 0 = 29 minutes ago, 29 = now. */
     perMinute: number[];
     pages: { name: string; users: number }[];
-    countries: { name: string; users: number }[];
+    /** `code` is the ISO alpha-2 country id. */
+    countries: { name: string; code: string; users: number }[];
     devices: { name: string; users: number }[];
+    /** Aggregated GA4 rows (minute x place x device x page), newest first; null when GA4 refused that report. */
+    live: RealtimeLiveRow[] | null;
     fetchedAt: string;
+}
+
+export interface RealtimeLiveRow {
+    minutesAgo: number;
+    code: string;
+    country: string;
+    city: string;
+    device: string;
+    page: string;
+    users: number;
 }
 
 export interface RetentionResponse {

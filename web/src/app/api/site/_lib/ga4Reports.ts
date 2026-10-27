@@ -3,9 +3,12 @@
  * current and comparison ranges in the same request (GA4 adds a `dateRange`
  * dimension), so a card costs one GA4 request, not two.
  */
+import { andFilters } from '@/components/site/lib/filters';
+import { bucketDates, gaBucketDate, type Interval } from '@/components/site/lib/intervals';
 import { AI_SOURCE_PATTERN } from '@/components/site/lib/rules';
 import type {
-    Ga4Breakdown, Ga4BreakdownResponse, Ga4Row, Ga4SeriesPoint, Ga4Summary, Ga4Totals, RealtimeResponse, RetentionResponse,
+    Ga4Breakdown, Ga4BreakdownResponse, Ga4Heatmap, Ga4OrganicSeries, Ga4PageTrends, Ga4Row, Ga4SeriesPoint, Ga4Summary, Ga4Totals,
+    RealtimeResponse, RetentionResponse,
 } from '@/components/site/lib/types';
 import { ga4Realtime, ga4Report, type GaReport } from './google';
 import { addDays, daysBetween, type RangeParams } from './params';
@@ -64,28 +67,40 @@ function fillDays(start: string, end: string): string[] {
     return Array.from({ length: n }, (_, i) => addDays(start, i));
 }
 
-export async function ga4Summary(userId: string, token: string, property: string, r: RangeParams): Promise<Ga4Summary> {
+type GaFilter = Record<string, unknown> | null;
+
+const BUCKET_DIM: Record<Interval, string> = { day: 'date', week: 'isoYearIsoWeek', month: 'yearMonth' };
+
+export async function ga4Summary(
+    userId: string, token: string, property: string, r: RangeParams,
+    opts: { filter?: GaFilter; interval?: Interval } = {},
+): Promise<Ga4Summary> {
     const multi = Boolean(r.cmp);
     const dr = ranges(r);
+    const filter = opts.filter ?? null;
+    const interval = opts.interval ?? 'day';
+    const bucketDim = BUCKET_DIM[interval];
     const aiFilter = { filter: { fieldName: 'sessionSource', stringFilter: { matchType: 'PARTIAL_REGEXP', value: AI_SOURCE_PATTERN, caseSensitive: false } } };
+    const withFilter = filter ? { dimensionFilter: filter } : {};
     const [totals, series, ai] = await Promise.all([
-        ga4Report(userId, token, property, { dateRanges: dr, metrics: TOTAL_METRICS.map((name) => ({ name })), limit: 5 }),
-        ga4Report(userId, token, property, { dateRanges: dr, dimensions: [{ name: 'date' }], metrics: SERIES_METRICS.map((name) => ({ name })), limit: 2000, keepEmptyRows: true }),
-        ga4Report(userId, token, property, { dateRanges: dr, dimensions: [{ name: 'date' }], metrics: [{ name: 'sessions' }], dimensionFilter: aiFilter, limit: 2000 }).catch(() => null),
+        ga4Report(userId, token, property, { dateRanges: dr, metrics: TOTAL_METRICS.map((name) => ({ name })), limit: 5, ...withFilter }),
+        ga4Report(userId, token, property, { dateRanges: dr, dimensions: [{ name: bucketDim }], metrics: SERIES_METRICS.map((name) => ({ name })), limit: 2000, keepEmptyRows: true, ...withFilter }),
+        ga4Report(userId, token, property, { dateRanges: dr, dimensions: [{ name: bucketDim }], metrics: [{ name: 'sessions' }], dimensionFilter: andFilters(filter, aiFilter), limit: 2000 }).catch(() => null),
     ]);
 
     const t = byRange(totals, 0, multi);
     const s = byRange(series, 1, multi);
     const a = ai ? byRange(ai, 1, multi) : { cur: [], cmp: [] };
-    const aiCur = new Map(a.cur.map((x) => [gaDate(x.dims[0]), x.m[0] ?? 0]));
-    const aiCmp = new Map(a.cmp.map((x) => [gaDate(x.dims[0]), x.m[0] ?? 0]));
+    const curName = (v: string) => gaBucketDate(v, interval, r.cur.start);
+    const cmpName = (v: string) => gaBucketDate(v, interval, r.cmp?.start ?? r.cur.start);
+    const aiCur = new Map(a.cur.map((x) => [curName(x.dims[0]), x.m[0] ?? 0]));
+    const aiCmp = new Map(a.cmp.map((x) => [cmpName(x.dims[0]), x.m[0] ?? 0]));
     const sum = (m: Map<string, number>) => [...m.values()].reduce((x, y) => x + y, 0);
 
-    const curByDate = new Map(s.cur.map((x) => [gaDate(x.dims[0]), x.m]));
-    const cmpByDate = new Map(s.cmp.map((x) => [gaDate(x.dims[0]), x.m]));
-    const curDays = fillDays(r.cur.start, r.cur.end);
-    const cmpDays = r.cmp ? fillDays(r.cmp.start, r.cmp.end) : [];
-
+    const curByDate = new Map(s.cur.map((x) => [curName(x.dims[0]), x.m]));
+    const cmpByDate = new Map(s.cmp.map((x) => [cmpName(x.dims[0]), x.m]));
+    const curDays = interval === 'day' ? fillDays(r.cur.start, r.cur.end) : bucketDates(r.cur.start, r.cur.end, interval);
+    const cmpDays = r.cmp ? (interval === 'day' ? fillDays(r.cmp.start, r.cmp.end) : bucketDates(r.cmp.start, r.cmp.end, interval)) : [];
     const points: Ga4SeriesPoint[] = curDays.map((date, i) => {
         const m = curByDate.get(date);
         const p: Ga4SeriesPoint = {
@@ -114,6 +129,8 @@ export async function ga4Summary(userId: string, token: string, property: string
         totals: totalsFrom(t.cur[0]?.m, sum(aiCur)),
         previous: multi ? totalsFrom(t.cmp[0]?.m, sum(aiCmp)) : null,
         series: points,
+        interval,
+        ...(totals.metadata?.timeZone ? { timeZone: totals.metadata.timeZone } : {}),
     };
 }
 
@@ -140,7 +157,7 @@ export const GA4_BREAKDOWNS: Record<Ga4Breakdown, BreakdownSpec> = {
         limit: 1500,
     },
     landing: { dims: ['landingPage'], metrics: ['sessions', 'activeUsers', 'engagementRate', 'keyEvents', 'averageSessionDuration', 'bounceRate'], order: 'sessions', limit: 600 },
-    countries: { dims: ['country'], metrics: ['activeUsers', 'sessions', 'engagementRate', 'keyEvents'], order: 'activeUsers', limit: 300 },
+    countries: { dims: ['country', 'countryId'], metrics: ['activeUsers', 'sessions', 'engagementRate', 'keyEvents'], order: 'activeUsers', limit: 300 },
     cities: { dims: ['city', 'country'], metrics: ['activeUsers', 'sessions', 'engagementRate'], order: 'activeUsers', limit: 300 },
     languages: { dims: ['language'], metrics: ['activeUsers', 'sessions', 'engagementRate'], order: 'activeUsers', limit: 150 },
     devices: { dims: ['deviceCategory'], metrics: ['activeUsers', 'sessions', 'engagementRate', 'keyEvents'], order: 'activeUsers', limit: 12 },
@@ -154,8 +171,9 @@ export function isBreakdown(v: string | null): v is Ga4Breakdown {
     return typeof v === 'string' && v in GA4_BREAKDOWNS;
 }
 
-export async function ga4Breakdown(userId: string, token: string, property: string, report: Ga4Breakdown, r: RangeParams): Promise<Ga4BreakdownResponse> {
+export async function ga4Breakdown(userId: string, token: string, property: string, report: Ga4Breakdown, r: RangeParams, filter: GaFilter = null): Promise<Ga4BreakdownResponse> {
     const spec = GA4_BREAKDOWNS[report];
+    const dimensionFilter = andFilters(spec.filter ?? null, filter);
     const multi = Boolean(r.cmp);
     const limit = multi ? spec.limit * 2 : spec.limit;
     const res = await ga4Report(userId, token, property, {
@@ -164,7 +182,7 @@ export async function ga4Breakdown(userId: string, token: string, property: stri
         metrics: spec.metrics.map((name) => ({ name })),
         orderBys: [{ metric: { metricName: spec.order }, desc: true }],
         limit,
-        ...(spec.filter ? { dimensionFilter: spec.filter } : {}),
+        ...(dimensionFilter ? { dimensionFilter } : {}),
     });
     const split = byRange(res, spec.dims.length, multi);
     const truncated = (res.rowCount ?? 0) > (res.rows?.length ?? 0);
@@ -191,12 +209,19 @@ export async function ga4Breakdown(userId: string, token: string, property: stri
 
 export async function ga4RealtimeSnapshot(userId: string, token: string, property: string): Promise<RealtimeResponse> {
     const users = [{ name: 'activeUsers' }];
-    const [total, minutes, pages, countries, devices] = await Promise.all([
+    const [total, minutes, pages, countries, devices, live] = await Promise.all([
         ga4Realtime(userId, token, property, { metrics: users }),
         ga4Realtime(userId, token, property, { dimensions: [{ name: 'minutesAgo' }], metrics: users, limit: 60 }),
         ga4Realtime(userId, token, property, { dimensions: [{ name: 'unifiedScreenName' }], metrics: users, limit: 20 }),
-        ga4Realtime(userId, token, property, { dimensions: [{ name: 'country' }], metrics: users, limit: 20 }),
+        ga4Realtime(userId, token, property, { dimensions: [{ name: 'country' }, { name: 'countryId' }], metrics: users, limit: 60 }),
         ga4Realtime(userId, token, property, { dimensions: [{ name: 'deviceCategory' }], metrics: users, limit: 5 }),
+        // Aggregated rows (minute x place x device x page), not individual visitors: GA4 has no visitor log.
+        ga4Realtime(userId, token, property, {
+            dimensions: [{ name: 'minutesAgo' }, { name: 'countryId' }, { name: 'country' }, { name: 'city' }, { name: 'deviceCategory' }, { name: 'unifiedScreenName' }],
+            metrics: users,
+            orderBys: [{ dimension: { dimensionName: 'minutesAgo', orderType: 'NUMERIC' }, desc: false }, { metric: { metricName: 'activeUsers' }, desc: true }],
+            limit: 40,
+        }).catch(() => null),
     ]);
     const list = (rep: GaReport) => (rep.rows ?? []).map((row) => ({ name: row.dimensionValues?.[0]?.value || '(not set)', users: num(row.metricValues?.[0]?.value) }));
     const perMinute = Array.from({ length: 30 }, () => 0);
@@ -204,14 +229,148 @@ export async function ga4RealtimeSnapshot(userId: string, token: string, propert
         const ago = Number(row.dimensionValues?.[0]?.value);
         if (Number.isFinite(ago) && ago >= 0 && ago < 30) perMinute[29 - ago] = num(row.metricValues?.[0]?.value);
     }
+    const dv = (row: { dimensionValues?: { value?: string }[] }, i: number) => row.dimensionValues?.[i]?.value || '(not set)';
     return {
         activeUsers: num(total.rows?.[0]?.metricValues?.[0]?.value),
         perMinute,
         pages: list(pages),
-        countries: list(countries),
+        countries: (countries.rows ?? []).map((row) => ({ name: dv(row, 0), code: dv(row, 1), users: num(row.metricValues?.[0]?.value) })),
         devices: list(devices),
+        live: live ? (live.rows ?? []).map((row) => ({
+            minutesAgo: Number(dv(row, 0)) || 0,
+            code: dv(row, 1),
+            country: dv(row, 2),
+            city: dv(row, 3),
+            device: dv(row, 4),
+            page: dv(row, 5),
+            users: num(row.metricValues?.[0]?.value),
+        })) : null,
         fetchedAt: new Date().toISOString(),
     };
+}
+
+// ─── Peak hours (weekday x hour) ────────────────────────────────────────────
+
+export async function ga4Heatmap(userId: string, token: string, property: string, r: RangeParams, filter: GaFilter = null): Promise<Ga4Heatmap> {
+    const res = await ga4Report(userId, token, property, {
+        dateRanges: [{ startDate: r.cur.start, endDate: r.cur.end }],
+        dimensions: [{ name: 'dayOfWeek' }, { name: 'hour' }],
+        metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
+        limit: 200,
+        ...(filter ? { dimensionFilter: filter } : {}),
+    });
+    const grid = () => Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+    const sessions = grid();
+    const users = grid();
+    for (const row of res.rows ?? []) {
+        const d = Number(row.dimensionValues?.[0]?.value);
+        const h = Number(row.dimensionValues?.[1]?.value);
+        if (!(d >= 0 && d < 7 && h >= 0 && h < 24)) continue;
+        sessions[d][h] = num(row.metricValues?.[0]?.value);
+        users[d][h] = num(row.metricValues?.[1]?.value);
+    }
+    return { sessions, users, timeZone: res.metadata?.timeZone ?? null, days: daysBetween(r.cur.start, r.cur.end) };
+}
+
+// ─── Top pages with titles and trend bars ──────────────────────────────────
+
+const MAX_TREND_BARS = 14;
+
+export async function ga4PageTrends(userId: string, token: string, property: string, r: RangeParams, filter: GaFilter = null, limit = 10): Promise<Ga4PageTrends> {
+    const multi = Boolean(r.cmp);
+    const n = Math.max(1, Math.min(25, limit));
+    const top = await ga4Report(userId, token, property, {
+        dateRanges: ranges(r),
+        dimensions: [{ name: 'hostName' }, { name: 'pagePath' }, { name: 'pageTitle' }],
+        metrics: [{ name: 'screenPageViews' }],
+        orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+        limit: multi ? 600 : 300,
+        ...(filter ? { dimensionFilter: filter } : {}),
+    });
+    const split = byRange(top, 3, multi);
+    type Agg = { host: string; path: string; views: number; prev: number; title: string; titleViews: number };
+    const pages = new Map<string, Agg>();
+    for (const x of split.cur) {
+        const [host, path, title] = x.dims;
+        const k = `${host}\u0001${path}`;
+        const a = pages.get(k) ?? { host, path, views: 0, prev: 0, title: '', titleViews: -1 };
+        const v = x.m[0] ?? 0;
+        a.views += v;
+        if (v > a.titleViews && title && title !== '(not set)') {
+            a.title = title;
+            a.titleViews = v;
+        }
+        pages.set(k, a);
+    }
+    const truncated = (top.rowCount ?? 0) > (top.rows?.length ?? 0);
+    for (const x of split.cmp) {
+        const a = pages.get(`${x.dims[0]}\u0001${x.dims[1]}`);
+        if (a) a.prev += x.m[0] ?? 0;
+    }
+    const chosen = [...pages.values()].sort((a, b) => b.views - a.views).slice(0, n);
+    if (!chosen.length) return { rows: [], bars: 0, barDays: 0 };
+
+    const days = daysBetween(r.cur.start, r.cur.end);
+    const bars = Math.min(MAX_TREND_BARS, days);
+    const inList = { filter: { fieldName: 'pagePath', inListFilter: { values: [...new Set(chosen.map((c) => c.path))], caseSensitive: true } } };
+    const daily = await ga4Report(userId, token, property, {
+        dateRanges: [{ startDate: r.cur.start, endDate: r.cur.end }],
+        dimensions: [{ name: 'hostName' }, { name: 'pagePath' }, { name: 'date' }],
+        metrics: [{ name: 'screenPageViews' }],
+        dimensionFilter: andFilters(filter, inList),
+        limit: 10000,
+    }).catch(() => null);
+    const trend = new Map<string, number[]>();
+    const startMs = Date.parse(`${r.cur.start}T00:00:00Z`);
+    for (const row of daily?.rows ?? []) {
+        const host = row.dimensionValues?.[0]?.value ?? '';
+        const path = row.dimensionValues?.[1]?.value ?? '';
+        const date = gaDate(row.dimensionValues?.[2]?.value ?? '');
+        const i = Math.round((Date.parse(`${date}T00:00:00Z`) - startMs) / 86_400_000);
+        if (!(i >= 0 && i < days)) continue;
+        const k = `${host}\u0001${path}`;
+        const t = trend.get(k) ?? Array.from({ length: bars }, () => 0);
+        t[Math.min(bars - 1, Math.floor((i * bars) / days))] += num(row.metricValues?.[0]?.value);
+        trend.set(k, t);
+    }
+    return {
+        rows: chosen.map((c) => {
+            const k = `${c.host}\u0001${c.path}`;
+            return {
+                host: c.host,
+                path: c.path,
+                title: c.title || null,
+                views: c.views,
+                ...(multi ? { prevViews: c.prev > 0 || !truncated ? c.prev : null } : {}),
+                trend: daily ? trend.get(k) ?? Array.from({ length: bars }, () => 0) : null,
+            };
+        }),
+        bars,
+        barDays: days / bars,
+    };
+}
+
+// ─── Google organic sessions per day (for the Search vs traffic chart) ─────
+
+export async function ga4OrganicSeries(userId: string, token: string, property: string, r: RangeParams): Promise<Ga4OrganicSeries> {
+    const google = {
+        andGroup: {
+            expressions: [
+                { filter: { fieldName: 'sessionSource', stringFilter: { matchType: 'EXACT', value: 'google', caseSensitive: false } } },
+                { filter: { fieldName: 'sessionMedium', stringFilter: { matchType: 'EXACT', value: 'organic', caseSensitive: false } } },
+            ],
+        },
+    };
+    const res = await ga4Report(userId, token, property, {
+        dateRanges: [{ startDate: r.cur.start, endDate: r.cur.end }],
+        dimensions: [{ name: 'date' }],
+        metrics: [{ name: 'sessions' }],
+        dimensionFilter: google,
+        keepEmptyRows: true,
+        limit: 2000,
+    });
+    const byDate = new Map((res.rows ?? []).map((row) => [gaDate(row.dimensionValues?.[0]?.value ?? ''), num(row.metricValues?.[0]?.value)]));
+    return { series: fillDays(r.cur.start, r.cur.end).map((date) => ({ date, sessions: byDate.get(date) ?? 0 })) };
 }
 
 // ─── Retention (cohorts by first visit) ────────────────────────────────────
