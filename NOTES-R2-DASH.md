@@ -59,3 +59,9 @@ Next on resume:
    baseline, features) + bshot.mjs into round2/candidate/dash/; sheet.py contact sheets.
 4. check-mobile.mjs on dashboard routes (--paths list, gallery, themed views, public client report); down.sh.
 5. Report.
+
+## Resumed 2026-10-27 ~09:55 UTC (one dev-slot session, then down.sh)
+- Gate cand2 (head f4e49b8+): 28/28 identical vs base samples (2 shots taken under parallel screenshot load re-shot with --only).
+- Mobile (390, light+dark, 7 dashboard routes): overflow 0, error 0; textSpill 2 (client report), smallTargets 4 (executive view).
+- Shots in round2/candidate/dash/: critique-* (judge equivalents; 390 list shots missing), templates/, themes/, features/, sheet-*.png.
+  themes/site-overview-studio-1440-light.png caught a loading frame (re-shoot next session).
