@@ -84,7 +84,7 @@ function AppearanceHint() {
     return (
         <SectionCard title="Link Analytics" description="Visitors, sources and devices">
             <p className="text-body-sm text-fg-secondary">This site only has Search Console. Link a GA4 property to see who visits, where they come from and what they do.</p>
-            <div className="mt-3"><Button asChild size="sm" variant="secondary"><Link href="/dashboard/settings?tab=sites">Link a GA4 property</Link></Button></div>
+            <div className="mt-3"><Button asChild size="sm" variant="secondary"><a href="#link-ga4">Link a GA4 property</a></Button></div>
             <p className="mt-3 text-meta text-fg-muted">Search breakdowns are in <Link className="underline" href={siteHref(site.host, 'search')}>Search</Link>.</p>
         </SectionCard>
     );

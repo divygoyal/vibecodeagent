@@ -20,6 +20,7 @@
 import { cachedFetch, CACHE_TTL, invalidateCache } from '@/lib/apiCache';
 import { describeGoogleError } from '@/lib/googleErrors';
 import { listAnalyticsProperties, listSearchConsoleSites } from '@/lib/googleApi';
+import { invalidateInventory } from '@/lib/sites/fetchInventory';
 import { AdminStoreError, adminStore } from '@/lib/portfolio/adminStore';
 import type { GoogleAccess } from '@/lib/portfolio/auth';
 import type { StoreAsset } from '@/lib/portfolio/snapshot';
@@ -83,19 +84,24 @@ export async function loadStoreDirectory(identifier: string): Promise<DirectoryP
         source: 'store',
         connected: true,
         sites: assets.filter((a) => a.asset_kind === 'gsc').map((a) => ({ siteUrl: a.asset_id, ...(a.permission_level ? { permissionLevel: a.permission_level } : {}) })),
-        properties: assets.filter((a) => a.asset_kind === 'ga4').map((a) => ({ property: a.asset_id, displayName: a.display_name || a.asset_id })),
+        properties: assets.filter((a) => a.asset_kind === 'ga4').map((a) => ({ property: a.asset_id, displayName: a.display_name || a.asset_id, ...(a.host ? { host: a.host } : {}) })),
         pairs: storedPairs(assets),
         errors: {},
     };
 }
 
-/** The live directory: both Google lists in parallel (cached), plus the stored pairing. `refresh` skips the cached lists ("Check again"). */
+/**
+ * The live directory: both Google lists in parallel (cached), plus the stored pairing. `refresh` skips the
+ * cached lists and drops the portfolio's cached inventory too ("Check again"), so the next portfolio sync
+ * lists Google afresh and stores a site the user just added.
+ */
 export async function loadLiveDirectory(identifier: string, getAccess: () => Promise<GoogleAccess>, opts: { refresh?: boolean } = {}): Promise<DirectoryPayload> {
     if (opts.refresh) {
         for (const key of [`gsc:sites:${identifier}`, `ga:properties:${identifier}`]) {
             invalidateCache(key);
             failureMemo.delete(key);
         }
+        invalidateInventory(identifier);
     }
     const [access, assets] = await Promise.all([getAccess(), storedAssets(identifier)]);
     const pairs = storedPairs(assets.filter((a) => !a.missing));
@@ -112,11 +118,12 @@ export async function loadLiveDirectory(identifier: string, getAccess: () => Pro
     const errors: DirectoryPayload['errors'] = {};
     if (!Array.isArray(sites)) errors.sites = toError(sites);
     if (!Array.isArray(properties)) errors.properties = toError(properties);
+    const hostOf = new Map(assets.filter((a) => a.asset_kind === 'ga4' && a.host).map((a) => [a.asset_id, a.host as string]));
     return {
         source: 'live',
         connected: true,
         sites: Array.isArray(sites) ? sites : [],
-        properties: Array.isArray(properties) ? properties : [],
+        properties: Array.isArray(properties) ? properties.map((p) => (hostOf.has(p.property) && !p.host ? { ...p, host: hostOf.get(p.property) } : p)) : [],
         pairs,
         errors,
     };

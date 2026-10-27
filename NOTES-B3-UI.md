@@ -41,3 +41,22 @@ Owner preview feedback, UI part. Checks run on worker1 (`scripts/dev/worker1.sh`
   also a thrown 401 (it used to restart on every poll). The tile never shows a skeleton any more: summed daily
   users with "≈" and a hover note until exact users land (`usersTotalTile` in lib/portfolio/view.ts).
 - Test: `tests/portfolioUsersTotal.test.mjs` (3 of 4 fail on the old code).
+
+## 5. Link pickers on empty Search Console / GA4 cards
+- `components/site/LinkSource.tsx` replaces the body of `SourceMissing` (Overview summary cards, Traffic and
+  Search pages): picker + Link + Check again + guidance. Card ids `link-gsc` / `link-ga4` (the GSC-only
+  Overview's "Link Analytics" hint now jumps to `#link-ga4` instead of Settings, which has no picker).
+- Picker lists every GSC site (Domain and URL prefix; unverified shown disabled; "linked to X" note) or every GA4
+  property from the live directory, ranked by `lib/sites/linkCandidates.ts` (stream host covered by the site, then
+  name match, then A-Z; a real match is preselected). Test `tests/linkCandidates.test.mjs`.
+- Save = the portfolio pairing dialog's call: `PATCH /api/portfolio/assets/ga4:<prop> {gscSite}` or
+  `gsc:<site> {ga4Property}` -> `setPairingOverride` (portfolio_assets). The route now stores the current Google
+  inventory once (`repairPairs`) when the site or the target is not in the store yet. After saving: directory,
+  pairs, store directory and portfolio keys revalidate; a GA4-only page (`ga4-123`) follows its new route key.
+- Check again = `GET /api/sites/directory?refresh=1` (existing cache bust; now also `invalidateInventory(id)`,
+  fetchInventory itself unchanged) + a background `POST /api/portfolio/sync {}` so the store learns new sites.
+- `DirectoryProperty.host` (stream host from the store) added in directoryServer for ranking.
+- Guidance: "Add it in Search Console" (welcome URL) + 2 verify steps / "Create a GA4 property" + 2 steps;
+  "In another Google account?": add <session email> (Search Console → Settings → Users and permissions /
+  GA Admin → Property access management) or connect another Google account (/dashboard/settings?tab=google,
+  where tc/b3-accounts adds the button).

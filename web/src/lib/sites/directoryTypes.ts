@@ -15,6 +15,8 @@ export interface DirectoryProperty {
     property: string;
     displayName: string;
     parent?: string;
+    /** Web stream host the portfolio stored for this property ('acme.com'), when known: ranks link suggestions. */
+    host?: string;
 }
 
 export interface DirectoryPayload {
