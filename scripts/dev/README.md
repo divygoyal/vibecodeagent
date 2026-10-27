@@ -197,15 +197,18 @@ Make the demo Google APIs fail like the real ones (`web/src/lib/demo/faults.ts`)
 | cookie `tc_demo_faults=<spec>` | one browser, no restart (`check-mobile.mjs --cookie tc_demo_faults=429`) |
 | token suffix `demo-access:main~<spec>` | one demo user, also background syncs/crons (the `f*` users below) |
 
-`<spec>` = comma list of `[scope:]fault[:ms]`; faults `403` `429` `500` `timeout[:ms]` (default 30 s,
-honours the caller's AbortSignal, then 504) `empty` `revoked` (refresh → `invalid_grant`, data → 401)
+`<spec>` = comma list of `[scope:]fault[:ms]`; faults `403` `429` `500` `502` (Google's HTML Bad Gateway page, always) `flaky[:n]` (the same 502 for the first n=2 tries of each distinct request, then it clears) `timeout[:ms]` (default 30 s,
+honours the caller's AbortSignal, then 504) `latency[:ms]` (default 1.5 s; waits, then answers normally:
+a slow Google, to time page loads) `empty` `revoked` (refresh → `invalid_grant`, data → 401)
 `huge` (counts × 10 M); scopes `ga4` `gsc` `psi` `list` (account/site lists) `all`. No scope = every
-data call (lists still work). E.g. `gsc:403`, `ga4:timeout:8000,gsc:empty`, `all:500`.
+data call (lists still work). E.g. `gsc:403`, `ga4:timeout:8000,gsc:empty`, `all:500`, `all:latency:2000`.
 
 Scenario users for `login.mjs --user` (no sample records seeded): `empty` (Google, 0 sites), `one`,
 `ga4only`, `gsconly`, `many` (200 generated sites, some with very long names), `nogoogle` (GitHub
 sign-in, no Google), `nocredits` (free, 0 credits), and `f403 f429 f500 ftimeout fempty frevoked fhuge`
 (the demo account's sites with that fault on every Google call).
+Also `f502` (every data call answers an HTML 502), `fflaky` (`flaky:2`: the first two tries of each data request get a 502, a retry
+gets through), `fflakyall` (the same on the site lists too) and `fslow` (`all:latency:1500`).
 
 ## 8. Checks
 

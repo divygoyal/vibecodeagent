@@ -2,7 +2,7 @@
  * Leaderboard text helpers. Numbers come from the app's one formatter (lib/format);
  * this file only decides what a shared metric looks like in text (exact number or band).
  */
-import { computeDelta, fmtCompact, fmtDay, fmtDuration, fmtFull, fmtPercent } from '@/lib/format';
+import { computeDelta, fmtCompact, fmtDay, fmtDayYear, fmtDuration, fmtFull, fmtPercent } from '@/lib/format';
 import type { CountMetric, EngagementMetric } from './types';
 
 export const compact = fmtCompact;
@@ -45,4 +45,39 @@ export function timeAgo(iso: string | null | undefined, now = Date.now()): strin
     if (hours < 24) return `${hours} h ago`;
     const days = Math.round(hours / 24);
     return `${days} d ago`;
+}
+
+/**
+ * How fresh the numbers are, as text for the board and profile (round 2, critique #9).
+ *  - fresh   (under 36 h): "Updated 3 h ago". The only level where "checked daily" is true.
+ *  - recent  (under 8 days): "Updated Oct 25" (absolute: "5 d ago" reads like a promise).
+ *  - stale   (older): "Last updated Aug 23". Callers drop the "daily" claim.
+ *  - unknown (no stamp): empty text.
+ * Dates are UTC days, like every other date in the app.
+ */
+export type FreshnessLevel = 'fresh' | 'recent' | 'stale' | 'unknown';
+export interface Freshness {
+    level: FreshnessLevel;
+    text: string;
+}
+
+export const FRESH_MS = 36 * 3_600_000;
+export const STALE_MS = 8 * 24 * 3_600_000;
+
+export function freshness(iso: string | null | undefined, now = Date.now()): Freshness {
+    if (!iso) return { level: 'unknown', text: '' };
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return { level: 'unknown', text: '' };
+    const age = Math.max(now - t, 0);
+    if (age < FRESH_MS) {
+        const mins = Math.floor(age / 60_000);
+        if (mins < 2) return { level: 'fresh', text: 'Updated just now' };
+        if (mins < 60) return { level: 'fresh', text: `Updated ${mins} min ago` };
+        const hours = Math.floor(mins / 60);
+        return { level: 'fresh', text: `Updated ${hours} h ago` };
+    }
+    const dayIso = new Date(t).toISOString().slice(0, 10);
+    const day = dayIso.slice(0, 4) === new Date(now).toISOString().slice(0, 4) ? fmtDay(dayIso) : fmtDayYear(dayIso);
+    if (age < STALE_MS) return { level: 'recent', text: `Updated ${day}` };
+    return { level: 'stale', text: `Last updated ${day}` };
 }

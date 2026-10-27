@@ -4525,6 +4525,8 @@ async def refresh_leaderboard_stats(
                 # v3 additions (older callers ignore unknown keys)
                 "gsc_site_url": profile.gsc_site_url if profile else None,
                 "verification_manual": bool(profile.verification_manual) if profile else False,
+                # Lets the caller skip entries refreshed recently (daily scheduler, repeated cron calls).
+                "last_refreshed": (entry.last_refreshed.isoformat() + "Z") if entry.last_refreshed else None,
             })
 
     return {"entries": refresh_list, "total": len(refresh_list)}

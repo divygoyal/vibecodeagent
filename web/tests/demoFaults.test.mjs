@@ -103,3 +103,39 @@ test('edge-case accounts: empty, ga4only, gsconly, many (200 sites, not in the p
     const s = getDemoSite('bulk001');
     assert.equal(findSiteByPropertyId(s.ga.propertyId)?.key, 'bulk001');
 });
+
+test('latency: waits, then answers normally; scopes and the abort signal work', async () => {
+    assert.deepEqual(parseDemoFaults('list:latency:3000,delay'), [
+        { kind: 'latency', scope: 'list', ms: 3000 },
+        { kind: 'latency', scope: 'data', ms: undefined },
+    ]);
+    const t0 = Date.now();
+    const res = await runReport('demo-access:main~ga4:latency:300');
+    assert.equal(res.status, 200);
+    assert.ok(Date.now() - t0 >= 280, 'waited for the latency');
+    assert.ok((await res.json()).rows.length > 0, 'and then answered with data');
+    const t1 = Date.now();
+    assert.equal((await gscQuery('demo-access:main~ga4:latency:2000')).status, 200);
+    assert.ok(Date.now() - t1 < 1000, 'a ga4 fault does not slow Search Console');
+    const ctl = new AbortController();
+    setTimeout(() => ctl.abort(), 50);
+    await assert.rejects(runReport('demo-access:main~ga4:latency:5000', ctl.signal));
+});
+
+test('flaky: the first n identical requests get an HTML 502, the retry gets through; 502 always fails', async () => {
+    assert.deepEqual(parseDemoFaults('flaky,all:flaky:3,502'), [
+        { kind: 'flaky', scope: 'data', ms: undefined },
+        { kind: 'flaky', scope: 'all', ms: 3 },
+        { kind: '502', scope: 'data', ms: undefined },
+    ]);
+    const token = 'demo-access:main~flaky:2';
+    const first = await runReport(token);
+    assert.equal(first.status, 502);
+    assert.match(first.headers.get('content-type'), /text\/html/);
+    assert.equal((await runReport(token)).status, 502);
+    const third = await runReport(token);
+    assert.equal(third.status, 200, 'the third identical request is let through');
+    assert.ok((await third.json()).rows.length > 0);
+    assert.equal((await gscQuery(token)).status, 502, 'a different request has its own count');
+    for (let i = 0; i < 4; i++) assert.equal((await runReport('demo-access:main~502')).status, 502);
+});

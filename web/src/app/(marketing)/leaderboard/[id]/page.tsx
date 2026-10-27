@@ -13,7 +13,7 @@ import { EmbedCard, LiveNow, OfferSection, ProfileCharts, RangeSwitch, ShareButt
 import { AboutCard, Breakdowns, GrowthCard, KpiGrid, OpenToLine, SimilarCard, SiteLine, SlotsCard } from '@/components/leaderboard/ProfileSections';
 import { SITE_ORIGIN } from '@/lib/leaderboard/constants';
 import { fmtDay } from '@/lib/format';
-import { metricText } from '@/lib/leaderboard/format';
+import { freshness, metricText } from '@/lib/leaderboard/format';
 import { getProfile, parseRange } from '@/lib/leaderboard/server';
 import { jsonLdString } from '@/lib/leaderboard/jsonld';
 
@@ -59,6 +59,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
     const profileUrl = `${SITE_ORIGIN}/leaderboard/${slug}`;
     const host = (p.website_url || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     const pending = p.status === 'pending';
+    const updated = freshness(p.updated_at);
 
     const jsonLd = {
         '@context': 'https://schema.org',
@@ -149,7 +150,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
                         <span className="text-fg-secondary">{p.verification.label}</span>
                         {p.verification.ga4_connected && p.verification.level === 'owner' ? <span>· GA4 data stream matches {host}</span> : null}
                         {p.verification.checked_at ? <span>· checked {fmtDay(p.verification.checked_at.slice(0, 10))}</span> : null}
-                        {p.updated_at ? <span>· numbers updated {fmtDay(p.updated_at.slice(0, 10))}</span> : null}
+                        {updated.text ? <span>· numbers {updated.text.charAt(0).toLowerCase() + updated.text.slice(1)}</span> : null}
                     </p>
 
                     <div className="mt-6 flex flex-col gap-4">

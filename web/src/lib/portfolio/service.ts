@@ -27,20 +27,22 @@ function emptySnapshot(range: PortfolioRange): SnapshotData {
 
 export async function loadPortfolio(identifier: string, range: PortfolioRange, req?: Request): Promise<PortfolioResponse> {
     const now = Date.now();
-    const access = await googleAccessFor(identifier, req);
-
-    let snap: SnapshotData;
-    try {
-        snap = await adminStore.snapshot(identifier, {
-            windows: windowRequests(range, now),
-            bucket_days: bucketDaysFor(range),
-            recent_days: RECENT_DAYS,
-            range_key: range,
-        });
-    } catch (err) {
-        if (!(err instanceof AdminStoreError && err.status === 404)) throw err;
-        snap = emptySnapshot(range); // user row not created yet
-    }
+    // The token check (a refresh at Google when the token is old) and the snapshot do not depend on each
+    // other: run them together so a first load waits for the slower one, not for both.
+    const loadSnapshot = async (): Promise<SnapshotData> => {
+        try {
+            return await adminStore.snapshot(identifier, {
+                windows: windowRequests(range, now),
+                bucket_days: bucketDaysFor(range),
+                recent_days: RECENT_DAYS,
+                range_key: range,
+            });
+        } catch (err) {
+            if (!(err instanceof AdminStoreError && err.status === 404)) throw err;
+            return emptySnapshot(range); // user row not created yet
+        }
+    };
+    const [access, snap] = await Promise.all([googleAccessFor(identifier, req), loadSnapshot()]);
 
     if (!access.ok) {
         const res = buildPortfolio(snap, {

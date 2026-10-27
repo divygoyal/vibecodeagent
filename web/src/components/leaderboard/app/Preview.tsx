@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Favicon } from '@/components/ui/Favicon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { BoardRowItem } from '@/components/leaderboard/BoardRows';
+import { boardColumns } from '@/lib/leaderboard/columns';
 import { CategoryBadge, CountValue, PctDelta, VerificationBadge } from '@/components/leaderboard/shared';
 import { engagementText } from '@/lib/leaderboard/format';
 import { PRIVACY_SECTIONS } from '@/lib/leaderboard/constants';
@@ -77,7 +78,7 @@ export function PreviewPanel({ entry, draft, range = '28d' }: { entry: MyEntry; 
                         <p className="mb-1.5 text-meta font-medium text-fg-muted">Leaderboard row</p>
                         {data.row ? (
                             <Card padding="none" className="@container overflow-hidden">
-                                <ul><BoardRowItem row={data.row} focus="visitors" range={range} showNew={false} /></ul>
+                                <ul><BoardRowItem row={data.row} focus="visitors" range={range} showNew={false} cols={boardColumns([data.row])} /></ul>
                             </Card>
                         ) : <p className="text-body-sm text-fg-muted">No preview yet.</p>}
                     </div>

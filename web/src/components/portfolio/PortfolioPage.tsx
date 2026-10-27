@@ -10,7 +10,7 @@ import { useDateRange } from '@/components/shell/DateRangeControl';
 import type { RangePreset } from '@/lib/dateRange';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite, SitePatch } from '@/lib/portfolio/types';
 import { parseFilter, parseSort, type FilterKey, type SortKey } from '@/lib/portfolio/view';
-import { PAIRS_KEY } from '@/lib/sites/siteDirectory';
+import { DIRECTORY_KEY, DIRECTORY_STORE_KEY, PAIRS_KEY } from '@/lib/sites/siteDirectory';
 import { patchWorkspaceWithRetry } from '@/lib/workspaceClient';
 import { PortfolioView } from './PortfolioView';
 
@@ -20,11 +20,28 @@ class HttpError extends Error {
     }
 }
 
+/** Failures in a row before the page shows an error; before that it retries quietly and keeps showing what it has. */
+const QUIET_FAILURES = 3;
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
+
+/** 5xx, a dropped connection or a proxy page: likely gone in a moment. 4xx (not signed in, bad request) is not. */
+function isTransient(err: unknown): boolean {
+    return err instanceof HttpError ? err.status === 0 || err.status >= 500 : true;
+}
+
 async function fetcher(url: string): Promise<PortfolioResponse> {
-    const res = await fetch(url, { cache: 'no-store' });
+    let res: Response;
+    try {
+        res = await fetch(url, { cache: 'no-store' });
+    } catch {
+        throw new HttpError(0, "We couldn't reach TrafficClaw. Check your connection; we'll keep trying.");
+    }
     if (!res.ok) {
+        // A proxy's 502 page is HTML, not our JSON: never show "HTTP 502" to a person.
         const body = await res.json().catch(() => ({}));
-        throw new HttpError(res.status, (body as { error?: string }).error || `HTTP ${res.status}`);
+        const message = (body as { error?: string }).error
+            || (res.status >= 500 ? 'TrafficClaw is busy for a moment. Try again shortly.' : `We couldn't load your portfolio (error ${res.status}).`);
+        throw new HttpError(res.status, message);
     }
     return res.json();
 }
@@ -71,12 +88,20 @@ export function PortfolioPage() {
     const [syncBusy, setSyncBusy] = useState(false);
 
     const key = `/api/portfolio?range=${range}`;
+    // Consecutive failed loads. A transient failure (a 502 while the first sync is writing, a restart) is retried
+    // quietly and only shown after QUIET_FAILURES in a row; the first sync itself runs on the server.
+    const [failures, setFailures] = useState(0);
     const { data, error, isLoading, isValidating, mutate } = useSWR<PortfolioResponse>(key, fetcher, {
         keepPreviousData: true,
         revalidateOnFocus: true,
         // Poll while a sync runs so cards fill in progressively.
         refreshInterval: (d) => (d?.syncing || d?.usersPending ? 2000 : 0),
         shouldRetryOnError: (err) => !(err instanceof HttpError && err.status === 401),
+        onSuccess: () => setFailures(0),
+        onError: () => setFailures((n) => n + 1),
+        onErrorRetry: (_err, _key, _config, revalidate, { retryCount }) => {
+            setTimeout(() => void revalidate({ retryCount }), RETRY_DELAYS_MS[Math.min(retryCount, RETRY_DELAYS_MS.length - 1)]);
+        },
     });
 
     const setParam = useCallback((name: string, value: string, fallback: string) => {
@@ -102,7 +127,11 @@ export function PortfolioPage() {
         }
         await mutate();
         // The app's site directory (switcher, setup, site pages) reads the stored pairing too.
-        if (patch.ga4Property !== undefined || patch.gscSite !== undefined || patch.resetPairing) void globalMutate(PAIRS_KEY);
+        if (patch.ga4Property !== undefined || patch.gscSite !== undefined || patch.resetPairing) {
+            void globalMutate(PAIRS_KEY);
+            void globalMutate(DIRECTORY_KEY);
+            void globalMutate(DIRECTORY_STORE_KEY);
+        }
         return res.ok;
     }, [mutate]);
 
@@ -144,12 +173,13 @@ export function PortfolioPage() {
         }
     }, [mutate]);
 
-    const errorText = error ? (error instanceof Error ? error.message : 'Something went wrong') : null;
+    const quietRetrying = Boolean(error) && isTransient(error) && failures < QUIET_FAILURES;
+    const errorText = error && !quietRetrying ? (error instanceof Error ? error.message : 'Something went wrong') : null;
 
     return (
         <PortfolioView
             data={data}
-            loading={isLoading}
+            loading={isLoading || (quietRetrying && !data)}
             refetching={Boolean(data && isValidating && data.range !== range)}
             error={errorText}
             range={range}
