@@ -106,7 +106,7 @@ export function GoogleTab({ connected }: { connected: boolean }) {
                         We never change anything in your Google accounts: no editing properties, no verifying sites, no sending email.
                         You can remove our access at any time in your{' '}
                         <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-brand-text underline underline-offset-2">
-                            Google account permissions<ExternalLink aria-hidden size={12} />
+                            Google account permissions<ExternalLink aria-hidden size={14} />
                         </a>.
                     </p>
                 </div>

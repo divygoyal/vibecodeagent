@@ -173,11 +173,11 @@ export default function SupportPage() {
                 <Card as="section" padding="none" aria-label="Conversation with support" className="flex h-[calc(100dvh-16rem)] min-h-[460px] max-h-[720px] flex-col overflow-hidden">
                     <div className="flex items-center gap-3 border-b border-border-subtle px-4 py-3">
                         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-subtle text-fg-muted">
-                            <LifeBuoy aria-hidden size={18} strokeWidth={1.75} />
+                            <LifeBuoy aria-hidden size={20} strokeWidth={1.75} />
                         </span>
                         <div className="min-w-0">
                             <h2 className="text-title-sm text-fg">{BRAND_NAME} support</h2>
-                            <p className="flex items-center gap-1.5 text-meta text-fg-muted"><Clock aria-hidden size={12} />Replies within 24 hours</p>
+                            <p className="flex items-center gap-1.5 text-meta text-fg-muted"><Clock aria-hidden size={14} />Replies within 24 hours</p>
                         </div>
                     </div>
 

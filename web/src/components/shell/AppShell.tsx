@@ -102,7 +102,7 @@ function ShellBody({ children }: { children: ReactNode }) {
     // Setup is a focused layout: logo + "Exit setup", no sidebar (DESIGN 5.3).
     if (isSetup) {
         return (
-            <div className="tc-root min-h-dvh bg-canvas text-fg">
+            <div className="tc-root tc-app min-h-dvh bg-canvas text-fg">
                 <header className="flex h-14 items-center justify-between px-4 md:px-6">
                     <Link href="/dashboard" className="flex items-center gap-2"><BrandMark size={24} /><Wordmark /></Link>
                     <Button asChild variant="ghost" size="sm"><Link href="/dashboard">Exit setup</Link></Button>
@@ -113,7 +113,7 @@ function ShellBody({ children }: { children: ReactNode }) {
     }
 
     return (
-        <div className="tc-root flex min-h-dvh bg-canvas text-fg">
+        <div className="tc-root tc-app flex min-h-dvh bg-canvas text-fg">
             {/* The aside is a full-height column (its surface and border run the
                 whole page, also in full-page screenshots); the sidebar inside it
                 sticks to the viewport and scrolls on its own. */}

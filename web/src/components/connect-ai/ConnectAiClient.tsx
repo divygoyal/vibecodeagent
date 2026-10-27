@@ -85,6 +85,23 @@ function day(ts: number): string {
 
 type Confirm = { title: string; description: string; label: string; run: () => Promise<unknown>; ok: string };
 
+
+/** Tool-call results in words ("rate_limited" -> "Rate limited"); the raw code stays in the title. */
+const RESULT_LABELS: Record<string, string> = {
+    rate_limited: 'Rate limited',
+    site_not_in_grant: 'Site not shared',
+    queries_excluded: 'Queries hidden',
+    google_reauth_required: 'Google expired',
+    not_found: 'Not found',
+};
+
+function resultLabel(status: string): string {
+    const code = status.replace(/^error:/, '');
+    if (RESULT_LABELS[code]) return RESULT_LABELS[code];
+    const words = code.replace(/[_-]+/g, ' ').trim();
+    return words ? words[0].toUpperCase() + words.slice(1) : 'Error';
+}
+
 export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabled: boolean }) {
     const { data, error, isLoading, mutate } = useSWR<Data>(enabled ? '/api/ai-connections' : null, fetcher);
     const [busy, setBusy] = useState<string | null>(null);
@@ -137,7 +154,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
         { key: 'app', header: 'App', cell: (a) => <span className="block max-w-[140px] truncate">{a.client_name || 'API key'}</span> },
         { key: 'tool', header: 'Tool', cell: (a) => <span className="font-mono text-[12px]">{a.tool}</span> },
         { key: 'site', header: 'Site', cell: (a) => <span className="block max-w-[160px] truncate text-fg-secondary">{a.site_host || '—'}</span> },
-        { key: 'status', header: 'Result', align: 'right', cell: (a) => (a.status === 'ok' ? <span className="text-up">OK</span> : <span className="text-down">{a.status.replace(/^error:/, '')}</span>) },
+        { key: 'status', header: 'Result', align: 'right', cell: (a) => (a.status === 'ok' ? <span className="text-up">OK</span> : <span className="text-down" title={a.status}>{resultLabel(a.status)}</span>) },
     ];
 
     return (
@@ -172,7 +189,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                 <CardHeader as="h2" title="Set up your app" />
                 <SetupTabs url={url} urlShown />
                 <div className="mt-5 border-t border-border-subtle pt-4">
-                    <h3 className="mb-2 text-caption uppercase tracking-[0.04em] text-fg-muted">Try asking</h3>
+                    <h3 className="mb-2 text-meta font-medium text-fg-muted">Try asking</h3>
                     <ul className="space-y-1.5">
                         {EXAMPLE_PROMPTS.slice(0, 3).map((p) => (
                             <li key={p} className="flex items-center gap-2">
@@ -184,7 +201,8 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                 </div>
             </Card>
 
-            <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+            {/* items-start: Usage is short, it must not stretch into an empty box next to the apps list. */}
+            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
                 <Card>
                     <CardHeader
                         as="h2"
@@ -251,7 +269,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
 
             <Table
                 caption="Recent tool calls"
-                toolbar={<CardHeader as="h2" title="Recent activity" className="mb-0" />}
+                toolbar={<CardHeader as="h2" title="Recent activity" className="mb-0 px-2 py-1" />}
                 density="compact"
                 loading={isLoading}
                 columns={activityColumns}

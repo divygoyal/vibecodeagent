@@ -13,7 +13,7 @@ function Tab({ href, label, icon: Icon, active, onClick }: { href?: string; labe
     const cls = cn('flex h-16 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium', active ? 'text-fg' : 'text-fg-muted');
     const inner = (
         <>
-            <Icon aria-hidden size={20} strokeWidth={active ? 2 : 1.75} />
+            <Icon aria-hidden size={20} strokeWidth={1.75} />
             <span>{label}</span>
         </>
     );

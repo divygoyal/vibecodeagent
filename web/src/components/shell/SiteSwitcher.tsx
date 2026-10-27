@@ -87,7 +87,7 @@ export function SiteSwitcher({ collapsed = false, onNavigate, open, onOpenChange
             )}
         >
             {showAll || !site ? (
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-[4px] bg-subtle text-fg-muted"><LayoutGrid aria-hidden size={13} /></span>
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-badge bg-subtle text-fg-muted"><LayoutGrid aria-hidden size={14} /></span>
             ) : (
                 <Favicon host={site.gscSiteUrl ?? site.host} size={20} />
             )}
@@ -140,7 +140,7 @@ export function SiteSwitcher({ collapsed = false, onNavigate, open, onOpenChange
                                 className={cn('flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-body text-fg', i === active && 'bg-subtle')}
                             >
                                 {isAll ? (
-                                    <span className="flex size-5 shrink-0 items-center justify-center rounded-[4px] bg-subtle text-fg-muted"><LayoutGrid aria-hidden size={13} /></span>
+                                    <span className="flex size-5 shrink-0 items-center justify-center rounded-badge bg-subtle text-fg-muted"><LayoutGrid aria-hidden size={14} /></span>
                                 ) : (
                                     <Favicon host={row.gscSiteUrl ?? row.host} size={20} />
                                 )}

@@ -326,6 +326,7 @@
 
 /* Keyframes live outside @theme so they are always emitted (the skeleton utility uses one directly) */
 @keyframes tc-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes tc-skel-sweep { from { background-position: 100% 0; } to { background-position: 0% 0; } }
 @keyframes tc-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes tc-pop-in { from { opacity: 0; transform: scale(0.97) translateY(2px); } to { opacity: 1; transform: none; } }
 @keyframes tc-sheet-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
@@ -363,10 +364,15 @@
 }
 
 /* ---------- 7. Small helpers ---------- */
+/* Skeleton: a flat block for the first second, then a soft sweep (round 2,
+   critique 2.6): fast loads never see motion, slow ones see progress. */
 @utility skeleton {
-  background: linear-gradient(90deg, var(--tc-subtle) 25%, var(--tc-subtle-strong) 50%, var(--tc-subtle) 75%);
-  background-size: 200% 100%;
-  animation: tc-shimmer 1.4s linear infinite;
+  background-color: var(--tc-subtle);
+  background-image: linear-gradient(90deg, transparent 40%, var(--tc-subtle-strong) 50%, transparent 60%);
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  background-position: 100% 0;
+  animation: tc-skel-sweep 1.6s linear 1s infinite both;
   border-radius: 6px;
 }
 @utility heatbar-clicks { background: color-mix(in oklab, var(--tc-m-clicks) var(--tc-heatbar), transparent); }
