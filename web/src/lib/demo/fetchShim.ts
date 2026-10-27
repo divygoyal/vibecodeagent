@@ -16,7 +16,7 @@
  * non-demo bearer token are refused, so a real token can never leave the box
  * from a demo server.
  *
- * Faults (403, 429, 500, timeout, empty, revoked, huge) can be injected with
+ * Faults (403, 429, 500, timeout, latency, empty, revoked, huge) can be injected with
  * TC_DEMO_FAULTS, the tc_demo_faults cookie or a `~spec` suffix on a demo
  * token; see faults.ts.
  */

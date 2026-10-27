@@ -198,9 +198,10 @@ Make the demo Google APIs fail like the real ones (`web/src/lib/demo/faults.ts`)
 | token suffix `demo-access:main~<spec>` | one demo user, also background syncs/crons (the `f*` users below) |
 
 `<spec>` = comma list of `[scope:]fault[:ms]`; faults `403` `429` `500` `timeout[:ms]` (default 30 s,
-honours the caller's AbortSignal, then 504) `empty` `revoked` (refresh → `invalid_grant`, data → 401)
+honours the caller's AbortSignal, then 504) `latency[:ms]` (default 1.5 s; waits, then answers normally:
+a slow Google, to time page loads) `empty` `revoked` (refresh → `invalid_grant`, data → 401)
 `huge` (counts × 10 M); scopes `ga4` `gsc` `psi` `list` (account/site lists) `all`. No scope = every
-data call (lists still work). E.g. `gsc:403`, `ga4:timeout:8000,gsc:empty`, `all:500`.
+data call (lists still work). E.g. `gsc:403`, `ga4:timeout:8000,gsc:empty`, `all:500`, `all:latency:2000`.
 
 Scenario users for `login.mjs --user` (no sample records seeded): `empty` (Google, 0 sites), `one`,
 `ga4only`, `gsconly`, `many` (200 generated sites, some with very long names), `nogoogle` (GitHub

@@ -11,15 +11,17 @@
  *
  * <spec> is a comma (or +) separated list of [scope:]fault[:ms]
  *   faults  403 (no access) · 429 (quota) · 500 · timeout[:ms] (default 30000; honours the
- *           caller's AbortSignal, then 504) · empty (no rows) · revoked (refresh → invalid_grant,
- *           data calls → 401) · huge (counts × 10,000,000)
+ *           caller's AbortSignal, then 504) · latency[:ms] (default 1500; waits, then answers
+ *           normally: a slow Google, to time page loads) · empty (no rows) · revoked (refresh →
+ *           invalid_grant, data calls → 401) · huge (counts × 10,000,000)
  *   scopes  ga4 · gsc · psi · list (GA4 account summaries, Search Console site list, admin
  *           list commands) · all. Without a scope a fault hits ga4 + gsc + psi data calls,
  *           so the user still sees their sites and every report fails.
- * Examples: `429`, `gsc:403`, `ga4:timeout:8000,gsc:empty`, `all:500`, `revoked`, `huge`.
+ * Examples: `429`, `gsc:403`, `ga4:timeout:8000,gsc:empty`, `all:500`, `revoked`, `huge`,
+ * `all:latency:2000` (every Google call takes 2 s), `list:latency:6000` (only the site lists are slow).
  */
 
-export type DemoFaultKind = '403' | '429' | '500' | 'timeout' | 'empty' | 'revoked' | 'huge';
+export type DemoFaultKind = '403' | '429' | '500' | 'timeout' | 'latency' | 'empty' | 'revoked' | 'huge';
 export type DemoFaultScope = 'ga4' | 'gsc' | 'psi' | 'list' | 'all' | 'data';
 export type DemoCallScope = 'ga4' | 'gsc' | 'psi' | 'list' | 'token';
 
@@ -31,6 +33,7 @@ export interface DemoFault {
 
 export const DEMO_FAULT_COOKIE = 'tc_demo_faults';
 export const DEMO_FAULT_TIMEOUT_MS = 30_000;
+export const DEMO_FAULT_LATENCY_MS = 1_500;
 const HUGE_FACTOR = 10_000_000;
 
 const KINDS: Record<string, DemoFaultKind> = {
@@ -38,6 +41,7 @@ const KINDS: Record<string, DemoFaultKind> = {
     '429': '429', quota: '429', ratelimit: '429',
     '500': '500', error: '500', internal: '500',
     timeout: 'timeout', slow: 'timeout', hang: 'timeout',
+    latency: 'latency', delay: 'latency',
     empty: 'empty', norows: 'empty',
     revoked: 'revoked', invalid_grant: 'revoked',
     huge: 'huge', big: 'huge',
@@ -126,6 +130,10 @@ export async function demoFaultBefore(faults: DemoFault[], call: DemoCallScope, 
             case 'timeout':
                 await sleep(f.ms ?? DEMO_FAULT_TIMEOUT_MS, signal);
                 return googleError(504, 'DEADLINE_EXCEEDED', 'The request was not answered in time.');
+            case 'latency':
+                // A slow but working Google: wait, then fall through to the normal answer.
+                await sleep(f.ms ?? DEMO_FAULT_LATENCY_MS, signal);
+                break;
             default:
                 break;
         }
