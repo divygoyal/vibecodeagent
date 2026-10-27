@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 
-import { fmtDateRange, fmtDay, fmtFull } from '@/lib/format';
+import { fmtDay, fmtFull } from '@/lib/format';
 import { METRICS } from '@/lib/metrics';
 import { ChartCard } from '@/components/charts/ChartCard';
 import { DualAxisChart } from '@/components/charts/DualAxisChart';
@@ -55,7 +55,7 @@ export function SearchVsTrafficCard({ className }: { className?: string }) {
         <ChartCard
             className={className}
             title="Search clicks vs organic visits"
-            subtitle={`Google Search Console clicks and GA4 sessions from google / organic, ${fmtDateRange(dr.resolvedSearch.start, lastDate)}`}
+            subtitle="Search Console clicks and GA4 sessions from google / organic, same days"
             actions={<IntervalSwitch days={searchDays} />}
             state={err ? 'error' : loading ? 'loading' : empty ? 'empty' : gsc.state === 'refetching' || ga.state === 'refetching' ? 'refetching' : 'ready'}
             error={{ message: err?.error?.message, onRetry: err?.mutate }}

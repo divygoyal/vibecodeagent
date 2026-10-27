@@ -44,7 +44,8 @@ export function IntervalSwitch({ days, className }: { days: number; className?: 
             variant="neutral"
             value={interval}
             onChange={set}
-            className={className}
+            // Phones: the card header has no room; day is the default there.
+            className={cn('max-sm:hidden', className)}
             options={[
                 { value: 'day', label: 'Day' },
                 { value: 'week', label: 'Week', disabled: !allowed.includes('week') },
@@ -79,7 +80,7 @@ export function PeriodStepper({ search }: { search?: boolean }) {
     const atEnd = r.end >= lastDay;
     const prevLabel = `${fmtDateRange(shift(r.start, -r.days), shift(r.end, -r.days))}`;
     return (
-        <div className="flex shrink-0 items-center" role="group" aria-label="Step through periods">
+        <div className="flex shrink-0 items-center max-sm:hidden" role="group" aria-label="Step through periods">
             <Tooltip content={`Previous period: ${prevLabel}`}>
                 <Button variant="ghost" size="md" iconOnly icon={ChevronLeft} aria-label={`Previous period, ${prevLabel}`} onClick={() => go(-1)} />
             </Tooltip>
