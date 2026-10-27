@@ -1,10 +1,11 @@
 'use client';
 
-import { forwardRef, isValidElement, type ButtonHTMLAttributes, type ReactElement, type ReactNode } from 'react';
-import { Loader2, type LucideIcon } from 'lucide-react';
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Slot } from 'radix-ui';
 
 import { cn } from '@/lib/cn';
+import { isIconComponent, type IconProp } from './iconProp';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'subtle' | 'danger' | 'link' | 'google';
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -56,12 +57,13 @@ export function buttonClasses({ variant = 'secondary', size = 'md', iconOnly = f
     );
 }
 
-export type ButtonIcon = LucideIcon | ReactElement;
+export type ButtonIcon = IconProp;
 
 function renderIcon(icon: ButtonIcon | undefined, size: number): ReactNode {
     if (!icon) return null;
-    if (isValidElement(icon)) return icon;
-    const Icon = icon as LucideIcon;
+    // Elements (and lazy nodes from RSC) render as they are; only components get our props.
+    if (!isIconComponent(icon)) return icon;
+    const Icon = icon;
     return <Icon aria-hidden size={size} strokeWidth={1.75} />;
 }
 
