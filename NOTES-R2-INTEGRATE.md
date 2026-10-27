@@ -10,7 +10,7 @@ Evidence: /root/projects/tc-redesign-research/round2/integrate/ (crawl, mobile, 
 | 2 | tc/r2-site (WS2) | 3d8dc5f | | none |
 | 3 | tc/r2-home (WS4) | c04d18b | | none |
 | 4 | tc/r2-fix (WS5) | e689c8f | | none |
-| 5 | tc/r2-dash (WS3) | 83c3fe7 | (pending) | |
+| 5 | tc/r2-dash (WS3) | 83c3fe7 | d4b73b2 | 2, both kept: `[id]/page.tsx` lucide import (Globe/Lock + MonitorPlay); `widgets/Charts.tsx` BarChart (WS3 click-to-filter + GRID_STROKE) |
 
 `npx tsc --noEmit` clean after each merge.
 
@@ -62,5 +62,30 @@ WS1's notes for WS3 had not been applied on tc/r2-dash, and the coordinator aske
   Leftovers (not gate): /dashboard/styleguide skeletons/small targets (by design); clipped "2m 58s" in the phone table
   list on the v1 dashboard at 360; 2 clipped on /view at 360.
 
-## Gates
-(final run after WS3: see below)
+## Golden gate after WS3 (scripts/dev/dash-golden.mjs, round2/integrate/golden)
+- base = 7163997 (pre-WS3), base2 = second capture of the same code: 28/28 identical (the donut race is gone).
+- cand = d4b73b2 (after WS3): 26/28 identical; tpl-blank light+dark differed by 3 anti-aliased pixels at the text
+  edges (271,157 and 1416,198-199) with identical layout (rects checked). Re-shots of the same code flip between both
+  states (cand-blank2 light and cand-blank dark equal base), so it is raster noise, not a change.
+  cand-final (cand + those re-shots): 28/28 identical vs base,base2.
+
+## Final gates (after WS3, d4b73b2)
+- tsc clean; npm test 145/145; builder query 11/11; MCP unit 22/22; admin 43/43; check:rsc 0; migrations 37/37.
+- Crawl (round2/integrate/final/crawl-demo, crawl-admin): 67 routes 200 as demo, 0 uncaught, 0 console errors (only
+  /admin's expected 403 status call for a non-admin); /admin and /superadmin 200 as admin.
+- Mobile (final/mobile, all routes, 360/390/414, light + dark): overflow 0, offscreen 0, error 0, badText 0.
+  Not gate: /dashboard/styleguide skeletons + small targets (a showcase page); "clipped" = the compact phone table
+  meta line on the v1 dashboard / its /view at 360 (WS1's one-line compact list cuts the last value by design).
+- Scenario sweep (final/scenarios; empty, nogoogle, f403, f429, f500, ftimeout, fempty, frevoked, fhuge): no error
+  boundary, no NaN/undefined. `j` cells are Google faults answered as JSON with a plain message (expected). `L`:
+  /dashboard f500 + ftimeout = the first portfolio sync still "syncing" (WS5 quiet retries; ftimeout was L in round 1);
+  site overview f403/f429/f500 + Search ftimeout were L on the user's first visit only; a recheck (final/scen-recheck)
+  shows them ok/j.
+- Golden: 28/28 identical (above).
+
+## Left for the owner / follow-ups
+- OWNER: confirm the deletion wording change (above).
+- frevoked on /dashboard/s/<host> says "We couldn't find <host>" (same as before round 2); a "Reconnect Google" state
+  would be clearer there (the portfolio page already says so).
+- The phone compact table list cuts the last labelled value at 360px (WS1 design: one meta line).
+- Nothing pushed; production untouched. Dev server stopped (down.sh).
