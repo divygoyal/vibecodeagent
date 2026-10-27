@@ -3,6 +3,7 @@ import type { MetadataRoute } from 'next';
 import { FREE_TOOLS } from '@/components/marketing/tools/catalog';
 import { SITE_URL } from '@/lib/brand';
 import { lbAdmin } from '@/lib/leaderboard/admin';
+import { publicDemoEnabled } from '@/lib/publicDemo/config';
 import type { BoardResponse } from '@/lib/leaderboard/types';
 
 type Freq = MetadataRoute.Sitemap[number]['changeFrequency'];
@@ -16,7 +17,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const now = new Date();
     const routes: Array<{ path: string; priority: number; changeFrequency: Freq }> = [
         { path: '/', priority: 1, changeFrequency: 'weekly' },
-        { path: '/demo', priority: 0.9, changeFrequency: 'daily' },
+        // With the live demo on, /demo is a redirect into the (noindex) app, so it is not listed; the static
+        // demo page it falls back to (TC_PUBLIC_DEMO=0) is.
+        ...(publicDemoEnabled() ? [] : [{ path: '/demo', priority: 0.9, changeFrequency: 'daily' as Freq }]),
         { path: '/pricing', priority: 0.9, changeFrequency: 'monthly' },
         { path: '/ai', priority: 0.9, changeFrequency: 'monthly' },
         { path: '/leaderboard', priority: 0.8, changeFrequency: 'daily' },

@@ -19,6 +19,12 @@
  * Faults (403, 429, 500, 502, timeout, latency, flaky, empty, revoked, huge) can be injected with
  * TC_DEMO_FAULTS, the tc_demo_faults cookie or a `~spec` suffix on a demo
  * token; see faults.ts.
+ *
+ * Production has a second, narrow mode for the public live demo (lib/publicDemo): installDemoGoogleFetch('publicDemo').
+ * It answers ONLY Google requests that belong to the demo (a demo-access:/demo-refresh: token, a *.example
+ * PageSpeed/CrUX target, or any Google call made while serving a demo request) and passes every other request
+ * through untouched, with the same arguments. Model hosts (Gemini, Vertex) are never answered by the demo and are
+ * refused inside demo requests. No faults, no latency, no demo OAuth code exchange in that mode.
  */
 
 import { accountCanReadProperty, accountCanReadSite, accountKeyFromToken, demoAccessToken, demoAccountSub, demoRefreshToken, findSiteByPropertyId, findSiteBySiteUrl, getDemoAccount, getDemoAccounts, type DemoGoogleAccount } from './catalog';
@@ -309,29 +315,165 @@ function demoCodeExchange(form: URLSearchParams): Response {
     });
 }
 
+// ─── Narrow production mode for the public live demo ───
+
+/** Model APIs: never answered from demo data, and refused while serving a demo request (no AI spend). */
+const MODEL_HOSTS = /^(generativelanguage|aiplatform|[a-z0-9-]+-aiplatform)\.googleapis\.com$|^api\.openai\.com$|^api\.anthropic\.com$/i;
+/** Request header middleware sets on requests it serves as the demo user (and strips from every other request). */
+export const DEMO_REQUEST_HEADER = 'x-tc-demo-request';
+/** The public demo user's id (lib/publicDemo/config.ts DEMO_USER_ID; kept here so this module has no app imports). */
+const PUBLIC_DEMO_USER_ID = 'tc-public-demo';
+
+export interface PublicDemoDeps {
+    /** True while the server is answering a demo request (middleware's x-tc-demo-request header). */
+    isDemoRequest: () => Promise<boolean>;
+    /** ADMIN_API_URL, for the demo user's plugin list commands. */
+    adminBase?: string;
+}
+
+async function headerSaysDemo(): Promise<boolean> {
+    try {
+        const { headers } = await import('next/headers');
+        return (await headers()).get(DEMO_REQUEST_HEADER) === '1';
+    } catch {
+        return false; // outside a request (schedulers, cron, instrumentation)
+    }
+}
+
+function requestUrl(input: RequestInfo | URL): string | null {
+    try {
+        return typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+    } catch {
+        return null;
+    }
+}
+
+/** The token a Google request presents, without consuming the caller's body. */
+async function presentedToken(input: RequestInfo | URL, init: RequestInit | undefined, url: URL): Promise<string | null> {
+    const isRequest = typeof Request !== 'undefined' && input instanceof Request;
+    const headers = new Headers(init?.headers ?? (isRequest ? (input as Request).headers : undefined));
+    const fromHeader = bearer(headers) || url.searchParams.get('access_token') || url.searchParams.get('token');
+    if (fromHeader) return fromHeader;
+    if (url.hostname !== 'oauth2.googleapis.com') return null;
+    // Token refresh / revoke: the token is in the form body. Only string-like bodies are read (a stream is left alone).
+    const raw = init?.body;
+    let body = '';
+    if (typeof raw === 'string') body = raw;
+    else if (raw instanceof URLSearchParams) body = raw.toString();
+    else if (raw == null && isRequest && !(input as Request).bodyUsed) body = await (input as Request).clone().text().catch(() => '');
+    else return null;
+    const form = new URLSearchParams(body);
+    return form.get('refresh_token') || form.get('token');
+}
+
+/** PageSpeed / CrUX request for a *.example page (reserved TLD: only the demo catalogue uses it). */
+function exampleTarget(url: URL, init: RequestInit | undefined): boolean {
+    const isExample = (u: string | null | undefined) => {
+        if (!u) return false;
+        try {
+            return /\.example$/i.test(new URL(/^https?:\/\//i.test(u) ? u : `https://${u}`).hostname);
+        } catch {
+            return false;
+        }
+    };
+    if (url.hostname === 'chromeuxreport.googleapis.com') {
+        const body = typeof init?.body === 'string' ? parseJson(init.body) : {};
+        return isExample(body?.origin) || isExample(body?.url);
+    }
+    if (url.hostname === 'pagespeedonline.googleapis.com' || url.pathname.startsWith('/pagespeedonline/')) {
+        return isExample(url.searchParams.get('url'));
+    }
+    return false;
+}
+
+/**
+ * Public-demo routing: a demo Response for requests that belong to the demo, or null to pass the
+ * request through unchanged. Exported for tests.
+ */
+export async function publicDemoGoogleFetch(input: RequestInfo | URL, init: RequestInit | undefined, network: FetchFn, deps: PublicDemoDeps): Promise<Response | null> {
+    const urlString = requestUrl(input);
+    if (!urlString || !/^https?:\/\//i.test(urlString)) return null;
+    let url: URL;
+    try {
+        url = new URL(urlString);
+    } catch {
+        return null;
+    }
+    const host = url.hostname;
+
+    // The demo user's admin plugin commands: answered here, never run in a container.
+    if (deps.adminBase && urlString.startsWith(deps.adminBase) && url.pathname === `/api/users/${PUBLIC_DEMO_USER_ID}/exec`) {
+        const req = await readRequest(input, init);
+        const listed = await handleAdminExec(req.url, req.headers, parseJson(req.body), network, [], req.signal);
+        return listed ?? json({ status: 'ok', data: { error: 'Not available in the demo' }, stderr: '' });
+    }
+
+    if (MODEL_HOSTS.test(host)) {
+        if (await deps.isDemoRequest()) {
+            console.warn(`[public-demo] refused a model call during a demo request: ${host}${url.pathname}`);
+            return json({ error: { code: 403, message: 'AI is not available in the demo.', status: 'PERMISSION_DENIED' } }, 403);
+        }
+        return null;
+    }
+    if (!GOOGLE_HOST.test(host)) return null;
+
+    const token = await presentedToken(input, init, url);
+    const demo = /^demo-(access|refresh):/i.test(token ?? '')
+        || exampleTarget(url, init)
+        || (await deps.isDemoRequest());
+    if (!demo) return null;
+
+    const req = await readRequest(input, init);
+    try {
+        if (host === 'oauth2.googleapis.com') {
+            if (url.pathname === '/revoke') return json({});
+            const form = new URLSearchParams(req.body);
+            // No demo code exchange in production: only refreshes of demo tokens.
+            if (url.pathname === '/token' && form.get('grant_type') !== 'refresh_token') {
+                return json({ error: 'invalid_grant', error_description: 'The demo only refreshes demo tokens.' }, 400);
+            }
+        }
+        return await answer(req, host, url.pathname);
+    } catch (err) {
+        if (req.signal?.aborted) throw err;
+        return errorResponse(err);
+    }
+}
+
 const INSTALLED = Symbol.for('trafficclaw.demoFetchInstalled');
 
 /**
  * Wraps globalThis.fetch once per process. Returns true when it installed the shim.
+ *
+ * mode 'full' (TC_DEMO_DATA=1, dev and the test machine): every Google data request is answered by the
+ * demo generator and real tokens are refused. mode 'publicDemo' (production, the public live demo): only
+ * requests that belong to the demo are answered (see publicDemoGoogleFetch); everything else goes to the
+ * network exactly as the caller made it.
  *
  * globalThis.fetch becomes an accessor: whatever gets assigned to it later
  * (Next.js patches fetch, and in dev resets it to the original on every
  * recompile) is stored as the inner fetch, and reads always return the demo
  * wrapper around it. A plain assignment would be lost on the first reset.
  */
-export function installDemoGoogleFetch(): boolean {
+export function installDemoGoogleFetch(mode: 'full' | 'publicDemo' = 'full'): boolean {
     const g = globalThis as any;
     if (g[INSTALLED]) return false;
     const network: FetchFn = globalThis.fetch.bind(globalThis);
     let inner: any = globalThis.fetch;
+    const deps: PublicDemoDeps = { isDemoRequest: headerSaysDemo, adminBase: process.env.ADMIN_API_URL };
     const wrappers = new WeakMap<object, FetchFn>();
     const wrap = (fn: any): FetchFn => {
         let w = wrappers.get(fn);
         if (!w) {
-            const wrapper: any = async function fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-                const demo = await demoGoogleFetch(input, init, network);
-                return demo ?? fn(input, init);
-            };
+            const wrapper: any = mode === 'full'
+                ? async function fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+                    const demo = await demoGoogleFetch(input, init, network);
+                    return demo ?? fn(input, init);
+                }
+                : async function fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+                    const demo = await publicDemoGoogleFetch(input, init, network, deps);
+                    return demo ?? fn(input, init);
+                };
             // Keep markers other code (e.g. Next.js) attaches to fetch.
             for (const key of Object.keys(fn)) wrapper[key] = fn[key];
             w = wrapper as FetchFn;
@@ -346,6 +488,8 @@ export function installDemoGoogleFetch(): boolean {
         set: (value: unknown) => { inner = value; },
     });
     g[INSTALLED] = true;
-    console.log('[demo-data] TC_DEMO_DATA=1 – Google API calls are answered by web/src/lib/demo (no network).');
+    console.log(mode === 'full'
+        ? '[demo-data] TC_DEMO_DATA=1 – Google API calls are answered by web/src/lib/demo (no network).'
+        : '[public-demo] live demo on: Google calls of the demo user are answered by web/src/lib/demo; all other requests are untouched.');
     return true;
 }

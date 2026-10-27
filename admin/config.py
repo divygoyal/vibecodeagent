@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # Network
     BASE_PORT: int = 9000  # First user gets 9000, second 9001, etc.
     MAX_USERS: int = 50    # Override via MAX_USERS env var for your server capacity
+
+    # The shared read-only user of the public live demo (web/src/lib/publicDemo/config.ts DEMO_USER_ID).
+    # Kept out of user lists, metrics and digests, and never joins the public leaderboard.
+    PUBLIC_DEMO_USER_ID: str = "tc-public-demo"
     
     # Paths
     PLUGINS_DIR: str = "/home/ubuntu/vibecodeagent/plugins" # Host path for plugins (skills)

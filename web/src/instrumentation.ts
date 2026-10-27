@@ -10,8 +10,13 @@
  * scripts/dev/README.md. It refuses to run when NODE_ENV is 'production' unless
  * lib/demo/gate.ts allows it (TC_ALLOW_DEMO_IN_PROD_BUILD=1 with a localhost NEXTAUTH_URL,
  * used only by scripts/dev/worker1.sh).
+ *
+ * Public live demo (lib/publicDemo, on unless TC_PUBLIC_DEMO=0): when the full demo shim is not
+ * installed, a narrow one is. It answers only the demo user's Google calls (demo tokens, *.example
+ * PageSpeed targets, calls made while serving a demo request) and passes everything else through untouched.
  */
 import { demoDataAllowed } from './lib/demo/gate';
+import { publicDemoEnabled } from './lib/publicDemo/config';
 
 
 export async function register() {
@@ -26,11 +31,15 @@ export async function register() {
         const { startLeaderboardScheduler } = await import('./lib/leaderboard/scheduledRefresh');
         if (startLeaderboardScheduler()) console.log('[leaderboard-scheduler] started: daily refresh, first check a few minutes after boot');
     }
-    if (process.env.TC_DEMO_DATA !== '1') return;
-    if (!demoDataAllowed()) {
+    const fullDemo = process.env.TC_DEMO_DATA === '1' && demoDataAllowed();
+    if (process.env.TC_DEMO_DATA === '1' && !fullDemo) {
         console.warn('[demo-data] TC_DEMO_DATA=1 ignored: demo data is only allowed outside production.');
-        return;
     }
-    const { installDemoGoogleFetch } = await import('./lib/demo/fetchShim');
-    installDemoGoogleFetch();
+    if (fullDemo) {
+        const { installDemoGoogleFetch } = await import('./lib/demo/fetchShim');
+        installDemoGoogleFetch('full');
+    } else if (publicDemoEnabled()) {
+        const { installDemoGoogleFetch } = await import('./lib/demo/fetchShim');
+        installDemoGoogleFetch('publicDemo');
+    }
 }

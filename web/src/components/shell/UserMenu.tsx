@@ -12,6 +12,7 @@ import {
     DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { signOutAndClear } from './signOut';
+import { DEMO_EXIT_HREF, useDemoSession } from '@/components/demo/useDemoSession';
 
 type SessionUser = { id?: string; name?: string | null; email?: string | null; image?: string | null };
 
@@ -21,6 +22,7 @@ export function UserMenu({ collapsed = false, onNavigate }: { collapsed?: boolea
     const user = session?.user as SessionUser | undefined;
     const [theme, setTheme] = useThemePreference();
     const router = useRouter();
+    const { demo } = useDemoSession();
     if (!user) return null;
     const go = (href: string) => {
         onNavigate?.();
@@ -45,9 +47,12 @@ export function UserMenu({ collapsed = false, onNavigate }: { collapsed?: boolea
                     </DropdownMenuRadioGroup>
                 </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuItem icon={CreditCard} onSelect={() => go('/dashboard/plan')}>Plan</DropdownMenuItem>
+            {demo ? null : <DropdownMenuItem icon={CreditCard} onSelect={() => go('/dashboard/plan')}>Plan</DropdownMenuItem>}
             <DropdownMenuSeparator />
-            <DropdownMenuItem icon={LogOut} onSelect={() => signOutAndClear(user)}>Sign out</DropdownMenuItem>
+            {/* The demo has no account to sign out of: leave it (the visitor's own session stays as it was). */}
+            {demo
+                ? <DropdownMenuItem icon={LogOut} onSelect={() => { window.location.href = DEMO_EXIT_HREF; }}>Exit demo</DropdownMenuItem>
+                : <DropdownMenuItem icon={LogOut} onSelect={() => signOutAndClear(user)}>Sign out</DropdownMenuItem>}
         </DropdownMenuContent>
     );
 

@@ -4,7 +4,7 @@
 #   scripts/dev/worker1.sh sync  <worktree> [--name n]   rsync code to worker1, npm ci once per lockfile hash
 #   scripts/dev/worker1.sh build <name>                  production `next build` on worker1
 #   scripts/dev/worker1.sh up    <name> [N] [--first K]  N instances (default 4) from slot K (default: first free slot): web 3201.., admin 8201.., fresh DB each
-#   scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden|mcp|multi] [--golden-base dirA,dirB]
+#   scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden|mcp|multi|demo] [--golden-base dirA,dirB]
 #   scripts/dev/worker1.sh down  <name>
 #   scripts/dev/worker1.sh run   <worktree> [what] [N]   sync + build + up + check + down in one go
 #   scripts/dev/worker1.sh status | clean [--all]
@@ -79,7 +79,14 @@ cmd_up() {
     if [ "${3:-}" = "--first" ]; then first="${4:-}"; [[ "$first" =~ ^[0-9]+$ ]] || die "--first needs a number"; fi
     push_runner
     local t0; t0="$(now)"
-    remote up "$name" "$n" "$first"
+    # TC_W1_DEMO_DATA=0: web without TC_DEMO_DATA, i.e. the production path (only the narrow public-demo shim
+    # answers Google, for demo tokens; see web/src/lib/demo/fetchShim.ts). TC_W1_PUBLIC_DEMO=0: the live demo's
+    # kill switch (TC_PUBLIC_DEMO=0).
+    if [ "${TC_W1_DEMO_DATA:-1}" = 0 ] || [ "${TC_W1_PUBLIC_DEMO:-1}" = 0 ]; then
+        "${SSH[@]}" "env TC_W1_DEMO_DATA=${TC_W1_DEMO_DATA:-1} TC_W1_PUBLIC_DEMO=${TC_W1_PUBLIC_DEMO:-1} bash '$RROOT/bin/worker1-remote.sh' up $name $n $first"
+    else
+        remote up "$name" "$n" "$first"
+    fi
     record up "$name" "$(secs "$t0")"
 }
 
@@ -89,7 +96,7 @@ cmd_check() {
     local name="${1:-}" what="all" gbase=""; validate_name "$name"; shift || true
     while [ $# -gt 0 ]; do
         case "$1" in
-            all|crawl|mobile|scenarios|golden|mcp|multi) what="$1"; shift ;;
+            all|crawl|mobile|scenarios|golden|mcp|multi|demo) what="$1"; shift ;;
             --golden-base) gbase="$2"; shift 2 ;;
             *) die "unknown option $1" ;;
         esac

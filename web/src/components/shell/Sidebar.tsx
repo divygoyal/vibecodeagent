@@ -15,6 +15,7 @@ import { useShell } from './ShellContext';
 import { SiteSwitcher } from './SiteSwitcher';
 import { useCurrentSite } from './useCurrentSite';
 import { UserMenu } from './UserMenu';
+import { useDemoSession } from '@/components/demo/useDemoSession';
 
 /** Credits per plan for the meter (same table as the old CreditsCard). */
 function planMax(plan: string): number {
@@ -126,6 +127,9 @@ export function Sidebar({ collapsed = false, inDrawer = false, onNavigate, local
     );
     const supportUnread = Math.max(0, Number(unread?.unread || 0));
     const onSitePage = pathname.startsWith('/dashboard/s/');
+    // Public live demo: no AI meter or Plan (nothing to buy on the shared demo account).
+    const { demo } = useDemoSession();
+    const bottomItems = demo ? BOTTOM_ITEMS.filter((item) => item.href !== '/dashboard/plan') : BOTTOM_ITEMS;
 
     return (
         <nav aria-label="Main" className={cn('flex h-full min-h-0 flex-col', inDrawer && 'overflow-y-auto overscroll-contain')}>
@@ -196,9 +200,9 @@ export function Sidebar({ collapsed = false, inDrawer = false, onNavigate, local
             </div>
 
             <div className="shrink-0 border-t border-border-subtle pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                <AiMeter collapsed={collapsed} onNavigate={onNavigate} />
-                <div className="mt-2 flex flex-col gap-0.5">
-                    {BOTTOM_ITEMS.map((item) => (
+                {demo ? null : <AiMeter collapsed={collapsed} onNavigate={onNavigate} />}
+                <div className={cn('flex flex-col gap-0.5', !demo && 'mt-2')}>
+                    {bottomItems.map((item) => (
                         <NavLink
                             key={item.href}
                             {...item}
