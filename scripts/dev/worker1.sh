@@ -3,7 +3,7 @@
 #
 #   scripts/dev/worker1.sh sync  <worktree> [--name n]   rsync code to worker1, npm ci once per lockfile hash
 #   scripts/dev/worker1.sh build <name>                  production `next build` on worker1
-#   scripts/dev/worker1.sh up    <name> [N]              N instances (default 4): web 3201.., admin 8201.., fresh DB each
+#   scripts/dev/worker1.sh up    <name> [N] [--first K]              N instances (default 4): web 3201.., admin 8201.., fresh DB each
 #   scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden|multi] [--golden-base dirA,dirB]
 #   scripts/dev/worker1.sh down  <name>
 #   scripts/dev/worker1.sh run   <worktree> [what] [N]   sync + build + up + check + down in one go
@@ -74,10 +74,12 @@ cmd_build() {
 }
 
 cmd_up() {
-    local name="${1:-}" n="${2:-4}"; validate_name "$name"
+    local name="${1:-}" n="${2:-4}" first=1; validate_name "$name"
+    # --first K: start at instance K (ports 3200+K, 8200+K) when another worktree holds the first ports.
+    if [ "${3:-}" = "--first" ]; then first="${4:-}"; [[ "$first" =~ ^[0-9]+$ ]] || die "--first needs a number"; fi
     push_runner
     local t0; t0="$(now)"
-    remote up "$name" "$n"
+    remote up "$name" "$n" "$first"
     record up "$name" "$(secs "$t0")"
 }
 

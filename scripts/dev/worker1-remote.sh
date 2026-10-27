@@ -202,20 +202,22 @@ cmd_down() {
 }
 
 cmd_up() {
-    local name="$1" n="${2:-4}" src="$SRC_ROOT/$1" i t0 avail
+    local name="$1" n="${2:-4}" first="${3:-1}" src="$SRC_ROOT/$1" i t0 avail
     [[ "$n" =~ ^[0-9]+$ ]] && [ "$n" -ge 1 ] && [ "$n" -le "$MAX_N" ] || die "N must be 1..$MAX_N"
+    # --first K: instances K..K+N-1 (ports 3200+K..), so two worktrees can run side by side.
+    [[ "$first" =~ ^[0-9]+$ ]] && [ "$first" -ge 1 ] && [ $((first + n - 1)) -le "$MAX_N" ] || die "first + N - 1 must be <= $MAX_N"
     [ -f "$src/web/.next/BUILD_ID" ] || die "no production build in $src/web/.next (run worker1.sh build $name)"
     [ -d "$src/web/node_modules/next" ] || die "node_modules missing"
     ensure_dev_home; load_dev_env
     cmd_down "$name"
     avail="$(mem_available_mb)"; [ "$avail" -ge "$MIN_MEM_MB" ] || die "only ${avail} MB RAM available (need $MIN_MEM_MB)"
-    for i in $(seq 1 "$n"); do
+    for i in $(seq "$first" $((first + n - 1))); do
         for p in "$(web_port "$i")" "$(admin_port "$i")"; do
             port_listening "$p" && die "port $p is already in use on worker1 (not ours); refusing to start"
         done
     done
     t0="$(now)"
-    for i in $(seq 1 "$n"); do
+    for i in $(seq "$first" $((first + n - 1))); do
         local d; d="$(inst_dir "$name" "$i")"
         rm -rf "$d"; mkdir -p "$d"; chmod 700 "$d"
         cat > "$d/instance.env" <<EOF
@@ -228,18 +230,18 @@ ADMIN_URL=http://127.0.0.1:$(admin_port "$i")
 EOF
         start_admin "$name" "$i"
     done
-    for i in $(seq 1 "$n"); do
+    for i in $(seq "$first" $((first + n - 1))); do
         wait_http "http://127.0.0.1:$(admin_port "$i")/health" "admin $i" 90 || { tail -n 20 "$(inst_dir "$name" "$i")/admin.log" >&2; die "admin $i did not start"; }
         start_web "$name" "$i"
     done
-    for i in $(seq 1 "$n"); do
+    for i in $(seq "$first" $((first + n - 1))); do
         wait_http "http://localhost:$(web_port "$i")/api/auth/providers" "web $i" 120 || { tail -n 30 "$(inst_dir "$name" "$i")/web.log" >&2; die "web $i did not start"; }
     done
     echo "start_secs=$(elapsed "$t0")"
     # Seed the three demo users on every instance (in parallel across instances).
     t0="$(now)"
     local pids=() failed=0
-    for i in $(seq 1 "$n"); do
+    for i in $(seq "$first" $((first + n - 1))); do
         (
             for u in demo demo2 admin; do
                 env -i PATH="$SAFE_PATH" HOME="$HOME" TMPDIR="$TMPDIR" LANG=C.UTF-8 TZ=UTC TC_DEV_HOME="$DEV_HOME" \
@@ -249,7 +251,7 @@ EOF
         pids+=($!)
     done
     for p in "${pids[@]}"; do wait "$p" || failed=1; done
-    [ "$failed" = 0 ] || { for i in $(seq 1 "$n"); do tail -n 8 "$(inst_dir "$name" "$i")/login.log" >&2; done; die "seeding demo users failed"; }
+    [ "$failed" = 0 ] || { for i in $(seq "$first" $((first + n - 1))); do tail -n 8 "$(inst_dir "$name" "$i")/login.log" >&2; done; die "seeding demo users failed"; }
     echo "seed_secs=$(elapsed "$t0")"
     log "$n instance(s) of '$name' ready: web $(web_port 1)..$(web_port "$n"), admin $(admin_port 1)..$(admin_port "$n")"
 }
@@ -394,7 +396,7 @@ cmd="${1:-}"; shift || true
 case "$cmd" in
     deps)   validate_name "${1:-}"; cmd_deps "$1" ;;
     build)  validate_name "${1:-}"; cmd_build "$1" ;;
-    up)     validate_name "${1:-}"; cmd_up "$1" "${2:-4}" ;;
+    up)     validate_name "${1:-}"; cmd_up "$1" "${2:-4}" "${3:-1}" ;;
     down)   validate_name "${1:-}"; ensure_dev_home; cmd_down "$1" ;;
     check)  validate_name "${1:-}"; cmd_check "$1" "${2:-all}" "${3:-}" ;;
     status) ensure_dev_home; cmd_status ;;

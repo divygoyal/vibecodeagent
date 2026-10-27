@@ -10,7 +10,7 @@ The dev kit (see `README.md`) runs `next dev` next to production on the main VPS
 cd /root/projects/worktrees/tc-<you>
 scripts/dev/worker1.sh sync  .                 # rsync code (no node_modules/.next/.git/.env*), npm ci once per lockfile hash
 scripts/dev/worker1.sh build <name>            # production `next build` (~50 s)
-scripts/dev/worker1.sh up    <name> [N]        # N instances (default 4): web 3201.., admin 8201.., fresh SQLite, demo users seeded (~15 s)
+scripts/dev/worker1.sh up    <name> [N] [--first K]  # N instances (default 4): web 3201.., admin 8201.. (3200+K.. with --first), fresh SQLite, demo users seeded (~15 s)
 scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden|multi] [--golden-base dirA,dirB]
 scripts/dev/worker1.sh down  <name>
 scripts/dev/worker1.sh run   . [what] [N]      # sync + build + up + check + down
