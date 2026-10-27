@@ -679,7 +679,7 @@ export async function buildEnrichedSnapshot(args: BuildArgs): Promise<EnrichedSn
     // cohorts are slow-rotating and a "this is the last 14 days from this
     // snapshot's run" semantic is still useful.
     const cohortPromise: Promise<EnrichedSnapshot['cohortRetention']> = propertyId
-        ? (() => { onLoad('cohortRetention'); return cachedFetch(`chatSnapshot:cohort:${propertyId}`, TTL.GA4_COHORT, () => fetchRetentionCohorts(googleToken, propertyId, 'daily').catch(() => null)); })()
+        ? (() => { onLoad('cohortRetention'); return cachedFetch(`chatSnapshot:cohort:${userId}:${propertyId}`, TTL.GA4_COHORT, () => fetchRetentionCohorts(googleToken, propertyId, 'daily').catch(() => null)); })()
         : Promise.resolve(null);
 
     // TODO(weekly-briefing): fetchJourneyData() accepts a string `range` key
@@ -690,19 +690,19 @@ export async function buildEnrichedSnapshot(args: BuildArgs): Promise<EnrichedSn
     // accurate fix would add an arbitrary-range overload to fetchJourneyData.
     const journeyRangeKey = resolvedRange ? '7d' : '28d';
     const journeyPromise: Promise<EnrichedSnapshot['journey']> = propertyId
-        ? (() => { onLoad('journey'); return cachedFetch(`chatSnapshot:journey:${propertyId}${rangeSuffix}`, TTL.GA4_JOURNEY, () => fetchJourneyData(googleToken, propertyId, journeyRangeKey).catch(() => null) as any); })()
+        ? (() => { onLoad('journey'); return cachedFetch(`chatSnapshot:journey:${userId}:${propertyId}${rangeSuffix}`, TTL.GA4_JOURNEY, () => fetchJourneyData(googleToken, propertyId, journeyRangeKey).catch(() => null) as any); })()
         : Promise.resolve(null);
 
     const eventsPromise: Promise<EnrichedSnapshot['events']> = propertyId
-        ? (() => { onLoad('events'); return cachedFetch(`chatSnapshot:events:${propertyId}${rangeSuffix}`, TTL.GA4_EVENTS, () => fetchEventsTop(googleToken, propertyId, resolvedRange)); })()
+        ? (() => { onLoad('events'); return cachedFetch(`chatSnapshot:events:${userId}:${propertyId}${rangeSuffix}`, TTL.GA4_EVENTS, () => fetchEventsTop(googleToken, propertyId, resolvedRange)); })()
         : Promise.resolve(null);
 
     const geoPromise: Promise<EnrichedSnapshot['geoConversion']> = propertyId
-        ? (() => { onLoad('geoConversion'); return cachedFetch(`chatSnapshot:geoConv:${propertyId}${rangeSuffix}`, TTL.GA4_GEO, () => fetchGeoConversion(googleToken, propertyId, resolvedRange)); })()
+        ? (() => { onLoad('geoConversion'); return cachedFetch(`chatSnapshot:geoConv:${userId}:${propertyId}${rangeSuffix}`, TTL.GA4_GEO, () => fetchGeoConversion(googleToken, propertyId, resolvedRange)); })()
         : Promise.resolve(null);
 
     const timePromise: Promise<EnrichedSnapshot['timePatterns']> = propertyId
-        ? (() => { onLoad('timePatterns'); return cachedFetch(`chatSnapshot:timePat:${propertyId}${rangeSuffix}`, TTL.GA4_TIME, () => fetchTimePatterns(googleToken, propertyId, resolvedRange)); })()
+        ? (() => { onLoad('timePatterns'); return cachedFetch(`chatSnapshot:timePat:${userId}:${propertyId}${rangeSuffix}`, TTL.GA4_TIME, () => fetchTimePatterns(googleToken, propertyId, resolvedRange)); })()
         : Promise.resolve(null);
 
     // ── Site profile (cheap deterministic compute over already-loaded context) ──

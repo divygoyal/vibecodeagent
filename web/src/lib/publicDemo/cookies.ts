@@ -3,9 +3,12 @@
  */
 import { DEMO_COOKIE, SESSION_COOKIES } from './config';
 
-/** Cookie names that carry a NextAuth session (both names and their chunks name.0, name.1, …). */
+/**
+ * Cookie names NextAuth may read as (part of) a session: both names and anything that starts with them (chunks
+ * name.0, name.1, … and odd names like nameX, which NextAuth also joins in).
+ */
 export function isSessionCookieName(name: string): boolean {
-    return SESSION_COOKIES.some((n) => name === n || (name.startsWith(`${n}.`) && /^\d+$/.test(name.slice(n.length + 1))));
+    return SESSION_COOKIES.some((n) => name.startsWith(n));
 }
 
 function parse(header: string | null | undefined): [string, string][] {

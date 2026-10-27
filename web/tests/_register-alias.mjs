@@ -23,7 +23,13 @@ export async function resolve(specifier, context, nextResolve) {
     const url = tryResolve(path.resolve(path.dirname(fileURLToPath(context.parentURL)), specifier));
     if (url) return nextResolve(url, context);
   }
-  return nextResolve(specifier, context);
+  try {
+    return await nextResolve(specifier, context);
+  } catch (err) {
+    // Packages without an exports map (next/headers, next-auth/core …) need the .js the bundler adds.
+    if (err && err.code === 'ERR_MODULE_NOT_FOUND' && /^(next|next-auth)\\/[\\w/-]+$/.test(specifier)) return nextResolve(specifier + '.js', context);
+    throw err;
+  }
 }
 `));
 

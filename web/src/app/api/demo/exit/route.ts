@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
-import { DEMO_COOKIE, isDemoToken } from '@/lib/publicDemo/config';
+import { DEMO_COOKIE, isDemoToken, isScriptFetch } from '@/lib/publicDemo/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic';
  * picked last (tc_site), so the visitor's own old links do not point at a sample site.
  */
 export async function GET(req: NextRequest) {
+    // A prefetch must not end the demo.
+    if (isScriptFetch(req.headers)) return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
     let signedIn = false;
     try {
         const token = await getToken({ req });

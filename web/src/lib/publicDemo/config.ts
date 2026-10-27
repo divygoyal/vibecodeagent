@@ -17,8 +17,11 @@
 /** The demo user's identifier in the admin DB (its "provider id"). Not numeric, so it can never collide with a Google sub or a GitHub id. */
 export const DEMO_USER_ID = 'tc-public-demo';
 export const DEMO_USER_NAME = 'Demo';
-/** Shown in the app's user menu only. Never stored in the admin DB (no welcome email, no digests). */
-export const DEMO_USER_EMAIL = 'demo@trafficclaw.com';
+/**
+ * The demo identity has no email (the JWT carries null), so nothing can ever match or create a real account by
+ * email from it. The user menu shows this label instead.
+ */
+export const DEMO_USER_LABEL = 'Sample data, read-only';
 /** The demo Google account of lib/demo/catalog.ts behind the demo user (11 sample sites). */
 export const DEMO_ACCOUNT_KEY = 'main';
 /** Its tokens (lib/demo/catalog.ts demoAccessToken / demoRefreshToken; inlined so middleware does not bundle the catalogue, a test keeps them equal). */
@@ -78,4 +81,22 @@ export function safeDemoTarget(to: string | null | undefined): string {
     if (path !== '/dashboard' && !path.startsWith('/dashboard/')) return fallback;
     if (path.startsWith('/dashboard/setup')) return fallback;
     return `${path}${parsed.search}${parsed.hash}`;
+}
+
+/**
+ * A script fetch or a speculative load (next/link prefetch or soft navigation, fetch(), Chrome prerender) must never
+ * start or end the demo: a prefetch of a /demo link would otherwise set the cookie behind the visitor's back. Keys on
+ * the browser-set Sec-Fetch-Mode / Sec-Purpose (Next strips its own RSC headers before middleware); clients without
+ * Sec-Fetch headers (curl, old browsers) count as page loads.
+ */
+export function isScriptFetch(headers: Headers): boolean {
+    const mode = headers.get('sec-fetch-mode');
+    const speculative = /prefetch|prerender/i.test(`${headers.get('sec-purpose') ?? ''} ${headers.get('purpose') ?? ''} ${headers.get('x-moz') ?? ''}`);
+    return Boolean((mode && mode !== 'navigate') || speculative);
+}
+
+/** Opened from another site (a link or redirect elsewhere)? Same origin, a typed URL or a bookmark are not. */
+export function isCrossSite(headers: Headers): boolean {
+    const site = headers.get('sec-fetch-site');
+    return site === 'cross-site' || site === 'same-site';
 }

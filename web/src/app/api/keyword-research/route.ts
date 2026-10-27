@@ -5,6 +5,7 @@ import {
   GOOGLE_GENAI_PRIMARY_MODEL,
   GOOGLE_GENAI_THINKING_DISABLED,
 } from '@/lib/googleGenAi';
+import { clientKey } from '@/lib/clientIp';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ function checkRateLimit(ip: string): boolean {
 }
 
 export async function GET(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+  const ip = clientKey(req.headers);
   if (!checkRateLimit(ip)) {
     return NextResponse.json({ error: 'Rate limited. Try again in a minute.' }, { status: 429 });
   }

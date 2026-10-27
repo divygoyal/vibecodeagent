@@ -8,6 +8,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
 import { accessForAsset, listLinkedGoogleConnections } from '@/lib/googleAccounts';
+import { clientKey as requestClientKey } from '@/lib/clientIp';
 
 export async function sessionUserId(): Promise<string | null> {
     const session = (await getServerSession(authOptions)) as { user?: { id?: string } } | null;
@@ -96,10 +97,9 @@ export function rateLimited(key: string, limit: number, windowMs = 60_000): bool
     return b.count > limit;
 }
 
+/** Rate-limit key of the caller (lib/clientIp.ts). */
 export function clientIp(req: Request): string {
-    const xf = req.headers.get('x-forwarded-for');
-    if (xf) return xf.split(',')[0].trim();
-    return req.headers.get('x-real-ip') ?? 'unknown';
+    return requestClientKey(req.headers);
 }
 
 /** Hash of token + IP, sent to the admin for its own password rate limit (no raw IPs stored). */

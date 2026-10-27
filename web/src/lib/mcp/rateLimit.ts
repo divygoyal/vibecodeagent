@@ -3,6 +3,7 @@
  * move to Upstash if the app ever runs several). MCP.md section 8.1.
  */
 import { shared } from './shared';
+import { clientKey } from '@/lib/clientIp';
 
 interface Window {
     count: number;
@@ -67,13 +68,9 @@ export async function acquireSlot(key: string, max: number, waitMs: number): Pro
     };
 }
 
-/** Client IP: CF-Connecting-IP when present, else the first X-Forwarded-For hop. */
+/** Rate-limit key of the caller: CF-Connecting-IP only from a Cloudflare peer, else the peer (lib/clientIp.ts). */
 export function clientIp(req: Request): string {
-    const cf = req.headers.get('cf-connecting-ip');
-    if (cf) return cf.trim();
-    const xff = req.headers.get('x-forwarded-for');
-    if (xff) return xff.split(',')[0].trim();
-    return req.headers.get('x-real-ip')?.trim() || 'unknown';
+    return clientKey(req.headers);
 }
 
 /** /24 for IPv4, /48 for IPv6: what we store in audit rows. */
