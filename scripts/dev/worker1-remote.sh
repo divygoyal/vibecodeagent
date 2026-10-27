@@ -253,7 +253,7 @@ EOF
     for p in "${pids[@]}"; do wait "$p" || failed=1; done
     [ "$failed" = 0 ] || { for i in $(seq "$first" $((first + n - 1))); do tail -n 8 "$(inst_dir "$name" "$i")/login.log" >&2; done; die "seeding demo users failed"; }
     echo "seed_secs=$(elapsed "$t0")"
-    log "$n instance(s) of '$name' ready: web $(web_port 1)..$(web_port "$n"), admin $(admin_port 1)..$(admin_port "$n")"
+    log "$n instance(s) of '$name' ready: web $(web_port "$first")..$(web_port $((first + n - 1))), admin $(admin_port "$first")..$(admin_port $((first + n - 1)))"
 }
 
 # ─────────────────────────────── check ──────────────────────────────
