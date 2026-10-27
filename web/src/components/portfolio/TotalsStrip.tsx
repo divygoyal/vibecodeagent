@@ -2,9 +2,9 @@
 
 import { useMemo } from 'react';
 
-import { Info } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info } from 'lucide-react';
 
-import { KpiStrip, Tooltip, type KpiItem } from '@/components/ui';
+import { Button, KpiStrip, Tooltip, type KpiItem } from '@/components/ui';
 import { TimeSeriesChart } from '@/components/charts';
 import { cn } from '@/lib/cn';
 import { fmtDateRange } from '@/lib/format';
@@ -29,13 +29,17 @@ export interface TotalsStripProps {
     /** Refetching: keep the frame at 60% opacity (DESIGN 2.7). */
     dimmed?: boolean;
     compact?: boolean;
+    /** The combined chart under the tiles; collapsed by default so the site cards stay above the fold. */
+    trendOpen: boolean;
+    onTrendOpenChange: (open: boolean) => void;
 }
 
 /**
- * Grand totals across every visible site (one KPI tile per metric, with the
- * delta vs the previous period) controlling one combined chart below.
+ * Grand totals across every visible site: one slim row of KPI tiles (with the
+ * delta vs the previous period) and, behind "Show trend", one combined chart.
+ * Picking a tile while the chart is hidden opens it on that metric.
  */
-export function TotalsStrip({ data, metric, onMetricChange, comparisonLabel, dimmed, compact }: TotalsStripProps) {
+export function TotalsStrip({ data, metric, onMetricChange, comparisonLabel, dimmed, compact, trendOpen, onTrendOpenChange }: TotalsStripProps) {
     const metrics = totalsMetrics(data);
     const total = data.totals.sites.total;
     const s = data.totals.search;
@@ -78,32 +82,52 @@ export function TotalsStrip({ data, metric, onMetricChange, comparisonLabel, dim
         <KpiStrip
             items={items}
             selected={metric}
-            onSelect={(m: MetricKey) => onMetricChange(m as TotalsMetric)}
+            onSelect={(m: MetricKey) => {
+                onMetricChange(m as TotalsMetric);
+                if (!trendOpen) onTrendOpenChange(true);
+            }}
             comparisonLabel={comparisonLabel}
             ariaLabel="Totals across all sites"
+            density="slim"
             className={cn('transition-opacity duration-180', dimmed && 'opacity-60')}
+            trailing={(
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    trailingIcon={trendOpen ? ChevronUp : ChevronDown}
+                    aria-expanded={trendOpen}
+                    aria-controls="portfolio-trend"
+                    onClick={() => onTrendOpenChange(!trendOpen)}
+                >
+                    {trendOpen ? 'Hide trend' : 'Show trend'}
+                </Button>
+            )}
         >
-            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <p className="flex flex-wrap items-center gap-x-1 text-body-sm text-fg-secondary">
-                    <span className="font-medium text-fg">{METRICS[metric].label}</span> {metric === 'position' ? 'across all sites, weighted by impressions' : `${unit}, all ${total} sites`}
-                    {window ? <span className="text-fg-muted"> · {fmtDateRange(window.curStart, window.curEnd)}</span> : null}
-                    {metric === 'users' && total > 1 ? (
-                        <Tooltip content="Users are exact per site and added up across sites, so a visitor of two sites counts twice.">
-                            <button type="button" aria-label="About the users total" className="ml-0.5 inline-flex rounded text-fg-faint hover:text-fg-muted">
-                                <Info aria-hidden size={14} strokeWidth={1.75} />
-                            </button>
-                        </Tooltip>
-                    ) : null}
-                </p>
-                <p className="text-meta text-fg-muted tabular-nums">Sites: {summary}</p>
-            </div>
-            <TimeSeriesChart
-                data={rows}
-                series={[{ metric, key: 'value', compareKey: prev ? 'prev' : undefined }]}
-                compareDateKey={prev ? 'prevDate' : undefined}
-                height={compact ? 180 : 240}
-                ariaLabel={`${METRICS[metric].label} ${unit} across all sites`}
-            />
+            {trendOpen ? (
+                <div id="portfolio-trend">
+                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                        <p className="flex flex-wrap items-center gap-x-1 text-body-sm text-fg-secondary">
+                            <span className="font-medium text-fg">{METRICS[metric].label}</span> {metric === 'position' ? 'across all sites, weighted by impressions' : `${unit}, all ${total} sites`}
+                            {window ? <span className="text-fg-muted"> · {fmtDateRange(window.curStart, window.curEnd)}</span> : null}
+                            {metric === 'users' && total > 1 ? (
+                                <Tooltip content="Users are exact per site and added up across sites, so a visitor of two sites counts twice.">
+                                    <button type="button" aria-label="About the users total" className="ml-0.5 inline-flex rounded text-fg-faint hover:text-fg-muted">
+                                        <Info aria-hidden size={14} strokeWidth={1.75} />
+                                    </button>
+                                </Tooltip>
+                            ) : null}
+                        </p>
+                        <p className="text-meta text-fg-muted tabular-nums">Sites: {summary}</p>
+                    </div>
+                    <TimeSeriesChart
+                        data={rows}
+                        series={[{ metric, key: 'value', compareKey: prev ? 'prev' : undefined }]}
+                        compareDateKey={prev ? 'prevDate' : undefined}
+                        height={compact ? 180 : 240}
+                        ariaLabel={`${METRICS[metric].label} ${unit} across all sites`}
+                    />
+                </div>
+            ) : null}
         </KpiStrip>
     );
 }
