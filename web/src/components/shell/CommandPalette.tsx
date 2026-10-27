@@ -235,7 +235,7 @@ export function CommandPalette() {
                     <div ref={listRef} id={listId} role="listbox" aria-label="Results" className="max-h-[min(400px,55dvh)] overflow-y-auto overscroll-contain p-1.5">
                         {groups.map((g) => (
                             <div key={g.section} role="group" aria-label={g.section}>
-                                <div className="px-3 pt-2 pb-1 text-caption tracking-[0.04em] text-fg-muted uppercase">{g.section}</div>
+                                <div className="px-3 pt-2 pb-1 text-meta font-medium text-fg-muted">{g.section}</div>
                                 {g.items.map((c) => {
                                     const i = index++;
                                     const selected = i === activeIndex;
