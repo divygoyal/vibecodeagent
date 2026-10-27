@@ -2,7 +2,7 @@
 
 /**
  * Weekday x hour heatmap (peak hours). Rows run Monday to Sunday, columns
- * 0-23 h. Cell tint follows the value (square-root scale so quiet hours
+ * 0-23 h. Cell tint follows the value (a gentle power scale so quiet hours
  * still show a shape); the busiest run of hours can be outlined. Hover or
  * focus a cell for its exact value. Values come in GA4 order (0 = Sunday).
  */
@@ -39,8 +39,8 @@ export function WeekHourHeatmap({ grid, color, format, unit, highlight, classNam
     const max = Math.max(0, ...grid.flat());
     const tint = (v: number) => {
         if (!v || max <= 0) return 'var(--color-subtle)';
-        const t = Math.sqrt(v / max);
-        return `color-mix(in oklab, ${color} ${Math.round(10 + t * 90)}%, var(--color-surface))`;
+        const t = (v / max) ** 0.85;
+        return `color-mix(in oklab, ${color} ${Math.round(6 + t * 94)}%, var(--color-surface))`;
     };
     const inPeak = (d: number, h: number) => Boolean(highlight && highlight.day === d && h >= highlight.hour && h < highlight.hour + highlight.length);
     const hv = hover ? grid[hover.d]?.[hover.h] ?? 0 : 0;

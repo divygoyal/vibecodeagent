@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  *   &start=YYYY-MM-DD&end=YYYY-MM-DD[&cmpStart=&cmpEnd=][&mode=daily|weekly|monthly]
  *   [&f=<key>:<value> ...]  click-to-filter (components/site/lib/filters.ts): summary, breakdowns, heatmap, pageTrends
  *   [&interval=day|week|month]  summary buckets
- *   [&limit=1-25]  pageTrends rows
+ *   [&limit=1-30]  pageTrends rows
  *
  * One small cached GA4 report per call (summary = 3), so each tab and card
  * fetches only what it shows. Read-only.

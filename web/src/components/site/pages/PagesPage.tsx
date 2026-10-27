@@ -52,7 +52,7 @@ export function PagesPage() {
     const sc = useGsc<GscRowsResponse>(site.hasGsc ? 'pages' : null);
     const decay = useGsc<{ rows: DecayRow[] }>(site.hasGsc ? 'decay' : null);
     // Titles for the top pages and trend bars for the top 25 (one extra GA4 call pair, cached).
-    const trends = useGa4<Ga4PageTrends>(site.hasGa4 ? 'pageTrends' : null, { extra: { limit: '25' } });
+    const trends = useGa4<Ga4PageTrends>(site.hasGa4 ? 'pageTrends' : null, { extra: { limit: '30' } });
     const { titleBy, trendBy } = useMemo(() => {
         const t = new Map<string, string>();
         const tr = new Map<string, number[]>();
@@ -106,13 +106,14 @@ export function PagesPage() {
                     </span>
                 ) : <span title={r.url ?? r.label}>{r.label}</span>;
             },
-            heat: site.hasGa4 ? { metric: 'pageviews', value: (r) => r.views } : { metric: 'clicks', value: (r) => r.clicks },
+            // Rows with a title and trend bars read better without a heat bar; keep it for GSC-only sites.
+            heat: site.hasGa4 ? undefined : { metric: 'clicks', value: (r) => r.clicks },
         },
         ...(site.hasGa4 ? [{
             key: 'trend', header: 'Trend', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
             cell: (r: Row) => {
                 const t = trendBy.get(r.key);
-                return t ? <TrendBars values={t} color={METRICS.pageviews.color} partialLast ariaLabel={`Views trend for ${r.label}`} /> : <span className="text-meta text-fg-faint" title="Trend bars show for the top 25 pages by views">–</span>;
+                return t ? <TrendBars values={t} color={METRICS.pageviews.color} partialLast ariaLabel={`Views trend for ${r.label}`} /> : <span className="text-meta text-fg-faint" title="Trend bars show for the top 30 pages by views">–</span>;
             },
         }] : []),
         ...(site.hasGa4 ? [

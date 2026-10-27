@@ -54,7 +54,8 @@ export function CtrPositionChart({ points, curve, maxPosition = 20, height = 300
         const yMax = yTicks[yTicks.length - 1];
         const iw = Math.max(1, width - M.left - M.right);
         const ih = Math.max(1, h - M.top - M.bottom);
-        const x = (pos: number) => M.left + ((pos - 1) / (maxPosition - 1)) * iw;
+        // Square-root position scale: most queries sit on page one, so positions 1-10 get more room.
+        const x = (pos: number) => M.left + (Math.sqrt(Math.max(0, pos - 1)) / Math.sqrt(maxPosition - 1)) * iw;
         const y = (ctr: number) => M.top + ih - (Math.min(ctr, yMax) / yMax) * ih;
         const maxImpr = Math.max(1, ...shown.map((p) => p.impressions));
         const r = (impr: number) => 2.5 + 6.5 * Math.sqrt(impr / maxImpr);
@@ -65,7 +66,7 @@ export function CtrPositionChart({ points, curve, maxPosition = 20, height = 300
         return { x, y, r, yTicks, yMax, curvePath, floorPath, iw, ih };
     }, [shown, width, h, curve, maxPosition]);
 
-    const xTicks = [1, 5, 10, 15, 20].filter((t) => t <= maxPosition);
+    const xTicks = [1, 2, 3, 5, 10, 15, 20].filter((t) => t <= maxPosition);
     // Draw big dots first so small ones stay visible; under-performers on top.
     const order = useMemo(() => [...shown].sort((a, b) => (a.under === b.under ? b.impressions - a.impressions : a.under ? 1 : -1)), [shown]);
 

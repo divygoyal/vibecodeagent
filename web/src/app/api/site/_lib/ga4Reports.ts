@@ -278,7 +278,7 @@ const MAX_TREND_BARS = 14;
 
 export async function ga4PageTrends(userId: string, token: string, property: string, r: RangeParams, filter: GaFilter = null, limit = 10): Promise<Ga4PageTrends> {
     const multi = Boolean(r.cmp);
-    const n = Math.max(1, Math.min(25, limit));
+    const n = Math.max(1, Math.min(30, limit));
     const top = await ga4Report(userId, token, property, {
         dateRanges: ranges(r),
         dimensions: [{ name: 'hostName' }, { name: 'pagePath' }, { name: 'pageTitle' }],
