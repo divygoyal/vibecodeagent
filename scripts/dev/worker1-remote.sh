@@ -164,9 +164,12 @@ start_web() {
     (
         cd "$src/web"
         # NODE_ENV=production + TC_ALLOW_DEMO_IN_PROD_BUILD: demo data in a real production server, honoured only
-        # because NEXTAUTH_URL is localhost (web/src/lib/demo/gate.ts).
-        env -i PATH="$SAFE_PATH" HOME="$HOME" TMPDIR="$TMPDIR" LANG=C.UTF-8 TZ=UTC TC_DEMO_DATA=1 \
-            NODE_ENV=production TC_ALLOW_DEMO_IN_PROD_BUILD=1 \
+        # because NEXTAUTH_URL is localhost (web/src/lib/demo/gate.ts). TC_W1_DEMO_DATA=0 leaves both out: the
+        # production path, where only the narrow public-demo shim answers Google (demo tokens only).
+        local demo_env=(TC_DEMO_DATA=1 TC_ALLOW_DEMO_IN_PROD_BUILD=1)
+        [ "${TC_W1_DEMO_DATA:-1}" = 0 ] && demo_env=(TC_PUBLIC_DEMO=1)
+        env -i PATH="$SAFE_PATH" HOME="$HOME" TMPDIR="$TMPDIR" LANG=C.UTF-8 TZ=UTC "${demo_env[@]}" \
+            NODE_ENV=production \
             NODE_OPTIONS="--max-old-space-size=2048" NEXT_TELEMETRY_DISABLED=1 \
             NEXTAUTH_URL="http://localhost:$wp" NEXTAUTH_SECRET="$NEXTAUTH_SECRET" \
             ADMIN_API_URL="http://127.0.0.1:$ap" ADMIN_API_KEY="$ADMIN_API_KEY" \
@@ -304,6 +307,7 @@ job_scen() { chk "$RES/scen-$1.log" "$KIT/check-scenarios.mjs" "$3" --users "$4"
 # mcp: the real-browser MCP consent test (web/tests/mcp/browser-consent.mjs) on the first instance only.
 job_mcp() { chk "$RES/mcp-browser.log" "$src_web_tests/mcp/browser-consent.mjs" "$1" --out "$RES/mcp-browser"; }
 job_multi() { chk "$RES/multi.log" "$KIT/check-multi-account.mjs" "$1" --out "$RES/multi"; }   # port (linked Google accounts e2e)
+job_demo() { chk "$RES/demo.log" "$KIT/check-demo.mjs" "$1" --out "$RES/demo" --shots "$RES/demo/shots"; }   # port (public live demo e2e)
 job_golden() { chk "$RES/golden-capture-$1.log" "$KIT/dash-golden.mjs" capture "$2" "$RES/golden/cand$1"; }
 
 cmd_check() {
@@ -360,6 +364,13 @@ cmd_check() {
         phase_start multi
         phase_job job_multi "$(web_port "${insts[0]}")"
         phase_end
+    fi
+    if [ "$all" = 1 ] || [ "$what" = demo ]; then
+        # The public live demo (/demo -> the real app, read-only) end to end, signed out and as a signed-in user.
+        phase_start demo
+        phase_job job_demo "$(web_port "${insts[0]}")"
+        phase_end
+        tail -n 3 "$RES/demo.log" >&2 || true
     fi
     if [ "$all" = 1 ] || [ "$what" = golden ]; then
         # Two captures of the same build in parallel (like base/base2 on the VPS: a stability sample), then

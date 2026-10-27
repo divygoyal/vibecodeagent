@@ -11,7 +11,7 @@ cd /root/projects/worktrees/tc-<you>
 scripts/dev/worker1.sh sync  .                 # rsync code (no node_modules/.next/.git/.env*), npm ci once per lockfile hash
 scripts/dev/worker1.sh build <name>            # production `next build` (~50 s)
 scripts/dev/worker1.sh up    <name> [N] [--first K]  # N instances (default 4) at the first free run of slots (exactly 3200+K.. with --first): web 3201.., admin 8201.., fresh SQLite, demo users seeded (~15 s)
-scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden|multi|mcp] [--golden-base dirA,dirB]
+scripts/dev/worker1.sh check <name> [all|crawl|mobile|scenarios|golden|multi|demo|mcp] [--golden-base dirA,dirB]
 scripts/dev/worker1.sh down  <name>
 scripts/dev/worker1.sh run   . [what] [N]      # sync + build + up + check + down
 scripts/dev/worker1.sh status                  # load, memory, running instances, disk
@@ -34,6 +34,12 @@ What `check` does, on the N running instances at once (the slowest job is the ph
 - **multi**: `check-multi-account.mjs` on the first instance: the `multi` user (two Google accounts, the second
   linked as a data connection) end to end: Settings list and screenshots, union directory and portfolio, account-2
   data, Disconnect in the UI, the demo link flow (added / same / cancelled / forged state), a revoked extra account.
+- **demo**: `check-demo.mjs` on the first instance: the public live demo (/demo -> the real app, read-only):
+  cookie and redirects, `?to=` validation, 403s of the denied API routes, a signed-out walk through every app
+  area at 1440/390 light/dark with screenshots, UI writes showing the demo toast, Exit demo, and a signed-in
+  dev user entering and leaving the demo with the real session cookie unchanged.
+  `TC_W1_DEMO_DATA=0 worker1.sh up <name>` starts the web without `TC_DEMO_DATA` (the production path: only the
+  narrow public-demo shim answers Google, for demo tokens).
 - **mcp** (not part of `all`): `web/tests/mcp/browser-consent.mjs` on the first instance: the MCP OAuth consent page
   in real Chromium (DCR + PKCE): demo, Allow and Cancel.
 - **golden**: two captures of the same build in parallel (a stability sample), then `compare` against the
