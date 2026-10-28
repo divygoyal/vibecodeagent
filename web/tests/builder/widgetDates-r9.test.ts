@@ -11,7 +11,7 @@ import test from 'node:test';
 import { demoAccessToken } from '@/lib/demo';
 import { createDemoGoogleFetch } from '@/lib/sites/fetchInventory';
 import { resolveCompare, resolveRange } from '@/lib/builder/dates';
-import { cleanOverride, hasOwnDates, overrideLabel, resolveWidgetDates, shiftRange } from '@/lib/builder/widgetDates';
+import { chipText, chipTitle, cleanOverride, hasOwnDates, overrideLabel, resolveWidgetDates, shiftRange } from '@/lib/builder/widgetDates';
 import { widgetRange } from '@/lib/builder/chartMarks';
 import { defaultWidget } from '@/lib/builder/registry';
 import { evaluateWidgets } from '@/lib/builder/server/engine';
@@ -138,3 +138,21 @@ test('widget dates: the engine asks Google for the widget\'s own days and compar
     assert.notEqual(row('w_own')['m:ga4:sessions'], row('w_plain')['m:ga4:sessions'], 'a 7 day widget differs from the 28 day one');
 });
 
+
+test('widget dates: the chip shows the real days, the title names the rule', () => {
+    const now = new Date('2026-10-26T12:00:00Z');
+    const week = resolveWidgetDates({ range: { kind: 'preset', id: '7d' } }, base());
+    assert.equal(chipText({ range: { kind: 'preset', id: '7d' } }, week, now), 'Oct 19–25');
+    assert.equal(chipTitle({ range: { kind: 'preset', id: '7d' } }, week), 'Own dates: Last 7 days (Oct 19 – Oct 25). Compared with Oct 12 – Oct 18 (previous period)');
+    // a time shift into last year reads like "Sep 30–Oct 27, 2025"
+    const yoy = resolveWidgetDates({ shift: { unit: 'year', amount: 1 } }, base());
+    assert.equal(chipText({ shift: { unit: 'year', amount: 1 } }, yoy, now), 'Sep 28–Oct 25, 2025');
+    assert.match(chipTitle({ shift: { unit: 'year', amount: 1 } }, yoy), /^Own dates: Previous year \(Sep 28 – Oct 25, 2025\)/);
+    // two weeks earlier, inside one month
+    const two = resolveWidgetDates({ shift: { unit: 'week', amount: 2 } }, base());
+    assert.equal(chipText({ shift: { unit: 'week', amount: 2 } }, two, now), 'Sep 14–Oct 11');
+    // only an own comparison: the days are the dashboard's, so the chip says so
+    const own = resolveWidgetDates({ compare: { mode: 'previous_year' } }, base());
+    assert.equal(chipText({ compare: { mode: 'previous_year' } }, own, now), 'Own comparison');
+    assert.equal(chipText({}, own, now), '');
+});

@@ -711,6 +711,13 @@ export interface ResultFlags {
     missingFamilies?: Array<'ga4' | 'gsc'>;
     sortedWithinTop?: number;
     currency?: string;
+    /**
+     * Round 9: the comparison window starts before Google has data (a property that is younger than the window, or
+     * history older than Search Console keeps). The comparison line breaks there instead of dropping to 0;
+     * `compareFrom` is the first comparison day with data, `compareNone` means none of the window has any.
+     */
+    compareFrom?: Iso;
+    compareNone?: boolean;
 }
 
 export interface WidgetResultOk {

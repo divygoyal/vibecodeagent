@@ -4,6 +4,7 @@ export * from './Banner';
 export * from './Button';
 export * from './Card';
 export * from './Checkbox';
+export * from './DateField';
 export * from './Drawer';
 export * from './DropdownMenu';
 export * from './EmptyState';

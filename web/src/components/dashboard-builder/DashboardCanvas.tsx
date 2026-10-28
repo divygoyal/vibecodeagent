@@ -20,9 +20,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { registerCalcs } from '@/lib/builder/calc';
 import { layoutFor } from '@/lib/builder/docOps';
 import { hiddenForViewers } from '@/lib/builder/placeholders';
+import { viewerRows } from '@/lib/builder/compactKpi';
 import { growsOnPhone, widgetMeta, widgetTitle } from '@/lib/builder/registry';
 import { densityPx, isDefaultLook, themeOptions } from '@/lib/builder/themes';
-import type { DashboardDocV2, LayoutItem, PageDef, WidgetDef, WidgetType } from '@/lib/builder/types';
+import type { CompareSpec, DashboardDocV2, LayoutItem, PageDef, WidgetDef, WidgetType } from '@/lib/builder/types';
 import { TV_MAX_ROW, tvScreens, useTvScreen } from './TvMode';
 
 export const ROW_H = 32;
@@ -86,6 +87,11 @@ export interface DashboardCanvasProps {
      * CSS `scale(zoom)` box; drag, resize and drop positions are corrected for it.
      */
     zoom?: number;
+    /**
+     * The dashboard's comparison mode. With it, viewers get KPI cards that show no comparison and no sparkline at a
+     * compact height (compactKpi.ts). The editor never compacts: it draws the author's layout.
+     */
+    compareMode?: CompareSpec['mode'];
 }
 
 function toRgl(items: LayoutItem[], doc: DashboardDocV2, bp: Bp, editing: boolean): RglItem[] {
@@ -100,15 +106,16 @@ function toRgl(items: LayoutItem[], doc: DashboardDocV2, bp: Bp, editing: boolea
     });
 }
 
-export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit, empty, fitHeight, zoom = 1 }: DashboardCanvasProps) {
+export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit, empty, fitHeight, zoom = 1, compareMode }: DashboardCanvasProps) {
     const editing = mode === 'edit' && Boolean(edit);
     registerCalcs(doc.calcs);
     const metrics = gridMetrics(doc);
     // Viewers never see unchanged template prompts or empty text/image widgets: the grid closes the gap (round 4).
     const pageItems = useMemo(() => {
         const all = layoutFor(doc, page, bp);
-        return editing ? all : all.filter((l) => !hiddenForViewers(doc.widgets[l.i]));
-    }, [doc, page, bp, editing]);
+        const shown = editing ? all : all.filter((l) => !hiddenForViewers(doc.widgets[l.i]));
+        return editing || !compareMode ? shown : shown.map((l) => { const h = viewerRows(doc.widgets[l.i], l.h, compareMode); return h === l.h ? l : { ...l, h }; });
+    }, [doc, page, bp, editing, compareMode]);
     const gap = metrics.gap;
     // TV: a page that cannot fit at a readable row height is shown as several screens (TvMode.tsx).
     const tv = useTvScreen();

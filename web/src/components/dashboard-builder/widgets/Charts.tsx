@@ -282,7 +282,7 @@ export function PieView(props: WidgetViewProps<PieWidget>) {
                     {width > 0 ? <Donut
                         items={rows.map((r, i) => {
                             const raw = String(r[`d:${c.dimension}`] ?? '');
-                            return { key: `${raw}-${i}`, label: dimText(c.dimension, raw, frame.labels), value: typeof r[`m:${id}`] === 'number' ? (r[`m:${id}`] as number) : 0, color: categoryColor(c.dimension, raw, i) };
+                            return { key: `${raw}-${i}`, label: dimText(c.dimension, raw, frame.labels), value: typeof r[`m:${id}`] === 'number' ? (r[`m:${id}`] as number) : 0, color: categoryColor(c.dimension, raw, i), other: raw === '(other)' || raw === '__other' };
                         })}
                         centerLabel={c.centerLabel === 'none' ? undefined : metricLabel(id)}
                         format={dsFormat(id)}

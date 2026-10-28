@@ -5,7 +5,7 @@ import { AlertTriangle, Download, Info, Link2, PlugZap, RefreshCw } from 'lucide
 
 import { cn } from '@/lib/cn';
 import { Button, Skeleton, Tooltip } from '@/components/ui';
-import { fmtDay } from '@/lib/format';
+import { fmtDay, fmtDayYear } from '@/lib/format';
 import { metricLabel } from '@/lib/builder/catalog';
 import { chartCsvFrame } from '@/lib/builder/charts';
 import { widgetTitle } from '@/lib/builder/registry';
@@ -103,6 +103,9 @@ export function flagNotes(r: WidgetResultOk | undefined, widget: WidgetDef): str
     if (f.thresholded) out.push('Google hides small groups (privacy thresholds)');
     if (f.otherRow) out.push('Some values are grouped as (other)');
     if (f.preliminaryFrom && (widget.type === 'timeseries' || widget.type === 'scorecard' || widget.type === 'kpi-strip')) out.push(`Search Console data after ${fmtDay(f.preliminaryFrom)} is still being processed`);
+    // Round 9: the comparison line has a gap where Google has no data (a younger property, history too old).
+    if (f.compareNone) out.push('No data in the comparison period');
+    else if (f.compareFrom) out.push(`No comparison data before ${fmtDayYear(f.compareFrom)}`);
     const ignored = ignoredFiltersNote(f.filtersIgnoredDims, f.filtersIgnored?.length ?? 0);
     if (ignored) out.push(ignored);
     if (f.usersSummed) out.push('Users are summed across sites');
@@ -177,6 +180,8 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                     ) : null}
                 </div>
             ) : null}
+            {/* A widget without a title row still tells the viewer its days. */}
+            {!showTitle && props.dates?.own ? <DateChip widget={widget} dates={props.dates} className="absolute right-2 top-2 z-10 bg-surface/90" /> : null}
             {props.drill && props.drill.depth > 0 ? <DrillCrumbs drill={props.drill} /> : null}
             <div className={cn('relative min-h-0 flex-1', refetching && 'opacity-60 transition-opacity', bodyClassName)}>
                 {loading && !ok ? (

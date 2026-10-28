@@ -46,18 +46,28 @@ const UNITS: [number, string][] = [
     [1e3, 'K'],
 ];
 
+/**
+ * `abs / size` rounded to 3 significant digits (or to `maxDecimals`), half UP on the decimal value. A binary
+ * `toPrecision` turned 75,550 into "75.5" while 75,553 gave "75.6", so one total read differently on two widgets
+ * (round 9 review, item 9). Scaling to an integer first keeps .5 where a person expects it.
+ */
+function scaled(abs: number, size: number, maxDecimals: number | null): number {
+    const x = abs / size;
+    const digits = Math.max(1, Math.floor(Math.log10(x)) + 1);
+    const decimals = maxDecimals === null ? Math.max(0, 3 - digits) : maxDecimals;
+    const f = 10 ** decimals;
+    return Math.round(abs * f / size * (1 + 1e-12)) / f;
+}
+
 function compactParts(abs: number, maxDecimals: number | null): string {
     for (let i = 0; i < UNITS.length; i++) {
         const [size, suffix] = UNITS[i];
         if (abs < size) continue;
-        let v = Number((abs / size).toPrecision(3));
-        if (maxDecimals !== null) v = Math.round(v * 10 ** maxDecimals) / 10 ** maxDecimals;
+        const v = scaled(abs, size, maxDecimals);
         if (v >= 1000 && i > 0) {
             // 999,950 rounds to "1000K": promote to the next unit ("1M").
             const [nextSize, nextSuffix] = UNITS[i - 1];
-            let w = Number((abs / nextSize).toPrecision(3));
-            if (maxDecimals !== null) w = Math.round(w * 10 ** maxDecimals) / 10 ** maxDecimals;
-            return `${stripZeros(String(w))}${nextSuffix}`;
+            return `${stripZeros(String(scaled(abs, nextSize, maxDecimals)))}${nextSuffix}`;
         }
         return `${stripZeros(String(v))}${suffix}`;
     }
@@ -384,6 +394,22 @@ export function fmtDateRange(start: DateInput, end: DateInput, now: Date = new D
     if (sameDay) return ya === current ? fmtDay(a) : fmtDayYear(a);
     if (ya !== current) return `${fmtDay(a)} – ${fmtDayYear(b)}`;
     return `${fmtDay(a)} – ${fmtDay(b)}`;
+}
+
+/**
+ * The tight form for chips: `Oct 14–20` (same month), `Sep 30–Oct 27`, `Sep 30–Oct 27, 2025` (not this year),
+ * `Dec 3, 2025–Jan 2, 2026` (across years), `Oct 14` (one day). `now` is for tests.
+ */
+export function fmtDateRangeShort(start: DateInput, end: DateInput, now: Date = new Date()): string {
+    const a = toDate(start);
+    const b = toDate(end);
+    const ya = a.getUTCFullYear();
+    const yb = b.getUTCFullYear();
+    if (ya !== yb) return `${fmtDayYear(a)}–${fmtDayYear(b)}`;
+    if (toIsoDay(a) === toIsoDay(b)) return ya === now.getUTCFullYear() ? fmtDay(a) : fmtDayYear(a);
+    const year = ya === now.getUTCFullYear() ? '' : `, ${ya}`;
+    const sameMonth = a.getUTCMonth() === b.getUTCMonth();
+    return `${fmtDay(a)}–${sameMonth ? b.getUTCDate() : fmtDay(b)}${year}`;
 }
 
 /**

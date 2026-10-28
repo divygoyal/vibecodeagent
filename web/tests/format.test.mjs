@@ -8,6 +8,7 @@ import {
     fmtAxis,
     fmtCompact,
     fmtDateRange,
+    fmtDateRangeShort,
     fmtDay,
     fmtDayLong,
     fmtDelta,
@@ -171,4 +172,32 @@ test('date axis ticks: short ranges by day, long ranges by month with year on Ja
     assert.equal(long('2025-10-01', 0), 'Oct 2025');
     assert.equal(long('2025-11-01', 1), 'Nov');
     assert.equal(long('2026-01-01', 3), 'Jan 2026');
+});
+
+test('fmtCompact rounds a .5 up the same way everywhere (75,550 is 75.6K like 75,553)', () => {
+    assert.equal(fmtCompact(75550), '75.6K');
+    assert.equal(fmtCompact(75551), '75.6K');
+    assert.equal(fmtCompact(75553), '75.6K');
+    assert.equal(fmtCompact(31616), '31.6K');
+    assert.equal(fmtCompact(31617), '31.6K');
+    assert.equal(fmtCompact(12345), '12.3K');
+    assert.equal(fmtCompact(99950), '100K');
+    assert.equal(fmtCompact(1234500), '1.23M');
+    assert.equal(fmtAxis(75550), '75.6K');
+    assert.equal(fmtAxis(1234567), '1.2M');
+});
+
+test('fmtValue currency compact uses the same rounding', () => {
+    assert.equal(fmtValue('currency', 61750, { compact: true }), '$61.8K');
+});
+
+test('fmtDateRangeShort: the tight range for chips', () => {
+    const now = new Date('2026-10-28T12:00:00Z');
+    assert.equal(fmtDateRangeShort('2026-10-14', '2026-10-20', now), 'Oct 14–20');
+    assert.equal(fmtDateRangeShort('2026-09-30', '2026-10-27', now), 'Sep 30–Oct 27');
+    assert.equal(fmtDateRangeShort('2025-09-30', '2025-10-27', now), 'Sep 30–Oct 27, 2025');
+    assert.equal(fmtDateRangeShort('2025-10-14', '2025-10-20', now), 'Oct 14–20, 2025');
+    assert.equal(fmtDateRangeShort('2025-12-03', '2026-01-02', now), 'Dec 3, 2025–Jan 2, 2026');
+    assert.equal(fmtDateRangeShort('2026-10-14', '2026-10-14', now), 'Oct 14');
+    assert.equal(fmtDateRangeShort('2025-10-14', '2025-10-14', now), 'Oct 14, 2025');
 });

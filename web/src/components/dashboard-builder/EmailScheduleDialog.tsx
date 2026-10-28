@@ -38,7 +38,21 @@ interface Props {
     shared: boolean;
 }
 
-const input = 'h-9 w-full rounded-control border border-border bg-surface px-3 text-body text-fg';
+/** "8:00 AM" for a stored "08:00". */
+export function timeLabel(hhmm: string): string {
+    const m = /^(\d{2}):(\d{2})$/.exec(hhmm);
+    if (!m) return hhmm;
+    const h = Number(m[1]);
+    return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/** Every quarter hour of the day, plus the stored time when it is not on that grid. */
+export function timeOptions(current: string): Array<{ value: string; label: string }> {
+    const list: string[] = [];
+    for (let h = 0; h < 24; h++) for (const m of [0, 15, 30, 45]) list.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    if (/^\d{2}:\d{2}$/.test(current) && !list.includes(current)) list.push(current);
+    return list.sort().map((value) => ({ value, label: timeLabel(value) }));
+}
 
 const STATUS: Record<RecipientView, { text: string; tone: string } | null> = {
     owner: null,
@@ -167,7 +181,8 @@ export function EmailScheduleDialog({ open, onOpenChange, dashboardId, doc, shar
         setBusy('test');
         try {
             const r = await fetchJson<{ ok: boolean; to: string; mock: boolean; file?: string }>(`${base}/test`, { method: 'POST', body: JSON.stringify({ config: body() }) });
-            toast.success(r.mock ? 'Test email rendered (demo mode, nothing was sent)' : `Test email sent to ${r.to}`, r.mock ? { description: r.file } : undefined);
+            // No file path in the toast: it is a server detail (the demo folder), not something the owner can act on.
+            toast.success(r.mock ? 'Test email prepared (demo mode, nothing was sent)' : `Test email sent to ${r.to}`);
         } catch (e) {
             toast.error(e instanceof Error ? e.message : 'Could not send the test');
         } finally {
@@ -208,6 +223,7 @@ export function EmailScheduleDialog({ open, onOpenChange, dashboardId, doc, shar
             title="Schedule email"
             description={doc.name}
             size="lg"
+            initialFocus="#email-sched-to"
             footer={(
                 <>
                     {saved ? <Button variant="ghost" disabled={Boolean(busy)} onClick={remove}>Remove schedule</Button> : null}
@@ -257,14 +273,14 @@ export function EmailScheduleDialog({ open, onOpenChange, dashboardId, doc, shar
                             {frequency === 'monthly' ? <Select ariaLabel="Day of the month" size="sm" className="min-w-36" value={String(monthDay)} onValueChange={(v) => setMonthDay(Number(v))} options={Array.from({ length: 31 }, (_, i) => ({ value: String(i + 1), label: i === 30 ? 'on the 31st (or last day)' : `on the ${ordinal(i + 1)}` }))} /> : null}
                         </div>
                     </div>
-                    <label className="block space-y-1.5"><span className="text-body-sm font-medium text-fg">Time</span>
-                        <input type="time" step={900} value={time} onChange={(e) => setTime(e.target.value)} className={input} />
-                    </label>
-                    <label className="block space-y-1.5"><span className="text-body-sm font-medium text-fg">Time zone</span>
-                        <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className={input} aria-label="Time zone">
-                            {(tzList.includes(timezone) ? tzList : [timezone, ...tzList]).map((z) => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}
-                        </select>
-                    </label>
+                    <div className="space-y-1.5">
+                        <p className="text-body-sm font-medium text-fg">Time</p>
+                        <Select ariaLabel="Time" className="w-full" contentClassName="max-h-64" value={time} onValueChange={setTime} options={timeOptions(time)} />
+                    </div>
+                    <div className="space-y-1.5">
+                        <p className="text-body-sm font-medium text-fg">Time zone</p>
+                        <Select ariaLabel="Time zone" className="w-full" contentClassName="max-h-64" value={timezone} onValueChange={setTimezone} options={(tzList.includes(timezone) ? tzList : [timezone, ...tzList]).map((z) => ({ value: z, label: z.replace(/_/g, ' ') }))} />
+                    </div>
                 </div>
 
                 {pages.length > 1 ? (
@@ -296,7 +312,7 @@ export function EmailScheduleDialog({ open, onOpenChange, dashboardId, doc, shar
 
                 <div className="space-y-1.5 rounded-card border border-border-subtle bg-surface-sunken p-3 text-body-sm text-fg-secondary">
                     <p className="flex items-center gap-1.5 font-medium text-fg"><Mail aria-hidden size={14} />What is in the email</p>
-                    <p>Key numbers with their change and chart pictures of each page, plus a &ldquo;View dashboard&rdquo; button. There is no PDF attachment: PDF export runs in the browser, and email is sent from our server.</p>
+                    <p>Key numbers with their change and chart pictures of each page, plus a &ldquo;View dashboard&rdquo; button. No PDF is attached; use Export PDF in the dashboard menu to get one.</p>
                     {info?.next && enabled ? <p className="font-medium text-fg">Next email: {fmtNext(info.next, timezone)} ({timezone})</p> : null}
                     {info?.last ? <p className="text-meta text-fg-muted">{info.last.ok ? `Last sent ${info.last.sent ?? 0} email${info.last.sent === 1 ? '' : 's'}${info.last.at ? ` on ${new Date(info.last.at.endsWith('Z') ? info.last.at : `${info.last.at}Z`).toLocaleString()}` : ''}.` : `Last run did not send: ${info.last.error ?? 'unknown error'}.`}</p> : null}
                     {info?.mock ? <p className="text-meta text-fg-muted">Demo mode: emails are written to a folder and never sent.</p> : null}

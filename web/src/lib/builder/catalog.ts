@@ -9,6 +9,7 @@ import { METRICS as DS_METRICS, type MetricKey } from '@/lib/metrics';
 import {
     computeDelta,
     fmtCompact,
+    fmtCurrency,
     fmtDuration,
     fmtFull,
     fmtPercent,
@@ -311,14 +312,8 @@ export function fmtMetricValue(
             return value >= 10_000 && compact ? fmtCompact(value) : value.toLocaleString('en-US', { maximumFractionDigits: opts.format?.decimals ?? 2, minimumFractionDigits: 0 });
         case 'currency': {
             const currency = opts.format?.currency ?? opts.currency ?? 'USD';
-            try {
-                if (compact && Math.abs(value) >= 10_000) {
-                    return new Intl.NumberFormat('en-US', { style: 'currency', currency, notation: 'compact', maximumSignificantDigits: 3 }).format(value);
-                }
-                return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: Math.abs(value) >= 1000 ? 0 : 2 }).format(value);
-            } catch {
-                return fmtFull(value);
-            }
+            // One rounding rule for money (lib/format fmtCurrency): $61.8K here, in the email and in the donut.
+            return fmtCurrency(value, currency, { compact: Boolean(compact), cents: Math.abs(value) < 1000 });
         }
         default:
             return compact ? fmtCompact(value) : fmtFull(value);

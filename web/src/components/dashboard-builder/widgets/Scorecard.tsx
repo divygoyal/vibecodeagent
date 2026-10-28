@@ -103,7 +103,7 @@ export function ScorecardView(props: WidgetViewProps<ScorecardWidget>) {
     const target = c.target && c.target.value > 0 && !missing ? c.target : undefined;
     const totalRaw = ok?.parts.total?.rows[0]?.[`m:${c.metric.id}`];
     return (
-        <div data-dash-widget="md" className={cn('relative flex h-full flex-col overflow-hidden rounded-card border border-border-subtle bg-surface p-4 shadow-card', c.align === 'center' && 'items-center text-center')}>
+        <div data-dash-widget="md" className={cn('relative flex h-full flex-col overflow-hidden rounded-card border border-border-subtle bg-surface shadow-card', height < 100 ? 'p-3' : 'p-4', c.align === 'center' && 'items-center text-center')}>
             {loading && !ok ? (
                 <div className="flex flex-col gap-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-7 w-28" /><Skeleton className="h-3.5 w-36" /></div>
             ) : result?.status === 'error' && !ok ? (
@@ -135,6 +135,9 @@ export function KpiStripView(props: WidgetViewProps<KpiStripWidget>) {
         <div data-dash-widget="strip" className="relative flex h-full flex-col overflow-hidden rounded-card border border-border-subtle bg-surface shadow-card">
             {widget.showTitle && widget.title ? (
                 <div className="flex items-center gap-2 px-4 pt-3"><h3 className="min-w-0 truncate text-title-sm text-fg">{widget.title}</h3><DateChip widget={widget} dates={props.dates} /></div>
+            ) : props.dates?.own && widget.dateOverride ? (
+                // No title to carry the chip: a slim row of its own above the tiles, so the days read for the whole strip.
+                <div className="flex items-center gap-2 px-4 pt-2"><DateChip widget={widget} dates={props.dates} /></div>
             ) : null}
             {result?.status === 'error' && !ok ? (
                 <WidgetError result={result} onRetry={props.onRetry} onChooseSource={props.onChooseSource} compact />
@@ -150,15 +153,13 @@ export function KpiStripView(props: WidgetViewProps<KpiStripWidget>) {
                     )}
                     role="list"
                 >
-                    {c.metrics.map((m, i) => (
-                        <div key={m.id} role="listitem" className={phone ? 'flex min-w-0 bg-surface p-3' : 'flex min-w-[150px] flex-1 snap-start border-r border-border-subtle p-4 last:border-r-0'}>
+                    {c.metrics.map((m) => (
+                        <div key={m.id} role="listitem" className={phone ? 'flex min-w-0 bg-surface p-3' : cn('flex min-w-[150px] flex-1 snap-start border-r border-border-subtle last:border-r-0', height < 100 ? 'p-3' : 'p-4')}>
                             {loading && !ok ? (
                                 <div className="flex flex-col gap-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-7 w-24" /></div>
                             ) : (
                                 <Tile
                                     m={m} total={ok?.parts.total} spark={ok?.parts.spark}
-                                    // Without a title the chip sits on the first tile (it speaks for the whole strip).
-                                    chip={i === 0 && !(widget.showTitle && widget.title) ? <DateChip widget={widget} dates={props.dates} tile /> : undefined}
                                     showDelta={c.comparison.show && props.compare !== 'none'} showSpark={c.sparkline.show && (phone ? false : height >= 170)} wrapCompare={phone}
                                     compareLine={phone || !(widget.showTitle && widget.title) || height >= 150}
                                     sparkHeight={28} cmp={cmpOf(props)} currency={ok?.flags.currency}

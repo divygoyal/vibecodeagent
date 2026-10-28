@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
 
@@ -31,22 +31,32 @@ export interface ModalProps {
     trigger?: ReactNode;
     hideClose?: boolean;
     className?: string;
+    /** CSS selector of the element that gets focus when the dialog opens (default: Radix focuses the first focusable one). */
+    initialFocus?: string;
 }
 
 /**
  * Dialog (DESIGN 3.17). Focus trap, Esc, focus return, scroll lock from Radix.
  * Below 768px it is a bottom sheet with a drag handle.
  */
-export function Modal({ open, onOpenChange, title, description, children, footer, size = 'md', trigger, hideClose, className }: ModalProps) {
+export function Modal({ open, onOpenChange, title, description, children, footer, size = 'md', trigger, hideClose, className, initialFocus }: ModalProps) {
     useHideChatWidget(open);
     const returnFocus = useReturnFocus();
+    const content = useRef<HTMLDivElement>(null);
+    const openFocus = (e: Event) => {
+        returnFocus.onOpenAutoFocus();
+        const target = initialFocus ? content.current?.querySelector<HTMLElement>(initialFocus) : null;
+        if (target) { e.preventDefault(); target.focus({ preventScroll: true }); }
+    };
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             {trigger ? <Dialog.Trigger asChild>{trigger}</Dialog.Trigger> : null}
             <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 z-70 bg-overlay animate-fade-in" />
                 <Dialog.Content
+                    ref={content}
                     {...returnFocus}
+                    onOpenAutoFocus={openFocus}
                     aria-describedby={description ? undefined : undefined}
                     className={cn(
                         'tc-ui fixed z-70 flex flex-col bg-surface-raised text-body text-fg shadow-modal outline-none',

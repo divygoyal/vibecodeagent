@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     const t = new URL(req.url).searchParams.get('t');
     const spec = specFromToken(t);
     if (!spec) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
-    const img = chartImage(spec);
+    const img = await chartImage(spec);
     img.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
     img.headers.set('X-Robots-Tag', 'noindex');
     return img;
