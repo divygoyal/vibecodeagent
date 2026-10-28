@@ -13,7 +13,7 @@ import { buildChartMarks, resolveRefLines } from '@/lib/builder/chartMarks';
 import { fmtAxis, fmtDay } from '@/lib/format';
 import { channelColor, deviceColor, CATEGORICAL, CATEGORICAL_OTHER } from '@/lib/metrics';
 import { fmtMetricValue, getMetric, metricColor, metricLabel, dimLabel } from '@/lib/builder/catalog';
-import { AXIS_LABEL_GAP, AXIS_LAST_TICK_PAD, categoryAxisWidth, fitLabel } from '@/lib/builder/axisLabels';
+import { AXIS_LABEL_GAP, AXIS_LAST_TICK_PAD, categoryAxisWidth, fitLabel, wrapLabel } from '@/lib/builder/axisLabels';
 import { pieLayout } from '@/lib/builder/pieLayout';
 import { mondayFirst } from '@/lib/builder/dayOrder';
 import { countryName } from '@/lib/builder/countries';
@@ -29,7 +29,7 @@ import { dsFormat, dsKey } from './metricUi';
 
 /** Display text for a dimension value. */
 export function dimText(dim: string, v: CellValue, labels?: Record<string, string>): string {
-    if (v === null || v === undefined || v === '') return '(not set)';
+    if (v === null || v === undefined || v === '') return dim === 'newVsReturning' ? 'Unknown' : '(not set)';
     const s = String(v);
     if (labels?.[s]) return labels[s];
     const friendly = friendlyDimValue(dim, s);
@@ -157,6 +157,18 @@ function CategoryTick({ x, y, payload, maxPx }: { x?: number; y?: number; payloa
     );
 }
 
+/** A column chart's x label: broken over two lines to the width of its column; the full text stays in a tooltip. */
+function WrapTick({ x, y, payload, band }: { x?: number; y?: number; payload?: { value: string }; band: number }) {
+    const full = String(payload?.value ?? '');
+    const lines = wrapLabel(full, Math.max(36, band - 6), 2);
+    return (
+        <text x={x ?? 0} y={(y ?? 0) + 4} textAnchor="middle" fill={AXIS_TICK.fill} fontSize={AXIS_TICK.fontSize}>
+            <title>{full}</title>
+            {lines.map((l, i) => <tspan key={i} x={x ?? 0} dy={i === 0 ? 8 : 13}>{l}</tspan>)}
+        </text>
+    );
+}
+
 function BarChartPlot({ widget, rows, seriesKeys, compare, compareName = 'Previous period', height, currency, labels, onPick }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; compareName?: string; height: number; currency?: string; labels?: Record<string, string>; onPick?: (value: string) => void }) {
     const c = widget.config;
     const anim = !useReducedMotion();
@@ -211,7 +223,7 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, compareName = 'Previo
         <BarChart responsive data={data} layout={vertical ? 'horizontal' : 'vertical'} style={{ width: '100%', height: legend ? height - LEGEND_PX : height, ...(onPick ? { cursor: 'pointer' } : {}) }}
             onClick={onPick ? (st: { activeLabel?: string | number; activeIndex?: number | string | null }) => { const r = typeof st?.activeIndex === 'number' ? rows[st.activeIndex] : rows.find((x) => dimText(dim, x[`d:${dim}`], labels) === st?.activeLabel); const raw = r?.[`d:${dim}`]; if (raw !== undefined && raw !== null && raw !== '(other)') onPick(String(raw)); } : undefined} margin={{ top: 4, right: vertical ? 8 : AXIS_LAST_TICK_PAD, bottom: 0, left: 0 }} barCategoryGap="24%" accessibilityLayer>
             <CartesianGrid horizontal={vertical} vertical={!vertical} stroke={GRID_STROKE} />
-            {vertical ? <XAxis {...catAxis} tickFormatter={(v: string) => (v.length > 12 ? `${v.slice(0, 11)}…` : v)} /> : <YAxis {...catAxis} width={yWidth} tick={<CategoryTick maxPx={yWidth - AXIS_LABEL_GAP} />} />}
+            {vertical ? <XAxis {...catAxis} height={data.some((d) => String(d.__label).length > 9) ? 42 : 30} tick={(tp) => <WrapTick x={Number(tp.x)} y={Number(tp.y)} payload={{ value: String(tp.payload?.value ?? '') }} band={(Number(tp.width) || 480) / Math.max(1, data.length)} />} /> : <YAxis {...catAxis} width={yWidth} tick={<CategoryTick maxPx={yWidth - AXIS_LABEL_GAP} />} />}
             {vertical ? <YAxis {...valAxis} width={44} /> : <XAxis {...valAxis} />}
             <RTooltip content={tooltip} cursor={{ fill: 'var(--color-subtle)' }} isAnimationActive={false} />
             {stacked

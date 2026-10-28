@@ -20,6 +20,13 @@ export function friendlyDimValue(dim: DimId, value: string): string | null {
         if (v === '(direct) / (none)') return 'Direct (no source)';
         if (v === '(not set)' || v === '(not set) / (not set)') return 'Not set';
     }
+    // GA4's raw values ("new", "returning", "(not set)") read as data, not words (round 10).
+    if (dim === 'newVsReturning') {
+        const l = v.toLowerCase();
+        if (l === 'new') return 'New visitors';
+        if (l === 'returning') return 'Returning visitors';
+        if (l === '(not set)' || l === '') return 'Unknown';
+    }
     if (dim === 'page' || dim === 'landingPage' || dim === 'pagePath') {
         if (v === '/') return pageLabel('/');
     }

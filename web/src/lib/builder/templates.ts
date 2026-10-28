@@ -238,7 +238,7 @@ const BUILDERS_V1: Record<string, () => Built> = {
                 page('p_search', 'Search', [
                     [[ts('w_s_trend', 'Clicks and impressions', ['gsc:clicks', 'gsc:impressions']), 12, 7]],
                     [[table('w_s_queries', 'Top queries', ['query'], SEARCH_COLS, { bars: ['gsc:clicks'] }), 6, 9], [table('w_s_pages', 'Top pages', ['page'], SEARCH_COLS, { bars: ['gsc:clicks'] }), 6, 9]],
-                    [[pie('w_s_devices', 'Devices', 'device', 'gsc:clicks'), 4, 7], [barList('w_s_countries', 'Countries', 'country', 'gsc:clicks'), 8, 7]],
+                    [[pie('w_s_devices', 'Devices', 'device', 'gsc:clicks'), 4, 7], [barList('w_s_countries', 'Countries by clicks', 'country', 'gsc:clicks'), 8, 7]],
                 ], w),
                 page('p_traffic', 'Traffic', [
                     [[breakdownTs('w_t_channel', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 10], [pie('w_t_channels', 'Channels', 'channel', 'ga4:sessions'), 4, 10]],
