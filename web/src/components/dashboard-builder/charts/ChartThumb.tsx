@@ -18,6 +18,16 @@ export function chartThumb(type: string, x: number, y: number, w: number, h: num
                 return <rect key={i} x={x + 2 + c * cw} y={y + 2 + r * ch} width={Math.max(1, cw - 0.6)} height={Math.max(1, ch - 0.6)} rx={0.4} fill={color} opacity={0.12 + Math.max(0, Math.min(1, v)) * 0.7} />;
             });
         }
+        case 'scatter': {
+            const pts = [[0.2, 0.7, 2], [0.35, 0.45, 1.4], [0.5, 0.6, 1.8], [0.62, 0.3, 2.6], [0.75, 0.5, 1.2], [0.85, 0.2, 2.2], [0.28, 0.25, 1], [0.7, 0.75, 1.5]];
+            return (
+                <>
+                    <line x1={x + w / 2} y1={y + 2} x2={x + w / 2} y2={y + h - 2} stroke="var(--color-fg-faint)" strokeWidth={0.4} strokeDasharray="1.2 1" />
+                    <line x1={x + 2} y1={y + h / 2} x2={x + w - 2} y2={y + h / 2} stroke="var(--color-fg-faint)" strokeWidth={0.4} strokeDasharray="1.2 1" />
+                    {pts.map(([px, py, r], i) => <circle key={i} cx={x + 3 + px * (w - 6)} cy={y + 3 + py * (h - 6)} r={Math.min(r, h / 6)} fill={color} opacity={0.5} />)}
+                </>
+            );
+        }
         default: return null;
     }
 }

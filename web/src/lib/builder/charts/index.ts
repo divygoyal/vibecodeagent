@@ -7,6 +7,7 @@
 import type { WidgetMeta, DefaultCtx } from '../registry';
 import type { DataFrame, DimId, MetricId, WidgetDef, WidgetId, WidgetQuery, WidgetResultOk } from '../types';
 import { compileHeatmap, defaultHeatmapConfig, heatmapProblem, heatmapTitle } from './heatmap';
+import { compileScatter, defaultScatterConfig, scatterMetrics, scatterProblem, scatterTitle } from './scatter';
 import { CHART_TYPES, type ChartType, type ChartWidgetDef } from './types';
 
 export { CHART_TYPES };
@@ -27,11 +28,12 @@ export function isChartWidget(w: WidgetDef): w is ChartWidgetDef {
 
 /** Palette entries, merged into WIDGET_META. */
 export const CHART_META: Record<ChartType, WidgetMeta> = {
-    heatmap: { type: 'heatmap', label: 'Heatmap', description: 'Busiest weekday and hour, or a calendar of days, for one metric', icon: 'Grid3x3', group: 'Charts', defaultSize: { w: 6, h: 7 }, minSize: { w: 4, h: 6 }, maxSize: { w: 12, h: 12 }, phoneH: 7, static: false, keywords: ['heatmap', 'heat map', 'calendar', 'weekday', 'hour', 'peak hours', 'busiest', 'when'] },
+    heatmap: { type: 'heatmap', label: 'Heatmap', description: 'Busiest weekday and hour, or a calendar of days, for one metric', icon: 'Grid3x3', group: 'Charts', defaultSize: { w: 6, h: 8 }, minSize: { w: 4, h: 7 }, maxSize: { w: 12, h: 12 }, phoneH: 8, static: false, keywords: ['heatmap', 'heat map', 'calendar', 'weekday', 'hour', 'peak hours', 'busiest', 'when'] },
+    scatter: { type: 'scatter', label: 'Scatter plot', description: 'Two metrics by page, query or country, with median guides', icon: 'ScatterChart', group: 'Charts', defaultSize: { w: 6, h: 9 }, minSize: { w: 4, h: 7 }, maxSize: { w: 12, h: 14 }, phoneH: 9, static: false, keywords: ['scatter', 'bubble', 'quadrant', 'opportunity', 'correlation', 'impressions', 'ctr', 'compare'] },
 };
 
 /** Where each chart goes in the palette (after the existing charts). */
-export const CHART_PALETTE_ORDER: ChartType[] = ['heatmap'];
+export const CHART_PALETTE_ORDER: ChartType[] = ['heatmap', 'scatter'];
 
 // ── defaults ─────────────────────────────────────────────────────────────
 
@@ -43,6 +45,10 @@ export function chartDefaultWidget(type: ChartType, ctx: DefaultCtx, base: { id:
             return ctx.families.ga4
                 ? { ...base, type, title: 'Sessions by weekday and hour', config: defaultHeatmapConfig('weekday-hour', 'ga4:sessions') }
                 : { ...base, type, title: 'Clicks by day', config: defaultHeatmapConfig('calendar', 'gsc:clicks') };
+        case 'scatter': {
+            const config = defaultScatterConfig(ctx.families);
+            return { ...base, type, title: scatterTitle(config), config };
+        }
     }
 }
 
@@ -52,6 +58,7 @@ export function chartDefaultWidget(type: ChartType, ctx: DefaultCtx, base: { id:
 export function chartMetrics(w: WidgetDef): MetricId[] {
     switch (w.type) {
         case 'heatmap': return [w.config.metric.id];
+        case 'scatter': return scatterMetrics(w.config);
         default: return [];
     }
 }
@@ -60,6 +67,7 @@ export function chartMetrics(w: WidgetDef): MetricId[] {
 export function chartDimensions(w: WidgetDef): DimId[] {
     switch (w.type) {
         case 'heatmap': return w.config.variant === 'calendar' ? [] : ['dayOfWeek', 'hour'];
+        case 'scatter': return [w.config.dimension];
         default: return [];
     }
 }
@@ -67,6 +75,7 @@ export function chartDimensions(w: WidgetDef): DimId[] {
 export function chartTitle(w: WidgetDef): string {
     switch (w.type) {
         case 'heatmap': return heatmapTitle(w.config);
+        case 'scatter': return scatterTitle(w.config);
         default: return 'Chart';
     }
 }
@@ -75,6 +84,7 @@ export function chartTitle(w: WidgetDef): string {
 export function compileChart(w: WidgetDef, base: QueryBase): WidgetQuery[] {
     switch (w.type) {
         case 'heatmap': return compileHeatmap(w, base);
+        case 'scatter': return compileScatter(w, base);
         default: return [];
     }
 }
@@ -83,6 +93,11 @@ export function compileChart(w: WidgetDef, base: QueryBase): WidgetQuery[] {
 export function swapChartMetric(w: WidgetDef, from: MetricId, to: MetricId): WidgetDef {
     switch (w.type) {
         case 'heatmap': return w.config.metric.id === from ? { ...w, config: { ...w.config, metric: { id: to } } } : w;
+        case 'scatter': {
+            const c = w.config;
+            const swap = <T extends { id: MetricId } | undefined>(m: T): T => (m && m.id === from ? ({ id: to } as T) : m);
+            return { ...w, config: { ...c, x: swap(c.x), y: swap(c.y), size: swap(c.size) } };
+        }
         default: return w;
     }
 }
@@ -91,6 +106,7 @@ export function swapChartMetric(w: WidgetDef, from: MetricId, to: MetricId): Wid
 export function chartProblem(w: WidgetDef): string | null {
     switch (w.type) {
         case 'heatmap': return heatmapProblem(w);
+        case 'scatter': return scatterProblem(w);
         default: return null;
     }
 }
