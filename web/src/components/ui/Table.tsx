@@ -11,8 +11,9 @@ import { Button } from './Button';
 import { Card } from './Card';
 import { Select } from './Select';
 import { Skeleton } from './Skeleton';
+import { sortRows, type SortDir } from './tableSort';
 
-export type SortDir = 'asc' | 'desc';
+export type { SortDir };
 export interface SortState {
     key: string;
     dir: SortDir;
@@ -133,14 +134,6 @@ function mobileRoles<T>(columns: TableColumn<T>[], sortKey: string | undefined):
     return roles;
 }
 
-function compare(a: unknown, b: unknown): number {
-    if (a === b) return 0;
-    if (a === null || a === undefined) return 1;
-    if (b === null || b === undefined) return -1;
-    if (typeof a === 'number' && typeof b === 'number') return a - b;
-    return String(a).localeCompare(String(b), 'en', { numeric: true, sensitivity: 'base' });
-}
-
 /**
  * Data table (DESIGN 3.13): sticky header, sortable columns with aria-sort,
  * tabular numbers, one optional heat-bar column, client or server pagination,
@@ -163,9 +156,8 @@ export function Table<T>({
         if (!sort || onSortChange) return rows;
         const col = columns.find((c) => c.key === sort.key);
         if (!col?.sortValue) return rows;
-        const sv = col.sortValue;
-        const out = [...rows].sort((a, b) => compare(sv(a), sv(b)));
-        return sort.dir === 'desc' ? out.reverse() : out;
+        // Empty values ("–") stay at the bottom in both directions (round 4 audit #1).
+        return sortRows(rows, col.sortValue, sort.dir);
     }, [rows, sort, columns, onSortChange]);
 
     const clientPaged = pagination && pagination.total === undefined;

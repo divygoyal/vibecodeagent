@@ -2,6 +2,8 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
+import { SourceIcon } from '@/components/site/SourceIcon';
+import { sourceInfo } from '@/components/site/lib/sources';
 import {
     Activity,
     Globe2,
@@ -375,6 +377,12 @@ export function OverviewValueIcon({
 
     if (column === 'event' || column === 'events' || column === 'conversions' || column === 'link_out') {
         return <FallbackIcon title={value}>{semanticEventFallback(value, column)}</FallbackIcon>;
+    }
+
+    // Traffic sources use the app's own source icons (favicon, or Direct / Not set / email glyphs), round 4.
+    if (column === 'referrer_name' || column === 'utm_source') {
+        const info = sourceInfo(value);
+        return <IconFrame title={info.label}><SourceIcon info={info} /></IconFrame>;
     }
 
     const site = buildFaviconTarget(value);

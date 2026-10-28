@@ -59,7 +59,7 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
     }, []);
 
     const legendH = showLegend ? 22 : 0;
-    const mapH = Math.max(60, height - legendH);
+    const mapH = height - legendH;
 
     const { path, thresholds, max } = useMemo(() => {
         const proj = (projection === 'mercator' ? geoMercator() : geoNaturalEarth1()).fitExtent([[2, 2], [width - 2, mapH - 2]], { type: 'Sphere' } as GeoPermissibleObjects);
@@ -77,6 +77,8 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
         return `color-mix(in oklab, ${color} ${pct}%, var(--color-surface))`;
     };
 
+    // Guard: a world map squeezed under ~70 px tall draws as an empty band (round 4 audit #3).
+    if (mapH < 72 || width < 100) return null;
     if (failed) return <p className="py-6 text-center text-body-sm text-fg-muted">The map could not load. The list shows the same numbers.</p>;
     if (!features) return <div className="skeleton" style={{ width, height: mapH }} />;
 

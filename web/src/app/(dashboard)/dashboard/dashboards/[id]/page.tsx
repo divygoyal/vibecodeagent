@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Skeleton } from '@/components/ui';
 import { DashboardView, useUrlControls } from '@/components/dashboard-builder/DashboardView';
 import { DashboardBrandHeader } from '@/components/dashboard-builder/DashboardBrandHeader';
+import { brandCompanyName } from '@/lib/builder/placeholders';
 import { ShareDialog } from '@/components/dashboard-builder/ShareDialog';
 import { TvFrame, tvRefreshMs } from '@/components/dashboard-builder/TvMode';
 import { dashRootProps } from '@/components/dashboard-builder/theme/DashTheme';
@@ -118,7 +119,7 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
             const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(bg);
             return m ? `#${[m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('')}` : '#f6f7f9';
         })();
-        toast.promise(exportDashboardToPDF(exportRef.current, { dashboardName: doc.name, dateRangeLabel: presetLabel(ctl.state.date.range), companyName: doc.theme.header.companyName, backgroundColor: hex }), { loading: 'Preparing PDF…', success: 'PDF downloaded', error: 'PDF export failed' });
+        toast.promise(exportDashboardToPDF(exportRef.current, { dashboardName: doc.name, dateRangeLabel: presetLabel(ctl.state.date.range), companyName: brandCompanyName(doc.theme) ?? undefined, backgroundColor: hex }), { loading: 'Preparing PDF…', success: 'PDF downloaded', error: 'PDF export failed' });
     }, [doc, ctl.state.date.range]);
     const del = async () => {
         await fetchJson(`/api/dashboards/${rec.id}`, { method: 'DELETE' });
