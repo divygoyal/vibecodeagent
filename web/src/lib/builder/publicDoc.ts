@@ -4,6 +4,7 @@
  * Viewers can only move the controls the owner allowed; metrics, dimensions and sources can
  * never come from the query string.
  */
+import { usesMetric } from './calc';
 import { compareFromParam, rangeFromParam } from './dates';
 import { clickableDims, interactionFromParam } from './interaction';
 import { cleanVariable } from './variables';
@@ -67,6 +68,7 @@ export function publicDoc(doc: DashboardDocV2, labelOf: (s: SourceRef) => string
     for (const id of Object.keys(widgets)) if (!visible.has(id)) delete widgets[id];
     const theme = { ...doc.theme };
     delete theme.legacy;
+    const calcs = (doc.calcs ?? []).filter((c) => usesMetric(widgets, c.id));
     return {
         schemaVersion: 2,
         name: doc.name,
@@ -87,6 +89,8 @@ export function publicDoc(doc: DashboardDocV2, labelOf: (s: SourceRef) => string
         theme,
         settings: { widthMode: doc.settings.widthMode, autoRefreshSec: doc.settings.autoRefreshSec, ...(doc.settings.tv ? { tv: doc.settings.tv } : {}) },
         meta: {},
+        // Round 7 (B3): names of the calculated metrics the visible widgets use (ids hold no site data).
+        ...(calcs.length ? { calcs } : {}),
     };
 }
 

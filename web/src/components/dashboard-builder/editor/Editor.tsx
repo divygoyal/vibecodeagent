@@ -20,6 +20,7 @@ import {
 
 import { cn } from '@/lib/cn';
 import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Kbd, SegmentedControl, Tooltip } from '@/components/ui';
+import { registerCalcs } from '@/lib/builder/calc';
 import { addPage, addWidget, duplicatePage, duplicateWidget, firstFreeSlot, layoutFor, moveWidgetToPage, movePage, readingOrder, removePage, removeWidget, renamePage, setLayout, updatePage, clampItem } from '@/lib/builder/docOps';
 import { defaultWidget, widgetMeta, widgetTitle, newWidgetId } from '@/lib/builder/registry';
 import { dimLabel } from '@/lib/builder/catalog';
@@ -101,6 +102,8 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const router = useRouter();
     const s = useEditorStore();
     const { doc, pageId, selectedId, preview, viewport, controls, status } = s;
+    // Calculated metric names for the panels, pickers and canvas (idempotent; ids are unique per dashboard).
+    registerCalcs(doc?.calcs);
     const [shareOpen, setShareOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [versionsOpen, setVersionsOpen] = useState(false);

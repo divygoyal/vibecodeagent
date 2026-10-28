@@ -4,12 +4,15 @@
  * bundles zod.
  */
 import { z } from 'zod';
+import { parseCalcId } from './calc';
 import type { DashboardDocV2, WidgetDef } from './types';
 
 const id = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
 const iso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const shortText = z.string().max(300);
 const metricId = z.string().regex(/^(ga4|gsc|calc):[A-Za-z0-9_:]{1,80}$/);
+/** Round 7: a named calculated metric; the id must describe a valid calculation (calc.ts). */
+const calculatedMetric = z.object({ id: metricId.refine((v) => Boolean(parseCalcId(v)), 'not a calculated metric'), label: z.string().trim().min(1).max(60) });
 const dimId = z.string().regex(/^[A-Za-z0-9_:]{1,80}$/);
 const httpsUrl = z.string().max(2000).refine((v) => v === '' || /^https:\/\/[^\s]+$/i.test(v), 'https URL only');
 
@@ -142,6 +145,7 @@ export const docSchema = z.object({
         tv: z.object({ rotateSec: z.union([z.literal(0), z.literal(15), z.literal(30), z.literal(60), z.literal(120)]), hideControls: z.boolean() }).optional(),
     }),
     meta: z.object({ createdFrom: z.string().max(64).optional(), migratedFromV1: z.object({ at: z.string(), propertyId: z.string(), siteUrl: z.string().optional() }).optional() }),
+    calcs: z.array(calculatedMetric).max(30).optional(),
 });
 
 export const controlStateSchema = z.object({

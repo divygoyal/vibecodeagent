@@ -16,6 +16,7 @@ import 'react-grid-layout/css/styles.css';
 
 import { cn } from '@/lib/cn';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui';
+import { registerCalcs } from '@/lib/builder/calc';
 import { layoutFor } from '@/lib/builder/docOps';
 import { hiddenForViewers } from '@/lib/builder/placeholders';
 import { growsOnPhone, widgetMeta, widgetTitle } from '@/lib/builder/registry';
@@ -100,6 +101,7 @@ function toRgl(items: LayoutItem[], doc: DashboardDocV2, bp: Bp, editing: boolea
 
 export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit, empty, fitHeight, zoom = 1 }: DashboardCanvasProps) {
     const editing = mode === 'edit' && Boolean(edit);
+    registerCalcs(doc.calcs);
     const metrics = gridMetrics(doc);
     // Viewers never see unchanged template prompts or empty text/image widgets: the grid closes the gap (round 4).
     const pageItems = useMemo(() => {

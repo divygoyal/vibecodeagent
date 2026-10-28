@@ -3,6 +3,7 @@
  * client can derive a stable SWR key from the same function the server uses to plan Google
  * calls. Dates stay relative here; the server resolves them.
  */
+import { expandCalcs, isCalcId } from './calc';
 import { getMetric, metricLabel } from './catalog';
 import { clickDimension } from './interaction';
 import { widgetMetrics } from './registry';
@@ -321,7 +322,8 @@ export function compileWidget(rawWidget: WidgetDef, ctx: CompileCtx): CompiledWi
 }
 
 function allAdditive(metrics: string[]): boolean {
-    return metrics.every((id) => getMetric(id)?.additive);
+    // A calculated metric gets an "Other" row when its inputs add up (round 7: computed from their sums).
+    return metrics.every((id) => getMetric(id)?.additive || (isCalcId(id) && expandCalcs([id]).every((x) => getMetric(x)?.additive)));
 }
 
 /** Deterministic JSON (sorted keys) for cache and SWR keys. */
