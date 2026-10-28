@@ -6,59 +6,10 @@ import { ArrowRight, ShieldCheck } from 'lucide-react';
 
 import { Badge, Button } from '@/components/ui';
 import { Sparkline } from '@/components/charts';
-import { fmtCompact } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { Section, SectionHeading } from '../site/Section';
 import { SiteIcon } from '../site/SiteIcon';
-import { boardRowsFor, fetchProofCounts, isTestServer, proofItems, type BoardPreviewRow, type ProofItem } from './proof';
-
-type PreviewRow = BoardPreviewRow;
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function hostOf(url: unknown): string | null {
-    if (typeof url !== 'string' || !url) return null;
-    try {
-        return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, '');
-    } catch {
-        return null;
-    }
-}
-
-function normalise(data: any): PreviewRow[] {
-    if (Array.isArray(data?.rows)) {
-        return data.rows.slice(0, 5).map((r: any, i: number) => {
-            const v = r.visitors;
-            return {
-                key: String(r.id),
-                rank: typeof r.rank === 'number' ? r.rank : i + 1,
-                href: `/leaderboard/${encodeURIComponent(r.slug ?? r.id)}`,
-                name: String(r.name ?? ''),
-                host: hostOf(r.website_url),
-                category: r.category ?? null,
-                visitors: v ? (v.mode === 'exact' ? fmtCompact(v.value) : String(v.label ?? '')) : null,
-                deltaPct: v && typeof v.delta_pct === 'number' ? v.delta_pct : null,
-                spark: Array.isArray(r.spark?.values) ? r.spark.values.map((x: unknown) => (typeof x === 'number' ? x : 0)) : null,
-                verified: Boolean(r.verification?.ranked ?? r.verification?.level === 'owner'),
-            };
-        });
-    }
-    if (Array.isArray(data?.entries)) {
-        return data.entries.slice(0, 5).map((e: any, i: number) => ({
-            key: String(e.id),
-            rank: i + 1,
-            href: `/leaderboard/${encodeURIComponent(e.slug ?? e.id)}`,
-            name: String(e.startup_name ?? ''),
-            host: hostOf(e.website_url),
-            category: e.category ?? null,
-            visitors: typeof e.monthly_visitors === 'number' ? fmtCompact(e.monthly_visitors) : null,
-            deltaPct: typeof e.visitor_trend === 'number' ? e.visitor_trend : null,
-            spark: null,
-            verified: Boolean(e.is_verified),
-        }));
-    }
-    return [];
-}
-/* eslint-enable @typescript-eslint/no-explicit-any */
+import { boardPreviewRows, boardRowsFor, fetchProofCounts, isTestServer, proofItems, type BoardPreviewRow, type ProofItem } from './proof';
 
 function Delta({ pct }: { pct: number | null }) {
     if (pct === null || !Number.isFinite(pct)) return null;
@@ -73,37 +24,38 @@ function Delta({ pct }: { pct: number | null }) {
 }
 
 /**
- * Live leaderboard teaser for the home page. Reads the public leaderboard API;
- * renders nothing at all (no section) until real rows arrive, and nothing when
- * the board is empty or unavailable. Never shows placeholder rows.
+ * Leaderboard teaser for the home page: the public board's top 5 for 28 days, the same rows, ranks, window and
+ * numbers as /leaderboard (proof.ts boardPreviewRows over the board query, so an owner who shows a range shows a
+ * range here too). The page renders it on the server (it is there without JavaScript); the client refreshes it
+ * from the same public API. Renders nothing when the board is empty or unavailable, never placeholder rows.
+ *
+ * On a real server, rows on reserved test domains never show (proof.ts boardRowsFor); on a test server the seeded
+ * listings show, tagged "Sample rows".
  *
  * Social proof (round 2): live counts of listed and owner-verified sites from
  * the same API, each shown only above its threshold (proof.ts), never invented.
  */
-export function LeaderboardPreview({ sampleRows = [] }: { sampleRows?: BoardPreviewRow[] }) {
-    const [rows, setRows] = useState<PreviewRow[] | null>(null);
-    const [sample, setSample] = useState(false);
+export function LeaderboardPreview({ initialRows = [], testServer = false }: { initialRows?: BoardPreviewRow[]; testServer?: boolean }) {
+    const [board, setBoard] = useState(() => boardRowsFor(initialRows, testServer));
     const [proof, setProof] = useState<ProofItem[]>([]);
 
     useEffect(() => {
         const ctrl = new AbortController();
-        fetch('/api/leaderboard?tab=top&range=28d&sort=traffic&page_size=5', { signal: ctrl.signal, headers: { Accept: 'application/json' } })
+        fetch('/api/leaderboard?tab=top&range=28d&page_size=5', { signal: ctrl.signal, headers: { Accept: 'application/json' } })
             .then((res) => (res.ok ? res.json() : null))
             .then((data) => {
-                const board = boardRowsFor(data ? normalise(data).filter((r) => r.name) : [], isTestServer(window.location.hostname));
-                // Test server with seeded listings: show the demo generator's own sites instead, so the numbers
-                // match the portfolio above (same sites, same 28-day users), clearly tagged as sample rows.
-                setRows(board.sample && sampleRows.length ? sampleRows : board.rows);
-                setSample(board.sample);
+                const rows = data ? boardPreviewRows(data) : [];
+                if (rows.length) setBoard(boardRowsFor(rows, isTestServer(window.location.hostname)));
             })
-            .catch(() => { /* aborted or offline: stay hidden */ });
+            .catch(() => { /* aborted or offline: keep the server rows */ });
         fetchProofCounts(ctrl.signal)
             .then((counts) => setProof(proofItems(counts)))
             .catch(() => { /* aborted or offline: no proof row */ });
         return () => ctrl.abort();
-    }, [sampleRows]);
+    }, []);
 
-    if (!rows || rows.length === 0) return null;
+    const { rows, sample } = board;
+    if (rows.length === 0) return null;
 
     return (
         <Section id="leaderboard" labelledBy="lb-title">

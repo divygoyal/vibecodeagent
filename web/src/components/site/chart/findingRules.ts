@@ -2,6 +2,7 @@
  * The rules behind the one-line chart findings (useFindings.ts), as pure functions: the hooks feed them the page's
  * data, and the home page's sample rows call them on the server with the same data. No React, no fetch.
  */
+import { endsToday } from '@/lib/dateRange';
 import { fmtCurrency } from '@/lib/format';
 import { METRICS, type MetricKey } from '@/lib/metrics';
 import { rateFinding, trendFinding, updateImpactFinding, type Driver, type Finding } from '../lib/findings';
@@ -16,6 +17,8 @@ export interface FindingContext {
     siteHost: string | null;
     /** Daily points (the series feeds the "best day" rules); false for week / month buckets. */
     daily?: boolean;
+    /** "Today" for the partial-day check (defaults to now). */
+    now?: Date | string;
 }
 
 /** The GA4 breakdown that names what moved a traffic metric (null: none needed). */
@@ -65,7 +68,8 @@ export function trafficFindingOf(metric: MetricKey, summary: Ga4Summary | undefi
         drivers: list,
         driverUnit: unit,
         series: ctx.daily === false ? undefined : summary.series.map((s) => ({ date: s.date, value: (s as unknown as Record<string, number>)[metric] ?? 0 })),
-        partialLast: true,
+        // Only a series that runs into today has a point still filling in (lib/dateRange: complete days only).
+        partialLast: endsToday(summary.series[summary.series.length - 1]?.date ?? '', ctx.now),
         ...(metric === 'revenue' ? { fmt: (n: number) => fmtCurrency(n, summary.currency, { compact: true }) } : {}),
     });
 }

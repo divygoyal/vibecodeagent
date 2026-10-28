@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import { cn } from '@/lib/cn';
+import { endsToday, partialTailFrom } from '@/lib/dateRange';
 import { fmtDateRange } from '@/lib/format';
 import { channelColor, deviceColor, METRICS, type MetricKey } from '@/lib/metrics';
 import { BarList } from '@/components/charts/BarList';
@@ -76,7 +77,7 @@ export function TrafficOverviewTab() {
                 <ChartCard
                     bare
                     title={`${METRICS[chartMetric].label} per ${interval}`}
-                    subtitle={compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')} · today is partial` : 'Today is partial'}
+                    subtitle={compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')}${endsToday(dr.resolved.end) ? ' · today is partial' : ''}` : endsToday(dr.resolved.end) ? 'Today is partial' : undefined}
                     actions={<IntervalSwitch days={days} />}
                     state={q.state === 'error' ? 'error' : empty ? 'empty' : q.state}
                     error={{ message: q.error?.message, onRetry: q.mutate }}
@@ -89,7 +90,7 @@ export function TrafficOverviewTab() {
                         data={series as unknown as Record<string, number | string | null>[]}
                         series={[{ metric: chartMetric, key: chartMetric, compareKey: compareOn ? `prev_${chartMetric}` : undefined, currency }]}
                         compareDateKey="prevDate"
-                        partialFrom={series.length > 1 ? series.length - 1 : undefined}
+                        partialFrom={partialTailFrom(series.length, dr.resolved.end)}
                         annotations={toAnnotations(marks.markers)}
                         height={300}
                         ariaLabel={`${METRICS[chartMetric].label} per ${interval}, ${fmtDateRange(dr.resolved.start, dr.resolved.end)}`}

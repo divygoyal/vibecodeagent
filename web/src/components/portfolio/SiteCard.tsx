@@ -152,6 +152,11 @@ export const SiteCard = memo(function SiteCard({
             ? { s: [{ metric: 'clicks' as const, values: site.series.clicks ?? [] }, { metric: 'impressions' as const, values: site.series.impressions ?? [] }], d: dates.search }
             : null;
     const window = trafficFirst && hasTraffic ? windows.traffic : hasSearch ? windows.search : windows.traffic;
+    // A paired card shows numbers from both sources, whose windows end on different days (GA4 yesterday, Search
+    // Console 2 days ago): the footer names the leading source's days, the tooltip both (the page subtitle says so too).
+    const windowTitle = hasTraffic && hasSearch && windows.traffic && windows.search && windows.traffic.curEnd !== windows.search.curEnd
+        ? `Traffic ${fmtDateRange(windows.traffic.curStart, windows.traffic.curEnd)} · Search ${fmtDateRange(windows.search.curStart, windows.search.curEnd)}`
+        : undefined;
     const chip = alertChipText(site);
     const critical = site.alerts[0]?.severity === 'critical';
     const sparkHeight = compact ? 56 : 72;
@@ -251,7 +256,7 @@ export const SiteCard = memo(function SiteCard({
                         </span>
                     </Tooltip>
                 ) : window && !loadingData ? (
-                    <span className="min-w-0 truncate text-meta whitespace-nowrap text-fg-muted">
+                    <span className="min-w-0 truncate text-meta whitespace-nowrap text-fg-muted" title={greyed ? undefined : windowTitle}>
                         {greyed && site.lastSyncedAt ? `Last data ${fmtDay(new Date(site.lastSyncedAt * 1000))}` : fmtDateRange(window.curStart, window.curEnd)}
                     </span>
                 ) : null}

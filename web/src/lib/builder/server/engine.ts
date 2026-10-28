@@ -15,7 +15,8 @@ import { calcValue, expandCalcs, parseCalcId, registerCalcs, shareTotals, sumOf,
 import { dimInFamily, getDim, getMetric, type Family, type MetricDef } from '../catalog';
 import { applyViewerControls, canonicalJson, compileWidget } from '../compile';
 import { alpha2ToGsc, gscToAlpha2 } from '../countries';
-import { addDays, autoGranularity, eachDay, fromDay, monthStart, resolveCompare, resolveRange, todayIn, weekStart } from '../dates';
+import { lastCompleteDay, searchWindowOf } from '@/lib/dateRange';
+import { addDays, autoGranularity, eachDay, fromDay, monthStart, resolveCompare, resolveRange, toDay, todayIn, weekStart } from '../dates';
 import { widgetMeta } from '../registry';
 import { tableTrendQuery } from '../trend';
 import type {
@@ -459,6 +460,13 @@ function withComponents(metrics: string[]): string[] {
 
 // ── Planning per widget ──────────────────────────────────────────────────
 
+/** A GSC leaf's window: the GA4 window moved onto Search Console's last complete day; the comparison moves with it. */
+function searchWindows(range: Range, compare: Range | undefined, today: Iso): { range: Range; compare?: Range } {
+    const r = searchWindowOf(range, today);
+    const shift = toDay(range.end) - toDay(r.end);
+    return { range: r, compare: compare && shift ? { start: addDays(compare.start, -shift), end: addDays(compare.end, -shift) } : compare };
+}
+
 interface Target { site: ResolvedSite; families: Family[] }
 
 interface WidgetPlan {
@@ -563,6 +571,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     const today = todayIn(tz, now);
     const baseRange = resolveRange(input.controls.date.range, today);
     const baseCompare = resolveCompare(baseRange, input.controls.date.compare);
+    const baseSearch = searchWindowOf(baseRange, today);
     const stats: ExecStats = { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 };
     const results: Record<string, WidgetResult> = {};
 
@@ -572,7 +581,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     }
     const response = (): DashboardQueryResponse => ({
         results,
-        resolved: { range: baseRange, compare: baseCompare, timezone: tz, today },
+        resolved: { range: baseRange, compare: baseCompare, ...(baseSearch.end !== baseRange.end ? { search: baseSearch } : {}), timezone: tz, today },
         meta: { durationMs: Date.now() - t0, google: { ga4Calls: stats.ga4Calls, gscCalls: stats.gscCalls, ga4Reports: stats.ga4Reports }, cache: { hit: stats.hit, stale: stats.stale, miss: stats.miss } },
     });
     if (!dataWidgets.length) return response();
@@ -674,8 +683,14 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             const granularity: 'day' | 'week' | 'month' = q.granularity ?? (timeDim === 'week' ? 'week' : timeDim === 'month' ? 'month' : (timeDim ? autoGranularity(range.start, range.end, 'line') : 'day'));
             const effDims = canonDims.map((d) => (d === 'date' && granularity !== 'day' ? granularity : d));
             const qCompare = q.compare ? compare : undefined;
+            // Search Console reads its own window (lib/dateRange: through 2 days ago), the days the site page and the
+            // portfolio count, except on a date axis it shares with GA4 (its newest day is then marked preliminary).
+            const gscOnly = families.length === 1 && families[0] === 'gsc';
+            const gscWin = timeDim && !gscOnly ? null : searchWindows(range, qCompare, today);
+            const gscRange = gscWin?.range ?? range;
+            const gscCompare = gscWin ? gscWin.compare : qCompare;
 
-            const entry: WidgetPlan['queries'][number] = { q, range, compare: qCompare, targets: [], leaves: [], families, granularity, base };
+            const entry: WidgetPlan['queries'][number] = { q, range: gscOnly ? gscRange : range, compare: gscOnly ? gscCompare : qCompare, targets: [], leaves: [], families, granularity, base };
             plan.queries.push(entry);
 
             const missing = new Set<Family>();
@@ -713,8 +728,8 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
                     if (family === 'ga4') {
                         entry.leaves.push({ site, leaf: { ...common, range, compare: qCompare } });
                     } else {
-                        entry.leaves.push({ site, leaf: { ...common, range } });
-                        if (qCompare) entry.leaves.push({ site, leaf: { ...common, range: qCompare, isPrev: true } });
+                        entry.leaves.push({ site, leaf: { ...common, range: gscRange } });
+                        if (gscCompare) entry.leaves.push({ site, leaf: { ...common, range: gscCompare, isPrev: true } });
                     }
                 }
             }
@@ -944,8 +959,9 @@ function assemble(
                 if (data.flags.otherRow) flags.otherRow = true;
                 if (data.flags.currency) flags.currency = data.flags.currency;
                 if (leaf.family === 'gsc' && !leaf.isPrev) {
-                    const lag = addDays(today, -2);
-                    const pf = data.flags.firstIncomplete ?? (e.range.end >= lag ? (lag > e.range.start ? lag : e.range.start) : undefined);
+                    // Days after Search Console's last complete day (lib/dateRange) are preliminary.
+                    const lag = addDays(lastCompleteDay('gsc', today), 1);
+                    const pf = data.flags.firstIncomplete ?? (leaf.range.end >= lag ? (lag > leaf.range.start ? lag : leaf.range.start) : undefined);
                     if (pf && (!flags.preliminaryFrom || pf < flags.preliminaryFrom)) flags.preliminaryFrom = pf;
                 }
                 const metricIds = data.metrics.map((api) => (leaf.family === 'gsc' ? `gsc:${api}` : `ga4:${api}`));

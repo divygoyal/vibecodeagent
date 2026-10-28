@@ -531,7 +531,7 @@ export default function SharedDashboardClient({
     token,
     config,
 }: SharedDashboardClientProps) {
-    const [range, setRange] = useState('30d');
+    const [range, setRange] = useState('28d');
     const [rawData, setRawData] = useState<RawApiResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

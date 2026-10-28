@@ -1,9 +1,12 @@
 /**
  * Portfolio ranges and date windows (UTC days, 'YYYY-MM-DD'). Client-safe.
  *
- * GA4 windows end yesterday (today is partial). Search Console windows end on
- * the newest stored GSC date (it lags 2-3 days), clamped to 1-6 days ago.
+ * The app's one window rule (lib/dateRange resolveWindow): GA4 windows end yesterday (today is
+ * partial), Search Console windows end 2 days ago, the same days the site pages, dashboards and
+ * share page use. When the stored Search Console data stops earlier (Google is a day late), the
+ * window ends on the newest stored day instead (never more than 6 days ago) and says so in its dates.
  */
+import { lastCompleteDay, resolveWindow } from '@/lib/dateRange';
 import type { PortfolioRange } from './types';
 
 export const PORTFOLIO_RANGES: readonly PortfolioRange[] = ['7d', '28d', '3m', '12m'];
@@ -68,10 +71,12 @@ export interface WindowRequest {
 /** Window requests for the admin snapshot (and the demo aggregator). */
 export function windowRequests(range: PortfolioRange, now: number = Date.now()): { ga4: WindowRequest; gsc: WindowRequest } {
     const today = todayIso(now);
-    const days = RANGE_DAYS[range];
+    const at = new Date(now);
+    const ga4 = resolveWindow({ preset: range, compare: 'prev' }, 'ga4', { now: at });
+    const gsc = resolveWindow({ preset: range, compare: 'prev' }, 'gsc', { now: at });
     return {
-        ga4: { days, end: addDays(today, -1) },
-        gsc: { days, end_min: addDays(today, -6), end_max: addDays(today, -1) },
+        ga4: { days: ga4.days, end: ga4.end },
+        gsc: { days: gsc.days, end_min: addDays(today, -6), end_max: lastCompleteDay('gsc', at) },
     };
 }
 

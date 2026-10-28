@@ -3,6 +3,7 @@
  * YYYY-MM-DD. Windows end at the latest complete day: GA4 yesterday,
  * Search Console two days ago (yesterday with fresh=true).
  */
+import { SOURCE_LAG_DAYS } from '@/lib/dateRange';
 import { ToolError } from './errors';
 
 export const PRESETS = ['last_7d', 'last_14d', 'last_28d', 'last_30d', 'last_90d', 'last_180d', 'last_365d', 'this_month', 'last_month', 'last_quarter', 'ytd'] as const;
@@ -37,10 +38,10 @@ export function todayDay(now = Date.now()): number {
     return Math.floor(now / DAY);
 }
 
+/** The app's one window rule (lib/dateRange SOURCE_LAG_DAYS): GA4 yesterday, Search Console 2 days ago. */
 export function latestCompleteDay(source: 'ga4' | 'gsc', fresh = false, now = Date.now()): number {
     const today = todayDay(now);
-    if (source === 'ga4') return today - 1;
-    return fresh ? today - 1 : today - 2;
+    return today - (source === 'gsc' && fresh ? 1 : SOURCE_LAG_DAYS[source]);
 }
 
 function parseToken(token: string, field: string, now: number): number {

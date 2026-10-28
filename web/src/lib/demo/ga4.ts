@@ -432,6 +432,19 @@ function siteComps(site: DemoSite, users: number, day: number, today: number): C
     };
 }
 
+/**
+ * A day's site totals as whole counts (round 7): a property's daily report then sums to exactly its range total, as in
+ * GA4, so the portfolio (which adds stored days) and the site page and dashboards (one report over the range) show the
+ * same sessions, views and key events for the same window. Durations and revenue stay fractional.
+ */
+const COUNT_KEYS = ['U', 'NU', 'S', 'ENG', 'PV', 'EV', 'KEY', 'TX', 'ATC', 'CO', 'VI'] as const;
+function wholeCounts(c: Comps): Comps {
+    for (const k of COUNT_KEYS) c[k] = Math.round(c[k]);
+    if (c.NU > c.U) c.NU = c.U;
+    if (c.ENG > c.S) c.ENG = c.S;
+    return c;
+}
+
 interface CompTable { start: number; daily: Comps[]; prefix: Record<CompKey, Float64Array> }
 const compCache = new Map<string, CompTable>();
 
@@ -442,7 +455,7 @@ function compTable(site: DemoSite, today: number): CompTable {
     if (table) return table;
     if (compCache.size > 100) compCache.clear();
     const { start, values } = dailySeries(site, today);
-    const daily = Array.from(values, (u, i) => (u > 0 ? siteComps(site, u, start + i, today) : emptyComps()));
+    const daily = Array.from(values, (u, i) => (u > 0 ? wholeCounts(siteComps(site, u, start + i, today)) : emptyComps()));
     const prefix = {} as Record<CompKey, Float64Array>;
     for (const k of COMP_KEYS) {
         const arr = new Float64Array(daily.length + 1);
@@ -664,13 +677,13 @@ function buildRows(site: DemoSite, dims: string[], dimensionFilter: any, ranges:
         combos = combos.filter(c => evalGaExpression(dimensionFilter, f => (TIME_DIMS.has(f) ? undefined : c.vals[f] ?? (DIMENSION_GROUP[f] ? undefined : '(not set)'))) !== false);
     }
     // Pass 2: merge combinations that share the requested dimension values. `un` keeps each range's
-    // noise-weighted share (the fast path's scale), from the entities' noise.
+    // noise-weighted share (the range-level scale of every path), from the entities' noise.
     const merged = new Map<string, Combo & { key2: string; un: number[] }>();
     const rangeBounds = ranges.map(r => [r.start, r.end] as const);
     for (const c of combos) {
         const values = entDims.map(d => c.vals[d] ?? '(not set)');
         const k = values.join('\u0001');
-        const un = needTime ? [] : rangeBounds.map(([rs, re]) => c.u * comboNoise(site, c, rs, re));
+        const un = rangeBounds.map(([rs, re]) => c.u * comboNoise(site, c, rs, re));
         const m = merged.get(k);
         if (!m) {
             merged.set(k, { ...c, vals: Object.fromEntries(entDims.map((d, i) => [d, values[i]])), key2: k, f: { ...c.f }, un });
@@ -697,12 +710,15 @@ function buildRows(site: DemoSite, dims: string[], dimensionFilter: any, ranges:
         const e = Math.min(range.end, today);
         for (const row of merged.values()) {
             const rowNoiseKey = row.key2 || '';
+            // The row's range-level share, the same in every report shape (round 7): a by-date report filtered to some
+            // entities (the AI sources) then sums to what the one-dimension report gives those entities.
+            const rangeScale = row.u > 0 ? row.un[ri] / row.u : 1;
             if (!needTime) {
                 // Fast path: one bucket for the whole range.
                 const days = e - s + 1;
                 if (days <= 0) continue;
                 const base = rangeComps(table, s, e);
-                const scale = rowNoiseKey && row.u > 0 ? row.un[ri] / row.u : 1;
+                const scale = rangeScale;
                 const k = `${rowNoiseKey}\u0002${range.name}`;
                 const acc = out.get(k) || { dims: [...entDims.map(d => row.vals[d]), ...(ranges.length > 1 ? [range.name] : [])], comps: emptyComps(), vals: row.vals };
                 addScaled(acc.comps, base, row, scale);
@@ -721,7 +737,7 @@ function buildRows(site: DemoSite, dims: string[], dimensionFilter: any, ranges:
                         const ok = evalGaExpression(dimensionFilter, f => tv[f] ?? row.vals[f]);
                         if (ok === false) continue;
                     }
-                    const scale = share * (rowNoiseKey ? noise(0.13, site.key, rowNoiseKey, day, hour ?? '') : hour !== null ? noise(0.1, site.key, 'h', day, hour) : 1);
+                    const scale = share * rangeScale * (rowNoiseKey ? noise(0.13, site.key, rowNoiseKey, day, hour ?? '') : hour !== null ? noise(0.1, site.key, 'h', day, hour) : 1);
                     const dimValues = dims.map(d => (TIME_DIMS.has(d) ? tv[d] : row.vals[d]));
                     if (ranges.length > 1) dimValues.push(range.name);
                     const k = dimValues.join('\u0001');

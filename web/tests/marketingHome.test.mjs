@@ -121,16 +121,29 @@ test('the home leaderboard never shows test-domain rows on a real server', async
     assert.deepEqual(boardRowsFor([{ host: 'real.com' }], true).sample, false);
 });
 
-test('test-server leaderboard rows come from the same generator as the hero', async () => {
-    const { buildHomeData } = await import('../src/components/marketing/home/homeData.ts');
-    const { byRange, boardSample } = buildHomeData(Date.UTC(2026, 9, 27, 12));
-    assert.equal(boardSample.length, 5);
-    for (let i = 0; i < boardSample.length; i++) {
-        const row = boardSample[i];
-        assert.equal(row.rank, i + 1);
-        const site = byRange['28d'].sites.find((s) => `sample:${s.key}` === row.key);
-        assert.ok(site && site.traffic, 'a real portfolio site');
-        assert.ok(row.visitors && !/[–-]/.test(row.visitors), 'exact numbers, no ranges');
-        assert.ok(!row.name.includes(' – '), 'short name');
+test('home "Top sites right now" is the board\'s own rows: ranks, privacy ranges and order as /leaderboard', async () => {
+    const { boardPreviewRows } = await import('../src/components/marketing/home/proof.ts');
+    // The shape of /api/lb/board (tab=top, range=28d): the admin API has applied each owner's privacy already.
+    const board = { rows: [
+        { id: 9, rank: 1, slug: 'pixelforge', name: 'PixelForge Games', website_url: 'https://pixelforge.example', category: 'Games', visitors: { mode: 'exact', value: 109_400, delta_pct: 4.2 }, verification: { level: 'owner', ranked: true } },
+        { id: 10, rank: 2, slug: 'bytebrief', name: 'ByteBrief Newsletter', website_url: 'https://bytebrief.example', category: 'Newsletter', visitors: { mode: 'range', label: '50K–100K', delta_pct: null }, verification: { level: 'owner', ranked: true } },
+        { id: 2, rank: 3, slug: 'health', name: 'Health Insights', website_url: 'https://www.healthinsights.example', category: 'Blog', visitors: { mode: 'range', label: '10K–50K', delta_pct: 2.5 }, verification: { level: 'owner', ranked: true } },
+        { id: 1, rank: 4, slug: 'acme', name: 'Acme Analytics', website_url: 'acmeanalytics.example', visitors: { mode: 'exact', value: 46_800, delta_pct: 8.2 } },
+        { id: 5, rank: 5, slug: 'x', name: 'X', website_url: null, visitors: null },
+        { id: 6, rank: 6, slug: 'y', name: 'Y', website_url: null, visitors: null },
+    ] };
+    const rows = boardPreviewRows(board);
+    assert.deepEqual(rows.map((r) => [r.rank, r.name, r.visitors]), [
+        [1, 'PixelForge Games', '109K'], [2, 'ByteBrief Newsletter', '50K–100K'], [3, 'Health Insights', '10K–50K'],
+        [4, 'Acme Analytics', '46.8K'], [5, 'X', null],
+    ]);
+    assert.equal(rows[2].host, 'healthinsights.example');
+    assert.equal(rows[0].href, '/leaderboard/pixelforge');
+    // An owner who shows a range never gets an exact number on the home page.
+    for (const r of rows) {
+        const v = board.rows.find((b) => b.name === r.name).visitors;
+        if (v?.mode === 'range') assert.equal(r.visitors, v.label);
     }
+    assert.deepEqual(boardPreviewRows(null), []);
+    assert.deepEqual(boardPreviewRows({ entries: [{ startup_name: 'old' }] }), [], 'no legacy shape with invented numbers');
 });

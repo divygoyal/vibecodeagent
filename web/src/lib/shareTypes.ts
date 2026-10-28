@@ -128,7 +128,7 @@ const DEFAULT_STUDIO_FIELDS = {
     } as Record<ShareSectionId, boolean>,
     theme: { accentColor: DEFAULT_SHARE_ACCENT, preset: 'aurora' as ShareThemePreset },
     branding: { logoUrl: null, companyName: null, showWatermark: true },
-    defaults: { range: '30d', interval: 'auto' as ShareDefaultInterval, metricIndex: 0, filter: null },
+    defaults: { range: '28d', interval: 'auto' as ShareDefaultInterval, metricIndex: 0, filter: null },
 };
 
 export const LEGACY_SHARE_CONFIG: NormalizedShareConfig = {
@@ -267,7 +267,9 @@ function normalizeDefaults(input?: ShareDefaults | null): NormalizedShareConfig[
         metricIndex = 0;
     }
     return {
-        range: typeof input?.range === 'string' && input.range.length > 0 ? input.range : '30d',
+        // 28 complete days, the app's window (lib/dateRange). '30d' was the stored default before round 7 and no
+        // screen sets it, so it reads as the default too: client pages open on whole weeks, comparison aligned.
+        range: typeof input?.range === 'string' && input.range.length > 0 && input.range !== '30d' ? input.range : '28d',
         interval,
         metricIndex,
         filter:

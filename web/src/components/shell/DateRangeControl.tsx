@@ -6,7 +6,7 @@ import { parseAsString, useQueryStates } from 'nuqs';
 
 import { cn } from '@/lib/cn';
 import {
-    COMPARE_OPTIONS, compareSuffix, normalizeDateRange, presetDef, QUICK_PRESETS, RANGE_PRESETS, resolveDateRange, toLegacyRange,
+    COMPARE_OPTIONS, compareSuffix, normalizeDateRange, presetDef, QUICK_PRESETS, RANGE_PRESETS, resolveWindow, toLegacyRange,
     type CompareMode, type DateRangeValue, type RangePreset, type ResolvedDateRange,
 } from '@/lib/dateRange';
 import { fmtDateRange, fmtMonthYear } from '@/lib/format';
@@ -23,7 +23,7 @@ export interface DateRangeState {
     setValue: (v: DateRangeValue) => void;
     setPreset: (p: RangePreset) => void;
     setCompare: (c: CompareMode) => void;
-    /** GA4 days (ends today). */
+    /** GA4 days (complete days: ends yesterday). lib/dateRange resolveWindow, the app's one window rule. */
     resolved: ResolvedDateRange;
     /** Search Console days (ends 2 days ago, the usual GSC delay). */
     resolvedSearch: ResolvedDateRange;
@@ -68,8 +68,8 @@ export function useDateRange(): DateRangeState {
             setValue,
             setPreset: (p: RangePreset) => setValue({ ...value, preset: p, from: undefined, to: undefined }),
             setCompare: (c: CompareMode) => setValue({ ...value, compare: c }),
-            resolved: resolveDateRange(value, { now }),
-            resolvedSearch: resolveDateRange(value, { now, lagDays: 2 }),
+            resolved: resolveWindow(value, 'ga4', { now }),
+            resolvedSearch: resolveWindow(value, 'gsc', { now }),
             label: presetDef(value.preset).label,
             compareLabel: compareSuffix(value),
             legacyRange: toLegacyRange(value.preset),

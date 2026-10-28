@@ -62,6 +62,7 @@ export function ActionsPage() {
             <SiteHeader
                 section="Actions"
                 search={!site.hasGa4}
+                both
                 source={counting ? 'Finding what to fix next…' : `${fmtFull(byStatus.open.length)} open${top5 > 0 ? ` · about +${fmtCompact(top5)} clicks a month if you finish the top 5` : ''}`}
                 actions={<Button asChild variant="secondary" icon={ClipboardCheck}><Link href={`${siteHref(site.host, 'actions')}/audit`}>Site audit</Link></Button>}
                 tabs={(

@@ -52,6 +52,7 @@ export async function GET(
         'yesterday',
         '7d',
         '14d',
+        '28d',
         '30d',
         '60d',
         '90d',
@@ -65,8 +66,9 @@ export async function GET(
         '12m',
         'all',
     ];
-    const rangeParam = new URL(req.url).searchParams.get('range') || '30d';
-    const range = allowedRanges.includes(rangeParam) ? rangeParam : '30d';
+    // Default: the app's 28 complete days (lib/dateRange, via googleApi.resolveRange), the site page's window.
+    const rangeParam = new URL(req.url).searchParams.get('range') || '28d';
+    const range = allowedRanges.includes(rangeParam) ? rangeParam : '28d';
 
     /* ─── Rate limiting ─── */
     if (isRateLimited(token)) {
@@ -163,7 +165,7 @@ export async function GET(
     if (shareConfig.seo && share.siteUrl) {
         try {
             const seoAccess = await accessForAsset(share.userId, { kind: 'gsc', id: share.siteUrl }, async () => tokens);
-            const seoDashboard = await fetchSeoDashboard(seoAccess.ok ? seoAccess.token : accessToken, share.siteUrl);
+            const seoDashboard = await fetchSeoDashboard(seoAccess.ok ? seoAccess.token : accessToken, share.siteUrl, range);
             result.seo = seoDashboard;
         } catch (err) {
             console.error('Share data — GSC fetch error:', err);

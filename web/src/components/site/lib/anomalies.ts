@@ -6,6 +6,7 @@
  * and every alert names its window. Opportunities (striking distance, quick
  * wins) are tasks, so they live in "What to fix next", never here.
  */
+import { endsToday } from '@/lib/dateRange';
 import { computeDelta, deltaOptionsFor, fmtDateRange, fmtDay, fmtFull, fmtPosition } from '@/lib/format';
 import type { ActionType, Ga4Summary, GscRow, GscSummary } from './types';
 
@@ -111,7 +112,7 @@ export function fellOffPageOne(rows: GscRow[], minPrevClicks = 5): GscRow[] {
 export interface AnomalyInput {
     gsc?: GscSummary | null;
     gscWindow: AnomalyWindow;
-    /** Daily GA4 summary (the last point is today, partial). */
+    /** Daily GA4 summary (complete days; its last point is partial only when the window runs into today). */
     ga4?: Ga4Summary | null;
     ga4Window: AnomalyWindow;
     /** Search Console query rows with `prev` (compare on). */
@@ -124,8 +125,10 @@ const ORDER = { critical: 0, warning: 1, success: 2 };
 export function siteAnomalies(inp: AnomalyInput): Anomaly[] {
     const out: Anomaly[] = [];
     const ga = inp.ga4;
+    // Complete days only (lib/dateRange): drop the last point only when it is today, still filling in.
+    const gaFull = ga ? (endsToday(inp.ga4Window.end, inp.now) ? ga.series.slice(0, -1) : ga.series) : [];
     if (ga) {
-        const full = ga.series.slice(0, -1);
+        const full = gaFull;
         const tail = full.slice(-2);
         if (tail.length === 2 && tail.every((p) => p.sessions === 0) && full.slice(0, -2).some((p) => p.sessions > 0)) {
             out.push({ id: 'ga-zero', severity: 'critical', title: 'No visits recorded for 2 days', detail: `0 sessions on ${fmtDay(tail[0].date)} and ${fmtDay(tail[1].date)}. The GA4 tag may be missing or the site may be down.`, task: 'traffic_drop' });
@@ -159,8 +162,8 @@ export function siteAnomalies(inp: AnomalyInput): Anomaly[] {
         const a = dayAnomaly('gsc-day', 'Clicks', 'clicks', g.series.map((p) => ({ date: p.date, value: p.clicks })), inp.gscWindow);
         if (a) out.push(a);
     }
-    if (ga && ga.series.length >= 8 && (ga.interval ?? 'day') === 'day') {
-        const a = dayAnomaly('ga-day', 'Sessions', 'sessions', ga.series.slice(0, -1).map((p) => ({ date: p.date, value: p.sessions })), { ...inp.ga4Window, end: ga.series[ga.series.length - 2].date });
+    if (ga && gaFull.length >= 7 && (ga.interval ?? 'day') === 'day') {
+        const a = dayAnomaly('ga-day', 'Sessions', 'sessions', gaFull.map((p) => ({ date: p.date, value: p.sessions })), { ...inp.ga4Window, end: gaFull[gaFull.length - 1].date });
         if (a) out.push(a);
     }
     return out.sort((x, y) => ORDER[x.severity] - ORDER[y.severity]).slice(0, 6);

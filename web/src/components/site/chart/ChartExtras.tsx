@@ -10,7 +10,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Diamond, Plus, StickyNote, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { resolveDateRange } from '@/lib/dateRange';
+import { lastCompleteDay } from '@/lib/dateRange';
 import { fmtDateRange, fmtDay } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
@@ -66,8 +66,7 @@ const shift = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:0
 export function PeriodStepper({ search }: { search?: boolean }) {
     const dr = useDateRange();
     const r = search ? dr.resolvedSearch : dr.resolved;
-    const lag = search ? 2 : 0;
-    const lastDay = resolveDateRange({ preset: '7d', compare: 'none' }, { lagDays: lag }).end;
+    const lastDay = lastCompleteDay(search ? 'gsc' : 'ga4');
     const go = (dir: -1 | 1) => {
         let from = shift(r.start, dir * r.days);
         let to = shift(r.end, dir * r.days);

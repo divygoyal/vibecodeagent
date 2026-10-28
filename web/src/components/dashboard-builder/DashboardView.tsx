@@ -257,6 +257,7 @@ export function DashboardView({
                 {data?.resolved && doc.theme.header.showDates ? (
                     <p className="text-meta text-fg-muted">
                         {fmtDateRange(data.resolved.range.start, data.resolved.range.end)}
+                        {data.resolved.search ? ` (Search Console ${fmtDateRange(data.resolved.search.start, data.resolved.search.end)})` : ''}
                         {data.resolved.compare ? ` · vs ${fmtDateRange(data.resolved.compare.start, data.resolved.compare.end)}` : ''}
                     </p>
                 ) : null}
