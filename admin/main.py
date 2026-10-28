@@ -5548,6 +5548,9 @@ async def delete_funnel_definition(
 # v1 + builder v2 routes live in dashboards_v2.py (022_dashboards_v2.sql).
 from dashboards_v2 import build_dashboards_router, ensure_dashboards_v2_schema  # noqa: E402
 app.include_router(build_dashboards_router(get_db, verify_admin_key, get_user_by_identifier, User))
+# Scheduled email delivery of dashboards (round 9): stored in share_settings JSON, no migration.
+from dashboard_email import build_dashboard_email_router  # noqa: E402
+app.include_router(build_dashboard_email_router(get_db, verify_admin_key, get_user_by_identifier, User))
 
 
 # ============= Chat Threads & Messages (Phase B-1: server-side memory) =============
