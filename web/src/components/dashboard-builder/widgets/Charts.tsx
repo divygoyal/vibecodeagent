@@ -15,6 +15,7 @@ import { channelColor, deviceColor, CATEGORICAL, CATEGORICAL_OTHER } from '@/lib
 import { fmtMetricValue, getMetric, metricColor, metricLabel, dimLabel } from '@/lib/builder/catalog';
 import { AXIS_LABEL_GAP, AXIS_LAST_TICK_PAD, categoryAxisWidth, fitLabel } from '@/lib/builder/axisLabels';
 import { pieLayout } from '@/lib/builder/pieLayout';
+import { mondayFirst } from '@/lib/builder/dayOrder';
 import { countryName } from '@/lib/builder/countries';
 import { friendlyDimValue } from '@/lib/builder/levelLabels';
 import { autoGranularity, toDay } from '@/lib/builder/dates';
@@ -194,8 +195,18 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, compareName = 'Previo
     const yWidth = categoryAxisWidth(data.map((d) => String(d.__label)));
     const catAxis = { dataKey: '__label', type: 'category' as const, tick: AXIS_TICK, tickLine: false, axisLine: AXIS_LINE, interval: 0 as const };
     const valAxis = { type: 'number' as const, tickFormatter: fmtV(metrics[0]), tick: AXIS_TICK, tickLine: false, axisLine: false, domain: nice.domain, ticks: nice.ticks, interval: 0 as const };
+    // Two bars per category (this period, the comparison) need a key (round 10: no legend for light vs dark bars).
+    const legend = compare && !stacked && metrics.length === 1 && vertical;
+    const LEGEND_PX = 22;
     return (
-        <BarChart responsive data={data} layout={vertical ? 'horizontal' : 'vertical'} style={{ width: '100%', height, ...(onPick ? { cursor: 'pointer' } : {}) }}
+        <>
+        {legend ? (
+            <div className="mb-1 flex h-[18px] items-center gap-4 text-meta text-fg-muted">
+                <span className="flex items-center gap-1.5"><span aria-hidden className="size-2 rounded-sm" style={{ background: metricColor(metrics[0]) }} />This period</span>
+                <span className="flex items-center gap-1.5"><span aria-hidden className="size-2 rounded-sm" style={{ background: metricColor(metrics[0]), opacity: 0.3 }} />{compareName}</span>
+            </div>
+        ) : null}
+        <BarChart responsive data={data} layout={vertical ? 'horizontal' : 'vertical'} style={{ width: '100%', height: legend ? height - LEGEND_PX : height, ...(onPick ? { cursor: 'pointer' } : {}) }}
             onClick={onPick ? (st: { activeLabel?: string | number; activeIndex?: number | string | null }) => { const r = typeof st?.activeIndex === 'number' ? rows[st.activeIndex] : rows.find((x) => dimText(dim, x[`d:${dim}`], labels) === st?.activeLabel); const raw = r?.[`d:${dim}`]; if (raw !== undefined && raw !== null && raw !== '(other)') onPick(String(raw)); } : undefined} margin={{ top: 4, right: vertical ? 8 : AXIS_LAST_TICK_PAD, bottom: 0, left: 0 }} barCategoryGap="24%" accessibilityLayer>
             <CartesianGrid horizontal={vertical} vertical={!vertical} stroke={GRID_STROKE} />
             {vertical ? <XAxis {...catAxis} tickFormatter={(v: string) => (v.length > 12 ? `${v.slice(0, 11)}…` : v)} /> : <YAxis {...catAxis} width={yWidth} tick={<CategoryTick maxPx={yWidth - AXIS_LABEL_GAP} />} />}
@@ -208,6 +219,7 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, compareName = 'Previo
                     <Bar key={id} dataKey={`m:${id}`} fill={metricColor(id)} maxBarSize={24} radius={vertical ? [4, 4, 0, 0] : [0, 4, 4, 0]} isAnimationActive={anim} animationDuration={400} />,
                 ])}
         </BarChart>
+        </>
     );
 }
 
@@ -217,7 +229,7 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
     const frame = ok?.parts.rows;
     const c = widget.config;
     const metric = c.metrics[0]?.id ?? 'gsc:clicks';
-    const rows = frame?.rows ?? [];
+    const rows = c.sort.by === 'dimension' ? mondayFirst(frame?.rows ?? [], c.dimension) : (frame?.rows ?? []);
     const compare = props.compare !== 'none' && c.compare === 'inherit' && rows.some((r) => `m:${metric}:prev` in r);
     const h = plotHeight(props.height, widget.showTitle !== false, true, Boolean(props.drill?.depth));
     const useList = c.variant === 'list' && !c.stackBy && c.metrics.length === 1;

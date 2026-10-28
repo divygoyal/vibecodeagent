@@ -258,7 +258,7 @@ const BUILDERS_V1: Record<string, () => Built> = {
                 [[geo('w_geo', 'Users by country', 'ga4:activeUsers'), 8, 10], [barList('w_countries', 'Top countries', 'country', 'ga4:activeUsers', { showShare: true }), 4, 10]],
                 [[table('w_cities', 'Cities', ['city', 'country'], ['ga4:activeUsers', 'ga4:sessions', 'ga4:engagementRate']), 6, 9], [barList('w_lang', 'Languages', 'language', 'ga4:activeUsers'), 3, 9], [pie('w_nvr', 'New vs returning', 'newVsReturning', 'ga4:sessions'), 3, 9]],
                 [[pie('w_devices', 'Devices', 'device', 'ga4:sessions'), 4, 7], [barList('w_browsers', 'Browsers', 'browser', 'ga4:activeUsers'), 4, 7], [barList('w_os', 'Operating systems', 'os', 'ga4:activeUsers'), 4, 7]],
-                [[barList('w_dow', 'When visitors arrive', 'dayOfWeek', 'ga4:sessions', { variant: 'chart', orientation: 'vertical', top: 7 }), 12, 7]],
+                [[barList('w_dow', 'When visitors arrive', 'dayOfWeek', 'ga4:sessions', { variant: 'chart', orientation: 'vertical', top: 7, sort: { by: 'dimension', dir: 'asc' } }), 12, 7]],
             ], w)],
         };
     },
