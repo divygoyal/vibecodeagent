@@ -171,6 +171,11 @@ export function BuilderTimeSeries(props: BuilderTimeSeriesProps) {
             </div>
         );
     }
+    // Every series is drawn on its own scale, so a second line without an axis of its own (templates and saved
+    // dashboards, e.g. clicks + impressions) used to sit on an unlabelled scale. Two lines: label the second on the right.
+    if (!breakdown && series.length === 2 && !series.some((s) => s.axis)) {
+        return <Plot {...props} series={[series[0], { ...series[1], axis: 'right' }]} />;
+    }
     return <Plot {...props} />;
 }
 
