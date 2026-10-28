@@ -28,7 +28,7 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
     const tab = parseTab(sp.tab);
     const label = TABS.find((t) => t.value === tab)?.label ?? 'Top';
     const title = tab === 'top' && !first(sp.category) ? `Verified traffic leaderboard | ${BRAND_NAME}` : `${label} sites${first(sp.category) ? ` in ${first(sp.category)}` : ''} | ${BRAND_NAME} leaderboard`;
-    const description = 'Real Google Analytics and Search Console numbers from sites whose owners are verified in Search Console, checked daily. Rank by visitors, search clicks and growth.';
+    const description = 'Visitors from Google Analytics and clicks from Search Console, for sites whose owners are verified in Google Search Console, checked daily. Rank by visitors, search clicks and growth.';
     const filtered = Boolean(first(sp.q) || first(sp.page) || first(sp.category) || sp.tab || sp.range);
     return {
         title: { absolute: title },
@@ -86,7 +86,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
                 </span>
                 <h1 className="mt-3 text-heading-lg text-fg md:text-display-sm">The verified traffic leaderboard</h1>
                 <p className="mt-2 max-w-[640px] text-body-lg text-fg-secondary">
-                    Real Google Analytics and Search Console numbers, from sites whose owners are verified. Owners choose what to show.
+                    Ownership verified in Google Search Console; visitors from Google Analytics, clicks from Search Console. Owners choose what to show.
                 </p>
                 <div className="mt-5 flex flex-wrap items-center gap-2">
                     <Button asChild variant="primary" size="lg"><Link href="/leaderboard/join">Add your site, free</Link></Button>

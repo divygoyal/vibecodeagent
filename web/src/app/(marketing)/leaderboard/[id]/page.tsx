@@ -34,10 +34,10 @@ export async function generateMetadata({ params, searchParams }: { params: Param
 
     const visitors = metricText(p.kpis?.visitors);
     const title = visitors
-        ? `${p.name}: ${visitors} verified visitors a month | ${BRAND_NAME}`
+        ? `${p.name}: ${visitors} visitors a month | ${BRAND_NAME}`
         : `${p.name} on the ${BRAND_NAME} verified traffic leaderboard`;
     const description = p.description
-        || `${p.name} on the ${BRAND_NAME} verified traffic leaderboard.${visitors ? ` ${visitors} visitors in the last 28 days, confirmed through Google Analytics and Search Console.` : ''}`;
+        || `${p.name} on the ${BRAND_NAME} verified traffic leaderboard.${visitors ? ` ${visitors} visitors in the last 28 days (Google Analytics). Owner verified in Google Search Console.` : ''}`;
     // Relative: resolved against metadataBase (the brand's site URL), like every other page's canonical.
     const canonical = `/leaderboard/${p.slug || p.id}`;
     const indexable = p.status === 'ranked' && !sp.range;

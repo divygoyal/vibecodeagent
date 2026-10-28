@@ -34,7 +34,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     const visitors = metricText(e?.visitors);
     const clicks = metricText(e?.clicks);
     const headline = visitors ?? clicks;
-    const headlineLabel = visitors ? 'visitors, last 28 days' : clicks ? 'search clicks, last 28 days' : '';
+    const headlineLabel = visitors ? 'visitors from Google Analytics' : clicks ? 'clicks from Search Console' : '';
     const delta = (visitors ? e?.visitors : e?.clicks)?.delta_pct ?? null;
     const deltaLabel = deltaText(delta);
     const spark = e?.spark ? sparkPath(e.spark.values, RIGHT_W, 150) : null;
@@ -62,7 +62,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, fontWeight: 700, padding: '8px 16px', borderRadius: 999, background: C.brandSoft, color: C.brandText }}>
                                     {e?.verification.level === 'owner' ? <OgTick size={20} color={C.brandText} /> : null}
-                                    <span style={{ display: 'flex' }}>{e?.verification.level === 'owner' ? 'Verified owner (Search Console)' : e ? e.verification.label : 'Not listed'}</span>
+                                    <span style={{ display: 'flex' }}>{e?.verification.level === 'owner' ? 'Owner verified in Search Console' : e ? e.verification.label : 'Not listed'}</span>
                                 </span>
                                 {e?.category ? <span style={{ display: 'flex', fontSize: 20, padding: '8px 16px', borderRadius: 999, background: '#eff1f4', color: C.muted }}>{e.category}</span> : null}
                             </div>
@@ -82,6 +82,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                                 <span style={{ display: 'flex', fontSize: 24, color: C.muted }}>{headlineLabel}</span>
                                 {deltaLabel ? <OgDelta label={deltaLabel} size={26} up={C.up} down={C.down} /> : null}
                             </div>
+                            {headline ? <div style={{ display: 'flex', marginTop: 6, fontSize: 22, color: C.muted }}>last 28 days</div> : null}
                         </div>
                         {spark ? (
                             <svg width={RIGHT_W} height="150" viewBox={`0 0 ${RIGHT_W} 150`} style={{ display: 'flex' }}>
