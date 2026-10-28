@@ -9,7 +9,7 @@ import { FinalCta } from '@/components/marketing/site/FinalCta';
 import { Section, SectionHeading } from '@/components/marketing/site/Section';
 import { BRAND_NAME, SITE_URL } from '@/lib/brand';
 
-const TITLE = 'Alternatives: compare TrafficClaw with Looker Studio, SEOgets and QuickSEO';
+const TITLE = 'Compare TrafficClaw: Looker Studio, SEOgets, QuickSEO';
 const DESCRIPTION = 'How TrafficClaw compares with Looker Studio, SEOgets and QuickSEO for Google Analytics 4 and Search Console reporting: pricing, features and where each one wins.';
 
 export const metadata: Metadata = {

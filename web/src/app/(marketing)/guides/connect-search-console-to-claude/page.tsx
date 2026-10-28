@@ -26,9 +26,9 @@ export const metadata: Metadata = {
     twitter: { card: 'summary_large_image', title: `${TITLE} | ${BRAND_NAME}`, description: DESCRIPTION },
 };
 
-const STEPS: Array<{ title: string; body: string }> = [
+const STEPS: Array<{ title: string; body: string; ld?: string }> = [
     { title: 'Connect Google to TrafficClaw', body: 'Sign in with Google. TrafficClaw asks for read-only access to Analytics and Search Console, nothing else. Every site your Google account can see is listed.' },
-    { title: 'Copy the server URL', body: `One URL works for every site and every app: ${MCP_URL}` },
+    { title: 'Copy the server URL', body: 'One URL works for every site and every app. It is in the box below, with a copy button.', ld: `Copy the server URL ${MCP_URL}. One URL works for every site and every app.` },
     { title: 'Add it to Claude or ChatGPT', body: 'Paste it as a custom connector (Claude) or custom MCP server (ChatGPT). Pick OAuth.' },
     { title: 'Approve and choose sites', body: 'Sign in with Google in the window that opens, pick which sites the app may read, and click Allow.' },
     { title: 'Ask a question', body: 'Start a chat, make sure the TrafficClaw connector is on, and ask about your traffic.' },
@@ -50,7 +50,7 @@ const howToLd = {
     description: DESCRIPTION,
     url: `${SITE_URL}${PATH}`,
     totalTime: 'PT3M',
-    step: STEPS.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, name: s.title, text: s.body })),
+    step: STEPS.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, name: s.title, text: s.ld ?? s.body })),
 };
 
 const GROUP_ICONS = { Traffic: BarChart3, Search: Search, 'Weekly digest': Sparkles } as const;
