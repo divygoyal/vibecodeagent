@@ -14,6 +14,7 @@ import { fmtFull } from '@/lib/format';
 import { useCredits } from '@/lib/useDashboardData';
 import { useLocalStorageString } from '@/lib/useLocalStorage';
 import { BRAND_NAME } from '@/lib/brand';
+import { useDemoSession } from '@/components/demo/useDemoSession';
 
 type SessionUser = { name?: string | null; email?: string | null; image?: string | null; provider?: string };
 
@@ -29,7 +30,8 @@ function useOrigin(): string {
 export function ProfileTab() {
     const { data: session, status } = useSession();
     const user = session?.user as SessionUser | undefined;
-    const { credits, plan } = useCredits();
+    const { credits, plan, isError, refresh } = useCredits();
+    const { demo } = useDemoSession();
     const provider = user?.provider === 'github' ? 'GitHub' : user?.provider === 'google' ? 'Google' : null;
 
     return (
@@ -60,12 +62,19 @@ export function ProfileTab() {
                             <Pill tone={plan === 'free' ? 'neutral' : 'brand'}>{plan === 'free' ? 'Current plan' : 'Active'}</Pill>
                         </span>
                     }
-                    description={credits === null ? <Skeleton className="h-3.5 w-40" delay={0} /> : `${fmtFull(credits)} Ask ${credits === 1 ? 'message' : 'messages'} left`}
+                    description={credits !== null ? `${fmtFull(credits)} Ask ${credits === 1 ? 'message' : 'messages'} left`
+                        : isError ? (
+                            <span className="inline-flex flex-wrap items-center gap-x-2">
+                                {isError.status === 429 ? 'Too many requests right now.' : "Couldn't load your Ask messages."}
+                                <button type="button" onClick={() => void refresh()} className="tap-area font-medium text-brand-text hover:underline">Try again</button>
+                            </span>
+                        ) : <Skeleton className="h-3.5 w-40" delay={0} />}
                     control={<Button asChild variant="secondary" size="sm" trailingIcon={ArrowRight}><Link href="/dashboard/plan">Plan and billing</Link></Button>}
                 />
             </SettingsSection>
 
-            <InviteSection email={user?.email ?? ''} />
+            {/* The shared demo user has no invite link worth sharing (round 7 audit #20). */}
+            {demo ? null : <InviteSection email={user?.email ?? ''} />}
         </>
     );
 }

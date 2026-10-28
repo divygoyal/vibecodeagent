@@ -20,6 +20,10 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
     ref,
 ) {
     const inner = useRef<HTMLInputElement>(null);
+    // A placeholder is not a name (round 7 audit #18): name the field after it unless the caller gave one.
+    // "Search templates (SEO, AI, client report…)" -> "Search templates"; "Query contains…" -> "Query contains".
+    const named = rest['aria-label'] || rest['aria-labelledby'] || rest.id;
+    const ariaLabel = named ? undefined : placeholder.replace(/\s*\(.*\)\s*$/, '').replace(/[.…]+$/, '').trim() || 'Search';
     useImperativeHandle(ref, () => inner.current as HTMLInputElement);
 
     useEffect(() => {
@@ -43,6 +47,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
                 type="search"
                 value={value}
                 placeholder={placeholder}
+                aria-label={ariaLabel}
                 onChange={(e) => onValueChange(e.target.value)}
                 onKeyDown={(e) => {
                     if (e.key === 'Escape' && value) {

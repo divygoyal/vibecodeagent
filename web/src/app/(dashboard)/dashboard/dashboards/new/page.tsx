@@ -139,7 +139,10 @@ function Gallery() {
             } else {
                 id = (await fetchJson<{ dashboard: DashboardRecord }>('/api/dashboards', { method: 'POST', body: JSON.stringify({ name: finalName, templateId: picked.tpl!.id, siteId: portfolio ? undefined : site?.siteId, portfolio, ...(themeChoice ? { themeId: themeChoice } : {}) }) })).dashboard.id;
             }
-            router.push(`/dashboard/dashboards/${id}/edit`);
+            // The editor needs 1024 px; on a phone or small tablet open the new dashboard itself, with a note
+            // (round 7 audit #4: it ended on "Editing works on larger screens" with nothing of the dashboard).
+            const wide = window.matchMedia('(min-width: 1024px)').matches;
+            router.push(wide ? `/dashboard/dashboards/${id}/edit` : `/dashboard/dashboards/${id}?created=1`);
         } catch (e) {
             toast.error(e instanceof Error ? e.message : 'Could not create the dashboard');
             setBusy(false);

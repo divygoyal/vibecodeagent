@@ -116,12 +116,13 @@ export default function HreflangValidatorPage() {
                     variants={fadeUp}
                     className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6 mb-8"
                 >
-                    <label className="block text-sm font-medium text-fg mb-2">Page URL</label>
+                    <label htmlFor="tool-url" className="block text-sm font-medium text-fg mb-2">Page URL</label>
                     <div className="flex flex-col sm:flex-row gap-3">
                         <input
                             type="url"
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
+                            id="tool-url"
                             placeholder="https://example.com/page"
                             className="flex-1 px-4 py-3 min-h-[44px] rounded-lg bg-surface border border-border shadow-xs text-fg placeholder-fg-faint focus:outline-none focus:border-focus transition-colors"
                         />

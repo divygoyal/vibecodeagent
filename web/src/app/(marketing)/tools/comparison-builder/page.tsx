@@ -164,11 +164,12 @@ export default function ComparisonBuilderPage() {
                 <motion.div initial="hidden" animate="visible" variants={fadeUp} className="space-y-6">
                     {/* Title */}
                     <div className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6">
-                        <label className="block text-sm font-medium text-fg mb-2">Comparison Title</label>
+                        <label htmlFor="comparison-title" className="block text-sm font-medium text-fg mb-2">Comparison Title</label>
                         <input
                             type="text"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
+                            id="comparison-title"
                             placeholder="e.g., Best Project Management Tools 2026"
                             className="w-full px-4 py-3 min-h-[44px] rounded-lg bg-surface border border-border shadow-xs text-fg placeholder-fg-faint focus:outline-none focus:border-focus transition-colors"
                         />
@@ -193,6 +194,7 @@ export default function ComparisonBuilderPage() {
                                             type="text"
                                             value={p.name}
                                             onChange={(e) => updateProduct(i, 'name', e.target.value)}
+                                            aria-label={`Product ${i + 1} name`}
                                             placeholder={`Product ${i + 1} name`}
                                             className="px-3 py-2 rounded-lg bg-surface border border-border shadow-xs text-fg text-sm placeholder-fg-faint focus:outline-none focus:border-focus transition-colors"
                                         />
@@ -200,6 +202,7 @@ export default function ComparisonBuilderPage() {
                                             type="text"
                                             value={p.description}
                                             onChange={(e) => updateProduct(i, 'description', e.target.value)}
+                                            aria-label={`Product ${i + 1} description`}
                                             placeholder="Short description"
                                             className="px-3 py-2 rounded-lg bg-surface border border-border shadow-xs text-fg text-sm placeholder-fg-faint focus:outline-none focus:border-focus transition-colors"
                                         />
@@ -207,6 +210,7 @@ export default function ComparisonBuilderPage() {
                                     {products.length > 2 && (
                                         <button
                                             onClick={() => removeProduct(i)}
+                                            aria-label={`Remove product ${i + 1}`}
                                             className="p-2 rounded-lg text-fg-muted hover:text-down hover:bg-down-soft transition-colors cursor-pointer"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -247,6 +251,7 @@ export default function ComparisonBuilderPage() {
                                                     type="text"
                                                     value={f.name}
                                                     onChange={(e) => updateFeatureName(fi, e.target.value)}
+                                                    aria-label={`Feature ${fi + 1} name`}
                                                     placeholder="Feature name"
                                                     className="w-full px-2 py-1.5 rounded bg-surface border border-border shadow-xs text-fg text-xs placeholder-fg-faint focus:outline-none focus:border-focus"
                                                 />
@@ -257,6 +262,7 @@ export default function ComparisonBuilderPage() {
                                                         type="text"
                                                         value={f.values[pi] || ''}
                                                         onChange={(e) => updateFeatureValue(fi, pi, e.target.value)}
+                                                        aria-label={`${f.name || `Feature ${fi + 1}`}: ${products[pi]?.name || `Product ${pi + 1}`}`}
                                                         placeholder="Value"
                                                         className="w-full px-2 py-1.5 rounded bg-surface border border-border shadow-xs text-fg text-xs placeholder-fg-faint focus:outline-none focus:border-focus"
                                                     />
@@ -266,6 +272,7 @@ export default function ComparisonBuilderPage() {
                                                 {features.length > 1 && (
                                                     <button
                                                         onClick={() => removeFeature(fi)}
+                                                        aria-label={`Remove feature ${fi + 1}`}
                                                         className="p-1 rounded text-fg-muted hover:text-down transition-colors cursor-pointer"
                                                     >
                                                         <Trash2 className="w-3.5 h-3.5" />

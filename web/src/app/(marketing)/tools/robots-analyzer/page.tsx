@@ -122,12 +122,13 @@ export default function RobotsAnalyzerPage() {
                     variants={fadeUp}
                     className="rounded-card border border-border-subtle bg-surface p-4 sm:p-6 mb-8"
                 >
-                    <label className="block text-sm font-medium text-fg mb-2">Domain</label>
+                    <label htmlFor="tool-domain" className="block text-sm font-medium text-fg mb-2">Domain</label>
                     <div className="flex flex-col sm:flex-row gap-3">
                         <input
                             type="text"
                             value={domain}
                             onChange={(e) => setDomain(e.target.value)}
+                            id="tool-domain"
                             placeholder="example.com"
                             className="flex-1 px-4 py-3 min-h-[44px] rounded-lg bg-surface border border-border shadow-xs text-fg placeholder-fg-faint focus:outline-none focus:border-focus transition-colors"
                         />

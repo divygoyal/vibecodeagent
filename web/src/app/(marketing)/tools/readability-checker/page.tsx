@@ -210,6 +210,7 @@ export default function ReadabilityCheckerPage() {
                                     type="url"
                                     value={url}
                                     onChange={(e) => setUrl(e.target.value)}
+                                    aria-label="Page URL"
                                     placeholder="https://example.com/blog-post"
                                     className="flex-1 px-4 py-3 min-h-[44px] rounded-lg bg-surface border border-border shadow-xs text-fg placeholder-fg-faint focus:outline-none focus:border-focus transition-colors"
                                 />
@@ -226,6 +227,7 @@ export default function ReadabilityCheckerPage() {
                                 <textarea
                                     value={text}
                                     onChange={(e) => setText(e.target.value)}
+                                    aria-label="Text to check"
                                     placeholder="Paste your content here..."
                                     rows={6}
                                     className="w-full px-4 py-3 rounded-lg bg-surface border border-border shadow-xs text-fg placeholder-fg-faint focus:outline-none focus:border-focus transition-colors resize-y"
