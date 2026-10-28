@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
         }
     }
     return {
-        title: name,
+        title: { absolute: `${name} | ${BRAND_NAME}` },
         description,
         openGraph: { title: name, description, siteName: BRAND_NAME, type: 'website' },
         twitter: { card: 'summary_large_image', title: name, description },
