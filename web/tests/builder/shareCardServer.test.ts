@@ -39,13 +39,14 @@ test('a password-protected dashboard never reaches Google for the card', async (
     assert.equal(await shareCardData({ ownerIdentifier: 'u1' } as never, rec as never, 50), null);
 });
 
-test('site shares: numbers only for a plain Google Analytics share that shows its metrics', async () => {
+test('site shares: numbers for a Google Analytics share (classic or overview layout) that shows its metrics', async () => {
     const base = { propertyId: 'properties/1', config: { layoutMode: 'legacy', shareProvider: 'legacy', traffic: true, sectionVisibility: { metrics: true } } } as never as Parameters<typeof shareShowsMetrics>[0];
     const cfg = (o: object) => ({ ...base, config: { ...base.config, ...o } });
     assert.equal(shareShowsMetrics(base), true);
     assert.equal(shareShowsMetrics(cfg({ traffic: false })), false);
     assert.equal(shareShowsMetrics(cfg({ sectionVisibility: { metrics: false } })), false);
-    assert.equal(shareShowsMetrics(cfg({ layoutMode: 'openpanel_overview' })), false);
+    assert.equal(shareShowsMetrics(cfg({ layoutMode: 'openpanel_overview', shareProvider: 'openpanel_overview' })), true, 'the default overview layout leads with the same three figures');
+    assert.equal(shareShowsMetrics(cfg({ layoutMode: 'umami_fork', shareProvider: 'umami_fork' })), false);
     assert.equal(shareShowsMetrics({ ...base, propertyId: '' }), false);
     assert.equal(shareSiteRangeLabel('28d', '2026-09-30', '2026-10-27'), 'Last 28 days · Sep 30 – Oct 27');
     assert.equal(shareSiteRangeLabel('today', 'today', 'today'), 'Today');

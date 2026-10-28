@@ -2,8 +2,7 @@
  * Numbers for the link-preview card of a site share (/share/<token>/opengraph-image). Server only.
  * The same three Google Analytics figures the share page leads with (users, sessions, pageviews) for the share's own
  * default range, two small reports (this period and the one before), not the page's fifteen. Kept for a while, and
- * given up after 2.5 s like the dashboard card. Shares that hide their metrics, or are not a plain Google Analytics
- * share, get no numbers.
+ * given up after 2.5 s like the dashboard card. Shares that hide their metrics, or are the Umami layout, get no numbers.
  */
 import { storedCredentialsForAsset } from '@/lib/googleAccounts';
 import { getValidAccessToken, resolvePrevRange, resolveRange, runGAReport } from '@/lib/googleApi';
@@ -14,21 +13,23 @@ import type { ShareCardNumbers } from '@/lib/builder/shareCard';
 import type { ShareData } from '@/lib/shareTypes';
 import { shareSiteLabel } from '@/components/share/ShareChrome';
 
+/** The three figures both share layouts lead with (the overview calls the first one "Visitors", the classic page "Users"). */
 const METRICS = [
-    { id: 'ga4:activeUsers', api: 'activeUsers', label: 'Users' },
-    { id: 'ga4:sessions', api: 'sessions', label: 'Sessions' },
-    { id: 'ga4:screenPageViews', api: 'screenPageViews', label: 'Pageviews' },
+    { id: 'ga4:activeUsers', api: 'activeUsers' },
+    { id: 'ga4:sessions', api: 'sessions' },
+    { id: 'ga4:screenPageViews', api: 'screenPageViews' },
 ] as const;
+const LABELS = { overview: ['Visitors', 'Sessions', 'Pageviews'], classic: ['Users', 'Sessions', 'Pageviews'] } as const;
 
 const shortDay = (iso: string): string => {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
     return m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '';
 };
 
-/** Whether the share page shows these numbers at all (plain Google Analytics layout, traffic on). */
+/** Whether the share page shows these numbers at all: a Google Analytics layout (classic or overview, not the Umami one) with its metrics on. */
 export function shareShowsMetrics(share: Pick<ShareData, 'propertyId' | 'config'>): boolean {
     const c = share.config;
-    return Boolean(share.propertyId) && c.layoutMode === 'legacy' && c.shareProvider === 'legacy' && c.traffic !== false && c.sectionVisibility?.metrics !== false;
+    return Boolean(share.propertyId) && c.layoutMode !== 'umami_fork' && c.shareProvider !== 'umami_fork' && c.traffic !== false && c.sectionVisibility?.metrics !== false;
 }
 
 /** "Last 28 days · Sep 30 – Oct 27" for a range key such as "28d". */
@@ -54,13 +55,14 @@ async function load(share: ShareData): Promise<ShareCardNumbers | null> {
     const a = now.rows?.[0]?.metricValues;
     if (!a) return null;
     const b = before.rows?.[0]?.metricValues;
+    const labels = share.config.layoutMode === 'openpanel_overview' ? LABELS.overview : LABELS.classic;
     const kpis = METRICS.flatMap((m, i) => {
         const value = Number(a[i]?.value);
         if (!Number.isFinite(value)) return [];
         const old = b ? Number(b[i]?.value) : NaN;
         const d = Number.isFinite(old) ? metricDeltaFor(m.id, value, old) : null;
         return [{
-            label: m.label,
+            label: labels[i],
             value: fmtMetricValue(m.id, value, { compact: true, tile: true }),
             ...(d && (d.state === 'change' || d.state === 'flat') ? { delta: { text: d.text, dir: d.direction, tone: d.tone } } : {}),
         }];
