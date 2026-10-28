@@ -28,6 +28,13 @@ export function chartThumb(type: string, x: number, y: number, w: number, h: num
                 </>
             );
         }
+        case 'funnel': {
+            const n = Math.max(3, Math.min(5, Math.floor((h - 4) / 4)));
+            return Array.from({ length: n }, (_, i) => {
+                const bw = (w - 6) * (1 - i * (0.7 / n));
+                return <rect key={i} x={x + (w - bw) / 2} y={y + 3 + i * ((h - 6) / n)} width={bw} height={Math.max(1.2, (h - 6) / n - 1.2)} rx={0.6} fill={color} opacity={0.75 - i * 0.12} />;
+            });
+        }
         default: return null;
     }
 }

@@ -231,7 +231,7 @@ function swapMetric(widget: WidgetDef, from: MetricId, to: MetricId): WidgetDef 
                 },
             };
         }
-        default: return swapChartMetric(widget, from, to);
+        default: return swapChartMetric(base, from, to);
     }
 }
 

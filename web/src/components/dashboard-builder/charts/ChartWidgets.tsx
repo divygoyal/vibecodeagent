@@ -2,6 +2,7 @@
 
 import type { ChartWidgetDef } from '@/lib/builder/charts/types';
 import type { WidgetViewProps } from '../widgets/WidgetFrame';
+import { FunnelView } from './FunnelView';
 import { HeatmapView } from './HeatmapView';
 import { ScatterView } from './ScatterView';
 
@@ -10,6 +11,7 @@ export function ChartWidgetView(props: WidgetViewProps<ChartWidgetDef>) {
     const w = props.widget;
     switch (w.type) {
         case 'heatmap': return <HeatmapView {...props} widget={w} />;
+        case 'funnel': return <FunnelView {...props} widget={w} />;
         case 'scatter': return <ScatterView {...props} widget={w} />;
         default: return null;
     }

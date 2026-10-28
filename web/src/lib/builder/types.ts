@@ -694,6 +694,11 @@ export interface WidgetQuery {
     limit?: number;
     offset?: number;
     top?: { n: number; other: boolean };
+    /**
+     * Extra filters for this query only (round 9: a funnel step), on top of the widget's own. The engine
+     * adds them to the filters it applies; they never come from a control, so no footnote names them.
+     */
+    stepFilters?: FilterClause[];
     totals?: boolean;
     compare: boolean;
     /** Zero-fill the date axis and align the comparison by day index. */

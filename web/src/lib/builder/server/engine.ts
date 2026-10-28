@@ -652,6 +652,8 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
         const portfolio = src.type === 'portfolio';
 
         for (const q of queries) {
+            // Round 9: a funnel step carries its own filter (an event or a page) next to the widget's filters.
+            const qOrigins: typeof filterOrigins = q.stepFilters?.length ? [...filterOrigins, ...q.stepFilters.map((clause) => ({ clause }))] : filterOrigins;
             if (q.dimensions.includes('site') && !portfolio) {
                 plan.error = errResult('INCOMPATIBLE', 'Break down by site needs the "All sites" source.');
                 break;
@@ -666,7 +668,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             const families = [...new Set(metricDefs.map((m) => m.family))];
             if (families.includes('gsc')) readsSearch = true;
             // Round 8: Discover and Google News have no queries and no position; say so instead of asking Google.
-            const stProblem = q.searchType ? searchTypeProblem(q.searchType, { dimensions: q.dimensions, filters: filterOrigins.map((f) => f.clause), metrics: q.metrics }) : null;
+            const stProblem = q.searchType ? searchTypeProblem(q.searchType, { dimensions: q.dimensions, filters: qOrigins.map((f) => f.clause), metrics: q.metrics }) : null;
             if (stProblem) {
                 plan.error = errResult('INCOMPATIBLE', stProblem);
                 break;
@@ -713,8 +715,8 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
                 entry.targets.push({ site, families: fams });
                 for (const family of fams) {
                     const fMetrics = metricDefs.filter((m) => m.family === family).map((m) => m.id);
-                    const applicable = filterOrigins.filter((fo) => dimInFamily(fo.clause.dimension, family));
-                    for (const fo of filterOrigins) {
+                    const applicable = qOrigins.filter((fo) => dimInFamily(fo.clause.dimension, family));
+                    for (const fo of qOrigins) {
                         if (!dimInFamily(fo.clause.dimension, family) && fo.controlId) {
                             plan.flags.filtersIgnored = [...new Set([...(plan.flags.filtersIgnored ?? []), fo.controlId])];
                             const seen = plan.flags.filtersIgnoredDims ?? [];

@@ -48,10 +48,38 @@ export interface ScatterConfig {
 }
 export type ScatterWidget = WidgetBase<'scatter', ScatterConfig>;
 
+// ── Funnel ───────────────────────────────────────────────────────────────
+
+/** One step of a funnel: an Analytics event name, or a page (exact path, or a path prefix or fragment). */
+export interface FunnelStep {
+    /** Up to 40 characters; default: the event name or the page path. */
+    label?: string;
+    kind: 'event' | 'page';
+    /** Pages only; default exact. */
+    match?: 'exact' | 'starts' | 'contains';
+    /** The event name, or the page path ('/pricing'). */
+    value: string;
+}
+
+/**
+ * Funnel (round 9) built from "step counts": each step is counted on its own (users, sessions or events
+ * that reached it in the date range) and the conversion between steps is the ratio of two counts. It is
+ * not a sequenced funnel (Google's funnel exploration follows each visitor through the steps in order),
+ * and the widget says so. Analytics metrics only.
+ */
+export interface FunnelConfig {
+    metric: MetricRef;
+    /** 2 to 8 steps, in order. */
+    steps: FunnelStep[];
+    /** Show the step-to-step conversion and drop-off lines. */
+    showDropoff: boolean;
+}
+export type FunnelWidget = WidgetBase<'funnel', FunnelConfig>;
+
 // ── union ────────────────────────────────────────────────────────────────
 
-export type ChartWidgetDef = HeatmapWidget | ScatterWidget;
+export type ChartWidgetDef = HeatmapWidget | ScatterWidget | FunnelWidget;
 export type ChartType = ChartWidgetDef['type'];
-export const CHART_TYPES: ChartType[] = ['heatmap', 'scatter'];
+export const CHART_TYPES: ChartType[] = ['heatmap', 'scatter', 'funnel'];
 
 export type { DimId };

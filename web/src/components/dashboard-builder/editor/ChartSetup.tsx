@@ -5,13 +5,16 @@
  * panel calls `ChartSetup` for any of them; the widget-wide fields (source, filters, title, style) stay
  * in PropertiesPanel.
  */
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 
 import { metricFamilies } from '@/lib/builder/catalog';
-import type { ChartWidgetDef, HeatmapWidget, ScatterWidget } from '@/lib/builder/charts/types';
+import { FUNNEL_MAX_STEPS, FUNNEL_MIN_STEPS, FUNNEL_NOTE } from '@/lib/builder/charts/funnel';
+import type { ChartWidgetDef, FunnelStep, FunnelWidget, HeatmapWidget, ScatterWidget } from '@/lib/builder/charts/types';
 import type { WidgetDef } from '@/lib/builder/types';
 import { quadrantText, scatterMetrics } from '@/lib/builder/charts/scatter';
 import type { Quadrant } from '@/lib/builder/charts/types';
+import { Button } from '@/components/ui';
 import { Choice, DimensionPicker, Field, MetricPicker, NumberInput, Toggle } from './Fields';
 
 export type ChartEdit = (fn: (w: WidgetDef) => WidgetDef, key?: string) => void;
@@ -28,6 +31,7 @@ export function ChartSetup(props: Props<ChartWidgetDef>) {
     switch (widget.type) {
         case 'heatmap': return <HeatmapSetup {...props} widget={widget} />;
         case 'scatter': return <ScatterSetup {...props} widget={widget} />;
+        case 'funnel': return <FunnelSetup {...props} widget={widget} />;
         default: return null;
     }
 }
@@ -77,6 +81,52 @@ function ScatterSetup({ widget, edit, source, portfolio }: Props<ScatterWidget>)
                 </Field>
             ) : null}
             <Toggle label="Name the biggest points" checked={c.labels} onChange={(v) => set({ labels: v })} />
+        </>
+    );
+}
+
+const COMMON_EVENTS = ['session_start', 'first_visit', 'page_view', 'user_engagement', 'scroll', 'click', 'view_item', 'add_to_cart', 'begin_checkout', 'add_payment_info', 'purchase', 'sign_up', 'login', 'generate_lead', 'form_start', 'form_submit', 'file_download'];
+
+function FunnelSetup({ widget, edit, source }: Props<FunnelWidget>) {
+    const c = widget.config;
+    const listId = useId();
+    const set = (p: Partial<FunnelWidget['config']>, key?: string) => edit((w) => patch(w as FunnelWidget, p), key);
+    const setStep = (i: number, p: Partial<FunnelStep>, key?: string) => set({ steps: c.steps.map((s, j) => (j === i ? { ...s, ...p } : s)) }, key);
+    const move = (i: number, d: -1 | 1) => {
+        const steps = [...c.steps];
+        [steps[i], steps[i + d]] = [steps[i + d], steps[i]];
+        set({ steps });
+    };
+    const input = 'h-9 w-full rounded-control border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint';
+    return (
+        <>
+            {source}
+            <Field label="Count" hint="Analytics only. Users who reached each step is the usual choice."><MetricPicker value={c.metric.id} families={['ga4']} noShare onChange={(id) => set({ metric: { id } })} /></Field>
+            <p className="text-meta text-fg-muted">{FUNNEL_NOTE}</p>
+            <datalist id={listId}>{COMMON_EVENTS.map((e) => <option key={e} value={e} />)}</datalist>
+            <ol className="space-y-3" aria-label="Funnel steps">
+                {c.steps.map((st, i) => (
+                    <li key={i} className="space-y-2 rounded-control border border-border-subtle p-2">
+                        <div className="flex items-center gap-1">
+                            <span className="w-5 text-meta text-fg-muted tabular-nums">{i + 1}.</span>
+                            <div className="min-w-0 flex-1">
+                                <Choice ariaLabel={`Step ${i + 1} type`} value={st.kind} onChange={(v) => setStep(i, { kind: v })} options={[{ value: 'event', label: 'Event' }, { value: 'page', label: 'Page' }]} />
+                            </div>
+                            <button type="button" aria-label={`Move step ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)} className="rounded p-1 text-fg-muted hover:text-fg disabled:opacity-30"><ArrowUp aria-hidden size={14} /></button>
+                            <button type="button" aria-label={`Move step ${i + 1} down`} disabled={i === c.steps.length - 1} onClick={() => move(i, 1)} className="rounded p-1 text-fg-muted hover:text-fg disabled:opacity-30"><ArrowDown aria-hidden size={14} /></button>
+                            <button type="button" aria-label={`Remove step ${i + 1}`} disabled={c.steps.length <= FUNNEL_MIN_STEPS} onClick={() => set({ steps: c.steps.filter((_, j) => j !== i) })} className="rounded p-1 text-fg-muted hover:text-fg disabled:opacity-30"><X aria-hidden size={14} /></button>
+                        </div>
+                        {st.kind === 'page' ? (
+                            <Choice ariaLabel={`Step ${i + 1} page match`} value={st.match ?? 'exact'} onChange={(v) => setStep(i, { match: v })} options={[{ value: 'exact', label: 'Page is exactly' }, { value: 'starts', label: 'Page starts with' }, { value: 'contains', label: 'Page contains' }]} />
+                        ) : null}
+                        <input aria-label={`Step ${i + 1} ${st.kind === 'event' ? 'event name' : 'page path'}`} className={input} list={st.kind === 'event' ? listId : undefined} value={st.value} maxLength={200}
+                            placeholder={st.kind === 'event' ? 'event name, e.g. add_to_cart' : '/pricing'} onChange={(e) => setStep(i, { value: e.target.value.trim() }, `step${i}v`)} />
+                        <input aria-label={`Step ${i + 1} label`} className={input} value={st.label ?? ''} maxLength={40} placeholder="Label (optional)" onChange={(e) => setStep(i, { label: e.target.value || undefined }, `step${i}l`)} />
+                    </li>
+                ))}
+            </ol>
+            <Button size="sm" variant="secondary" icon={Plus} disabled={c.steps.length >= FUNNEL_MAX_STEPS} onClick={() => set({ steps: [...c.steps, { kind: 'event', value: '' }] })}>Add a step</Button>
+            <Toggle label="Show conversion between steps" checked={c.showDropoff} onChange={(v) => set({ showDropoff: v })} />
         </>
     );
 }

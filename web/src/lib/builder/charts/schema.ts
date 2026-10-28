@@ -25,5 +25,16 @@ export function chartWidgetSchemas({ base, metricRef, dimId }: SchemaShared) {
                 xScale: z.enum(['linear', 'log']).optional(), yScale: z.enum(['linear', 'log']).optional(), labels: z.boolean().optional(),
             }),
         }),
+        z.object({
+            ...base, type: z.literal('funnel'),
+            config: z.looseObject({
+                metric: metricRef,
+                steps: z.array(z.object({
+                    label: z.string().max(40).optional(), kind: z.enum(['event', 'page']), match: z.enum(['exact', 'starts', 'contains']).optional(),
+                    value: z.string().max(200),
+                })).min(2).max(8),
+                showDropoff: z.boolean().optional(),
+            }),
+        }),
     ] as const;
 }

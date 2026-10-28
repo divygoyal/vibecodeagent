@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn';
 import { Button, Skeleton, Tooltip } from '@/components/ui';
 import { fmtDay } from '@/lib/format';
 import { metricLabel } from '@/lib/builder/catalog';
+import { chartCsvFrame } from '@/lib/builder/charts';
 import { widgetTitle } from '@/lib/builder/registry';
 import { drillTitleSuffix, ignoredFiltersNote } from '@/lib/builder/levelLabels';
 import { searchTypeLabel, widgetSearchType } from '@/lib/builder/searchType';
@@ -66,7 +67,7 @@ export function WidgetError({ result, onRetry, onChooseSource, compact }: { resu
 
 /** CSV of the widget's main frame (P1 "Download CSV"). */
 export function downloadCsv(widget: WidgetDef, r: WidgetResultOk) {
-    const frame = r.parts.rows ?? r.parts.series ?? r.parts.sites ?? r.parts.total;
+    const frame = chartCsvFrame(widget, r) ?? r.parts.rows ?? r.parts.series ?? r.parts.sites ?? r.parts.total;
     if (!frame) return;
     const keys = frame.seriesKeys?.length ? [frame.columns[0]?.id, ...frame.seriesKeys].filter(Boolean) as string[] : frame.columns.map((c) => c.id);
     // Calculated metrics (round 7): the dashboard's name, which the editor's inline queries do not send.
