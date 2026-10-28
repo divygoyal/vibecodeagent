@@ -306,7 +306,7 @@ export interface DeltaOptions {
 export interface DeltaResult {
     /** change: a real delta; flat: |change| below the threshold; new: previous was 0; none: no data. */
     state: 'change' | 'flat' | 'new' | 'none';
-    /** Direction of the arrow. For `absolute` + better 'down' (position) the arrow shows improvement. */
+    /** Direction of the arrow: where the NUMBER moved, for every metric (position included). Colour (`tone`) says good or bad. */
     direction: 'up' | 'down' | 'flat';
     tone: 'good' | 'bad' | 'neutral';
     /** Without arrow: `18.4%`, `0.1 pt`, `0.4`, `0%`, `new`, `–`. */
@@ -315,6 +315,8 @@ export interface DeltaResult {
     label: string;
     /** Screen-reader phrase without the comparison period: `up 18.4 percent`. */
     srText: string;
+    /** For lower-is-better metrics (position, bounce rate): what the arrow means, for a tooltip. `Up 0.1: worse (lower is better)`. */
+    note?: string;
     /** Raw change in the mode's unit (percent, points or absolute), null when undefined. */
     change: number | null;
 }
@@ -382,11 +384,13 @@ export function computeDelta(current: Num, previous: Num, opts: DeltaOptions = {
 
     const rose = change > 0;
     const good = better === 'up' ? rose : !rose;
-    // Position: the arrow points the way the rank moved (▲ = better), not the number.
-    const direction: 'up' | 'down' = mode === 'absolute' && better === 'down' ? (good ? 'up' : 'down') : rose ? 'up' : 'down';
+    // One rule for every metric (Looker / GA): the arrow is where the number moved, the colour is good or bad.
+    // Position 17.1 -> 17.2 is ▲ in red; "lower is better" is spelled out in `note` for the tooltip.
+    const direction: 'up' | 'down' = rose ? 'up' : 'down';
     const noisy = opts.noiseFloor !== undefined && Math.abs(previous) < opts.noiseFloor;
     const tone = noisy ? 'neutral' : good ? 'good' : 'bad';
-    const word = mode === 'absolute' && better === 'down' ? (good ? 'improved' : 'worse by') : rose ? 'up' : 'down';
+    const word = rose ? 'up' : 'down';
+    const verdict = good ? 'better' : 'worse';
 
     return {
         state: 'change',
@@ -394,7 +398,8 @@ export function computeDelta(current: Num, previous: Num, opts: DeltaOptions = {
         tone,
         text,
         label: `${direction === 'up' ? ARROW_UP : ARROW_DOWN} ${text}`,
-        srText: `${word} ${spoken}`,
+        srText: better === 'down' ? `${word} ${spoken}, ${verdict}` : `${word} ${spoken}`,
+        ...(better === 'down' ? { note: `${rose ? 'Up' : 'Down'} ${text}: ${verdict} (lower is better)` } : {}),
         change,
     };
 }
@@ -409,7 +414,7 @@ export function fmtDeltaPoints(current: Num, previous: Num): string {
     return computeDelta(current, previous, { mode: 'points' }).label;
 }
 
-/** Position change: absolute, 1 decimal, arrow = improvement (`▲ 0.4` when it went 8.8 -> 8.4). */
+/** Position change: absolute, arrow = where the number moved (`▼ 0.4` when it went 8.8 -> 8.4), colour says better. */
 export function fmtDeltaPosition(current: Num, previous: Num): string {
     return computeDelta(current, previous, { mode: 'absolute', better: 'down' }).label;
 }

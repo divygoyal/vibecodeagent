@@ -123,14 +123,22 @@ test('rate deltas: percentage points', () => {
     assert.equal(d.srText, 'down 0.1 percentage points');
 });
 
-test('position delta: absolute, 1 decimal, arrow = improvement ', () => {
-    assert.equal(fmtDeltaPosition(8.4, 8.8), '▲ 0.4'); // rank improved
-    assert.equal(fmtDeltaPosition(23.2, 17.1), '▼ 6.1'); // rank got worse
+test('position delta: absolute, arrow = where the number moved, colour = good or bad (r10)', () => {
+    assert.equal(fmtDeltaPosition(8.4, 8.8), '▼ 0.4'); // the number fell: better
+    assert.equal(fmtDeltaPosition(23.2, 17.1), '▲ 6.1'); // the number rose: worse
     const better = computeDelta(8.4, 8.8, { mode: 'absolute', better: 'down' });
-    assert.equal(better.direction, 'up');
+    assert.equal(better.direction, 'down');
     assert.equal(better.tone, 'good');
+    assert.equal(better.srText, 'down 0.4, better');
     const worse = computeDelta(23.2, 17.1, { mode: 'absolute', better: 'down' });
-        assert.equal(worse.tone, 'bad');
+    assert.equal(worse.direction, 'up');
+    assert.equal(worse.tone, 'bad');
+    assert.equal(worse.note, 'Up 6.1: worse (lower is better)');
+    // Judge r9 item 10: "17.2 ▼0.1 vs 17.1" used to point down while the number rose.
+    const j = computeDelta(17.2, 17.1, { mode: 'absolute', better: 'down' });
+    assert.equal(j.label, '▲ 0.1');
+    assert.equal(j.tone, 'bad');
+    assert.equal(j.note, 'Up 0.1: worse (lower is better)');
     const flat = computeDelta(16.21, 16.19, { mode: 'absolute', better: 'down' });
     assert.equal(flat.state, 'flat');
     assert.equal(flat.text, '–');

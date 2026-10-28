@@ -49,11 +49,12 @@ export function MetricDelta({ size = 'sm', comparisonLabel = 'versus previous pe
     if (d.state === 'none' || d.state === 'new') return null;
     if (d.state === 'flat' && d.change === 0 && d.text === '–') return null;
     const tone = d.state === 'change' ? d.tone : 'neutral';
-    // Position: ▲ means the rank got better (a lower number). Say so on hover, the arrow alone reads both ways.
+    // The arrow is where the number moved, the colour is good or bad (Looker / GA). For lower-is-better metrics
+    // (position, bounce rate) the hover spells it out: "Position up 0.1: worse (lower is better)".
     const rank = (input.metric ? METRICS[input.metric].format : input.format) === 'position';
     return (
         <span
-            title={rank && d.state === 'change' ? `Position ${d.srText} (lower is better)` : undefined}
+            title={d.state === 'change' && d.note ? (rank ? `Position ${d.note.charAt(0).toLowerCase()}${d.note.slice(1)}` : d.note) : undefined}
             className={cn(
                 'inline-flex shrink-0 items-center gap-0.5 font-medium tabular-nums whitespace-nowrap',
                 size === 'md' ? 'text-body-sm' : 'text-meta',

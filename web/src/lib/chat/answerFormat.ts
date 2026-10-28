@@ -168,10 +168,10 @@ export function parseDelta(text: string, opts: { betterDown?: boolean; neutral?:
     const value = `${m[2]}${m[3] ? `.${m[3]}` : ''}`;
     if (opts.rank && !m[4]) {
         // A position change written as new minus old ("+1.6" = the number rose = the page fell). Same convention as
-        // the app's MetricDelta for position: the arrow shows where the rank moved (▲ = better), green when better.
+        // the app's MetricDelta: the arrow shows where the number moved (▲ = it rose), red when that is worse.
         if (zero) return { direction: 'flat', tone: 'neutral', text: value, spoken: 'no change' };
         const better = m[1] !== '+';
-        return { direction: better ? 'up' : 'down', tone: better ? 'good' : 'bad', text: value, spoken: better ? `improved ${value}` : `worse by ${value}` };
+        return { direction: m[1] === '+' ? 'up' : 'down', tone: better ? 'good' : 'bad', text: value, spoken: better ? `improved ${value}` : `worse by ${value}` };
     }
     const direction = zero ? 'flat' : m[1] === '+' ? 'up' : 'down';
     const good = direction === 'flat' || opts.neutral ? null : (direction === 'up') !== Boolean(opts.betterDown);
