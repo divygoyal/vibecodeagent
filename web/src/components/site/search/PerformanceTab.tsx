@@ -4,9 +4,10 @@ import { useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { fmtDateRange, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
+import { fmtAxis, fmtDateRange, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
 import { fmtMetric, METRICS } from '@/lib/metrics';
 import { ChartCard } from '@/components/charts/ChartCard';
+import { DualAxisChart, type DualAxisSide } from '@/components/charts/DualAxisChart';
 import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -31,6 +32,8 @@ import { CtrBenchmarkCard } from './CtrBenchmarkCard';
 import { SearchDetailDrawer } from './SearchDetailDrawer';
 
 type SearchMetric = 'clicks' | 'impressions' | 'ctr' | 'position';
+/** Split panels above 200 px keep their own labelled y axis (TimeSeriesChart hides it at 200 or less). */
+const SPLIT_PANEL = 210;
 const ALL: SearchMetric[] = ['clicks', 'impressions', 'ctr', 'position'];
 export const DIMS = ['queries', 'pages', 'countries', 'devices', 'appearance', 'dates'] as const;
 export type SearchDim = (typeof DIMS)[number];
@@ -79,6 +82,19 @@ function MetricToggles({ summary, loading, selected, onToggle }: { summary?: Gsc
     );
 }
 
+/** One side of the two-axis chart: the metric's colour, scale rules and formats. */
+function dualSide(k: SearchMetric): DualAxisSide {
+    const f = METRICS[k].format;
+    return {
+        key: k,
+        label: METRICS[k].label,
+        color: METRICS[k].color,
+        format: (v) => fmtMetric(k, v),
+        axis: f === 'position' ? 'position' : f === 'percent' ? 'percent' : 'count',
+        tickFormat: f === 'percent' ? (v) => fmtPercent(v, { tile: true }) : f === 'position' ? (v) => String(Math.round(v)) : (v) => fmtAxis(v),
+    };
+}
+
 function rowLabel(dim: SearchDim, key: string, siteHost: string | null): { text: string; node: React.ReactNode } {
     if (dim === 'pages') {
         const t = displayPage(pageRef(key), siteHost);
@@ -102,7 +118,11 @@ export function PerformanceTab() {
     const { interval } = useInterval(searchDays);
     const summary = useGsc<GscSummary>('summary');
     const [selected, setSelected] = useState<SearchMetric[]>(['clicks', 'impressions']);
-    const [mode, setMode] = useState<'overlay' | 'split'>('overlay');
+    // Two metrics: one chart, each on its own labelled axis (Overlay) or Split. Three or four: Split only, since
+    // one shared axis would draw 780K impressions next to 24K clicks as if they were the same size (audit item 8).
+    const [modeChoice, setMode] = useState<'overlay' | 'split'>('overlay');
+    const mode: 'overlay' | 'split' = selected.length > 2 ? 'split' : modeChoice;
+    const dual = selected.length === 2 && mode === 'overlay';
     const [dim, setDim] = useTabParam(DIMS, { name: 'dim' });
     const [presetRaw, setPreset] = useStringParam('filter');
     const preset = (presetRaw && presetRaw in PRESET_LABEL ? presetRaw : null) as Preset | null;
@@ -192,10 +212,10 @@ export function PerformanceTab() {
                     <ChartCard
                         bare
                         title={`${selected.map((k) => METRICS[k].label).join(', ')}${interval === 'day' ? '' : ` per ${interval}`}`}
-                        subtitle={selected.length > 1 && mode === 'overlay' ? 'Lines use separate scales; the axis shows the first one' : selected.includes('position') ? 'Position: lower is better' : compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')}` : undefined}
+                        subtitle={dual ? `Each line has its own axis: ${METRICS[selected[0]].label} left, ${METRICS[selected[1]].label} right${selected.includes('position') ? ' (position: lower is better)' : ''}` : selected.length > 1 ? `One chart per metric${selected.includes('position') ? ' · position: lower is better' : ''}` : selected.includes('position') ? 'Position: lower is better' : compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')}` : undefined}
                         actions={(
                             <>
-                                {selected.length > 1 ? (
+                                {selected.length === 2 ? (
                                     <SegmentedControl ariaLabel="Chart mode" size="sm" variant="neutral" value={mode} onChange={setMode} options={[{ value: 'overlay', label: 'Overlay' }, { value: 'split', label: 'Split' }]} />
                                 ) : null}
                                 <IntervalSwitch days={searchDays} />
@@ -204,19 +224,30 @@ export function PerformanceTab() {
                         state={summary.state === 'error' ? 'error' : s && s.totals.impressions === 0 ? 'empty' : summary.state}
                         error={{ message: summary.error?.message, onRetry: summary.mutate }}
                         empty={{ title: 'No impressions in this period', description: 'New sites can take a few weeks to show up in Google.' }}
-                        height={selected.length > 1 && mode === 'split' ? selected.length * 160 : 300}
+                        height={selected.length > 1 && mode === 'split' ? selected.length * SPLIT_PANEL : 300}
                         footer={s?.lastDate ? `Data through ${fmtDateRange(s.lastDate, s.lastDate)} · Search Console is about 2 days behind` : undefined}
                     >
                         <FindingLine finding={finding} />
-                        <TimeSeriesChart
+                        {dual ? (
+                            <DualAxisChart
+                                data={bucketed as unknown as { date: string; [k: string]: number | string | null }[]}
+                                left={dualSide(selected[0])}
+                                right={dualSide(selected[1])}
+                                tintAxes
+                                annotations={toAnnotations(marks.markers)}
+                                titleFor={interval === 'day' ? undefined : (d) => `${interval === 'week' ? 'Week' : 'Month'} of ${fmtDateRange(d, d)}`}
+                                height={300}
+                                ariaLabel={`${METRICS[selected[0]].label} (left axis) and ${METRICS[selected[1]].label} (right axis) per ${interval}`}
+                            />
+                        ) : <TimeSeriesChart
                             data={bucketed as unknown as Record<string, number | string | null>[]}
                             series={chartSeries}
                             mode={selected.length > 1 ? mode : 'single'}
                             compareDateKey="prevDate"
                             annotations={toAnnotations(marks.markers)}
-                            height={selected.length > 1 && mode === 'split' ? selected.length * 160 : 300}
+                            height={selected.length > 1 && mode === 'split' ? selected.length * SPLIT_PANEL : 300}
                             ariaLabel={`${selected.map((k) => METRICS[k].label).join(', ')} per ${interval}`}
-                        />
+                        />}
                         <ChartMarkers markers={marks.markers} start={dr.resolvedSearch.start} end={lastDate} notesKey={marks.notesKey} scope={marks.scope} onChanged={marks.mutateNotes} notesFailed={marks.notesFailed} />
                     </ChartCard>
                 </div>

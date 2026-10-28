@@ -12,13 +12,19 @@ import { CartesianGrid, ComposedChart, Line, ReferenceLine, Tooltip as RTooltip,
 import { cn } from '@/lib/cn';
 import { fmtAxis, fmtDayLong, fmtFull, makeDateTickFormatter } from '@/lib/format';
 import { ChartTooltipCard } from './ChartTooltip';
+import { niceAxis, type AxisFormat } from './axis';
 import { evenDateTicks, niceTicks } from './chartScales';
 
 export interface DualAxisSide {
     key: string;
     label: string;
     color: string;
+    /** Tooltip value format (default: full number). */
     format?: (v: number) => string;
+    /** Axis scale rules (axis.ts niceAxis): 'position' starts at 1 and runs top-down. Default: zero-based round ticks. */
+    axis?: AxisFormat;
+    /** Tick label format (default: compact number). */
+    tickFormat?: (v: number) => string;
 }
 
 export interface DualAxisChartProps {
@@ -32,14 +38,24 @@ export interface DualAxisChartProps {
     titleFor?: (date: string) => string;
     ariaLabel?: string;
     className?: string;
+    /** Colour each axis's tick labels like its line (for metrics without a fixed pairing, e.g. Search > Performance). */
+    tintAxes?: boolean;
 }
 
-export function DualAxisChart({ data, left, right, height = 260, annotations, titleFor, ariaLabel, className }: DualAxisChartProps) {
+function sideAxis(data: DualAxisChartProps['data'], side: DualAxisSide): { domain: [number, number]; ticks: number[] } {
+    const values = data.map((d) => Number(d[side.key])).filter((v) => Number.isFinite(v));
+    if (side.axis) return niceAxis(values.length ? Math.max(...values) : 0, { format: side.axis });
+    const t = niceTicks(Math.max(0, ...values));
+    return { domain: [0, t[t.length - 1]], ticks: t };
+}
+
+export function DualAxisChart({ data, left, right, height = 260, annotations, titleFor, ariaLabel, className, tintAxes }: DualAxisChartProps) {
     const dates = useMemo(() => data.map((d) => d.date), [data]);
     const tickFmt = useMemo(() => makeDateTickFormatter(dates), [dates]);
     const xTicks = useMemo(() => evenDateTicks(dates), [dates]);
-    const lt = useMemo(() => niceTicks(Math.max(0, ...data.map((d) => Number(d[left.key]) || 0))), [data, left.key]);
-    const rt = useMemo(() => niceTicks(Math.max(0, ...data.map((d) => Number(d[right.key]) || 0))), [data, right.key]);
+    const la = useMemo(() => sideAxis(data, left), [data, left]);
+    const ra = useMemo(() => sideAxis(data, right), [data, right]);
+    const tick = (color: string) => ({ fill: tintAxes ? color : 'var(--color-chart-tick)', fontSize: 11 });
     const fl = left.format ?? fmtFull;
     const fr = right.format ?? fmtFull;
 
@@ -85,10 +101,10 @@ export function DualAxisChart({ data, left, right, height = 260, annotations, ti
                         axisLine={{ stroke: 'var(--color-chart-axis)' }}
                         tickMargin={8}
                     />
-                    <YAxis yAxisId="l" orientation="left" width={44} domain={[0, lt[lt.length - 1]]} ticks={lt} tickFormatter={(v: number) => fmtAxis(v)}
-                        tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }} tickLine={false} axisLine={false} />
-                    <YAxis yAxisId="r" orientation="right" width={44} domain={[0, rt[rt.length - 1]]} ticks={rt} tickFormatter={(v: number) => fmtAxis(v)}
-                        tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }} tickLine={false} axisLine={false} />
+                    <YAxis yAxisId="l" orientation="left" width={44} domain={la.domain} ticks={la.ticks} interval={left.axis ? 0 : undefined} reversed={left.axis === 'position'}
+                        tickFormatter={left.tickFormat ?? ((v: number) => fmtAxis(v))} tick={tick(left.color)} tickLine={false} axisLine={false} />
+                    <YAxis yAxisId="r" orientation="right" width={44} domain={ra.domain} ticks={ra.ticks} interval={right.axis ? 0 : undefined} reversed={right.axis === 'position'}
+                        tickFormatter={right.tickFormat ?? ((v: number) => fmtAxis(v))} tick={tick(right.color)} tickLine={false} axisLine={false} />
                     <RTooltip content={tooltip} cursor={{ stroke: 'var(--color-chart-cursor)', strokeWidth: 1 }} isAnimationActive={false} offset={12} />
                     {annotations?.map((a) => (
                         <ReferenceLine key={`${a.date}-${a.label}`} x={a.date} yAxisId="l" stroke="var(--color-chart-cursor)" strokeDasharray="3 3" />

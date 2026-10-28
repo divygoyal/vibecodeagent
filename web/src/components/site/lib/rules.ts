@@ -160,3 +160,30 @@ const AI_SOURCE_RE = new RegExp(AI_SOURCE_PATTERN, 'i');
 export function isAiSource(source: string): boolean {
     return AI_SOURCE_RE.test(source);
 }
+
+/** Rows split into winners, losers, new and lost, each sorted by the size of its move. */
+export function moverGroups(rows: GscRow[]): Record<MoverKind, GscRow[]> {
+    const out: Record<MoverKind, GscRow[]> = { winner: [], loser: [], new: [], lost: [] };
+    for (const r of rows) {
+        const k = moverKind(r);
+        if (k) out[k].push(r);
+    }
+    const d = (r: GscRow) => r.clicks - (r.prev?.clicks ?? 0);
+    out.winner.sort((a, b) => d(b) - d(a));
+    out.loser.sort((a, b) => d(a) - d(b));
+    out.new.sort((a, b) => b.clicks - a.clicks);
+    out.lost.sort((a, b) => (b.prev?.clicks ?? 0) - (a.prev?.clicks ?? 0));
+    return out;
+}
+
+const MOVER_WORD: Record<MoverKind, string> = { winner: 'winners', loser: 'losers', new: 'new', lost: 'lost' };
+
+/** The one quiet line for empty groups: "No losers, new or lost queries in this period." */
+export function emptyMoversLine(kinds: MoverKind[], noun: 'queries' | 'pages'): string {
+    if (!kinds.length) return '';
+    const words = kinds.map((k) => MOVER_WORD[k]);
+    const list = words.length === 1 ? words[0] : `${words.slice(0, -1).join(', ')} or ${words[words.length - 1]}`;
+    // "No new or lost queries", but "No winners or losers among your queries".
+    const last = kinds[kinds.length - 1];
+    return `No ${list}${last === 'new' || last === 'lost' ? ` ${noun}` : ` among your ${noun}`} in this period.`;
+}

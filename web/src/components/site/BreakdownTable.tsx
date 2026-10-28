@@ -12,7 +12,8 @@ import { SearchInput, useDebouncedValue } from '@/components/ui/SearchInput';
 import { Table, type TableColumn } from '@/components/ui/Table';
 import { downloadCsv } from './useSiteData';
 
-export type ValueFormat = 'count' | 'percent' | 'duration' | 'position';
+/** `decimal`: a small rate with 2 significant digits (3.4, 0.012), e.g. events per session. */
+export type ValueFormat = 'count' | 'percent' | 'duration' | 'position' | 'decimal';
 
 export interface BreakdownColumn<T> {
     key: string;
@@ -50,6 +51,7 @@ export function fmtCell(v: number | null | undefined, format: ValueFormat = 'cou
     if (format === 'percent') return fmtPercent(v);
     if (format === 'duration') return fmtDuration(v);
     if (format === 'position') return fmtPosition(v);
+    if (format === 'decimal') return v >= 100 ? fmtFull(Math.round(v)) : v === 0 ? '0' : v.toPrecision(2);
     return fmtFull(v);
 }
 
