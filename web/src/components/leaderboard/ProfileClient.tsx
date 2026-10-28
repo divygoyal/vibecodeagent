@@ -253,11 +253,11 @@ export function OfferSection({ idOrSlug, siteName, openTo, slots, initialSlotId 
                         <input name="email" type="email" required maxLength={255} autoComplete="email" className={cn(input, 'h-9 text-body')} />
                     </label>
                     <label>
-                        <span className="mb-1.5 block text-body-sm font-medium text-fg-secondary">Company <span className="text-fg-faint">(optional)</span></span>
+                        <span className="mb-1.5 block text-body-sm font-medium text-fg-secondary">Company <span className="text-fg-muted">(optional)</span></span>
                         <input name="company" maxLength={160} autoComplete="organization" className={cn(input, 'h-9 text-body')} />
                     </label>
                     <label>
-                        <span className="mb-1.5 block text-body-sm font-medium text-fg-secondary">Budget or terms <span className="text-fg-faint">(optional)</span></span>
+                        <span className="mb-1.5 block text-body-sm font-medium text-fg-secondary">Budget or terms <span className="text-fg-muted">(optional)</span></span>
                         <input name="budget" maxLength={80} placeholder="e.g. $200 per month" className={cn(input, 'h-9 text-body')} />
                     </label>
                     <label className="sm:col-span-2">

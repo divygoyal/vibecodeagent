@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Tabs } from '@/components/ui/Tabs';
 import { siteHref } from '@/components/shell/nav';
 import { ActionList, ActionRow } from '../ActionCard';
-import { ACTION_TYPE_LABEL } from '../lib/actionText';
+import { ACTION_TYPE_LABEL, topClickGain } from '../lib/actionText';
 import type { ActionImpact, ActionStatus, SiteAction } from '../lib/types';
 import { SiteHeader } from '../SiteHeader';
 import { LoadError } from '../SiteStates';
@@ -50,7 +50,8 @@ export function ActionsPage() {
     const listKey = `${status}|${type}|${impact}`;
     const [limitFor, setLimitFor] = useState<{ key: string; n: number }>({ key: listKey, n: PAGE_SIZE });
     const limit = limitFor.key === listKey ? limitFor.n : PAGE_SIZE;
-    const top5 = byStatus.open.filter((a) => /clicks/.test(a.expectedImpact)).slice(0, 5).reduce((s, a) => s + (a.type === 'audit' ? 0 : a.score), 0);
+    // The numbers the top 5 click tasks show (not their sort scores), so the header adds up what the rows say.
+    const top5 = topClickGain(byStatus.open);
     const loading = actions.state === 'loading';
     // Counts wait for the audit too (the list does not), so a count never jumps from 16 to 18 or disagrees with the Overview.
     const counting = loading || (actions.state !== 'error' && !settled);

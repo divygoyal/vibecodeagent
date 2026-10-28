@@ -68,7 +68,7 @@ export function InboxPanel({ entryId }: { entryId?: number }) {
                                     <Badge variant={k.variant}><k.icon aria-hidden size={11} /> {k.label}</Badge>
                                     <span className="text-body font-semibold text-fg">{it.name || it.email}</span>
                                     {it.company ? <span className="text-body-sm text-fg-muted">{it.company}</span> : null}
-                                    <span className="text-meta text-fg-faint">{timeAgo(it.created_at)} · {it.site_name}</span>
+                                    <span className="text-meta text-fg-muted">{timeAgo(it.created_at)} · {it.site_name}</span>
                                     <span className="ml-auto flex items-center gap-2">
                                         {it.status === 'new' ? <Badge variant="up">New</Badge> : null}
                                         {it.source === 'inquiry' ? (

@@ -37,8 +37,8 @@ export function ThinkingBlock({ content, isStreaming }: ThinkingBlockProps) {
             >
                 <Brain aria-hidden className="size-3.5 shrink-0 text-fg-muted" strokeWidth={1.75} />
                 <span className="font-medium">{isStreaming ? 'Thinking…' : 'Reasoning'}</span>
-                <span className="ml-auto text-caption text-fg-faint tabular-nums">{content.length} chars</span>
-                {expanded ? <ChevronDown aria-hidden className="size-3.5 text-fg-faint" /> : <ChevronRight aria-hidden className="size-3.5 text-fg-faint" />}
+                <span className="ml-auto text-caption text-fg-muted tabular-nums">{content.length} chars</span>
+                {expanded ? <ChevronDown aria-hidden className="size-3.5 text-fg-muted" /> : <ChevronRight aria-hidden className="size-3.5 text-fg-muted" />}
             </button>
             {expanded && (
                 <div className="border-t border-border-subtle px-3 py-2">

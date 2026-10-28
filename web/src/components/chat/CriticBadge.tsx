@@ -38,7 +38,7 @@ export function CriticBadge({ verdict }: CriticBadgeProps) {
         <div className={`mt-3 flex items-center gap-1.5 rounded-control border px-2 py-1 text-caption ${bg} ${border}`}>
             <Icon aria-hidden className={`size-3.5 ${fg}`} />
             <span className={`${fg} font-medium tabular-nums`}>{verdict.score.toFixed(1)}/5</span>
-            <span aria-hidden className="text-fg-faint">·</span>
+            <span aria-hidden className="text-fg-muted">·</span>
             <span className="truncate text-fg-secondary" title={verdict.notes}>{verdict.notes || 'reviewed'}</span>
             <span className="ml-auto text-caption text-fg-muted tabular-nums">
                 G {verdict.groundedness} · C {verdict.completeness} · F {verdict.format}

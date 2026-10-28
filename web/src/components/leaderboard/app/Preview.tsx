@@ -106,13 +106,13 @@ export function PreviewPanel({ entry, draft, range = '28d' }: { entry: MyEntry; 
                                         <div key={label} className="rounded-control bg-surface-sunken p-2.5">
                                             <dt className="text-meta text-fg-muted">{label}</dt>
                                             <dd className="mt-0.5 flex items-baseline gap-1.5">
-                                                {m ? <><CountValue m={m} className="text-title-sm text-fg" /><PctDelta pct={m.delta_pct} /></> : <span className="text-body-sm text-fg-faint">Hidden</span>}
+                                                {m ? <><CountValue m={m} className="text-title-sm text-fg" /><PctDelta pct={m.delta_pct} /></> : <span className="text-body-sm text-fg-muted">Hidden</span>}
                                             </dd>
                                         </div>
                                     ))}
                                     <div className="rounded-control bg-surface-sunken p-2.5">
                                         <dt className="text-meta text-fg-muted">Engagement</dt>
-                                        <dd className="mt-0.5 text-title-sm text-fg">{engagementText(p.kpis?.engagement) ?? <span className="text-body-sm font-normal text-fg-faint">Hidden</span>}</dd>
+                                        <dd className="mt-0.5 text-title-sm text-fg">{engagementText(p.kpis?.engagement) ?? <span className="text-body-sm font-normal text-fg-muted">Hidden</span>}</dd>
                                     </div>
                                 </dl>
                                 <p className="mt-3 text-meta text-fg-muted">

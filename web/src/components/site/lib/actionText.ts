@@ -1,4 +1,5 @@
 /** Small pure helpers for building and showing site actions (server + client). */
+import { expectedCtr } from './rules';
 import type { ActionImpact, SiteAction } from './types';
 
 /** FNV-1a 32-bit, hex: short stable ids for action subjects. */
@@ -41,6 +42,7 @@ export const ACTION_TYPE_LABEL: Record<SiteAction['type'], string> = {
     striking: 'Striking distance',
     low_ctr: 'Low CTR',
     cannibalization: 'Cannibalization',
+    deindexed: 'Dropped from Google',
     traffic_drop: 'Traffic drop',
     search_drop: 'Search drop',
     audit: 'Audit issue',
@@ -48,14 +50,50 @@ export const ACTION_TYPE_LABEL: Record<SiteAction['type'], string> = {
 
 const IMPACT_RANK: Record<ActionImpact, number> = { high: 3, medium: 2, low: 1 };
 
+/** What a task is listed by inside its tier: the number it shows, or (no number) its score. */
+function rankValue(a: Pick<SiteAction, 'gain' | 'score'>): number {
+    return a.gain ?? a.score;
+}
+
 /**
- * One order for open tasks everywhere (Overview top 3 and the Actions list):
- * by impact, then in the order given. The server already ranks by impact and
- * a type-mixed score, and audit tasks are appended after it, so a stable sort
- * keeps that mix (`Array.prototype.sort` is stable).
+ * One order for open tasks everywhere (Overview top 3, the Actions list, the home fix list, the demo Ask answer): by
+ * impact tier, then by the monthly number the task shows, biggest first (round 7, audit item 8: "+392" sat above
+ * "+958" because a hidden per-type damping ranked it). Tasks without a number ("Fixes a problem that can stop pages
+ * ranking") go by their score, so the shown numbers always read in order. Ties keep the given order (stable sort).
  */
-export function rankByImpact<T extends Pick<SiteAction, 'impact'>>(list: readonly T[]): T[] {
-    return [...list].sort((a, b) => IMPACT_RANK[b.impact] - IMPACT_RANK[a.impact]);
+export function rankByImpact<T extends Pick<SiteAction, 'impact' | 'gain' | 'score'>>(list: readonly T[]): T[] {
+    return [...list].sort((a, b) => IMPACT_RANK[b.impact] - IMPACT_RANK[a.impact] || rankValue(b) - rankValue(a));
+}
+
+/** Clicks a month the first `n` open click tasks show, added up (the Actions header and the demo Ask answer). */
+export function topClickGain(open: readonly Pick<SiteAction, 'expectedImpact' | 'gain'>[], n = 5): number {
+    return topClickTasks(open, n).reduce((s, a) => s + (a.gain ?? 0), 0);
+}
+
+/** The first `n` tasks (in the given, ranked order) whose number is in clicks. */
+export function topClickTasks<T extends Pick<SiteAction, 'expectedImpact' | 'gain'>>(open: readonly T[], n = 5): T[] {
+    return open.filter((a) => a.gain !== null && / clicks a month/.test(a.expectedImpact)).slice(0, n);
+}
+
+/** How clearly several pages split a query (structure only, no priority). 'weak' is not worth a task. */
+export type CannibalizationOverlap = 'strong' | 'some' | 'weak';
+
+/**
+ * Extra clicks a month (28 days) if one page held the query one place above the best of the competing pages, at the
+ * usual CTR for that position, minus the clicks the query gets now. The Actions task and the Cannibalization card
+ * both show this number.
+ */
+export function cannibalizationGain(c: { totalImpressions: number; totalClicks: number; bestPosition: number }, days: number): number {
+    const now = c.totalClicks / Math.max(1, c.totalImpressions);
+    return per28(Math.round(c.totalImpressions * Math.max(0, expectedCtr(Math.max(1, c.bestPosition - 1)) - now)), days);
+}
+
+/**
+ * The one severity rule for cannibalization (round 7, audit item 8): the Cannibalization tab's badge and the Actions
+ * tier are the same priority, `impactFor` of the gain against the site's monthly clicks. A weak overlap is low.
+ */
+export function cannibalizationImpact(overlap: CannibalizationOverlap, gain: number, monthlyScale: number): ActionImpact {
+    return overlap === 'weak' ? 'low' : impactFor(gain, monthlyScale);
 }
 
 export interface ShortImpact {

@@ -88,7 +88,10 @@
   /* Text */
   --tc-fg:           var(--tc-gray-900);   /* 17.4:1 on white */
   --tc-fg-secondary: var(--tc-gray-600);   /* 7.8:1 */
-  --tc-fg-muted:     var(--tc-gray-500);   /* 5.4:1 on white, 5.0:1 on canvas */
+  --tc-fg-muted:     var(--tc-gray-500);   /* 5.4:1 on white, 5.0:1 on canvas, 4.75:1 on subtle: secondary content */
+  /* Faint is 3.2:1 on white, 2.96:1 on canvas: input placeholders and disabled states ONLY. Anything a person reads
+     (labels, "(optional)", counts, "–" cells, icons that carry meaning) uses fg-muted, 4.75:1 or more on every
+     light surface (tests/faintText.test.mjs fails on other uses, round 7 audit item 14). */
   --tc-fg-faint:     var(--tc-gray-400);   /* 3.2:1, placeholders and disabled only */
   --tc-fg-inverse:   #ffffff;
 
@@ -161,8 +164,8 @@
 
   --tc-fg:           var(--tc-night-900);  /* 15.7:1 on surface */
   --tc-fg-secondary: var(--tc-night-700);  /* 8.7:1 */
-  --tc-fg-muted:     var(--tc-night-600);  /* 5.3:1 */
-  --tc-fg-faint:     var(--tc-night-500);  /* 3.1:1, disabled only */
+  --tc-fg-muted:     var(--tc-night-600);  /* 5.3:1 on surface, 5.8 on canvas, 5.0 raised, 4.75 subtle */
+  --tc-fg-faint:     var(--tc-night-500);  /* 3.1:1 on surface, placeholders and disabled only (fg-muted: 4.75:1+) */
   --tc-fg-inverse:   var(--tc-gray-900);
 
   /* Filled brand states keep the deep pine of light mode (round 2, critique D1):

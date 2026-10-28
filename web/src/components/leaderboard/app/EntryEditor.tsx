@@ -26,7 +26,7 @@ import { PrivacyForm } from './PrivacyForm';
 import { SlotsEditor } from './SlotsEditor';
 
 // Separators only where the status fits on one line: on phones it wraps and a line ended on a stray "·" (round 5 judge).
-const Dot = () => <span aria-hidden className="text-fg-faint max-md:hidden">·</span>;
+const Dot = () => <span aria-hidden className="text-fg-muted max-md:hidden">·</span>;
 
 const FIELD = 'tc-control w-full rounded-control border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint transition-[border-color,box-shadow] duration-120 hover:border-border-strong focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none';
 
@@ -261,7 +261,7 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                                         <input className={cn(FIELD, 'h-9')} value={draft.startup_name} maxLength={100} onChange={(e) => set('startup_name', e.target.value)} />
                                     </label>
                                     <label className="sm:col-span-2">
-                                        <span className="mb-1 flex justify-between text-body-sm font-medium text-fg-secondary">Tagline <span className="font-normal text-fg-faint tabular-nums">{draft.description.length}/200</span></span>
+                                        <span className="mb-1 flex justify-between text-body-sm font-medium text-fg-secondary">Tagline <span className="font-normal text-fg-muted tabular-nums">{draft.description.length}/200</span></span>
                                         <textarea className={cn(FIELD, 'h-auto min-h-[5.25rem] py-2')} rows={3} maxLength={200} value={draft.description} placeholder="One line on what the site is and who it is for" onChange={(e) => set('description', e.target.value)} />
                                     </label>
                                     <div>
@@ -269,7 +269,7 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                                         <Select ariaLabel="Category" value={draft.category} onValueChange={(c) => set('category', c)} options={CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] ?? c }))} />
                                     </div>
                                     <label>
-                                        <span className="mb-1 block text-body-sm font-medium text-fg-secondary">Logo URL <span className="font-normal text-fg-faint">(optional, defaults to the site icon)</span></span>
+                                        <span className="mb-1 block text-body-sm font-medium text-fg-secondary">Logo URL <span className="font-normal text-fg-muted">(optional, defaults to the site icon)</span></span>
                                         <input className={cn(FIELD, 'h-9')} inputMode="url" autoCapitalize="none" spellCheck={false} value={draft.logo_url} placeholder="https://" onChange={(e) => set('logo_url', e.target.value)} />
                                     </label>
                                     <label>

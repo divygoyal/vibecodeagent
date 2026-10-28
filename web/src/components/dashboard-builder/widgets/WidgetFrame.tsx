@@ -132,7 +132,7 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                     </h3>
                     {widget.description ? (
                         <Tooltip content={widget.description}>
-                            <button type="button" aria-label="About this widget" className="mt-0.5 shrink-0 text-fg-faint hover:text-fg-muted"><Info aria-hidden size={14} strokeWidth={1.75} /></button>
+                            <button type="button" aria-label="About this widget" className="mt-0.5 shrink-0 text-fg-muted hover:text-fg"><Info aria-hidden size={14} strokeWidth={1.75} /></button>
                         </Tooltip>
                     ) : null}
                     {ok?.sourceLabel && props.mode !== 'public' && widget.source?.type && widget.source.type !== 'default' ? (
@@ -143,7 +143,7 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                             {actions}
                             {ok && props.mode !== 'edit' ? (
                                 <Tooltip content="Download CSV">
-                                    <button type="button" aria-label={`Download ${widgetTitle(widget)} as CSV`} onClick={() => downloadCsv(widget, ok)} className="rounded p-0.5 text-fg-faint opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100">
+                                    <button type="button" aria-label={`Download ${widgetTitle(widget)} as CSV`} onClick={() => downloadCsv(widget, ok)} className="rounded p-0.5 text-fg-muted opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100">
                                         <Download aria-hidden size={14} />
                                     </button>
                                 </Tooltip>

@@ -52,7 +52,7 @@ export function PlanCard({ plan }: PlanCardProps) {
                         <span className="flex items-center gap-0.5"><Coins aria-hidden className="size-3" />{plan.est_cost_cents.toFixed(1)}¢</span>
                     )}
                 </span>
-                {open ? <ChevronDown aria-hidden className="size-3.5 text-fg-faint" /> : <ChevronRight aria-hidden className="size-3.5 text-fg-faint" />}
+                {open ? <ChevronDown aria-hidden className="size-3.5 text-fg-muted" /> : <ChevronRight aria-hidden className="size-3.5 text-fg-muted" />}
             </button>
             {open && (
                 <ol className="space-y-1.5 border-t border-border-subtle px-3 pb-2 pt-2">
@@ -65,7 +65,7 @@ export function PlanCard({ plan }: PlanCardProps) {
                                 <code className="font-mono text-caption text-fg">{step.tool}</code>
                                 <span className="text-fg-muted"> — {step.why}</span>
                                 {step.expected && (
-                                    <p className="mt-0.5 text-caption text-fg-faint">→ {step.expected}</p>
+                                    <p className="mt-0.5 text-caption text-fg-muted">→ {step.expected}</p>
                                 )}
                             </div>
                         </li>

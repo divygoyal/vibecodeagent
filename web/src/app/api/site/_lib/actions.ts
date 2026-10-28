@@ -3,14 +3,14 @@
  * (cached GA4 + Search Console reports), each with the numbers that triggered
  * it, an expected impact and a suggested fix.
  */
-import { fmtFull } from '@/lib/format';
+import { fmtDayYear, fmtFull } from '@/lib/format';
 import {
     displayPage, expectedCtr, isDecaying, isLowCtr, isStriking, lowCtrPotential, median, pageRef, STRIKING_TARGET, strikingPotential, strikingTitle,
 } from '@/components/site/lib/rules';
-import { actionId, impactFor, pct, per28, plural } from '@/components/site/lib/actionText';
+import { actionId, impactFor, pct, per28, plural, rankByImpact } from '@/components/site/lib/actionText';
 import type { ActionsResponse, SiteAction } from '@/components/site/lib/types';
 import { ga4Breakdown, ga4Summary } from './ga4Reports';
-import { gscCannibalization, gscDecay, gscRows, gscSummary, topPageByQuery } from './gscReports';
+import { gscCannibalization, gscDecay, gscDroppedPages, gscRows, gscSummary, topPageByQuery } from './gscReports';
 import { addDays, daysBetween, type RangeParams } from './params';
 
 export interface ActionsInput {
@@ -78,6 +78,7 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
                 ],
                 expectedImpact: `Recover up to ${fmtFull(per28(lost, days))} clicks a month`,
                 score: per28(lost, days) * 1.2,
+                gain: per28(lost, days),
                 fix: [
                     'Open Winners & losers to see which queries and pages lost the most.',
                     'If impressions fell too, check Indexing for pages that dropped out of Google.',
@@ -109,6 +110,7 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
                 ],
                 expectedImpact: `Win back up to ${fmtFull(d.lost)} clicks a month`,
                 score: d.lost,
+                gain: d.lost,
                 fix: [
                     'Check which queries for this page lost position (open the page in Pages).',
                     'Update facts, dates and examples; add what the pages now outranking it cover.',
@@ -145,6 +147,7 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
                 ],
                 expectedImpact: `+${fmtFull(gain)} clicks a month at position ${STRIKING_TARGET}`,
                 score: gain,
+                gain,
                 fix: [
                     `Make sure the page answers "${x.key}" directly near the top, with the query in the title and H1.`,
                     'Add a section covering what the top results cover and you do not.',
@@ -179,6 +182,7 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
                 ],
                 expectedImpact: `+${fmtFull(gain)} clicks a month at the usual CTR`,
                 score: gain,
+                gain,
                 fix: [
                     'Lead the title with what searchers want; keep it under ~60 characters.',
                     'Write a meta description that promises a specific answer or benefit.',
@@ -193,15 +197,16 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
 
     // Cannibalization.
     if (cannibal) {
-        for (const c of cannibal.filter((x) => x.severity !== 'low' && x.totalImpressions >= 100).slice(0, 8)) {
+        // The report's own gain and severity (one rule with the Cannibalization tab, round 7 audit item 8).
+        for (const c of cannibal.filter((x) => x.overlap !== 'weak' && x.totalImpressions >= 100).slice(0, 8)) {
             const lead = c.pages[0];
             const others = c.pages.slice(1, 3);
-            const gain = per28(Math.round(c.totalImpressions * Math.max(0, expectedCtr(Math.max(1, c.bestPosition - 1)) - c.totalClicks / Math.max(1, c.totalImpressions))), days);
+            const gain = c.gain;
             out.push({
                 id: actionId('cannibalization', c.query),
                 type: 'cannibalization',
                 area: 'Content',
-                impact: c.severity === 'high' ? impactFor(Math.max(gain, scale * 0.02), scale) : impactFor(gain, scale),
+                impact: c.severity,
                 title: `${c.pages.length} pages compete for "${c.query}"`,
                 summary: `${plural(c.pages.length, 'page')} split ${fmtFull(c.totalImpressions)} impressions: ${c.pages.slice(0, 3).map((p) => `${show(p.page)} ${pct(p.share)} (pos ${pos(p.position)})`).join(', ')}.`,
                 evidence: [
@@ -211,6 +216,7 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
                 ],
                 expectedImpact: gain > 0 ? `+${fmtFull(gain)} clicks a month if one page ranks` : 'Clearer ranking for this query',
                 score: Math.max(gain, 1),
+                gain: gain > 0 ? gain : null,
                 fix: [
                     `Pick ${show(lead.page)} as the page for "${c.query}".`,
                     others.length ? `Point ${others.map((p) => show(p.page)).join(' and ')} at a different intent, or merge and 301-redirect them.` : 'Merge or redirect the weaker page.',
@@ -221,6 +227,38 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
                 askPrompt: `On ${host}, ${c.pages.length} pages compete for "${c.query}": ${c.pages.slice(0, 3).map((p) => `${show(p.page)} (pos ${pos(p.position)})`).join(', ')}. Which should I keep and what should I do with the others?`,
             });
         }
+    }
+
+    // Top pages that had clicks in the range but Google no longer indexes (round 7, audit item 6).
+    const dropped = pages ? await gscDroppedPages(inp.userId, inp.token, site, pages.rows).catch(() => []) : [];
+    for (const d of dropped) {
+        const p = show(d.url);
+        const gain = per28(d.clicks, days);
+        const crawled = d.lastCrawlTime ? fmtDayYear(d.lastCrawlTime.slice(0, 10)) : null;
+        out.push({
+            id: actionId('deindexed', d.url),
+            type: 'deindexed',
+            area: 'Technical',
+            impact: impactFor(gain, scale),
+            title: `Get ${p} back into Google`,
+            summary: `${p} had ${fmtFull(d.clicks)} clicks in this period, but Google reported it as not indexed${crawled ? ` when it last crawled it (${crawled})` : ''}${d.coverageState ? `: "${d.coverageState}"` : ''}.`,
+            evidence: [
+                { label: 'Clicks in this period', value: fmtFull(d.clicks) },
+                { label: 'Index status', value: d.coverageState ?? 'Not indexed' },
+                ...(crawled ? [{ label: 'Last crawl', value: crawled }] : []),
+            ],
+            expectedImpact: `Win back up to ${fmtFull(gain)} clicks a month`,
+            score: gain,
+            gain,
+            fix: [
+                'Open the page in Search › Indexing and check what Google saw at the last crawl.',
+                'Make sure it is not blocked (noindex, robots.txt, a redirect or an error) and that its canonical points to itself.',
+                'Improve or merge thin content, link to it from strong pages, then request indexing in Search Console.',
+            ],
+            page: d.url,
+            query: null,
+            askPrompt: `${p} on ${host} had ${fmtFull(d.clicks)} Google clicks in this period but Search Console now says "${d.coverageState ?? 'not indexed'}". Why might Google have dropped it and how do I get it back?`,
+        });
     }
     return out;
 }
@@ -258,6 +296,7 @@ async function trafficActions(inp: ActionsInput, partial: string[]): Promise<Sit
                 evidence: tail.map((p) => ({ label: p.date, value: '0 sessions' })),
                 expectedImpact: 'Restores your data (and possibly your visitors)',
                 score: Math.max(scale, 1000),
+                gain: null,
                 fix: [
                     'Open the site and check it loads.',
                     'Check the GA4 tag fires (GA4 > Admin > DebugView, or the Tag Assistant).',
@@ -287,6 +326,7 @@ async function trafficActions(inp: ActionsInput, partial: string[]): Promise<Sit
                     ],
                     expectedImpact: `Recover up to ${fmtFull(per28(lost, days))} sessions a month`,
                     score: per28(lost, days),
+                    gain: per28(lost, days),
                     fix: [
                         'See which channel fell most (Traffic > Sources).',
                         'If it is Organic Search, open Search > Winners & losers.',
@@ -321,6 +361,7 @@ async function trafficActions(inp: ActionsInput, partial: string[]): Promise<Sit
                 ],
                 expectedImpact: `Recover up to ${fmtFull(per28(lost, days))} sessions a month`,
                 score: per28(lost, days),
+                gain: per28(lost, days),
                 fix: name === 'Organic Search'
                     ? ['Open Search > Winners & losers to find the queries that dropped.', 'Check Indexing for pages that fell out of Google.']
                     : ['Open Traffic > Sources and filter to this channel to see which source fell.', 'Check whether a campaign, newsletter or partner link ended.'],
@@ -355,6 +396,7 @@ async function trafficActions(inp: ActionsInput, partial: string[]): Promise<Sit
                 ],
                 expectedImpact: `Recover up to ${fmtFull(per28(lost, days))} views a month`,
                 score: per28(lost, days) * 0.6,
+                gain: per28(lost, days),
                 fix: [
                     'Open the page in Pages to see whether search clicks fell too.',
                     'Check the page still loads, and that links to it from your menu or other pages still exist.',
@@ -376,19 +418,8 @@ export async function buildActions(inp: ActionsInput): Promise<ActionsResponse> 
     ]);
     const seen = new Set<string>();
     const unique = [...search, ...traffic].filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true)));
-    // Mix types: the n-th task of the same type ranks as if 20% smaller per step,
-    // so one signal (e.g. ten striking-distance queries) doesn't fill the top.
-    const nth = new Map<string, number>();
-    const ranked = [...unique].sort((a, b) => b.score - a.score).map((a) => {
-        const n = nth.get(a.type) ?? 0;
-        nth.set(a.type, n + 1);
-        return { a, adj: a.score * 0.8 ** n };
-    });
-    const rank = { high: 3, medium: 2, low: 1 };
-    const actions = ranked
-        .sort((x, y) => rank[y.a.impact] - rank[x.a.impact] || y.adj - x.adj)
-        .map((x) => x.a)
-        .slice(0, 60);
+    // By impact tier, then by the number each task shows (rankByImpact, the order every screen uses).
+    const actions = rankByImpact(unique).slice(0, 60);
     const w = inp.siteUrl ? withPrevious(inp.search) : withPrevious(inp.traffic);
     return {
         actions,

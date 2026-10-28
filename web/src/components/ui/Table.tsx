@@ -229,7 +229,7 @@ export function Table<T>({
                                                 aria-hidden
                                                 size={12}
                                                 strokeWidth={1.75}
-                                                className={active ? 'text-fg' : 'text-fg-faint transition-colors duration-120 group-hover/sort:text-fg-muted'}
+                                                className={active ? 'text-fg' : 'text-fg-muted transition-colors duration-120 group-hover/sort:text-fg'}
                                             />
                                         </button>
                                     ) : c.header}

@@ -127,11 +127,11 @@ export function ToolCallCard({ tool }: { tool: ToolCall }) {
                 <span className="min-w-0 flex-1 truncate">{TOOL_NAMES[tool.name] || tool.name}</span>
                 {/* A6: live elapsed-seconds while the tool is in flight */}
                 {!isDone && typeof tool.elapsedSec === 'number' && tool.elapsedSec > 0 && (
-                    <span className="text-meta text-fg-faint tabular-nums">{tool.elapsedSec}s</span>
+                    <span className="text-meta text-fg-muted tabular-nums">{tool.elapsedSec}s</span>
                 )}
                 {isDone && (expanded
-                    ? <ChevronDown aria-hidden className="size-3.5 text-fg-faint" />
-                    : <ChevronRight aria-hidden className="size-3.5 text-fg-faint" />
+                    ? <ChevronDown aria-hidden className="size-3.5 text-fg-muted" />
+                    : <ChevronRight aria-hidden className="size-3.5 text-fg-muted" />
                 )}
             </button>
             {expanded && displayContent && (

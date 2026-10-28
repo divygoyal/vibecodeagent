@@ -21,12 +21,19 @@ test('shortImpact: the monthly number of each expected-impact sentence, once', (
     assert.equal(shortImpact('Fixes a problem that can stop pages ranking'), null);
 });
 
-test('rankByImpact keeps the server order inside an impact level, so Overview top 3 = Actions first 3', () => {
+test('rankByImpact: tier, then the number each task shows (round 7 audit item 8); no number goes by score', () => {
     const list = [
-        { id: 'a', impact: 'high' }, { id: 'b', impact: 'medium' }, { id: 'c', impact: 'high' },
-        { id: 'audit1', impact: 'high' }, { id: 'd', impact: 'low' }, { id: 'audit2', impact: 'medium' },
+        { id: 'a', impact: 'high', gain: 120, score: 120 }, { id: 'b', impact: 'medium', gain: 392, score: 392 },
+        { id: 'c', impact: 'high', gain: 958, score: 958 }, { id: 'audit1', impact: 'high', gain: null, score: 40 },
+        { id: 'd', impact: 'low', gain: 22, score: 22 }, { id: 'audit2', impact: 'medium', gain: null, score: 10 },
+        { id: 'e', impact: 'medium', gain: 958, score: 1149.6 }, { id: 'f', impact: 'low', gain: 53, score: 53 },
     ];
-    assert.deepEqual(rankByImpact(list).map((x) => x.id), ['a', 'c', 'audit1', 'b', 'audit2', 'd']);
+    assert.deepEqual(rankByImpact(list).map((x) => x.id), ['c', 'a', 'audit1', 'e', 'b', 'audit2', 'f', 'd']);
+    // Shown numbers read in order inside every tier.
+    for (const tier of ['high', 'medium', 'low']) {
+        const nums = rankByImpact(list).filter((x) => x.impact === tier && x.gain !== null).map((x) => x.gain);
+        assert.deepEqual(nums, [...nums].sort((x, y) => y - x));
+    }
     // Pure: the input is not reordered.
     assert.equal(list[1].id, 'b');
 });

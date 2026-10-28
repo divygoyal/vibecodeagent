@@ -57,6 +57,32 @@ export function LiveRow<K extends LiveKind>({ kind, data, reserve, children }: {
         };
     }, [kind]);
 
+    // The static picture must show before the swap (round 7, audit item 13: full-page captures, previews and fast
+    // scrolls saw ~750 px blank cards, because every picture was lazy and far below the fold). Only the variant that is
+    // rendered (this width and theme) is promoted to eager: the first row at once, the others after the page's load
+    // event, so they never compete with the hero.
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const promote = () => {
+            for (const img of el.querySelectorAll<HTMLImageElement>('img[loading="lazy"]')) {
+                if (img.getClientRects().length) img.loading = 'eager';
+            }
+        };
+        if (kind === 'site') {
+            promote();
+            return;
+        }
+        let timer: number | undefined;
+        const later = () => { timer = window.setTimeout(promote, 300); };
+        if (document.readyState === 'complete') later();
+        else window.addEventListener('load', later, { once: true });
+        return () => {
+            window.removeEventListener('load', later);
+            if (timer) window.clearTimeout(timer);
+        };
+    }, [kind]);
+
     return (
         // Until the swap, the picture sits centred in a box as tall as the live row (`reserve`, per breakpoint), so the
         // swap moves nothing below it, also when the row is on screen at load (a #tour-… link).
