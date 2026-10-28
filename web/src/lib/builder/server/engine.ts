@@ -1129,16 +1129,23 @@ function shapeFrame(
             for (const b of buckets) if (cur.get(kOf(b))) lastWithData = b;
             const curTot = hasCalc ? shareTotals(q.metrics, buckets.map((b) => cur.get(kOf(b))?.cur ?? {})) : {};
             const prevTot = hasCalc && e.compare ? shareTotals(q.metrics, prevBuckets.map((b) => prev.get(kOf(b))?.cur ?? {})) : {};
+            // Round 9: comparison days before the first one Google has data for are "no data", not zero: the line breaks.
+            const firstPrev = e.compare ? prevBuckets.findIndex((pb) => prev.has(kOf(pb))) : -1;
+            if (e.compare && prevBuckets.length) {
+                if (firstPrev === -1) flags.compareNone = true;
+                else if (firstPrev > 0 && (!flags.compareFrom || prevBuckets[firstPrev] < flags.compareFrom)) flags.compareFrom = prevBuckets[firstPrev];
+            }
             buckets.forEach((b, i) => {
                 const c = cur.get(kOf(b));
                 const p = e.compare ? prev.get(kOf(prevBuckets[i] ?? '')) : undefined;
+                const noPrev = e.compare && (firstPrev === -1 || i < firstPrev);
                 const fill: Vals = {};
                 const missingTail = gscOnly && !c && lagStart && b >= lagStart && b > lastWithData;
                 for (const id of fillIds) fill[id] = missingTail ? null : zeroFor(id);
                 const pfill: Vals = {};
                 for (const id of fillIds) pfill[id] = zeroFor(id);
                 const cv = c ? { ...fill, ...c.cur } : fill;
-                const pv = e.compare ? (p ? { ...pfill, ...p.cur } : prevBuckets[i] ? pfill : undefined) : undefined;
+                const pv = e.compare ? (p ? { ...pfill, ...p.cur } : prevBuckets[i] && !noPrev ? pfill : undefined) : undefined;
                 const row = toRow(bySite ? { site: sid, [timeDim]: b } : { [timeDim]: b }, withCalcs(cv, curTot), withCalcs(pv, prevTot));
                 row[`d:date`] = b;
                 if (e.compare && prevBuckets[i]) row['d:date:prev'] = prevBuckets[i];
