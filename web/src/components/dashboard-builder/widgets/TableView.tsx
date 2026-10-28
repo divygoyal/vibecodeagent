@@ -30,6 +30,9 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
  * and DataFast's breakdown cards).
  */
 export const NARROW_TABLE_PX = 640;
+/** Height a search box (with its gap) and a totals line take out of the rows' room (round 10: the pager was cut off). */
+const SEARCH_PX = 44;
+const TOTALS_PX = 38;
 /** Narrow cards keep the trend column from this width (name, number, change and a 72 px line fit). */
 export const NARROW_TREND_PX = 360;
 
@@ -93,7 +96,7 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
     const phone = props.bp === 'sm';
     // A table that does not paginate used to scroll inside its card, which left the last row cut through its text
     // (round 8 judge). It now pages by whole rows that fit, like a paginated one; a short table shows no pager.
-    const fitRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (flagNotes(ok, widget).length ? 26 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - 36 - 48) / 36));
+    const fitRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (flagNotes(ok, widget).length ? 26 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - (c.search ? SEARCH_PX : 0) - (footer ? TOTALS_PX : 0) - 36 - 48) / 36));
     const pageSize = phone ? 5 : c.pagination ? Math.min(c.pageSize, fitRows) : fitRows;
     // TV: no pager, just the top rows that fit the card (round 4).
     const tv = Boolean(useTvScreen());
