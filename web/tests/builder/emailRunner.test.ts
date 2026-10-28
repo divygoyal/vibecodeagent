@@ -31,7 +31,7 @@ const row = (id: string, c: EmailScheduleConfig, o: Partial<ScheduleRow> = {}, s
     dashboardId: id, name: `Dash ${id}`, ownerUserId: 1, ownerIdentifier: 'gh-1', ownerEmail: 'owner@example.com', shareToken: null, schedule: { config: c, state }, ...o,
 });
 const digest = (name = 'Weekly report'): DigestModel => ({
-    dashboardName: name, rangeLabel: 'Last 7 days · Oct 21 – Oct 27', siteLabel: 'acme.test', pages: [{ title: 'Overview', kpis: [{ label: 'Clicks', value: '1.2K', delta: { text: '12.4%', dir: 'up', tone: 'good' }, compare: 'vs previous period' }], charts: [] }],
+    dashboardName: name, rangeLabel: 'Last 7 days · Oct 21 – Oct 27', siteLabel: 'acme.test', omitted: 0, pages: [{ title: 'Overview', kpis: [{ label: 'Clicks', value: '1.2K', delta: { text: '12.4%', dir: 'up', tone: 'good' }, compare: 'vs previous period' }], charts: [] }],
     viewUrl: `${ORIGIN}/dashboard/dashboards/x`, viewKind: 'app', message: '', accent: '#0d3a2c', scheduleText: 'You get this email every day at 09:00 (UTC).',
 });
 function setup(rows: ScheduleRow[], o: Partial<RunnerDeps> = {}) {
@@ -309,6 +309,12 @@ test('the email: KPI tiles and signed chart pictures from widget results, view l
     assert.ok(html.includes('Unsubscribe from these emails'));
     assert.ok(html.includes('&amp;x=1'));
     assert.ok(!/<script/i.test(html));
+    // widgets the email cannot draw (tables, maps…) are counted and named, layout widgets are not
+    const undrawable = Object.values(doc.widgets).filter((w) => !['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', 'text', 'image', 'section'].includes(w.type)).length;
+    assert.ok(undrawable > 0, 'the template has a table or map');
+    assert.ok(m.omitted >= undrawable);
+    assert.ok(html.includes('more widget'));
+    assert.ok(renderReportHtml({ ...m, omitted: 0 }, { unsubscribeUrl: 'https://x.test/u' }).includes('more widget') === false);
 });
 
 test('the email names the comparison the dashboard really uses (same weekdays, custom days) and follows a widget with its own comparison', () => {

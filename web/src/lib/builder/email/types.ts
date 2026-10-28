@@ -72,6 +72,8 @@ export interface DigestModel {
     rangeLabel: string;
     siteLabel: string;
     pages: DigestPage[];
+    /** Data widgets on the chosen pages that are not in the email (types it cannot draw, over the per-page limit, or failed). */
+    omitted: number;
     viewUrl: string;
     viewKind: 'public' | 'app';
     message: string;

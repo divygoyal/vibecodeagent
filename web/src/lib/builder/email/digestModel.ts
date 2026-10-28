@@ -14,6 +14,9 @@ import { barSize, chartUrl, downsample, LINE_SIZE, type ChartSpec } from './char
 import { describeSchedule, lowerFirst, type EmailScheduleConfig } from './schedule';
 import type { DigestChart, DigestKpi, DigestModel, DigestPage } from './types';
 
+/** Layout-only widgets: never counted as missing from the email. */
+const DECORATIVE = new Set<WidgetDef['type']>(['text', 'image', 'section']);
+
 export const MAX_KPIS_PER_PAGE = 6;
 export const MAX_CHARTS_PER_PAGE = 3;
 
@@ -129,6 +132,7 @@ export function widgetOrder(page: PageDef): string[] {
 export function buildDigestModel(input: ModelInput): DigestModel {
     const { doc, config, origin } = input;
     const pages: DigestPage[] = [];
+    let omitted = 0;
     let rangeLabel = '';
 
     for (const { page, res } of input.pages) {
@@ -140,6 +144,7 @@ export function buildDigestModel(input: ModelInput): DigestModel {
         }
         const kpis: DigestKpi[] = [];
         const charts: DigestChart[] = [];
+        const shown = new Set<string>();
         for (const id of widgetOrder(page)) {
             const w = doc.widgets[id];
             if (!w || w.type === undefined) continue;
@@ -151,16 +156,17 @@ export function buildDigestModel(input: ModelInput): DigestModel {
             const cmpText = compareOn ? compareLabel(spec) : '';
             if (w.type === 'scorecard') {
                 const k = kpiOf(w.config.metric.id, w.config.metric.label || (w.showTitle !== false ? w.title : undefined), ok.parts.total, ok, w.config.comparison.show && compareOn, cmpText, w.config.metric.format);
-                if (k && kpis.length < MAX_KPIS_PER_PAGE) kpis.push(k);
+                if (k && kpis.length < MAX_KPIS_PER_PAGE) { kpis.push(k); shown.add(id); }
             } else if (w.type === 'kpi-strip') {
                 for (const m of w.config.metrics) {
                     const k = kpiOf(m.id, m.label, ok.parts.total, ok, w.config.comparison.show && compareOn, cmpText, m.format);
-                    if (k && kpis.length < MAX_KPIS_PER_PAGE) kpis.push(k);
+                    if (k && kpis.length < MAX_KPIS_PER_PAGE) { kpis.push(k); shown.add(id); }
                 }
             } else if (charts.length < MAX_CHARTS_PER_PAGE && (w.type === 'timeseries' || w.type === 'bar' || w.type === 'pie')) {
                 const chart = w.type === 'timeseries' ? lineChart(w, ok, compareOn) : barChart(w, ok);
                 if (!chart) continue;
                 const size = chart.g === 'line' ? LINE_SIZE : barSize(chart.v.length);
+                shown.add(id);
                 charts.push({
                     title: chart.t,
                     imageUrl: chartUrl(origin, chart, input.secret),
@@ -169,6 +175,8 @@ export function buildDigestModel(input: ModelInput): DigestModel {
                 });
             }
         }
+        // Data widgets the email cannot draw (tables, maps, heatmaps, realtime, embeds…) or that failed: counted so the email can say so.
+        omitted += widgetOrder(page).filter((id) => { const t = doc.widgets[id]?.type; return t !== undefined && !DECORATIVE.has(t) && !shown.has(id); }).length;
         if (kpis.length || charts.length) pages.push({ title: page.title, kpis, charts });
     }
 
@@ -178,6 +186,7 @@ export function buildDigestModel(input: ModelInput): DigestModel {
         rangeLabel: rangeLabel || 'Latest data',
         siteLabel: input.siteLabel,
         pages,
+        omitted,
         viewUrl,
         viewKind: input.shareToken ? 'public' : 'app',
         message: config.message,

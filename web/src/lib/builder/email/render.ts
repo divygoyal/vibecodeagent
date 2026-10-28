@@ -80,6 +80,7 @@ ${m.message ? `<div style="font:400 14px/21px ${FONT};color:${INK};margin-top:12
 </td></tr>
 ${pages}
 <tr><td align="left" style="padding:20px 24px 8px 24px;">
+${m.omitted > 0 ? `<div style="font:400 13px/18px ${FONT};color:${MUTED};margin:0 0 12px 0;">${m.omitted === 1 ? '1 more widget' : `${m.omitted} more widgets`} (tables, maps and other charts) ${m.omitted === 1 ? 'is' : 'are'} on the dashboard.</div>` : ''}
 <a href="${esc(m.viewUrl)}" style="display:inline-block;background:${accent};color:#ffffff;font:600 14px/20px ${FONT};text-decoration:none;padding:11px 20px;border-radius:9px;">View dashboard</a>
 <div style="font:400 12px/18px ${FONT};color:${MUTED};margin-top:8px;">${m.viewKind === 'public' ? 'Opens the shared view of this dashboard (it may ask for a password).' : `Opens the dashboard in ${esc(BRAND_NAME)}; you need to be signed in as its owner.`}</div>
 </td></tr>
@@ -99,6 +100,7 @@ export function renderReportText(m: DigestModel, o: ReportRenderOptions): string
         for (const k of p.kpis) lines.push(`${k.label}: ${k.value}${k.delta ? ` (${k.delta.dir === 'down' ? '-' : k.delta.dir === 'up' ? '+' : ''}${k.delta.text.replace(/^[-+]/, '')}${k.compare ? ` ${k.compare}` : ''})` : ''}`);
         lines.push('');
     }
+    if (m.omitted > 0) lines.push(`${m.omitted === 1 ? '1 more widget is' : `${m.omitted} more widgets are`} on the dashboard (tables, maps and other charts).`, '');
     lines.push(`View dashboard: ${m.viewUrl}`, '', m.scheduleText, `Unsubscribe: ${o.unsubscribeUrl}`);
     return lines.join('\n');
 }
