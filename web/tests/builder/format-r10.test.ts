@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { fmtMetricPair, fmtMetricValue, metricDeltaFor } from '@/lib/builder/catalog';
+import { fmtMetricPair, fmtMetricValue, metricColumnFormatter, metricDeltaFor } from '@/lib/builder/catalog';
 
 const KEY_RATE = 'ga4:sessionKeyEventRate';
 const ENGAGEMENT = 'ga4:engagementRate';
@@ -45,6 +45,28 @@ test('item 4 (counts): two compact values that would read the same fall back to 
     const p = fmtMetricPair('ga4:sessions', 12_345, 12_320, TILE);
     assert.deepEqual(p, { value: '12,345', previous: '12,320' });
     assert.deepEqual(fmtMetricPair('ga4:sessions', 12_345, 20_320, TILE), { value: '12.3K', previous: '20.3K' });
+});
+
+test('item 5: one format per table column, decided by the column', () => {
+    const sessions = [27_153, 18_001, 14_530, 4_922, 3_147];
+    const narrow = metricColumnFormatter('ga4:sessions', sessions, { compact: true });
+    assert.deepEqual(sessions.map(narrow), ['27,153', '18,001', '14,530', '4,922', '3,147']);
+    const wide = metricColumnFormatter('ga4:sessions', sessions, { compact: false });
+    assert.deepEqual(sessions.map(wide), ['27,153', '18,001', '14,530', '4,922', '3,147']);
+    const big = [503_118, 78_200, 4_922];
+    assert.deepEqual(big.map(metricColumnFormatter('ga4:sessions', big, { compact: true })), ['503K', '78K', '5K']);
+    assert.deepEqual(big.map(metricColumnFormatter('ga4:sessions', big, { compact: false })), ['503,118', '78,200', '4,922']);
+    // Money: whole units unless every row is under 1,000; one unit above 100,000.
+    const money = [1_204, 45.2, 27_056];
+    assert.deepEqual(money.map(metricColumnFormatter('ga4:totalRevenue', money, { compact: true })), ['$1,204', '$45', '$27,056']);
+    const cents = [45.2, 3.1];
+    assert.deepEqual(cents.map(metricColumnFormatter('ga4:totalRevenue', cents, { compact: true })), ['$45.20', '$3.10']);
+    const rich = [210_000, 61_800, 4_922];
+    assert.deepEqual(rich.map(metricColumnFormatter('ga4:totalRevenue', rich, { compact: true })), ['$210K', '$62K', '$5K']);
+    // Rates have one format already.
+    const rates = [0.6522, 0.4, 0.05];
+    assert.deepEqual(rates.map(metricColumnFormatter(ENGAGEMENT, rates, { compact: true })), ['65.2%', '40.0%', '5.0%']);
+    assert.equal(metricColumnFormatter('ga4:sessions', [1, 2], { compact: true })(null), '–');
 });
 
 test('a plain value is unchanged by the pair writer when nothing needs more digits', () => {

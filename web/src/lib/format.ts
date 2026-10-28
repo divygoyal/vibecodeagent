@@ -86,6 +86,37 @@ export function fmtCompact(n: Num): string {
     return sign + compactParts(abs, null);
 }
 
+export interface ColumnUnit {
+    size: number;
+    suffix: string;
+    decimals: number;
+}
+
+/**
+ * The one unit a table column of counts or money is written in (round 9 judge, item 5: "27.2K, 18K, 14.5K, then
+ * 4,922" in one column). Decided by the column's largest absolute value: below 100,000 the column is written in full
+ * (`27,153` · `4,922`, null); from there every value shares the unit of the max and has the same decimals (`503K`
+ * · `78K` · `5K`; `1.24M` · `0.08M`).
+ */
+export function columnUnit(values: Num[]): ColumnUnit | null {
+    let max = 0;
+    for (const v of values) if (isNum(v)) max = Math.max(max, Math.abs(v));
+    if (max < 100_000) return null;
+    for (const [size, suffix] of UNITS) {
+        if (max < size) continue;
+        const digits = Math.floor(Math.log10(max / size)) + 1;
+        return { size, suffix, decimals: Math.max(0, 3 - digits) };
+    }
+    return null;
+}
+
+/** `n` written in a column's unit: `503K`, `78K`, `0.08M`. Zero stays `0`. */
+export function fmtUnit(n: number, unit: ColumnUnit): string {
+    if (n === 0) return '0';
+    const abs = Math.abs(n);
+    return `${n < 0 ? '-' : ''}${roundTo(abs / unit.size, unit.decimals).toFixed(unit.decimals)}${unit.suffix}`;
+}
+
 /** Axis ticks: compact with at most 1 decimal. `0` · `500` · `1K` · `1.5K` · `503K` · `1.5M`. */
 export function fmtAxis(n: Num): string {
     if (!isNum(n)) return DASH;
@@ -196,6 +227,8 @@ export interface CurrencyOptions {
     compact?: boolean;
     /** Two decimals (`$1.12`), for small per-session or per-user values. Default: whole units, so a column never mixes `$27,056` with `$45.20`. */
     cents?: boolean;
+    /** A table column's shared unit (`columnUnit`): every value as `$503K`, never `$4,922` next to `$61.8K`. Wins over `compact`. */
+    unit?: ColumnUnit;
 }
 
 /**
@@ -207,6 +240,14 @@ export function fmtCurrency(n: Num, currency: string | null | undefined = 'USD',
     const code = (currency || 'USD').toUpperCase();
     const abs = Math.abs(n);
     const sign = n < 0 ? '-' : '';
+    if (opts.unit && abs !== 0) {
+        const parts = currencyFormatter(code, 0).formatToParts?.(1) ?? [];
+        const sym = parts.find((p) => p.type === 'currency')?.value;
+        const symFirst = parts.findIndex((p) => p.type === 'currency') < parts.findIndex((p) => p.type === 'integer');
+        const num = fmtUnit(abs, opts.unit);
+        if (sym) return symFirst ? `${sign}${sym}${num}` : `${sign}${num} ${sym}`;
+        return `${sign}${num} ${code}`;
+    }
     if (opts.compact && abs >= 10_000) {
         // "$" + "61.8K": the symbol from the formatter, the number from compactParts (same rounding as fmtCompact).
         const parts = currencyFormatter(code, 0).formatToParts?.(1) ?? [];

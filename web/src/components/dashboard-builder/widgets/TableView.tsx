@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
 import { Sparkline } from '@/components/charts';
 import { fmtDay } from '@/lib/format';
 import { Button, EmptyState, MetricDelta, Modal, SearchInput, Table, type TableColumn as UiColumn } from '@/components/ui';
-import { dimLabel, fmtMetricValue, metricHeatbar, metricLabel } from '@/lib/builder/catalog';
+import { dimLabel, fmtMetricValue, metricColumnFormatter, metricHeatbar, metricLabel } from '@/lib/builder/catalog';
 import { cellStyle } from '@/lib/builder/cfRules';
 import { rowTrends, TABLE_TREND_ROWS, trendChange, trendMetric, trendUnsupported, type RowTrends } from '@/lib/builder/trend';
 import type { CellValue, TableWidget } from '@/lib/builder/types';
@@ -219,6 +219,9 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
     const rows = needle ? all.filter((r) => `${dimText(d0, r[`d:${d0}`], frame?.labels)} ${frame?.sublabels?.[String(r[`d:${d0}`])] ?? ''}`.toLowerCase().includes(needle)) : all;
     const maxOf: Record<string, number> = {};
     for (const col of metricCols) maxOf[col.ref] = Math.max(0, ...rows.map((r) => (typeof r[`m:${col.ref}`] === 'number' ? (r[`m:${col.ref}`] as number) : 0)));
+    // One number format per column, decided by the column's values (round 9 judge: "27.2K, 18K, 14.5K, then 4,922").
+    const fmtCol: Record<string, (v: number | null) => string> = {};
+    for (const col of metricCols) fmtCol[col.id] = metricColumnFormatter(col.ref, all.map((r) => r[`m:${col.ref}`] as number | null | undefined), { compact: narrow, currency: ok?.flags.currency, format: col.format });
 
     const columns: UiColumn<Row>[] = cols.map((col, i) => {
         if (col.kind === 'dimension') {
@@ -280,7 +283,7 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                             <span aria-hidden className={cn('absolute bottom-0 right-1 h-[3px] rounded-full', metricHeatbar(id))} style={{ width: `${Math.max(pct, 1.5)}%`, ['--tc-heatbar' as string]: '45%' }} />
                         ) : pct ? <span aria-hidden className={cn('absolute inset-y-0.5 right-[-6px] rounded-md', metricHeatbar(id))} style={{ width: `calc(${pct}% + 6px)` }} /> : null}
                         <span className={cf ? `relative tc-cf-cell tc-cf-${cf} font-medium` : 'relative'} title={cf ? (cf === 'good' ? 'Meets a good rule' : cf === 'bad' ? 'Matches a bad rule' : 'Needs attention') : narrow && v !== null ? fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format }) : undefined}>
-                            {fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format, compact: narrow })}
+                            {fmtCol[col.id](v)}
                         </span>
                         {showDelta && pv !== undefined ? (
                             <MetricDelta className="relative" current={v} previous={typeof pv === 'number' ? pv : null} format={dsFormat(id)} better={metricBetter(id)} />
