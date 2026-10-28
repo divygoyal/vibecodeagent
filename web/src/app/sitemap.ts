@@ -34,9 +34,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         { path: '/terms', priority: 0.2, changeFrequency: 'yearly' },
     ];
 
-    // Verified, listed profiles (privacy-applied board; up to 100 by traffic).
-    const board = await lbAdmin<BoardResponse>('/api/lb/board', { query: { tab: 'top', page_size: 100 }, revalidate: 3600, timeoutMs: 4000 });
-    const profiles: MetadataRoute.Sitemap = (board.data?.rows ?? []).map((r) => ({
+    // Verified, listed profiles (privacy-applied board, by traffic): every page of 100, up to 1,000 profiles.
+    const rows: BoardResponse['rows'] = [];
+    for (let page = 1; page <= 10; page++) {
+        const board = await lbAdmin<BoardResponse>('/api/lb/board', { query: { tab: 'top', page_size: 100, page }, revalidate: 3600, timeoutMs: 4000 });
+        const got = board.data?.rows ?? [];
+        rows.push(...got);
+        if (got.length < 100 || rows.length >= (board.data?.total ?? 0)) break;
+    }
+    const profiles: MetadataRoute.Sitemap = rows.map((r) => ({
         url: `${SITE_URL}/leaderboard/${r.slug || r.id}`,
         lastModified: r.last_refreshed ? new Date(r.last_refreshed) : now,
         changeFrequency: 'daily' as const,

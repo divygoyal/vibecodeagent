@@ -16,7 +16,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/cn';
 import { Button, EmptyState, Skeleton } from '@/components/ui';
 import { DashboardView, publicSiteOptions, useUrlControls, viewerSelection } from '@/components/dashboard-builder/DashboardView';
-import { DashboardBrandHeader, MadeWithBadge } from '@/components/dashboard-builder/DashboardBrandHeader';
+import { DashboardBrandHeader } from '@/components/dashboard-builder/DashboardBrandHeader';
+import { MadeWithTrafficClaw } from '@/components/share/MadeWith';
 import { TvFrame, tvRefreshMs } from '@/components/dashboard-builder/TvMode';
 import { interactionToParam } from '@/components/dashboard-builder/Interactions';
 import { dashRootProps } from '@/components/dashboard-builder/theme/DashTheme';
@@ -218,7 +219,7 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
                 onInteraction={allow.filters ? ctl.setInteraction : undefined}
                 onDrill={allow.filters ? ctl.setDrill : undefined}
                 header={header}
-                footer={pub.share?.badge ? <div className="flex justify-center pt-2"><MadeWithBadge /></div> : null}
+                footer={pub.share?.badge ? <div className="flex justify-center pt-2"><MadeWithTrafficClaw kind={embed ? 'embed' : 'view'} /></div> : null}
                 shell="inherit"
                 notes={notes}
             />

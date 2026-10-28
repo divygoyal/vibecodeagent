@@ -148,11 +148,14 @@ function SharedUmamiPage({
     siteUrl,
     views,
     embedMode = false,
+    showMadeWith = true,
 }: {
     token: string;
     siteUrl: string;
     views: number;
     embedMode?: boolean;
+    /** The share config's branding.showWatermark switch. */
+    showMadeWith?: boolean;
 }) {
     const [range, setRange] = useQueryState(
         'range',
@@ -297,7 +300,7 @@ function SharedUmamiPage({
                     </>
                 ) : null}
             </main>
-            {embedMode ? null : <ShareFooter />}
+            {showMadeWith ? <ShareFooter compact={embedMode} kind={embedMode ? 'embed' : 'share'} /> : null}
         </SharePage>
     );
 }
@@ -307,6 +310,7 @@ export default function SharedUmamiClient(props: {
     siteUrl: string;
     views: number;
     embedMode?: boolean;
+    showMadeWith?: boolean;
 }) {
     return (
         <NuqsAdapter>

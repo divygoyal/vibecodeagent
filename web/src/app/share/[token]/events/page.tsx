@@ -4,6 +4,7 @@ import { lookupShare } from '@/app/api/share/route';
 import SharedEventsReportClient from '@/components/share-overview/openpanel/SharedEventsReportClient';
 import { ShareNotFound } from '@/components/share/ShareChrome';
 import { BRAND_NAME } from '@/lib/brand';
+import { shareMadeWithVisible } from '@/lib/growth/madeWith';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,7 @@ export default async function SharedEventsReportPage({
         <SharedEventsReportClient
             token={token}
             siteUrl={share.siteUrl}
+            showMadeWith={shareMadeWithVisible(share.config.branding)}
         />
     );
 }

@@ -27,7 +27,7 @@ export default async function LeaderboardWidget({ params, searchParams }: { para
         <div data-theme={theme} className="tc-root flex min-h-screen items-stretch bg-transparent p-0 text-fg">
             {e ? (
                 <a
-                    href={`${SITE_ORIGIN}/leaderboard/${e.slug || e.id}`}
+                    href={`${SITE_ORIGIN}/leaderboard/${e.slug || e.id}?ref=embed`}
                     target="_blank"
                     rel="noopener"
                     className="tc-card flex w-full flex-col justify-between gap-3 rounded-card border border-border-subtle bg-surface p-4 shadow-card transition-colors duration-120 hover:border-border"

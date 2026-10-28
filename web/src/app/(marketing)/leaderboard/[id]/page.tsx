@@ -37,7 +37,8 @@ export async function generateMetadata({ params, searchParams }: { params: Param
         : `${p.name} on the ${BRAND_NAME} verified traffic leaderboard`;
     const description = p.description
         || `${p.name} on the ${BRAND_NAME} verified traffic leaderboard.${visitors ? ` ${visitors} visitors in the last 28 days, confirmed through Google Analytics and Search Console.` : ''}`;
-    const canonical = `${SITE_ORIGIN}/leaderboard/${p.slug || p.id}`;
+    // Relative: resolved against metadataBase (the brand's site URL), like every other page's canonical.
+    const canonical = `/leaderboard/${p.slug || p.id}`;
     const indexable = p.status === 'ranked' && !sp.range;
     return {
         // The page title gets "| TrafficClaw" from the root template only when it does not already name it.

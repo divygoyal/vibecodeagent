@@ -50,6 +50,7 @@ import { dateAxisTick } from '@/components/charts/AxisTick';
 import { sourceInfo } from '@/components/site/lib/sources';
 import DatePicker, { getRangeLabel } from '@/components/DatePicker';
 import { SHARE_CONTAINER, ShareBrand, ShareFooter, ShareHeader, SharePage } from '@/components/share/ShareChrome';
+import { shareMadeWithVisible } from '@/lib/growth/madeWith';
 import { OverviewCountryFlag, OverviewValueIcon } from '@/components/share-overview/openpanel/OverviewIcons';
 import {
     useShareOverviewState,
@@ -1518,7 +1519,7 @@ function ShareOverviewPage() {
         <div className={cn('z-20 border-b border-border-subtle bg-canvas', !isEmbed && 'sticky top-0')}>
             <div className={cn(SHARE_CONTAINER, 'flex flex-col gap-2 py-3')}>
                 {isEmbed && !runtime.hideOwnerLogo ? (
-                    <div className="flex items-center"><ShareBrand branding={branding} size={20} /></div>
+                    <div className="flex items-center"><ShareBrand branding={branding} size={20} kind="embed" /></div>
                 ) : null}
                 <div className="flex items-center justify-between gap-2">
                     <DatePicker range={range} setRange={(value) => setRange(value as ShareOverviewRange)} chevrons={false} />
@@ -1536,7 +1537,7 @@ function ShareOverviewPage() {
             <main className={cn(SHARE_CONTAINER, 'grid gap-4 py-4 md:grid-cols-2 md:py-6')}>
                 {sectionOrder.map((id) => (isVisible(id) ? renderSection(id) : null))}
             </main>
-            {branding.showWatermark ? <ShareFooter compact={isEmbed} /> : null}
+            {shareMadeWithVisible(branding) ? <ShareFooter compact={isEmbed} kind={isEmbed ? 'embed' : 'share'} /> : null}
         </SharePage>
     );
 }

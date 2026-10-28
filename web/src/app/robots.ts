@@ -23,8 +23,8 @@ export default function robots(): MetadataRoute.Robots {
                     '/auth/',
                     '/oauth/',
                     '/mcp',
-                    '/share/',
-                    '/view/',
+                    // /share/ and /view/ stay crawlable on purpose: link-preview bots (X, LinkedIn) obey robots.txt and
+                    // would show no card for a shared dashboard. Both are noindex (page meta), so search never lists them.
                     '/embed/',
                 ],
             },

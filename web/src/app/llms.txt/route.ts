@@ -19,7 +19,7 @@ Everything is free with no site limit: the portfolio, per-site traffic and searc
 - [Pricing](${SITE_URL}/pricing): free plan and the paid Ask-message plans
 - [ChatGPT and Claude](${SITE_URL}/ai): connect Google Analytics and Search Console to ChatGPT, Claude, Cursor or VS Code through the hosted MCP server at ${SITE_URL}/mcp
 - [Leaderboard](${SITE_URL}/leaderboard): public leaderboard of sites with traffic verified through Google; only verified Search Console owners rank
-- [Sponsor slots](${SITE_URL}/sponsor): labelled sponsor placements on the leaderboard
+- [Sponsor slots](${SITE_URL}/leaderboard/advertise): labelled sponsor placements on the leaderboard
 - [Free SEO tools](${SITE_URL}/tools): no sign-up tools
 ${FREE_TOOLS.map((t) => `  - [${t.title}](${SITE_URL}/tools/${t.slug}): ${t.short}`).join('\n')}
 - [Security and data](${SITE_URL}/security): exactly what ${BRAND_NAME} reads (read-only scopes), what it stores and how, what it never does, how to revoke access and delete data

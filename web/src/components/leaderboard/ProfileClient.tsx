@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { badgeSnippets } from '@/lib/leaderboard/badgeSnippets';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Check, Copy, ExternalLink, Linkedin, Send, Share2, Download, Link2 } from 'lucide-react';
 
@@ -315,23 +316,24 @@ function CopyField({ label, value }: { label: string; value: string }) {
     );
 }
 
+type BadgeVariantChoice = 'traffic' | 'minimal' | 'stats' | 'live';
+const BADGE_HEIGHT: Record<BadgeVariantChoice, number> = { traffic: 32, minimal: 48, stats: 76, live: 76 };
+
 export function EmbedCard({ origin, slug, id, name, liveEnabled }: { origin: string; slug: string; id: number; name: string; liveEnabled: boolean }) {
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [variant, setVariant] = useState<'minimal' | 'stats' | 'live'>(liveEnabled ? 'live' : 'stats');
-    const profile = `${origin}/leaderboard/${slug}`;
+    const [variant, setVariant] = useState<BadgeVariantChoice>('traffic');
     // Snippets use the absolute public origin (they are pasted on other sites); the preview
     // loads the same image from this page's own origin so it renders wherever the page is served.
-    const imgPath = `/api/badges/${id}?variant=${variant}&theme=${theme}`;
+    const imgPath = variant === 'traffic' ? `/badge/${slug}.svg?theme=${theme}` : `/api/badges/${id}?variant=${variant}&theme=${theme}`;
     const img = `${origin}${imgPath}`;
-    const alt = `${name} on TrafficClaw`;
-    const html = `<a href="${profile}" target="_blank" rel="noopener"><img src="${img}" alt="${alt}" height="${variant === 'minimal' ? 48 : 76}" /></a>`;
-    const md = `[![${alt}](${img})](${profile})`;
-    const iframe = `<iframe src="${origin}/embed/leaderboard/${slug}?theme=${theme}" width="340" height="168" style="border:0;border-radius:12px" loading="lazy" title="${alt}"></iframe>`;
+    const alt = variant === 'traffic' ? 'Verified traffic on TrafficClaw' : `${name} on TrafficClaw`;
+    const { html, md } = badgeSnippets({ origin, slug, imgUrl: img, alt, height: BADGE_HEIGHT[variant] });
+    const iframe = `<iframe src="${origin}/embed/leaderboard/${slug}?theme=${theme}" width="340" height="168" style="border:0;border-radius:12px" loading="lazy" title="${name} on TrafficClaw"></iframe>`;
     return (
         <Card>
             <CardHeader
-                title="Embed this profile"
-                description="A live verified badge or a small widget for your own site."
+                title="Get your badge"
+                description="Show your verified traffic on your own site. It updates by itself and links back to this profile."
                 actions={<SegmentedControl ariaLabel="Badge theme" size="sm" variant="neutral" value={theme} onChange={setTheme} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />}
             />
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -341,12 +343,12 @@ export function EmbedCard({ origin, slug, id, name, liveEnabled }: { origin: str
                     variant="neutral"
                     value={variant}
                     onChange={setVariant}
-                    options={[{ value: 'minimal', label: 'Minimal' }, { value: 'stats', label: 'Stats' }, ...(liveEnabled ? [{ value: 'live' as const, label: 'Live' }] : [])]}
+                    options={[{ value: 'traffic', label: 'Verified traffic' }, { value: 'minimal', label: 'Minimal' }, { value: 'stats', label: 'Stats' }, ...(liveEnabled ? [{ value: 'live' as const, label: 'Live' }] : [])]}
                 />
             </div>
             <div className={cn('mb-4 flex min-h-24 items-center justify-center rounded-control border border-border-subtle p-4', theme === 'dark' ? 'bg-[#0e1014]' : 'bg-surface-sunken')}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img key={imgPath} src={imgPath} alt={alt} height={variant === 'minimal' ? 48 : 76} className="max-w-full" />
+                <img key={imgPath} src={imgPath} alt={alt} height={BADGE_HEIGHT[variant]} className="max-w-full" />
             </div>
             <div className="grid gap-3">
                 <CopyField label="Badge (HTML)" value={html} />

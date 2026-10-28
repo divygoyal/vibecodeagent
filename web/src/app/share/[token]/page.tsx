@@ -9,6 +9,7 @@ import SharePromoPopup from '@/components/share/SharePromoPopup';
 import ShareConversionBar from '@/components/share/ShareConversionBar';
 import { verifyShareWatermarkSignature } from '@/lib/shareWatermark';
 import { BRAND_NAME } from '@/lib/brand';
+import { shareMadeWithVisible } from '@/lib/growth/madeWith';
 import { SHARE_CONTAINER, ShareFooter, ShareHeader, ShareNotFound, SharePage } from '@/components/share/ShareChrome';
 
 // Promo popup auto-opens 20s after a viewer lands on the public share view,
@@ -66,6 +67,8 @@ export default async function SharedDashboardPage({
     const isInIframe = h.get('sec-fetch-dest') === 'iframe';
     const showConversionBar = !isEmbed && !hideOwnerLogo && !isInIframe;
 
+    const showMadeWith = shareMadeWithVisible(share.config.branding);
+
     if (share.config.layoutMode === 'openpanel_overview') {
         return (
             <>
@@ -92,6 +95,7 @@ export default async function SharedDashboardPage({
                     siteUrl={share.siteUrl}
                     views={share.views}
                     embedMode={isEmbed}
+                    showMadeWith={showMadeWith}
                 />
                 {!isEmbed ? <SharePromoPopup autoOpenDelayMs={PROMO_POPUP_DELAY_MS} /> : null}
             </>
@@ -109,6 +113,7 @@ export default async function SharedDashboardPage({
                         views={share.views}
                     />
                 </main>
+                {showMadeWith ? <ShareFooter compact kind="embed" /> : null}
             </SharePage>
         );
     }
@@ -126,7 +131,7 @@ export default async function SharedDashboardPage({
                     views={share.views}
                 />
             </main>
-            <ShareFooter />
+            {showMadeWith ? <ShareFooter /> : null}
             <SharePromoPopup autoOpenDelayMs={PROMO_POPUP_DELAY_MS} />
         </SharePage>
     );
