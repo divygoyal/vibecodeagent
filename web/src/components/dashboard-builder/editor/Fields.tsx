@@ -89,7 +89,7 @@ export function MetricPicker({ value, onChange, families, ariaLabel = 'Metric', 
                     <button type="button" aria-label={`${ariaLabel}: ${metricLabel(value)}`} className="flex h-9 w-full items-center gap-2 rounded-control border border-border bg-surface px-3 text-left text-body text-fg hover:border-border-strong">
                         <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: metricColor(value) }} />
                         <span className="min-w-0 flex-1 truncate">{def?.label ?? value}</span>
-                        <span className="text-caption text-fg-faint">{def?.calc ? 'Calculated' : def?.family === 'gsc' ? 'Search' : 'Analytics'}</span>
+                        <span className="text-caption text-fg-muted">{def?.calc ? 'Calculated' : def?.family === 'gsc' ? 'Search' : 'Analytics'}</span>
                         <ChevronDown aria-hidden size={14} className="text-fg-muted" />
                     </button>
                 </PopoverTrigger>

@@ -102,7 +102,7 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
             trigger={(
                 // Same size as the CSV button next to it (a 44 px touch target via tap-area, no taller title row).
                 <button type="button" aria-label="Add a note to this chart" title="Add a note"
-                    className="tap-area rounded p-0.5 text-fg-faint opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-fg pointer-coarse:opacity-100">
+                    className="tap-area rounded p-0.5 text-fg-muted opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-fg pointer-coarse:opacity-100">
                     <StickyNote aria-hidden size={14} />
                 </button>
             )}

@@ -240,7 +240,7 @@ function PickOne({ label, value, options, onChange, icon, disabled }: { label: s
                             <button key={o.value || '__default'} type="button" role="option" aria-selected={on} onClick={() => { onChange(o.value); setOpen(false); }}
                                 className="flex min-h-8 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-body-sm text-fg hover:bg-subtle">
                                 <span className="min-w-0 flex-1 truncate">{o.label}</span>
-                                {o.hint ? <span className="shrink-0 text-caption text-fg-faint">{o.hint}</span> : null}
+                                {o.hint ? <span className="shrink-0 text-caption text-fg-muted">{o.hint}</span> : null}
                                 {on ? <Check aria-hidden size={14} className="shrink-0 text-brand-text" /> : null}
                             </button>
                         );
@@ -383,7 +383,7 @@ export function PageTabs({ pages, value, onChange, trailing }: { pages: PageDef[
                     <button key={p.id} type="button" role="tab" aria-selected={on} onClick={() => onChange(p.id)}
                         className={cn('relative h-10 shrink-0 px-3 text-body-sm font-medium transition-colors', on ? 'text-fg' : 'text-fg-muted hover:text-fg')}>
                         {p.title}
-                        {p.hidden ? <span className="ml-1 text-caption text-fg-faint">(hidden)</span> : null}
+                        {p.hidden ? <span className="ml-1 text-caption text-fg-muted">(hidden)</span> : null}
                         {on ? <span aria-hidden className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand" /> : null}
                     </button>
                 );

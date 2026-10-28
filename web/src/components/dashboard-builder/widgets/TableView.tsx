@@ -162,7 +162,7 @@ function trendColumn(trend: TrendData, dim: string, labels?: Record<string, stri
             const values = lines.byValue.get(raw);
             const ends = values ? trendChange(values) : null;
             if (!values || !ends) {
-                return <span className="text-fg-faint" title={r.__other ? undefined : `Trends show for the top ${TABLE_TREND_ROWS} rows`}>–</span>;
+                return <span className="text-fg-muted" title={r.__other ? undefined : `Trends show for the top ${TABLE_TREND_ROWS} rows`}>–</span>;
             }
             const text = dimText(dim, r[`d:${dim}`], labels);
             const from = fmtMetricValue(metric, ends.first, { compact: true });
@@ -246,7 +246,7 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                             {pick ? (
                                 <button type="button" onClick={() => pick(raw)} title={sub ? `Filter the page by ${text} (${sub})` : `Filter the page by ${text}`} className={cn('truncate text-left hover:text-brand-text hover:underline', props.selectedValue === raw && 'font-semibold text-brand-text')}>{text}{subEl}</button>
                             ) : <span className="truncate" title={sub ? `${text} · ${sub}` : text}>{text}{subEl}</span>}
-                            {href && props.mode !== 'edit' ? <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${text}`} className="shrink-0 text-fg-faint hover:text-fg-muted"><ExternalLink aria-hidden size={12} /></a> : null}
+                            {href && props.mode !== 'edit' ? <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${text}`} className="shrink-0 text-fg-muted hover:text-fg"><ExternalLink aria-hidden size={12} /></a> : null}
                         </span>
                     );
                 },

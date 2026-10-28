@@ -532,7 +532,7 @@ function BreakdownTable<T>({ rows, rowKey, labelHeader, label, labelText, column
     };
     const sortIcon = (key: string) => {
         const Icon = sort?.key === key ? (sort.dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
-        return <Icon aria-hidden size={12} className={sort?.key === key ? 'text-fg' : 'text-fg-faint'} />;
+        return <Icon aria-hidden size={12} className={sort?.key === key ? 'text-fg' : 'text-fg-muted'} />;
     };
     const ariaSort = (key: string) => (sort?.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined);
 
@@ -1168,7 +1168,7 @@ function TopPagesWidget() {
                                 rel="noreferrer"
                                 onClick={(event) => event.stopPropagation()}
                                 aria-label={`Open ${r.path}`}
-                                className="shrink-0 text-fg-faint hover:text-fg"
+                                className="shrink-0 text-fg-muted hover:text-fg"
                             >
                                 <ExternalLink aria-hidden size={12} strokeWidth={1.75} />
                             </a>

@@ -9,18 +9,8 @@ const root = path.resolve(import.meta.dirname, '../src');
 
 // Allowed variants: placeholders, disabled states, list markers (decoration).
 const ALLOWED_PREFIX = /(placeholder|data-\[placeholder\]|disabled|data-\[disabled\]|aria-disabled|marker):$/;
-// Files other round 7 streams own (builder B1-B3: editor panels, Controls, TableView; WS-A: share overview, date
-// control). Move their uses to fg-muted once those land, then empty this list.
-const PENDING = new Set([
-    'components/dashboard-builder/editor/Editor.tsx',
-    'components/dashboard-builder/editor/Fields.tsx',
-    'components/dashboard-builder/editor/LeftPanel.tsx',
-    'components/dashboard-builder/Controls.tsx',
-    'components/dashboard-builder/widgets/TableView.tsx',
-    'components/share-overview/openpanel/SharedOverviewClient.tsx',
-    // Calendar days in the future are disabled (fine as faint); the file is WS-A's this round.
-    'components/shell/DateRangeControl.tsx',
-]);
+// Files that may keep a content use for now (empty since round 7's streams merged; keep it that way).
+const PENDING = new Set([]);
 
 function* files(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

@@ -365,7 +365,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                 ) : (
                     <button type="button" onClick={() => setNameEdit(true)} className="group flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 hover:bg-subtle" title="Rename">
                         <span className="max-w-[260px] truncate text-title-sm text-fg">{doc.name}</span>
-                        <Pencil aria-hidden size={13} className="text-fg-faint group-hover:text-fg-muted" />
+                        <Pencil aria-hidden size={13} className="text-fg-muted group-hover:text-fg" />
                     </button>
                 )}
                 <span className="hidden truncate rounded-badge bg-subtle px-2 py-0.5 text-meta text-fg-secondary xl:inline">{defaultLabel}</span>
@@ -422,12 +422,12 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                 ) : (
                                     <div key={p.id} className="group relative flex shrink-0 items-center">
                                         <button type="button" role="tab" aria-selected={on} onClick={() => s.setPage(p.id)} onDoubleClick={() => setRenaming(p.id)} className={cn('h-10 px-3 text-body-sm font-medium', on ? 'text-fg' : 'text-fg-muted hover:text-fg')}>
-                                            {p.title}{p.hidden ? <span className="ml-1 text-caption text-fg-faint">(hidden)</span> : null}
+                                            {p.title}{p.hidden ? <span className="ml-1 text-caption text-fg-muted">(hidden)</span> : null}
                                         </button>
                                         {on ? <span aria-hidden className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-brand" /> : null}
                                         {on ? (
                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><button type="button" aria-label={`Page ${p.title} actions`} className="-ml-2 rounded p-0.5 text-fg-faint hover:bg-subtle hover:text-fg"><MoreHorizontal aria-hidden size={14} /></button></DropdownMenuTrigger>
+                                                <DropdownMenuTrigger asChild><button type="button" aria-label={`Page ${p.title} actions`} className="-ml-2 rounded p-0.5 text-fg-muted hover:bg-subtle hover:text-fg"><MoreHorizontal aria-hidden size={14} /></button></DropdownMenuTrigger>
                                                 <DropdownMenuContent>
                                                     <DropdownMenuItem icon={Pencil} onSelect={() => setRenaming(p.id)}>Rename</DropdownMenuItem>
                                                     <DropdownMenuItem icon={Copy} onSelect={() => { let nid = ''; s.apply((d) => { const r = duplicatePage(d, p.id); nid = r.id; return r.doc; }); if (nid) s.setPage(nid); }}>Duplicate</DropdownMenuItem>
@@ -450,7 +450,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                 <div key={f.id} className={cn('flex items-center rounded-control', s.selectedControlId === f.id && 'outline-2 outline-offset-2 outline-brand')}>
                                     <FilterControlView control={f} value={controls.filters[f.id] ?? []} onChange={(v) => s.setControls({ ...controls, filters: { ...controls.filters, [f.id]: v } })}
                                         options={{ load: (c, q) => fetchJson<{ options: Array<{ value: string; label: string }> }>(`/api/dashboards/options?dimension=${encodeURIComponent(c.dimension)}&q=${encodeURIComponent(q)}${filterSiteId ? `&siteId=${encodeURIComponent(filterSiteId)}` : ''}`).then((r) => r.options) }} />
-                                    {!preview ? <button type="button" aria-label={`Edit ${f.label} control`} onClick={() => s.selectControl(f.id)} className="ml-0.5 rounded p-1 text-fg-faint hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
+                                    {!preview ? <button type="button" aria-label={`Edit ${f.label} control`} onClick={() => s.selectControl(f.id)} className="ml-0.5 rounded p-1 text-fg-muted hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
                                 </div>
                             ))}
                             {switchDefs.map((c) => (
@@ -464,7 +464,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                     ) : c.type === 'grain' ? (
                                         <GrainSwitch control={c} state={controls} size="sm" onChange={(v) => setPick('grain', c.id, v === c.default ? null : v)} />
                                     ) : null}
-                                    {!preview ? <button type="button" aria-label={`Edit ${c.label} control`} onClick={() => s.selectControl(c.id)} className="ml-0.5 rounded p-1 text-fg-faint hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
+                                    {!preview ? <button type="button" aria-label={`Edit ${c.label} control`} onClick={() => s.selectControl(c.id)} className="ml-0.5 rounded p-1 text-fg-muted hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
                                 </div>
                             ))}
                             {!preview ? (

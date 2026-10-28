@@ -224,7 +224,7 @@ function MonthGrid({ year, month, from, to, hover, today, onPick, onHover }: {
                             onMouseLeave={() => onHover(null)}
                             className={cn(
                                 'mx-auto flex size-8 items-center justify-center rounded-md text-body-sm tabular-nums transition-colors duration-80',
-                                future ? 'text-fg-faint' : 'text-fg hover:bg-subtle',
+                                future ? 'text-fg-faint' : 'text-fg hover:bg-subtle', // faint-ok: future days are disabled
                                 inRange && 'rounded-none bg-brand-soft text-brand-soft-fg',
                                 isEdge && 'bg-brand text-brand-fg hover:bg-brand-hover',
                             )}
