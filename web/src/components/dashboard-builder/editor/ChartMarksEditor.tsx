@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { Plus, Target, X } from 'lucide-react';
 
-import { Button } from '@/components/ui';
+import { Button, Select } from '@/components/ui';
 import { fmtMetricValue, getMetric, metricLabel } from '@/lib/builder/catalog';
 import { annotationMode } from '@/lib/builder/chartMarks';
 import type { AnnotationMode, DashboardDocV2, RefLine, TimeSeriesWidget, WidgetDef } from '@/lib/builder/types';
@@ -28,7 +28,8 @@ function setLines(w: WidgetDef, lines: RefLine[]): WidgetDef {
 export function ChartMarksEditor({ widget, edit, doc }: { widget: TimeSeriesWidget; edit: Edit; doc: DashboardDocV2 }) {
     const c = widget.config;
     const lines = c.refLines ?? [];
-    const metrics = c.series.map((s) => s.metric.id);
+    // The metrics the chart plots: a breakdown draws its first metric only (chartMarks.resolveRefLines).
+    const metrics = (c.breakdown ? c.series.slice(0, 1) : c.series).map((s) => s.metric.id);
     const update = (i: number, patch: Partial<RefLine>, key?: string) =>
         edit((w) => setLines(w, ((w as TimeSeriesWidget).config.refLines ?? []).map((l, j) => (j === i ? { ...l, ...patch } : l))), key ? `rl${i}:${key}` : undefined);
     const remove = (i: number) => edit((w) => setLines(w, ((w as TimeSeriesWidget).config.refLines ?? []).filter((_, j) => j !== i)));
@@ -70,7 +71,10 @@ export function ChartMarksEditor({ widget, edit, doc }: { widget: TimeSeriesWidg
 }
 
 function LineRow({ index, line, metrics, onChange, onRemove }: { index: number; line: RefLine; metrics: string[]; onChange: (p: Partial<RefLine>, key?: string) => void; onRemove: () => void }) {
-    const metric = line.metric && metrics.includes(line.metric) ? line.metric : metrics[0];
+    // A line set for a metric the chart no longer plots is not drawn: say so and offer to move it.
+    const stale = Boolean(line.metric && !metrics.includes(line.metric));
+    const metric = line.metric && !stale ? line.metric : metrics[0];
+    // Calculated metrics answer too: a difference of two additive metrics is additive, a ratio is not.
     const def = getMetric(metric);
     const pct = def?.format === 'percent';
     const [draft, setDraft] = useState(line.value === undefined ? '' : String(pct ? Math.round(line.value * 10000) / 100 : line.value));
@@ -90,8 +94,12 @@ function LineRow({ index, line, metrics, onChange, onRemove }: { index: number; 
                 </div>
                 <Button size="sm" variant="ghost" iconOnly icon={X} aria-label={`Remove line ${index + 1}`} onClick={onRemove} />
             </div>
-            {metrics.length > 1 ? (
-                <Choice ariaLabel={`Line ${index + 1} metric`} value={metric} onChange={(m) => onChange({ metric: m })} options={metrics.map((m) => ({ value: m, label: metricLabel(m) }))} />
+            {stale ? (
+                <p className="text-meta text-fg-muted">Set for {metricLabel(line.metric!).toLowerCase()}, which this chart no longer shows, so it is hidden. Pick a metric or remove it.</p>
+            ) : null}
+            {metrics.length > 1 || stale ? (
+                <Select size="sm" className="w-full" ariaLabel={`Line ${index + 1} metric`} value={stale ? undefined : metric} placeholder="Pick a metric"
+                    onValueChange={(m) => onChange({ metric: m })} options={metrics.map((m) => ({ value: m, label: metricLabel(m) }))} />
             ) : null}
             {!isAvg ? (
                 <div className="flex flex-col gap-2">

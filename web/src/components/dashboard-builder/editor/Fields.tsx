@@ -151,7 +151,7 @@ export function MetricList({ value, onChange, max, min = 1, families, noShare }:
             {value.length < max ? (
                 <button type="button" onClick={() => {
                     const used = new Set(value.map((m) => m.id));
-                    const fam = families ?? (value[0] ? [value[0].id.startsWith('gsc:') ? 'gsc' : 'ga4'] as Family[] : undefined);
+                    const fam = families ?? (value[0] ? metricFamilies(value[0].id).slice(0, 1) : undefined);
                     const next = METRIC_LIST.find((m) => !used.has(m.id) && m.tier === 'core' && (!fam || fam.includes(m.family)));
                     if (next) onChange([...value, { id: next.id }]);
                 }} className="inline-flex items-center gap-1 text-body-sm font-medium text-brand-text hover:underline">

@@ -9,7 +9,7 @@
 import { Trash2 } from 'lucide-react';
 
 import { Button, Checkbox } from '@/components/ui';
-import { metricLabel } from '@/lib/builder/catalog';
+import { metricFamilies, metricLabel } from '@/lib/builder/catalog';
 import { followsMetricControl } from '@/lib/builder/compile';
 import { widgetMeta } from '@/lib/builder/registry';
 import type { ControlDef, ControlScope, DashboardDocV2, GrainControl, MetricControl, MetricRef, SiteControl } from '@/lib/builder/types';
@@ -116,7 +116,8 @@ export function MetricControlProps({ control, doc }: { control: MetricControl; d
     const pageId = useEditorStore((s) => s.pageId) ?? undefined;
     const options = control.options.includes(control.default) ? control.options : [control.default, ...control.options];
     const following = scopedWidgets(doc, control).filter((x) => followsMetricControl(control, x.w, { controlDefs: doc.controls, pageId: x.pageId ?? pageId })).length;
-    const families = new Set(options.map((id) => (id.startsWith('gsc:') ? 'gsc' : 'ga4')));
+    // Calculated metrics count by their inputs' families.
+    const families = new Set(options.flatMap((id) => metricFamilies(id)));
     return (
         <Shell title="Metric switcher" onRemove={remove}>
             <Field label="Label"><TextInput value={control.label} onChange={(v) => set({ label: v.slice(0, 60) }, 'label')} /></Field>
@@ -186,7 +187,7 @@ export function newMetricControl(doc: DashboardDocV2): MetricControl {
         if (w.type === 'scorecard') counts.set(w.config.metric.id, (counts.get(w.config.metric.id) ?? 0) + 1);
     }
     const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'gsc:clicks';
-    const partners = top.startsWith('gsc:') ? ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position'] : ['ga4:sessions', 'ga4:totalUsers', 'ga4:screenPageViews', 'ga4:keyEvents'];
+    const partners = metricFamilies(top)[0] === 'gsc' ? ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position'] : ['ga4:sessions', 'ga4:totalUsers', 'ga4:screenPageViews', 'ga4:keyEvents'];
     return { id: `m_metric_${rid()}`, type: 'metric', label: 'Metric', options: [top, ...partners.filter((p) => p !== top)], default: top, scope: { mode: 'all' } };
 }
 

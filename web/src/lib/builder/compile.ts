@@ -3,7 +3,7 @@
  * client can derive a stable SWR key from the same function the server uses to plan Google
  * calls. Dates stay relative here; the server resolves them.
  */
-import { expandCalcs, isCalcId } from './calc';
+import { expandCalcs, isCalcId, parseCalcId } from './calc';
 import { getMetric, metricLabel } from './catalog';
 import { clickDimension } from './interaction';
 import { widgetMetrics } from './registry';
@@ -19,6 +19,7 @@ import type {
     MetricId,
     MetricRef,
     PageId,
+    RefLine,
     SiteControl,
     SourceRef,
     WidgetDef,
@@ -144,26 +145,50 @@ function swapRefs(refs: MetricRef[], from: MetricId, to: MetricId): MetricRef[] 
     return out;
 }
 
+/**
+ * Goal / reference / average lines when a time series' metric is swapped (round 7: metric switcher x
+ * chart lines). A goal or reference value was set for the old metric, so it is dropped, like a scorecard
+ * target: drawn on the new metric's scale it would be a wrong number. An average is computed from the
+ * data, so it moves to the new metric. Lines on the chart's other metrics stay. A line without a
+ * metric is on the first series.
+ */
+function swapRefLines(lines: RefLine[], first: MetricId | undefined, from: MetricId, to: MetricId): RefLine[] {
+    const out: RefLine[] = [];
+    for (const l of lines) {
+        if ((l.metric ?? first) !== from) out.push(l);
+        else if (l.kind === 'average') out.push(l.metric ? { ...l, metric: to } : l);
+    }
+    return out;
+}
+
 /** One metric swapped in a widget's config (labels and formats of the old metric are dropped). */
 function swapMetric(widget: WidgetDef, from: MetricId, to: MetricId): WidgetDef {
     const sortRef = (by: string) => (by === from ? to : by);
     const base = { ...widget, title: retitle(widget.title, from, to) } as WidgetDef;
+    const oneNumberShare = parseCalcId(to)?.op === 'share';
     switch (base.type) {
         case 'scorecard': {
-            if (base.config.metric.id !== from) return widget;
+            // A "% of total" calc is always 100% as one number (the editor hides it for scorecards and KPI strips).
+            if (base.config.metric.id !== from || oneNumberShare) return widget;
             // A target belongs to the metric it was set for.
             const { target: _t, ...rest } = base.config;
             void _t;
             return { ...base, config: { ...rest, metric: { id: to } } };
         }
-        case 'kpi-strip': return { ...base, config: { ...base.config, metrics: swapRefs(base.config.metrics, from, to) } };
+        case 'kpi-strip': return oneNumberShare ? widget : { ...base, config: { ...base.config, metrics: swapRefs(base.config.metrics, from, to) } };
         case 'timeseries': {
             const series: typeof base.config.series = [];
             for (const sd of base.config.series) {
                 const next = sd.metric.id === from ? { ...sd, metric: { id: to } } : sd;
                 if (!series.some((x) => x.metric.id === next.metric.id)) series.push(next);
             }
-            return { ...base, config: { ...base.config, series } };
+            const config = { ...base.config, series };
+            if (base.config.refLines) {
+                const refLines = swapRefLines(base.config.refLines, base.config.series[0]?.metric.id, from, to);
+                if (refLines.length) config.refLines = refLines;
+                else delete config.refLines;
+            }
+            return { ...base, config };
         }
         case 'bar': return { ...base, config: { ...base.config, metrics: swapRefs(base.config.metrics, from, to), sort: { ...base.config.sort, by: sortRef(base.config.sort.by) } } };
         case 'pie': return base.config.metric.id === from ? { ...base, config: { ...base.config, metric: { id: to } } } : widget;

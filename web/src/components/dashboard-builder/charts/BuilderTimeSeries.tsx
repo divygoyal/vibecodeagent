@@ -28,7 +28,7 @@ import { fmtAxis, fmtDayLong, fmtDuration, fmtMonthYear, fmtPercent, makeDateTic
 import { CATEGORICAL, CATEGORICAL_OTHER, channelColor, deviceColor } from '@/lib/metrics';
 import { AXIS_LINE, AXIS_TICK, CURSOR, ChartTooltipCard, GRID_STROKE, dateAxisTick, dateTicks as evenDateTicks, maxOf, niceAxis, type AxisFormat, type ChartTooltipRow, type NiceAxis } from '@/components/charts';
 import { MetricDelta, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
-import { fmtMetricValue, getMetric, metricColor, metricLabel } from '@/lib/builder/catalog';
+import { fmtMetricValue, getMetric, metricColor, metricFamilies, metricLabel } from '@/lib/builder/catalog';
 import { countryName } from '@/lib/builder/countries';
 import type { ChartMark, ResolvedRefLine } from '@/lib/builder/chartMarks';
 import type { CellValue } from '@/lib/builder/types';
@@ -64,7 +64,8 @@ export interface BuilderTimeSeriesProps {
 
 // Theme tokens (--tc-*), not the --color-* aliases: those resolve on :root, so a dark dashboard theme
 // inside the light app would get light colours (dashboard-themes.css section 0).
-export const MARK_COLOR: Record<ChartMark['kind'], string> = { note: 'var(--tc-brand-text)', google: 'var(--tc-warn)' };
+// --tc-mark-note: a theme whose brand is as warm as the Google colour (Sunrise) gives notes their own hue.
+export const MARK_COLOR: Record<ChartMark['kind'], string> = { note: 'var(--tc-mark-note, var(--tc-brand-text))', google: 'var(--tc-warn)' };
 const REF_STYLE: Record<ResolvedRefLine['kind'], { stroke: string; dash: string; width: number }> = {
     goal: { stroke: 'var(--tc-up)', dash: '6 4', width: 1.5 },
     reference: { stroke: 'var(--tc-fg-muted)', dash: '4 4', width: 1.25 },
@@ -451,7 +452,8 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                         return <Bar key={k} yAxisId={s.metric} dataKey={k} fill={color} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={anim} animationDuration={400} name={s.label ?? metricLabel(s.metric)} />;
                     }
                     const common = { yAxisId: s.metric, type: 'monotone' as const, stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, connectNulls: false, isAnimationActive: anim, animationDuration: 400 };
-                    const isGsc = s.metric.startsWith('gsc:');
+                    // Calculated metrics on a Search Console input get the dashed lag tail too.
+                    const isGsc = metricFamilies(s.metric).includes('gsc');
                     if (!hasPartial || !isGsc) {
                         return <Line key={k} className={`tc-series-${si}`} {...common} dataKey={k} dot={rows.length === 1 ? { r: 3, fill: color, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: color, stroke: 'var(--color-surface)', strokeWidth: 2 }} name={s.label ?? metricLabel(s.metric)} />;
                     }
