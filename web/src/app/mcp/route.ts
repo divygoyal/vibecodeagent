@@ -1,7 +1,7 @@
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { authenticate, challengeResponse, checkOrigin, toAuthInfo, withMcpCors, type McpPrincipal } from '@/lib/mcp/auth';
 import { mcpEnabled, notFoundResponse } from '@/lib/mcp/config';
-import { clientIp, hitLimit, ipPrefix } from '@/lib/mcp/rateLimit';
+import { clientIp, hitLimit, ipPrefix, perIpLimit } from '@/lib/mcp/rateLimit';
 import { buildServer } from '@/lib/mcp/server';
 
 export const runtime = 'nodejs';
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
     const auth = await authenticate(req);
     if (!auth.ok) {
-        const flood = hitLimit(`mcp-unauth:${clientIp(req)}`, 120, 60_000);
+        const flood = hitLimit(`mcp-unauth:${clientIp(req)}`, perIpLimit(clientIp(req), 120), 60_000);
         if (!flood.ok) return withMcpCors(req, new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429, headers: { 'content-type': 'application/json', 'retry-after': String(flood.retryAfterS) } }));
         return challengeResponse(req, auth);
     }

@@ -1,6 +1,6 @@
 import { adminStore } from '@/lib/mcp/adminStore';
 import { DCR_CLIENT_PREFIX, mcpEnabled, notFoundResponse, SUPPORTED_SCOPES } from '@/lib/mcp/config';
-import { clientIp, hitLimit } from '@/lib/mcp/rateLimit';
+import { clientIp, hitLimit, perIpLimit as scaleIpLimit } from '@/lib/mcp/rateLimit';
 import { rememberDcrClient } from '@/lib/oauth/clients';
 import { oauthError, oauthJson, publicPreflight } from '@/lib/oauth/metadata';
 import { classifyRedirectUri, randomToken, sha256Hex } from '@/lib/oauth/primitives';
@@ -15,8 +15,8 @@ export async function POST(req: Request) {
     if (!mcpEnabled()) return notFoundResponse();
     const ip = clientIp(req);
     const perIpLimit = Number(process.env.TC_MCP_DCR_LIMIT) || 10;
-    const perIp = hitLimit(`dcr:ip:${ip}`, perIpLimit, 3600_000);
-    const global = hitLimit('dcr:global', Math.max(200, perIpLimit * 20), 86400_000);
+    const perIp = hitLimit(`dcr:ip:${ip}`, scaleIpLimit(ip, perIpLimit), 3600_000);
+    const global = hitLimit('dcr:global', Math.max(1000, perIpLimit * 20), 86400_000);
     if (!perIp.ok || !global.ok) {
         const retry = String(Math.max(perIp.retryAfterS, global.retryAfterS));
         return oauthError('slow_down', 'Too many client registrations. Try again later.', 429, { 'retry-after': retry });

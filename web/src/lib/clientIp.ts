@@ -49,7 +49,7 @@ function ipv6Groups(ip: string): number[] | null {
     return groups.length === 8 && groups.every((g) => Number.isInteger(g) && g >= 0 && g <= 0xffff) ? groups : null;
 }
 
-function inCidr(ip: string, cidr: string): boolean {
+export function inCidr(ip: string, cidr: string): boolean {
     const [base, bitsRaw] = cidr.split('/');
     const bits = Number(bitsRaw);
     const a4 = ipv4ToInt(ip);

@@ -3,7 +3,7 @@
  * move to Upstash if the app ever runs several). MCP.md section 8.1.
  */
 import { shared } from './shared';
-import { clientKey } from '@/lib/clientIp';
+import { clientKey, inCidr } from '@/lib/clientIp';
 
 interface Window {
     count: number;
@@ -71,6 +71,23 @@ export async function acquireSlot(key: string, max: number, waitMs: number): Pro
 /** Rate-limit key of the caller: CF-Connecting-IP only from a Cloudflare peer, else the peer (lib/clientIp.ts). */
 export function clientIp(req: Request): string {
     return clientKey(req.headers);
+}
+
+/**
+ * Anthropic's published outbound range (platform.claude.com/docs/en/api/ip-addresses): every Claude user's
+ * connector traffic (token exchange, refresh, DCR, the unauthenticated first call) arrives from a few shared
+ * addresses, so the per-IP limits meant for one visitor would throttle all of them together.
+ */
+const ANTHROPIC_EGRESS = ['160.79.104.0/21'];
+export const CONNECTOR_HOST_FACTOR = 25;
+
+export function isAnthropicEgress(ip: string): boolean {
+    return ANTHROPIC_EGRESS.some((r) => inCidr(ip, r));
+}
+
+/** A per-IP limit, scaled up for the shared Claude connector egress addresses. */
+export function perIpLimit(ip: string, base: number): number {
+    return isAnthropicEgress(ip) ? base * CONNECTOR_HOST_FACTOR : base;
 }
 
 /** /24 for IPv4, /48 for IPv6: what we store in audit rows. */
