@@ -29,7 +29,7 @@ import {
 import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ChartColumn, ExternalLink, TableProperties, X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { fmtAxis, fmtCompact, fmtDuration, fmtFull, fmtPercent, type MetricFormat } from '@/lib/format';
+import { fmtAxis, fmtCompact, fmtDuration, fmtFull, fmtPercent, makeDateTickFormatter, type MetricFormat } from '@/lib/format';
 import { categoricalColor, METRICS as METRIC_DEFS, type MetricKey } from '@/lib/metrics';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -43,6 +43,9 @@ import { Tabs } from '@/components/ui/Tabs';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { ChartTooltipCard, type ChartTooltipRow } from '@/components/charts/ChartTooltip';
+import { AXIS_LINE, AXIS_TICK, CURSOR, GRID_STROKE, dateTicks, maxOf, niceAxis, type AxisFormat } from '@/components/charts/axis';
+import { dateAxisTick } from '@/components/charts/AxisTick';
+import { sourceInfo } from '@/components/site/lib/sources';
 import DatePicker, { getRangeLabel } from '@/components/DatePicker';
 import { SHARE_CONTAINER, ShareBrand, ShareFooter, ShareHeader, SharePage } from '@/components/share/ShareChrome';
 import { OverviewCountryFlag, OverviewValueIcon } from '@/components/share-overview/openpanel/OverviewIcons';
@@ -358,7 +361,11 @@ function useDebouncedLiveValue(value: number, delay: number, reconcileMs: number
     return displayValue;
 }
 
+/** Columns holding a traffic source: shown with the app's names ("(direct)" -> "Direct", "google" -> "Google"). */
+const SOURCE_COLUMNS = new Set(['referrer_name', 'utm_source']);
+
 function formatValueLabel(column: string, value: string) {
+    if (SOURCE_COLUMNS.has(column)) return sourceInfo(value).label;
     if (!value) return '(not set)';
     if (column === 'referrer' || column === 'referrer_name' || column === 'origin') {
         return value.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
@@ -602,6 +609,23 @@ function RowLabel({ icon, prefix, text, trailing }: { icon?: ReactNode; prefix?:
 
 /* ─── Charts ─── */
 
+/** Bounce rate arrives as 35.2 (a percent number): a plain round axis; the tick formatter adds the %. */
+const AXIS_FORMAT: Record<OverviewFormat, AxisFormat> = { count: 'count', percent: 'number', duration: 'duration', decimal: 'number' };
+
+/** Width of an element (ResizeObserver), so date ticks thin to fit. */
+function useBoxWidth<T extends HTMLElement>(): [(el: T | null) => void, number] {
+    const [el, setEl] = useState<T | null>(null);
+    const [w, setW] = useState(0);
+    useEffect(() => {
+        if (!el) return;
+        // A ResizeObserver reports the first size right after observe().
+        const ro = new ResizeObserver(([e]) => setW(e.contentRect.width));
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [el]);
+    return [setEl, w];
+}
+
 function OverviewChart({ data, metric, interval, height = 260 }: { data: StatsSeriesPoint[]; metric: OverviewMetric; interval: string; height?: number }) {
     const color = METRIC_DEFS[metric.family].color;
     const gradientId = `ov-fill-${metric.key}`;
@@ -609,7 +633,19 @@ function OverviewChart({ data, metric, interval, height = 260 }: { data: StatsSe
         () => data.map((p) => ({ date: String(p.date), value: seriesValue(p, metric.key), prev: seriesValue(p, `prev_${metric.key}`) })),
         [data, metric.key],
     );
-    const yFmt = (v: number) => (metric.format === 'count' ? fmtAxis(v) : fmtOverview(metric.format, v, { compact: true }));
+    const yFmt = (v: number) => (metric.format === 'count' ? fmtAxis(v) : metric.format === 'decimal' ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : fmtOverview(metric.format, v, { compact: true }));
+    // The app's axis rules (components/charts/axis.ts, round 4 audit #6): round steps (0 / 1K / 2K / 3K)
+    // and evenly spaced dates anchored on the last day, thinned to the plot width.
+    const [figRef, figW] = useBoxWidth<HTMLElement>();
+    const y = useMemo(() => niceAxis(maxOf(rows, ['value', 'prev']), { format: AXIS_FORMAT[metric.format] }), [rows, metric.format]);
+    const dates = useMemo(() => rows.map((r) => r.date), [rows]);
+    const xTicks = useMemo(() => dateTicks(dates, { width: (figW || 640) - 60 }), [dates, figW]);
+    const xTick = useMemo(() => {
+        const sameDay = interval === 'hour' && dates.length > 1 && dates[0].slice(0, 10) === dates[dates.length - 1].slice(0, 10);
+        const days = makeDateTickFormatter(dates);
+        const format = sameDay ? (v: string) => formatDateLabel(v, 'hour') : interval === 'month' ? (v: string) => formatDateLabel(v, 'month') : (v: string, i: number) => days(v, i);
+        return dateAxisTick({ first: dates[0], last: dates[dates.length - 1], ticks: xTicks, format });
+    }, [dates, xTicks, interval]);
 
     const renderTooltip = (props: TooltipContentProps<number, string>) => {
         if (!props.active || !props.payload?.length) return null;
@@ -637,6 +673,7 @@ function OverviewChart({ data, metric, interval, height = 260 }: { data: StatsSe
 
     return (
         <figure
+            ref={figRef}
             aria-label={`${metric.label} over time, compared with the previous period`}
             className="relative m-0 h-[var(--ov-h)] max-md:h-[min(var(--ov-h),220px)]"
             style={{ ['--ov-h' as string]: `${height}px` }}
@@ -648,28 +685,10 @@ function OverviewChart({ data, metric, interval, height = 260 }: { data: StatsSe
                         <stop offset="100%" stopColor={color} stopOpacity={0} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid vertical={false} stroke="var(--color-chart-grid)" />
-                <XAxis
-                    dataKey="date"
-                    tickFormatter={(v) => formatDateLabel(String(v), interval)}
-                    tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={{ stroke: 'var(--color-chart-axis)' }}
-                    tickMargin={8}
-                    minTickGap={32}
-                    interval="preserveStartEnd"
-                />
-                <YAxis
-                    width={44}
-                    domain={[0, 'auto']}
-                    allowDecimals={metric.format !== 'count'}
-                    tickFormatter={yFmt}
-                    tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickCount={5}
-                />
-                <RTooltip content={renderTooltip} cursor={{ stroke: 'var(--color-chart-cursor)', strokeWidth: 1 }} isAnimationActive={false} offset={12} />
+                <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+                <XAxis dataKey="date" ticks={xTicks} interval={0} tick={xTick} tickLine={false} axisLine={AXIS_LINE} tickMargin={8} />
+                <YAxis width={44} domain={y.domain} ticks={y.ticks} interval={0} tickFormatter={yFmt} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                <RTooltip content={renderTooltip} cursor={CURSOR} isAnimationActive={false} offset={12} />
                 <Line dataKey="prev" type="monotone" stroke={color} strokeWidth={1.5} strokeDasharray="4 4" strokeOpacity={0.5} dot={false} activeDot={false} isAnimationActive={false} name="Previous period" />
                 <Area dataKey="value" type="monotone" stroke="none" fill={`url(#${gradientId})`} isAnimationActive={false} activeDot={false} tooltipType="none" />
                 <Line
@@ -711,6 +730,10 @@ function BreakdownLineChart({ items, interval, metric = 'sessions', column }: {
         });
     }, [top, metric]);
 
+    const [boxRef, boxW] = useBoxWidth<HTMLDivElement>();
+    const xTicks = useMemo(() => dateTicks(data.map((r) => String(r.date)), { width: (boxW || 640) - 80 }), [data, boxW]);
+    const yAxis = useMemo(() => niceAxis(maxOf(data, top.map(keyOf)), { format: 'count' }), [data, top]);
+
     const renderTooltip = (props: TooltipContentProps<number, string>) => {
         if (!props.active || !props.payload?.length) return null;
         const rows: ChartTooltipRow[] = props.payload.map((p, i) => ({
@@ -723,12 +746,12 @@ function BreakdownLineChart({ items, interval, metric = 'sessions', column }: {
     };
 
     return (
-        <div className="p-4">
+        <div ref={boxRef} className="p-4">
             <figure aria-label={`Top ${top.length} over time`} className="m-0 h-[280px] max-md:h-[220px]">
                 <LineChart responsive data={data} style={{ width: '100%', height: '100%' }} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                     <CartesianGrid vertical={false} stroke="var(--color-chart-grid)" />
-                    <XAxis dataKey="date" tickFormatter={(v) => formatDateLabel(String(v), interval)} tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }} tickLine={false} axisLine={{ stroke: 'var(--color-chart-axis)' }} tickMargin={8} minTickGap={32} />
-                    <YAxis width={40} domain={[0, 'auto']} tickFormatter={(v: number) => fmtAxis(v)} tick={{ fill: 'var(--color-chart-tick)', fontSize: 11 }} tickLine={false} axisLine={false} tickCount={5} />
+                    <XAxis dataKey="date" ticks={xTicks} interval={0} tickFormatter={(v) => formatDateLabel(String(v), interval)} tick={AXIS_TICK} tickLine={false} axisLine={AXIS_LINE} tickMargin={8} />
+                    <YAxis width={40} domain={yAxis.domain} ticks={yAxis.ticks} interval={0} tickFormatter={(v: number) => fmtAxis(v)} tick={AXIS_TICK} tickLine={false} axisLine={false} />
                     <RTooltip content={renderTooltip} cursor={{ stroke: 'var(--color-chart-cursor)', strokeWidth: 1 }} isAnimationActive={false} offset={12} />
                     {top.map((item, i) => (
                         <Line key={keyOf(item)} type="monotone" dataKey={keyOf(item)} name={keyOf(item)} stroke={categoricalColor(i)} strokeWidth={2} dot={false} activeDot={{ r: 3.5, strokeWidth: 0 }} isAnimationActive={false} />
@@ -749,6 +772,11 @@ function BreakdownLineChart({ items, interval, metric = 'sessions', column }: {
 
 /* ─── Metrics section ─── */
 
+/**
+ * Live tile: the same visitors-right-now number as the header pill (round 4 audit #6: it used to
+ * show sessions in the last 30 minutes next to a different "live now"), with sessions per minute
+ * as the bars underneath.
+ */
 function LiveTile({ data, total }: { data?: LiveOverviewResponse; total: number }) {
     const hasBreakdown = hasLiveBreakdown(data);
     const bars = useMemo(() => (hasBreakdown ? aggregateLiveBars(data.minuteCounts) : []), [data, hasBreakdown]);
@@ -758,7 +786,7 @@ function LiveTile({ data, total }: { data?: LiveOverviewResponse; total: number 
         <div className="flex min-h-[132px] flex-col p-4">
             <span className="flex items-center gap-2">
                 <LiveDot active={total > 0} />
-                <span className="truncate text-body-sm font-medium text-fg-secondary">{hasBreakdown ? 'Sessions, last 30 min' : 'Visitors right now'}</span>
+                <span className="truncate text-body-sm font-medium text-fg-secondary">Visitors right now</span>
             </span>
             <span className="mt-1 block text-stat text-fg tabular-nums">{fmtCompact(total)}</span>
             {topReferrers.length ? (
@@ -773,7 +801,7 @@ function LiveTile({ data, total }: { data?: LiveOverviewResponse; total: number 
                 </span>
             ) : null}
             {bars.length ? (
-                <div className="mt-auto flex h-7 items-end gap-0.5 pt-2" aria-hidden>
+                <div className="mt-auto flex h-7 items-end gap-0.5 pt-2" aria-hidden title="Sessions per minute, last 30 minutes">
                     {bars.map((b, i) => (
                         <span
                             key={i}
@@ -788,7 +816,7 @@ function LiveTile({ data, total }: { data?: LiveOverviewResponse; total: number 
     );
 }
 
-function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
+function OverviewMetrics({ liveData, liveVisitors }: { liveData?: LiveOverviewResponse; liveVisitors: number }) {
     const runtime = useOverviewRuntime();
     const { range, interval, metric, setMetric, startDate, endDate, filters, eventNames } = useShareOverviewState();
     const pageScoped = hasPageScopedFilter(filters);
@@ -807,10 +835,6 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
     const selectedIndex = OVERVIEW_METRICS[metric] ? metric : 0;
     const selected = OVERVIEW_METRICS[selectedIndex];
     const data = useMemo(() => statsQuery.data?.series ?? [], [statsQuery.data?.series]);
-    const liveTotal = hasLiveBreakdown(liveData)
-        ? liveData.minuteCounts.reduce((sum, item) => sum + item.sessionCount, 0)
-        : liveData?.activeUsers || 0;
-    const displayedLiveTotal = useDebouncedLiveValue(liveTotal, 800, LIVE_RECONCILE_INTERVAL_MS);
     const loading = statsQuery.isLoading && !statsQuery.data;
     const refetching = statsQuery.isFetching && !loading;
 
@@ -870,7 +894,7 @@ function OverviewMetrics({ liveData }: { liveData?: LiveOverviewResponse }) {
                     );
                 })}
                 <div className="border-b border-border-subtle">
-                    <LiveTile data={liveData} total={displayedLiveTotal} />
+                    <LiveTile data={liveData} total={liveVisitors} />
                 </div>
             </div>
             <div role="tabpanel" className="p-4 md:p-5">
@@ -944,8 +968,8 @@ function GenericBreakdownWidget<T extends string>({ tabs, tab, setTab, title, on
     const supported = query.data?.supported !== false;
 
     const rows = useMemo(
-        () => (query.data?.items || []).filter((item) => matchesSearch(`${item.prefix || ''} ${item.name}`, search)),
-        [query.data?.items, search],
+        () => (query.data?.items || []).filter((item) => matchesSearch(`${item.prefix || ''} ${item.name} ${formatValueLabel(tab, item.name)}`, search)),
+        [query.data?.items, search, tab],
     );
     const chartItems = useMemo(
         () => (seriesQuery.data?.items || []).filter((item) => matchesSearch(`${item.prefix || ''} ${item.name}`, search)),
@@ -973,7 +997,7 @@ function GenericBreakdownWidget<T extends string>({ tabs, tab, setTab, title, on
                     text={formatValueLabel(tab, r.name)}
                 />
             )}
-            labelText={(r) => (r.prefix ? `${r.prefix} / ${r.name}` : r.name)}
+            labelText={(r) => (r.prefix ? `${formatValueLabel(tab, r.prefix)} / ${formatValueLabel(tab, r.name)}` : formatValueLabel(tab, r.name))}
             columns={columns}
             heatMetric={primary === 'pageviews' ? 'pageviews' : 'sessions'}
             onRowClick={supported ? onRowClick : undefined}
@@ -1436,7 +1460,7 @@ function ShareOverviewPage() {
     const renderSection = (id: ShareSectionId) => {
         switch (id) {
             case 'metrics':
-                return <OverviewMetrics key={id} liveData={liveQuery.data} />;
+                return <OverviewMetrics key={id} liveData={liveQuery.data} liveVisitors={liveVisitors} />;
             case 'sources':
                 return <TopSourcesWidget key={id} />;
             case 'geo':

@@ -22,3 +22,18 @@ export function useElementWidth<T extends HTMLElement>(): [(el: T | null) => voi
     }, [el]);
     return [ref, w];
 }
+
+/** Border-box height of an element (callback ref + ResizeObserver); layout px, unaffected by transforms. */
+export function useElementHeight<T extends HTMLElement>(): [(el: T | null) => void, number] {
+    const [el, setEl] = useState<T | null>(null);
+    const [h, setH] = useState(0);
+    const ref = useCallback((node: T | null) => setEl(node), []);
+    useIsoLayoutEffect(() => {
+        if (!el) return;
+        setH(el.offsetHeight);
+        const ro = new ResizeObserver(() => setH(el.offsetHeight));
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [el]);
+    return [ref, h];
+}

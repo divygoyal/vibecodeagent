@@ -6,13 +6,14 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ImageOff } from 'lucide-react';
+import { ImageOff, PencilLine } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { BarList, Sparkline } from '@/components/charts';
 import { EmptyState, Favicon, MetricDelta } from '@/components/ui';
 import { fmtMetricValue, metricColor, metricLabel, metricDeltaFor } from '@/lib/builder/catalog';
 import { countryName } from '@/lib/builder/countries';
+import { isPlaceholderMarkdown } from '@/lib/builder/placeholders';
 import type { GeoWidget, ImageWidget, PortfolioGridWidget, SectionWidget, TextWidget } from '@/lib/builder/types';
 import { okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { plotHeight } from './Charts';
@@ -39,24 +40,29 @@ export function GeoView(props: WidgetViewProps<GeoWidget>) {
         return m;
     }, [frame, id]);
     const h = plotHeight(props.height, widget.showTitle !== false);
-    const side = c.topList > 0 && props.bp === 'lg' && width > 520;
-    const below = c.topList > 0 && !side;
-    const listW = side ? Math.min(240, Math.floor(width * 0.34)) : 0;
-    const mapW = Math.max(120, width - listW - (side ? 16 : 0));
-    const mapH = below ? Math.max(100, h - Math.min(c.topList, 5) * 36 - 12) : h;
+    const layout = geoLayout({ width, height: h, topList: c.topList, bp: props.bp, legend: c.showLegend });
+    const [listOnlyMap, setListOnlyMap] = useState(false);
     const top = [...values.entries()].sort((a, b) => b[1] - a[1]).slice(0, c.topList || 0);
     const fmt = (v: number) => fmtMetricValue(id, v, { compact: true, currency: ok?.flags.currency });
+    const showMap = layout.kind !== 'list' || listOnlyMap;
+    const showList = top.length > 0 && (layout.kind === 'side' || layout.kind === 'below' || (layout.kind === 'list' && !listOnlyMap));
+    // Too little room for a readable map under the list: the list shows, the map is one click away.
+    const toggle = layout.kind === 'list' && values.size ? (
+        <button type="button" onClick={() => setListOnlyMap((v) => !v)} className="rounded-md px-1.5 py-0.5 text-meta font-medium text-fg-muted hover:bg-subtle hover:text-fg" data-pdf-ignore="true">
+            {listOnlyMap ? 'List' : 'Map'}
+        </button>
+    ) : undefined;
     return (
-        <WidgetFrame props={props}>
-            <div ref={ref} className={cn('flex h-full min-w-0', side ? 'flex-row gap-4' : 'flex-col gap-3')}>
+        <WidgetFrame props={props} actions={toggle}>
+            <div ref={ref} className={cn('flex h-full min-w-0', layout.kind === 'side' ? 'flex-row items-start gap-4' : 'flex-col gap-3')}>
                 {!frame ? null : !values.size ? (
                     <EmptyState variant="inline" title={`No ${metricLabel(id).toLowerCase()} by country in this period`} />
                 ) : (
                     <>
-                        {width > 0 ? <ChoroplethMap values={values} color={metricColor(id)} width={mapW} height={mapH} projection={c.projection} steps={c.scale.steps} format={fmt} label={metricLabel(id)} showLegend={c.showLegend} onSelect={props.onFilterClick} /> : null}
-                        {top.length ? (
-                            <div className="min-w-0 flex-1 overflow-hidden" style={side ? { width: listW } : undefined}>
-                                <BarList items={top.map(([code, v]) => ({ key: code, label: countryName(code), text: countryName(code), value: v }))} metric={dsKey(id)} limit={below ? Math.min(top.length, 5) : top.length} formatValue={(v) => fmtMetricValue(id, v, { currency: ok?.flags.currency })} labelHeader="Country" onItemClick={props.onFilterClick ? (it) => props.onFilterClick!(String(it.key)) : undefined} />
+                        {width > 0 && showMap ? <ChoroplethMap values={values} color={metricColor(id)} width={layout.kind === 'list' ? width : layout.mapW} height={layout.kind === 'list' ? h : layout.mapH} projection={c.projection} steps={c.scale.steps} format={fmt} label={metricLabel(id)} showLegend={c.showLegend} onSelect={props.onFilterClick} /> : null}
+                        {showList ? (
+                            <div className="min-w-0 flex-1 overflow-hidden" style={layout.kind === 'side' ? { width: layout.listW, flex: 'none' } : undefined}>
+                                <BarList items={top.map(([code, v]) => ({ key: code, label: countryName(code), text: countryName(code), value: v }))} metric={dsKey(id)} limit={layout.kind === 'side' ? Math.min(top.length, layout.listRows) : Math.min(top.length, 5)} formatValue={(v) => fmtMetricValue(id, v, { currency: ok?.flags.currency, compact: layout.kind === 'side' && layout.listW < 200 })} labelHeader="Country" onItemClick={props.onFilterClick ? (it) => props.onFilterClick!(String(it.key)) : undefined} />
                             </div>
                         ) : null}
                     </>
@@ -66,6 +72,34 @@ export function GeoView(props: WidgetViewProps<GeoWidget>) {
     );
 }
 
+/** Smallest map area (px) a world map is drawn in; smaller boxes left an empty grey band (round 4 audit #3). */
+export const MIN_MAP_H = 140;
+const LIST_ROW_H = 32;
+
+/**
+ * Where the map and the top-countries list go. Wide cards: side by side. Otherwise the list
+ * goes under the map when the map keeps at least MIN_MAP_H; else beside it from 340 px wide;
+ * else the list alone with a Map toggle.
+ */
+export function geoLayout({ width, height, topList, bp, legend }: { width: number; height: number; topList: number; bp: 'lg' | 'md' | 'sm'; legend: boolean }):
+    | { kind: 'map'; mapW: number; mapH: number }
+    | { kind: 'side'; mapW: number; mapH: number; listW: number; listRows: number }
+    | { kind: 'below'; mapW: number; mapH: number }
+    | { kind: 'list' } {
+    if (topList <= 0) return { kind: 'map', mapW: Math.max(120, width), mapH: height };
+    const listRows = Math.max(1, Math.min(topList, Math.floor((height + 4) / LIST_ROW_H)));
+    const side = (listW: number) => {
+        const mapW = Math.max(120, width - listW - 16);
+        // A world map is about twice as wide as tall: no taller box than that (keeps it top aligned with the list).
+        return { kind: 'side' as const, listW, listRows, mapW, mapH: Math.min(height, Math.round(mapW * 0.56) + (legend ? 22 : 0)) };
+    };
+    if (bp === 'lg' && width > 520) return side(Math.min(240, Math.floor(width * 0.34)));
+    const belowH = height - Math.min(topList, 5) * LIST_ROW_H - 12;
+    if (belowH >= MIN_MAP_H) return { kind: 'below', mapW: Math.max(120, width), mapH: belowH };
+    if (width >= 340) return side(Math.floor(width * 0.45));
+    return { kind: 'list' };
+}
+
 // ── Text, section, image ─────────────────────────────────────────────────
 
 export function fillVars(md: string, vars: Record<string, string>): string {
@@ -73,7 +107,7 @@ export function fillVars(md: string, vars: Record<string, string>): string {
 }
 
 const ROLE: Record<TextWidget['config']['role'], string> = {
-    heading: 'text-title text-fg [&_h1]:text-heading [&_h2]:text-title [&_h3]:text-title-sm',
+    heading: 'text-title text-fg [&_h1]:text-heading [&_h2]:text-title [&_h3]:text-title-sm [&_h1+p]:text-body [&_h1+p]:text-fg-secondary [&_h2+p]:text-body [&_h2+p]:text-fg-secondary [&_h1+p]:font-normal [&_h2+p]:font-normal',
     subheading: 'text-title-sm text-fg-secondary',
     body: 'text-body text-fg-secondary',
     note: 'text-body-sm text-fg-muted',
@@ -87,16 +121,27 @@ export function stripEmptyBullets(md: string): string {
 
 export function TextView({ widget, vars, mode }: WidgetViewProps<TextWidget>) {
     const c = widget.config;
+    const prompt = isPlaceholderMarkdown(c.markdown);
+    // Template prompts ("What went well this month") are for the author only (round 4).
+    if (mode !== 'edit' && (prompt || !c.markdown.trim())) return null;
     const filled = c.variables ? fillVars(c.markdown, vars) : c.markdown;
     const md = mode === 'edit' ? filled : stripEmptyBullets(filled);
     return (
-        <div data-dash-widget={c.role !== 'callout' && widget.style?.background === 'surface' ? 'md' : undefined} className={cn(
+        <div data-dash-widget={c.role !== 'callout' && widget.style?.background === 'surface' && !prompt ? 'md' : undefined} className={cn(
             'h-full overflow-auto',
-            c.role === 'callout' ? 'rounded-card border border-border-subtle bg-surface-sunken p-4' : widget.style?.background === 'surface' ? 'rounded-card border border-border-subtle bg-surface p-4 shadow-card' : 'px-1 py-1',
+            prompt ? 'rounded-card border border-dashed border-border bg-surface-sunken/60 p-4'
+                : c.role === 'callout' ? 'rounded-card border border-border-subtle bg-surface-sunken p-4' : widget.style?.background === 'surface' ? 'rounded-card border border-border-subtle bg-surface p-4 shadow-card' : 'px-1 py-1',
         )}>
+            {prompt ? (
+                <p className="mb-2 flex items-center gap-1.5 text-caption font-medium text-fg-muted">
+                    <PencilLine aria-hidden size={12} strokeWidth={1.75} />
+                    Template prompt: viewers do not see it until you write your own text
+                </p>
+            ) : null}
             <div className={cn(
                 'max-w-none space-y-2 [&_a]:text-brand-text [&_a]:underline [&_code]:rounded [&_code]:bg-subtle [&_code]:px-1 [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_strong]:text-fg [&_ul]:list-disc',
                 ROLE[c.role],
+                prompt && 'opacity-70',
                 c.align === 'center' && 'text-center',
                 c.align === 'right' && 'text-right',
             )}>
