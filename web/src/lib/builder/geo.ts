@@ -156,3 +156,167 @@ export function bubbleView(bubbles: Array<Pick<Bubble, 'lat' | 'lng'>>): { west:
     const padY = Math.max(3, h * 0.25);
     return { west: Math.max(-180, west - padX), east: Math.min(180, east + padX), south: Math.max(-80, south - padY), north: Math.min(84, north + padY) };
 }
+
+// ── Region shapes (admin-1) ──────────────────────────────────────────────
+
+/**
+ * First-level regions (states, provinces) of one country, one small file per country under public/geo/admin1/
+ * (Natural Earth admin-1, PUBLIC DOMAIN, simplified by scripts/geo/build-admin1.mjs; see
+ * public/geo/admin1/LICENSE-natural-earth.txt). Loaded only for the country a region widget shows.
+ */
+export const ADMIN1_BASE = '/geo/admin1';
+export const ADMIN1_CREDIT = 'Region shapes: Natural Earth (public domain)';
+
+export function admin1Url(country: string): string | null {
+    return /^[A-Z]{2}$/.test(country) ? `${ADMIN1_BASE}/${country}.json` : null;
+}
+
+/** One country's file as shipped. Rings are delta coded integers in 1/q degrees (see the build script). */
+export interface Admin1File {
+    v: number;
+    country: string;
+    q: number;
+    units: Array<{ n: string; a?: string[]; p: number[][][] }>;
+}
+
+export interface RegionShape {
+    name: string;
+    aliases: string[];
+    /** GeoJSON MultiPolygon coordinates, exterior rings clockwise (d3-geo winding). */
+    coordinates: number[][][][];
+}
+
+const DROP_WORDS = new Set([
+    'state', 'of', 'the', 'province', 'prefecture', 'oblast', 'krai', 'kray', 'region', 'county', 'district', 'governorate', 'voivodeship',
+    'canton', 'kanton', 'department', 'departement', 'municipality', 'city', 'autonomous', 'metropolitan', 'division', 'emirate',
+]);
+
+/**
+ * "State of São Paulo", "Sao Paulo", "SAO-PAULO" and "São Paulo Province" are one key. Google Analytics adds words
+ * like "State of", "Prefecture", "Voivodeship" that Natural Earth leaves out; they are dropped on both sides. A name
+ * made only of such words keeps them.
+ */
+export function regionKey(name: string): string {
+    const base = name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/['’`]/g, '');
+    const words = base.split(/[^a-z0-9]+/).filter(Boolean);
+    const kept = words.filter((w) => !DROP_WORDS.has(w));
+    return (kept.length ? kept : words).join('');
+}
+
+/** Decodes a shipped file into shapes. Rings are closed here. */
+export function decodeAdmin1(file: Admin1File | null | undefined): RegionShape[] {
+    if (!file || !Array.isArray(file.units) || !(file.q > 0)) return [];
+    const q = file.q;
+    const ring = (flat: number[]): number[][] => {
+        const out: number[][] = [];
+        let x = 0, y = 0;
+        for (let i = 0; i + 1 < flat.length; i += 2) {
+            x += flat[i];
+            y += flat[i + 1];
+            out.push([x / q, y / q]);
+        }
+        return out;
+    };
+    // d3-geo reads a counter-clockwise exterior ring as "everything but this": enforce clockwise exteriors and counter-clockwise holes whatever the file says.
+    const wound = (flat: number[], exterior: boolean): number[][] => {
+        let r = ring(flat);
+        let a = 0;
+        for (let i = 0; i < r.length; i++) {
+            const p = r[i], n = r[(i + 1) % r.length];
+            a += p[0] * n[1] - n[0] * p[1];
+        }
+        if (a < 0 !== exterior) r = r.reverse();
+        if (r.length) r.push(r[0]);
+        return r;
+    };
+    return file.units.map((u) => ({ name: u.n, aliases: u.a ?? [], coordinates: u.p.map((poly) => poly.map((flat, i) => wound(flat, i === 0))) }));
+}
+
+/** Region rows matched to shapes. `values` is keyed by shape index. */
+export interface RegionMatch {
+    values: Map<number, number>;
+    /** Rows whose name no shape claims (a region Google reports under a name we do not know). */
+    unmatched: GeoRow[];
+    /** Shape index per row place name (for hover and highlight). */
+    shapeOf: Map<string, number>;
+}
+
+export function matchRegions(shapes: Array<Pick<RegionShape, 'name' | 'aliases'>>, rows: GeoRow[]): RegionMatch {
+    // Names first, then aliases that no name has claimed ("Lombardy" for a unit Natural Earth calls Lombardia).
+    const byKey = new Map<string, number>();
+    shapes.forEach((s, i) => { const k = regionKey(s.name); if (k && !byKey.has(k)) byKey.set(k, i); });
+    shapes.forEach((s, i) => { for (const a of s.aliases) { const k = regionKey(a); if (k && !byKey.has(k)) byKey.set(k, i); } });
+    const values = new Map<number, number>();
+    const shapeOf = new Map<string, number>();
+    const unmatched: GeoRow[] = [];
+    for (const r of rows) {
+        const i = byKey.get(regionKey(r.place));
+        if (i === undefined) { unmatched.push(r); continue; }
+        values.set(i, (values.get(i) ?? 0) + r.value);
+        shapeOf.set(r.place, i);
+    }
+    return { values, unmatched, shapeOf };
+}
+
+/** Rows to show in a region list: the first `fit` ones, or all of them when expanded. */
+export function visibleRegions<T>(regions: T[], fit: number, expanded: boolean): { shown: T[]; rest: number } {
+    if (expanded || regions.length <= fit) return { shown: regions, rest: 0 };
+    return { shown: regions.slice(0, fit), rest: regions.length - fit };
+}
+
+// ── Colour scale (same as the country map) ───────────────────────────────
+
+/** Quantile cut points of the country map: `steps - 1` thresholds over the positive values. */
+export function scaleThresholds(values: Iterable<number>, steps: number): { thresholds: number[]; max: number } {
+    const vals = [...values].filter((v) => v > 0).sort((a, b) => a - b);
+    const thresholds: number[] = [];
+    for (let i = 1; i < steps; i++) thresholds.push(vals.length ? vals[Math.min(vals.length - 1, Math.floor((i / steps) * vals.length))] : 0);
+    return { thresholds, max: vals.length ? vals[vals.length - 1] : 0 };
+}
+
+/** Step 0..steps-1 of a value on that scale. */
+export function scaleBin(v: number, thresholds: number[], steps: number): number {
+    const bin = thresholds.findIndex((t) => v < t);
+    return bin < 0 ? steps - 1 : bin;
+}
+
+/** The ramp colour of a step: the metric colour mixed into the surface, 18% to 100%. */
+export function scaleColor(color: string, bin: number, steps: number): string {
+    return `color-mix(in oklab, ${color} ${Math.round(18 + (bin / Math.max(1, steps - 1)) * 82)}%, var(--color-surface))`;
+}
+
+// ── City bubbles that overlap ────────────────────────────────────────────
+
+export interface ScreenBubble { key: string; city: string; country: string; value: number; x: number; y: number }
+export interface BubbleCluster extends ScreenBubble {
+    /** Radius in px. */
+    r: number;
+    /** The other cities folded into this one, biggest first. */
+    members: ScreenBubble[];
+}
+
+/**
+ * Cities that would sit on top of each other (Paris, Brussels, Amsterdam on a Europe map) become one bubble at the
+ * biggest city's position with the summed value; the tooltip names the others. A bubble is folded into a bigger one
+ * when their centres are closer than `overlap` of the two radii. Radius caps at `maxPx`.
+ */
+export function declutterBubbles(items: ScreenBubble[], opts: { maxPx: number; minPx?: number; overlap?: number }): BubbleCluster[] {
+    const minPx = opts.minPx ?? 3;
+    const overlap = opts.overlap ?? 0.75;
+    const max = items.reduce((m, b) => Math.max(m, b.value), 0);
+    const radius = (v: number) => bubbleRadius(v, max, opts.maxPx, minPx);
+    const sorted = [...items].sort((a, b) => b.value - a.value || a.key.localeCompare(b.key));
+    const clusters: BubbleCluster[] = [];
+    for (const b of sorted) {
+        const r = radius(b.value);
+        const host = clusters.find((c) => Math.hypot(c.x - b.x, c.y - b.y) < (c.r + r) * overlap);
+        if (host) {
+            host.members.push(b);
+            host.value += b.value;
+            host.r = radius(host.value);
+        } else {
+            clusters.push({ ...b, r, members: [] });
+        }
+    }
+    return clusters;
+}

@@ -12,19 +12,45 @@ import { BarList } from '@/components/charts';
 import { EmptyState, Select } from '@/components/ui';
 import { fmtMetricValue, metricColor, metricLabel } from '@/lib/builder/catalog';
 import { countryName } from '@/lib/builder/countries';
-import { countryTotals, geoRows, placeBubbles, PLACES_CREDIT, regionsOf, selectedCountry, type GeoRow } from '@/lib/builder/geo';
+import { ADMIN1_CREDIT, countryTotals, geoRows, matchRegions, bubbleView, placeBubbles, PLACES_CREDIT, regionsOf, selectedCountry, visibleRegions, type GeoRow } from '@/lib/builder/geo';
 import type { GeoWidget } from '@/lib/builder/types';
 import { useElementWidth } from '../useElementWidth';
 import { usePlaces } from '../charts/GeoBubbleMap';
+import { useAdmin1 } from '../useAdmin1';
 import { okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { plotHeight } from './Charts';
 import { dsKey } from './metricUi';
 import { geoLayout } from './Other';
 
 const BubbleMap = dynamic(() => import('../charts/GeoBubbleMap').then((m) => m.BubbleMap), { ssr: false, loading: () => <div className="skeleton h-full w-full" /> });
-const CountryOutline = dynamic(() => import('../charts/GeoBubbleMap').then((m) => m.CountryOutline), { ssr: false, loading: () => <div className="skeleton h-full w-full" /> });
+const RegionMap = dynamic(() => import('./RegionMap').then((m) => m.RegionMap), { ssr: false, loading: () => <div className="skeleton h-full w-full" /> });
 
 const ROW_H = 32;
+/** Header row (country picker, metric and total) and the "Show all" control under the list. */
+const HEAD_H = 32;
+const CONTROL_H = 28;
+
+/** How a region card is laid out in a body of this size (pure, so it is tested). */
+export function regionLayout({ width, height, map, want, count }: { width: number; height: number; map: boolean; want: number; count: number }): {
+    kind: 'side' | 'stacked' | 'list';
+    mapW: number;
+    mapH: number;
+    listW: number;
+    listH: number;
+    fit: number;
+} {
+    const side = map && width >= 440 && height >= 170;
+    const stacked = map && !side && width >= 200 && height >= 320;
+    const mapW = side ? Math.max(220, Math.min(400, Math.round(width * 0.5))) : width;
+    const mapH = side ? height : stacked ? Math.min(Math.round(height * 0.48), Math.round(width * 0.75)) : 0;
+    const listW = side ? width - mapW - 16 : width;
+    const listH = side ? height : stacked ? height - mapH - 12 : height;
+    const rows = Math.max(1, Math.floor((listH - HEAD_H) / ROW_H));
+    const all = Math.min(want, rows);
+    // Everything fits: no control. Otherwise leave room for it.
+    const fit = count <= all ? count : Math.max(2, Math.min(want, Math.floor((listH - HEAD_H - CONTROL_H) / ROW_H)));
+    return { kind: side ? 'side' : stacked ? 'stacked' : 'list', mapW, mapH, listW, listH, fit };
+}
 
 // ── Regions of one country ───────────────────────────────────────────────
 
@@ -35,48 +61,72 @@ export function GeoRegionView(props: WidgetViewProps<GeoWidget>) {
     const id = c.metric.id;
     const [ref, width] = useElementWidth<HTMLDivElement>();
     const [picked, setPicked] = useState<string | null>(null);
+    const [expanded, setExpanded] = useState(false);
     const { rows, notSet } = useMemo(() => geoRows(ok?.parts.rows, 'region', id), [ok, id]);
     const totals = useMemo(() => countryTotals(rows), [rows]);
     const country = selectedCountry(picked ?? c.country, totals);
-    const regions = country ? regionsOf(rows, country) : [];
+    const regions = useMemo(() => (country ? regionsOf(rows, country) : []), [rows, country]);
     const countryTotal = totals.find((t) => t.code === country)?.value ?? 0;
+    const shapes = useAdmin1(country);
+    const match = useMemo(() => (shapes ? matchRegions(shapes, regions) : null), [shapes, regions]);
+    // A country with no shapes (or none of whose regions we can place) shows the list across the card.
+    const mapOn = shapes === undefined || Boolean(match && match.values.size > 0);
     const h = plotHeight(props.height, widget.showTitle !== false);
-    const SELECT_H = 40;
     const want = c.topList === 10 ? 10 : 5;
-    const fit = Math.max(1, Math.min(want, Math.floor((h - SELECT_H) / ROW_H)));
-    const side = width >= 440 && h >= 150;
-    const outlineW = side ? Math.min(240, Math.floor(width * 0.4)) : 0;
+    const lay = regionLayout({ width, height: h, map: mapOn, want, count: regions.length });
     const fmt = (v: number) => fmtMetricValue(id, v, { compact: true, currency: ok?.flags.currency });
     const options = totals.slice(0, 40).map((t) => ({ value: t.code, label: countryName(t.code) }));
     if (country && !options.some((o) => o.value === country)) options.unshift({ value: country, label: countryName(country) });
-    const shown = regions.slice(0, fit);
-    const rest = regions.length - shown.length;
-    const foot = notSet > 0 ? `${fmt(notSet)} with no region reported by Google` : '';
+    const { shown, rest } = visibleRegions(regions, lay.fit, expanded);
+    const foot = [
+        notSet > 0 ? `${fmt(notSet)} with no region reported by Google` : '',
+        match && match.unmatched.length && mapOn ? `${match.unmatched.length} region${match.unmatched.length === 1 ? ' is' : 's are'} in the list only (not found on the map)` : '',
+        mapOn && shapes ? ADMIN1_CREDIT : '',
+    ].filter(Boolean).join(' · ');
+    const metric = metricLabel(id);
+
+    const list = country ? (
+        <div className="flex min-w-0 flex-1 flex-col gap-1" style={lay.kind === 'side' ? { width: lay.listW, flex: 'none' } : undefined}>
+            <div className="flex items-center gap-2" style={{ height: HEAD_H - 4 }}>
+                <Select size="sm" ariaLabel="Country" value={country} onValueChange={(v) => { setPicked(v); setExpanded(false); }} options={options} className="min-w-0 max-w-[220px] flex-1" />
+                <span className="ml-auto shrink-0 text-body-sm tabular-nums text-fg-secondary" title={`${metric} in ${countryName(country)}`} data-testid="region-total">
+                    <span className="text-fg-muted">{metric}</span> <span className="font-medium text-fg">{fmt(countryTotal)}</span>
+                </span>
+            </div>
+            {shown.length ? (
+                <div className={cn(expanded && 'overflow-y-auto')} style={expanded ? { maxHeight: Math.max(ROW_H * 3, lay.listH - HEAD_H - CONTROL_H) } : undefined} data-testid="region-list">
+                    <BarList
+                        items={shown.map((r) => ({ key: r.place, label: r.place, text: r.place, value: r.value }))}
+                        metric={dsKey(id)}
+                        limit={shown.length}
+                        formatValue={(v) => fmtMetricValue(id, v, { currency: ok?.flags.currency, compact: true })}
+                        labelHeader="Region"
+                        valueHeader={metric}
+                    />
+                </div>
+            ) : <p className="py-2 text-body-sm text-fg-muted">Google reports no regions for {countryName(country)}.</p>}
+            {rest > 0 || (expanded && regions.length > lay.fit) ? (
+                <button type="button" onClick={() => setExpanded((v) => !v)} className="self-start rounded-md px-2 py-1 text-meta font-medium text-fg-muted hover:bg-subtle hover:text-fg" aria-expanded={expanded} data-pdf-ignore="true" data-testid="region-more">
+                    {expanded ? `Show top ${lay.fit}` : `Show all ${regions.length} regions`}
+                </button>
+            ) : null}
+        </div>
+    ) : null;
+
+    const map = mapOn && country && lay.mapH > 0 && width > 0 ? (
+        shapes && match ? <RegionMap code={country} shapes={shapes} values={match.values} color={metricColor(id)} width={lay.mapW} height={lay.mapH} format={fmt} label={metric} />
+            : <div className="skeleton shrink-0 rounded-card" style={{ width: lay.mapW, height: lay.mapH }} />
+    ) : null;
 
     return (
         <WidgetFrame props={props} footnote={foot ? { node: foot, text: foot } : undefined}>
-            <div ref={ref} className={cn('flex h-full min-w-0', side ? 'flex-row items-start gap-4' : 'flex-col gap-2')} data-geo-level="region">
+            <div ref={ref} className={cn('flex h-full min-w-0', lay.kind === 'side' ? 'flex-row items-start gap-4' : 'flex-col gap-3')} data-geo-level="region" data-geo-layout={lay.kind}>
                 {!ok?.parts.rows ? null : !country ? (
-                    <EmptyState variant="inline" title={`No ${metricLabel(id).toLowerCase()} by region in this period`} />
+                    <EmptyState variant="inline" title={`No ${metric.toLowerCase()} by region in this period`} />
                 ) : (
                     <>
-                        {side && width > 0 ? <CountryOutline code={country} color={metricColor(id)} width={outlineW} height={Math.min(h, Math.round(outlineW * 0.9))} label={metricLabel(id)} /> : null}
-                        <div className="flex min-w-0 flex-1 flex-col gap-1">
-                            <div className="flex items-center gap-2" style={{ height: SELECT_H - 8 }}>
-                                <Select size="sm" ariaLabel="Country" value={country} onValueChange={setPicked} options={options} className="min-w-0 max-w-[220px] flex-1" />
-                                <span className="ml-auto shrink-0 text-body-sm tabular-nums text-fg-secondary" title={`${metricLabel(id)} in ${countryName(country)}`}>{fmt(countryTotal)}</span>
-                            </div>
-                            {shown.length ? (
-                                <BarList
-                                    items={shown.map((r) => ({ key: r.place, label: r.place, text: r.place, value: r.value }))}
-                                    metric={dsKey(id)}
-                                    limit={shown.length}
-                                    formatValue={(v) => fmtMetricValue(id, v, { currency: ok?.flags.currency, compact: true })}
-                                    labelHeader="Region"
-                                />
-                            ) : <p className="py-2 text-body-sm text-fg-muted">Google reports no regions for {countryName(country)}.</p>}
-                            {rest > 0 ? <p className="px-2 text-meta text-fg-muted">and {rest} more region{rest === 1 ? '' : 's'}</p> : null}
-                        </div>
+                        {map}
+                        {list}
                     </>
                 )}
             </div>
@@ -115,7 +165,10 @@ export function GeoCityView(props: WidgetViewProps<GeoWidget>) {
         index === undefined ? 'the city positions could not load, the list has every city' : missing.length ? `${missing.length} smaller or unknown ${missing.length === 1 ? 'city is' : 'cities are'} in the list only` : '',
     ].filter(Boolean).join(' · ');
     const mapW = layout.kind === 'list' ? width : layout.kind === 'map' ? width : layout.mapW;
-    const mapH = layout.kind === 'list' ? h : layout.kind === 'map' ? h : layout.mapH;
+    // A zoomed map (every city in one part of the world) uses the whole card height beside the list; a world map is
+    // only about half as tall as wide, so it keeps its own height instead of leaving grey land under it.
+    const zoomed = useMemo(() => bubbleView(bubbles) !== null, [bubbles]);
+    const mapH = layout.kind === 'list' ? h : layout.kind === 'map' ? h : layout.kind === 'side' && zoomed ? h : layout.mapH;
 
     return (
         <WidgetFrame props={props} actions={toggle} footnote={sorted.length ? { node: foot, text: foot } : undefined}>
