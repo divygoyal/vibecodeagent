@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-import { THEME_STORAGE_KEY } from '@/lib/themeScript';
+import { THEME_EVENT, THEME_STORAGE_KEY } from '@/lib/themeScript';
 import { resolveHomeTheme, type HomeTheme } from './homeTheme';
 
 function apply(theme: HomeTheme) {
@@ -14,7 +14,8 @@ function apply(theme: HomeTheme) {
 
 /**
  * Keeps the home page on the visitor's theme (client-side navigation lands here without the inline script,
- * and the OS setting can change while the page is open), and restores the marketing site's light theme on
+ * the OS setting can change while the page is open, and the header's theme menu or another tab can change the
+ * saved choice), and restores the marketing site's light theme on
  * the way out. Renders nothing.
  */
 export function HomeThemeSync() {
@@ -30,8 +31,12 @@ export function HomeThemeSync() {
         const update = () => apply(resolveHomeTheme(saved(), Boolean(mql?.matches)));
         update();
         mql?.addEventListener('change', update);
+        window.addEventListener(THEME_EVENT, update);
+        window.addEventListener('storage', update);
         return () => {
             mql?.removeEventListener('change', update);
+            window.removeEventListener(THEME_EVENT, update);
+            window.removeEventListener('storage', update);
             apply('light');
         };
     }, []);
