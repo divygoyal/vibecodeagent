@@ -5,7 +5,7 @@
  * Search Console / Analytics, synonym search, "More metrics" collapsed, metric-colour dots),
  * dimension and source pickers. Builder-specific; generic inputs come from components/ui.
  */
-import { useMemo, useState, type ReactNode } from 'react';
+import { Children, cloneElement, isValidElement, useId, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { Calculator, Check, ChevronDown, Plus, X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -16,11 +16,24 @@ import type { MetricRef, SourceRef } from '@/lib/builder/types';
 import { useEditorStore } from '@/stores/dashboardEditorStore';
 import { CalcDialog, MAX_CALCS } from './CalcEditor';
 
+/**
+ * A labelled field. The label points at the first TextInput / NumberInput inside it (a generated id unless the
+ * caller passes `htmlFor` and gives its input that id), so screen readers name the input and clicking the label
+ * focuses it.
+ */
 export function Field({ label, hint, children, htmlFor }: { label: string; hint?: ReactNode; children: ReactNode; htmlFor?: string }) {
+    const autoId = useId();
+    let target = htmlFor;
+    const body = htmlFor ? children : Children.map(children, (child) => {
+        if (target || !isValidElement(child) || (child.type !== TextInput && child.type !== NumberInput)) return child;
+        const el = child as ReactElement<{ id?: string }>;
+        target = el.props.id ?? autoId;
+        return el.props.id ? el : cloneElement(el, { id: autoId });
+    });
     return (
         <div className="space-y-1.5">
-            <label htmlFor={htmlFor} className="block text-body-sm font-medium text-fg">{label}</label>
-            {children}
+            <label htmlFor={target} className="block text-body-sm font-medium text-fg">{label}</label>
+            {body}
             {hint ? <p className="text-meta text-fg-muted">{hint}</p> : null}
         </div>
     );
