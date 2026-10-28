@@ -141,11 +141,102 @@ export function lowerLabel(label: string): string {
     return /^[A-Z]{2,}/.test(label) ? label : label.charAt(0).toLowerCase() + label.slice(1);
 }
 
-const levelWord = (id: MetricId, high: boolean) => `${high ? 'above' : 'below'}-median ${lowerLabel(getMetric(id)?.label ?? metricLabel(id))}`;
+/** A metric where a smaller number is better (average position: 1 is the top of the results). */
+export function lowerIsBetter(id: MetricId): boolean {
+    return getMetric(id)?.format === 'position';
+}
 
-/** "Above-median impressions, below-median CTR". */
+const levelWord = (id: MetricId, high: boolean) => {
+    const name = lowerLabel(getMetric(id)?.label ?? metricLabel(id));
+    // "Above-median position" would read as a better rank, which it is not: a big position number is a worse rank.
+    return lowerIsBetter(id) ? `${high ? 'worse' : 'better'}-than-median ${name}` : `${high ? 'above' : 'below'}-median ${name}`;
+};
+
+/** "Above-median impressions, below-median CTR"; for a position axis "worse-than-median avg. position". */
 export function quadrantText(q: Quadrant, c: ScatterConfig): string {
     return `${levelWord(c.x.id, q[1] === 'r')}, ${levelWord(c.y.id, q[0] === 't')}`.replace(/^./, (ch) => ch.toUpperCase());
+}
+
+// ── axes and labels (pixel geometry, pure so it is tested without a browser) ──
+
+export interface PlotBox { x0: number; y0: number; x1: number; y1: number }
+
+/** Pixel position of a value on an axis (linear or log) between two pixel bounds; `reversed` flips the direction. */
+export function axisPixel(v: number, domain: [number, number], scale: 'linear' | 'log', from: number, to: number, reversed = false): number {
+    const [d0, d1] = domain;
+    const t = scale === 'log' && d0 > 0 && v > 0 ? Math.log(v / d0) / Math.log(d1 / d0) : d1 === d0 ? 0.5 : (v - d0) / (d1 - d0);
+    const u = reversed ? 1 - t : t;
+    return from + u * (to - from);
+}
+
+export interface LabelRect { x: number; y: number; w: number; h: number }
+const overlaps = (a: LabelRect, b: LabelRect, pad = 2) => a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
+
+export const LABEL_FONT = 10;
+export const LABEL_CHAR_W = 5.6;
+export const LABEL_H = 12;
+export const LABEL_MIN_CHARS = 8;
+
+/** Shorten to `max` characters with an ellipsis ("/blog/product-an…"). */
+export function ellipsize(text: string, max: number): string {
+    return text.length <= max ? text : `${text.slice(0, Math.max(1, max - 1)).trimEnd()}…`;
+}
+
+export interface LabelInput { key: string; text: string; cx: number; cy: number; r: number }
+export interface PlacedLabel extends LabelRect {
+    key: string;
+    /** What is drawn (possibly cut with an ellipsis). */
+    text: string;
+    full: string;
+    /** x is the anchor: the start of the text ('start'), its end ('end') or its centre ('middle'). */
+    anchor: 'start' | 'end' | 'middle';
+    /** Baseline y of the text. */
+    baseline: number;
+    truncated: boolean;
+}
+
+/**
+ * Place point labels so they do not cover each other, the median labels (`reserved`) or the edge of the
+ * chart. Points come in priority order (the biggest first). A label goes to the right of its point; near the
+ * right edge it flips to the left, then above, then below; long names are cut with an ellipsis to fit the
+ * room there is. Among the places that are free the one that covers the fewest other points wins; when no
+ * place is free the label is left out (the tooltip still names the point).
+ */
+export function placeLabels(items: LabelInput[], bounds: LabelRect, reserved: LabelRect[] = [], maxChars = 24, all: Array<{ cx: number; cy: number; r: number }> = items): PlacedLabel[] {
+    const placed: PlacedLabel[] = [];
+    const taken: LabelRect[] = [...reserved];
+    const bx1 = bounds.x + bounds.w;
+    const by1 = bounds.y + bounds.h;
+    for (const it of items) {
+        const width = (t: string) => Math.ceil(t.length * LABEL_CHAR_W);
+        const h = LABEL_H;
+        const tries: Array<{ anchor: PlacedLabel['anchor']; room: number; rect: (w: number) => LabelRect }> = [
+            { anchor: 'start', room: bx1 - (it.cx + it.r + 3), rect: (w) => ({ x: it.cx + it.r + 3, y: it.cy - h / 2, w, h }) },
+            { anchor: 'end', room: it.cx - it.r - 3 - bounds.x, rect: (w) => ({ x: it.cx - it.r - 3 - w, y: it.cy - h / 2, w, h }) },
+            { anchor: 'middle', room: 2 * Math.min(it.cx - bounds.x, bx1 - it.cx), rect: (w) => ({ x: it.cx - w / 2, y: it.cy - it.r - 3 - h, w, h }) },
+            { anchor: 'middle', room: 2 * Math.min(it.cx - bounds.x, bx1 - it.cx), rect: (w) => ({ x: it.cx - w / 2, y: it.cy + it.r + 3, w, h }) },
+        ];
+        let best: { label: PlacedLabel; score: number } | null = null;
+        for (const t of tries) {
+            const chars = Math.min(maxChars, Math.floor(t.room / LABEL_CHAR_W));
+            // A cut name must still say something: with fewer characters than that, try the next side.
+            if (chars < Math.min(LABEL_MIN_CHARS, it.text.length)) continue;
+            const text = ellipsize(it.text, chars);
+            const rect = t.rect(width(text));
+            if (rect.x < bounds.x - 0.5 || rect.x + rect.w > bx1 + 0.5 || rect.y < bounds.y || rect.y + rect.h > by1) continue;
+            if (taken.some((o) => overlaps(rect, o))) continue;
+            const score = all.reduce((n, p) => n + (p.cx + p.r > rect.x && p.cx - p.r < rect.x + rect.w && p.cy + p.r > rect.y && p.cy - p.r < rect.y + rect.h && !(p.cx === it.cx && p.cy === it.cy) ? 1 : 0), 0);
+            const label: PlacedLabel = { ...rect, key: it.key, text, full: it.text, anchor: t.anchor, baseline: rect.y + h - 3, truncated: text !== it.text };
+            // Text drawn from its end or its middle is anchored there, so x is the anchor.
+            if (!best || score < best.score) best = { label, score };
+            if (score === 0) break;
+        }
+        if (best) {
+            placed.push(best.label);
+            taken.push(best.label);
+        }
+    }
+    return placed;
 }
 
 /** Families of the metrics on a scatter (the editor offers dimensions both can use). */

@@ -43,7 +43,7 @@ export interface ScatterConfig {
     highlight?: Quadrant;
     xScale: 'linear' | 'log';
     yScale: 'linear' | 'log';
-    /** Write the names of the largest points next to them. */
+    /** Name up to 10 of the largest points instead of the 5 biggest, which are always named. */
     labels: boolean;
 }
 export type ScatterWidget = WidgetBase<'scatter', ScatterConfig>;

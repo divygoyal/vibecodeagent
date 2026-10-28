@@ -69,13 +69,13 @@ function ScatterSetup({ widget, edit, source, portfolio }: Props<ScatterWidget>)
         <>
             {source}
             <Field label="One point per"><DimensionPicker value={c.dimension} metrics={scatterMetrics(c)} allowSite={portfolio} onChange={(d) => d && set({ dimension: d })} /></Field>
-            <Field label="Across (x)"><MetricPicker value={c.x.id} ariaLabel="Metric across" exclude={[c.y.id]} noShare onChange={(id) => set({ x: { id } })} /></Field>
-            <Field label="Up (y)"><MetricPicker value={c.y.id} ariaLabel="Metric up" exclude={[c.x.id]} noShare onChange={(id) => set({ y: { id } })} /></Field>
+            <Field label="X axis"><MetricPicker value={c.x.id} ariaLabel="Metric on the X axis" exclude={[c.y.id]} noShare onChange={(id) => set({ x: { id } })} /></Field>
+            <Field label="Y axis"><MetricPicker value={c.y.id} ariaLabel="Metric on the Y axis" exclude={[c.x.id]} noShare onChange={(id) => set({ y: { id } })} /></Field>
             <Toggle label="Size points by a metric" checked={Boolean(c.size)} onChange={(v) => set({ size: v ? { id: c.x.id === 'gsc:clicks' ? 'gsc:impressions' : 'gsc:clicks' } : undefined })} />
             {c.size ? <Field label="Size"><MetricPicker value={c.size.id} ariaLabel="Metric for size" noShare onChange={(id) => set({ size: { id } })} /></Field> : null}
-            <Field label="Points" hint="The biggest ones are plotted (by size, else across)."><NumberInput value={c.top} min={5} max={200} onChange={(n) => set({ top: n }, 'top')} /></Field>
-            <Field label="Across scale" hint="Log spreads out a few huge values."><Choice ariaLabel="Across scale" value={c.xScale ?? 'linear'} onChange={(v) => set({ xScale: v })} options={[{ value: 'linear', label: 'Linear' }, { value: 'log', label: 'Log' }]} /></Field>
-            <Field label="Up scale"><Choice ariaLabel="Up scale" value={c.yScale ?? 'linear'} onChange={(v) => set({ yScale: v })} options={[{ value: 'linear', label: 'Linear' }, { value: 'log', label: 'Log' }]} /></Field>
+            <Field label="Points" hint="The biggest ones are plotted (by size, else by the X metric)."><NumberInput value={c.top} min={5} max={200} onChange={(n) => set({ top: n }, 'top')} /></Field>
+            <Field label="X scale" hint="Log spreads out a few huge values."><Choice ariaLabel="X scale" value={c.xScale ?? 'linear'} onChange={(v) => set({ xScale: v })} options={[{ value: 'linear', label: 'Linear' }, { value: 'log', label: 'Log' }]} /></Field>
+            <Field label="Y scale"><Choice ariaLabel="Y scale" value={c.yScale ?? 'linear'} onChange={(v) => set({ yScale: v })} options={[{ value: 'linear', label: 'Linear' }, { value: 'log', label: 'Log' }]} /></Field>
             <Toggle label="Median guides" description="Dashed lines at the medians split the plot in four." checked={c.quadrants !== false} onChange={(v) => set({ quadrants: v })} />
             {c.quadrants !== false ? (
                 <Field label="Shade a quadrant" hint="It is counted under the chart, with its biggest points.">
@@ -83,7 +83,7 @@ function ScatterSetup({ widget, edit, source, portfolio }: Props<ScatterWidget>)
                         options={[{ value: 'none', label: 'None' }, ...quads.map((q) => ({ value: q, label: quadrantText(q, c) }))]} />
                 </Field>
             ) : null}
-            <Toggle label="Name the biggest points" checked={c.labels} onChange={(v) => set({ labels: v })} />
+            <Toggle label="Name more points" description="The 5 biggest points are always named; this names up to 10." checked={c.labels} onChange={(v) => set({ labels: v })} />
         </>
     );
 }

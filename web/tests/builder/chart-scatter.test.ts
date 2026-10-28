@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { applyViewerControls, compileWidget } from '@/lib/builder/compile';
-import { logTicks, median, pointRadius, quadrantOf, quadrantText, shapeScatter } from '@/lib/builder/charts/scatter';
+import { axisPixel, ellipsize, logTicks, lowerIsBetter, median, placeLabels, pointRadius, quadrantOf, quadrantText, shapeScatter, type LabelRect, type PlacedLabel } from '@/lib/builder/charts/scatter';
 import type { ScatterWidget } from '@/lib/builder/charts/types';
 import { defaultWidget, widgetMetrics, widgetTitle } from '@/lib/builder/registry';
 import { validateWidgets } from '@/lib/builder/schema';
@@ -102,6 +102,55 @@ test('scatter helpers: median, radius, log ticks, quadrant wording', () => {
     assert.deepEqual(logTicks(8, 600), [10, 20, 50, 100, 200, 500]);
     assert.ok(logTicks(3, 3.1).length >= 2);
     assert.equal(quadrantText('br', scatter().config), 'Above-median impressions, below-median CTR');
+});
+
+test('scatter: a position axis is inverted (1 at top) and quadrants say better or worse, never "above-median position"', () => {
+    const q = scatter({ y: { id: 'gsc:position' }, x: { id: 'gsc:impressions' } }).config;
+    assert.equal(lowerIsBetter('gsc:position'), true);
+    assert.equal(lowerIsBetter('gsc:ctr'), false);
+    assert.equal(quadrantText('tr', q), 'Above-median impressions, worse-than-median avg. position');
+    assert.equal(quadrantText('br', q), 'Above-median impressions, better-than-median avg. position');
+    assert.doesNotMatch(quadrantText('tl', q), /above-median avg\. position/);
+    // The pixel scale flips a reversed axis: position 1 sits at the top (small y), the biggest position at the bottom.
+    assert.equal(axisPixel(1, [1, 50], 'linear', 300, 10, true), 10);
+    assert.equal(axisPixel(50, [1, 50], 'linear', 300, 10, true), 300);
+    assert.equal(axisPixel(50, [1, 50], 'linear', 300, 10, false), 10);
+    assert.ok(Math.abs(axisPixel(100, [10, 1000], 'log', 0, 200) - 100) < 1e-9);
+});
+
+const bounds: LabelRect = { x: 2, y: 8, w: 396, h: 200 };
+const rectOf = (l: PlacedLabel): LabelRect => ({ x: l.x, y: l.y, w: l.w, h: l.h });
+const hit = (a: LabelRect, b: LabelRect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+test('scatter labels: a name near the right edge flips to the left of its point and stays inside the chart', () => {
+    const [l] = placeLabels([{ key: 'a', text: '/blog/a-long-page-name', cx: 380, cy: 100, r: 8 }], bounds);
+    assert.equal(l.anchor, 'end');
+    assert.ok(l.x >= bounds.x && l.x + l.w <= bounds.x + bounds.w);
+    // Plenty of room: it goes to the right.
+    assert.equal(placeLabels([{ key: 'a', text: '/blog/a', cx: 50, cy: 100, r: 8 }], bounds)[0].anchor, 'start');
+});
+
+test('scatter labels: long names are cut with an ellipsis; no two labels, and no median label, overlap', () => {
+    assert.equal(ellipsize('/blog/product-analytics-tools-compared', 16), '/blog/product-a…'); // 15 characters and the ellipsis make 16
+    assert.equal(ellipsize('short', 16), 'short');
+    const items = Array.from({ length: 10 }, (_, i) => ({ key: `k${i}`, text: `/blog/some-quite-long-page-name-${i}`, cx: 60 + (i % 5) * 18, cy: 80 + Math.floor(i / 5) * 9, r: 7 }));
+    const reserved: LabelRect[] = [{ x: 150, y: 9, w: 90, h: 12 }];
+    const out = placeLabels(items, bounds, reserved);
+    assert.ok(out.length >= 3, `placed ${out.length}`);
+    assert.ok(out.every((l) => l.text.length <= 24 && l.x >= bounds.x && l.x + l.w <= bounds.x + bounds.w + 1));
+    assert.ok(out.some((l) => l.truncated && l.text.endsWith('…')));
+    for (let i = 0; i < out.length; i++) {
+        assert.equal(hit(rectOf(out[i]), reserved[0]), false);
+        for (let j = i + 1; j < out.length; j++) assert.equal(hit(rectOf(out[i]), rectOf(out[j])), false, `${out[i].key} / ${out[j].key}`);
+    }
+    // Labels that cannot be placed are dropped rather than stacked: 40 points in one spot never give 40 labels.
+    const pile = placeLabels(Array.from({ length: 40 }, (_, i) => ({ key: `p${i}`, text: 'same place', cx: 200, cy: 100, r: 6 })), bounds);
+    assert.ok(pile.length > 0 && pile.length < 10);
+});
+
+test('scatter labels: the biggest points are placed first', () => {
+    const out = placeLabels([{ key: 'big', text: 'big', cx: 100, cy: 100, r: 14 }, { key: 'small', text: 'small', cx: 104, cy: 102, r: 4 }], bounds);
+    assert.equal(out[0].key, 'big');
 });
 
 test('scatter engine: pages with impressions, CTR and clicks from Search Console (and Analytics pages too)', async () => {
