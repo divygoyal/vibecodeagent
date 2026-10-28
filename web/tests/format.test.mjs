@@ -19,6 +19,8 @@ import {
     fmtPercent,
     fmtPosition,
     fmtValue,
+    fmtValuePair,
+    pairDecimals,
     makeDateTickFormatter,
     toDate,
 } from '../src/lib/format.ts';
@@ -62,16 +64,21 @@ test('fmtAxis: compact, max 1 decimal', () => {
     assert.equal(fmtAxis(null), '–');
 });
 
-test('fmtPercent: CTR always 1 decimal, <0.1% for tiny, 0%, tiles round rates >= 10%', () => {
+test('fmtPercent: rates always 1 decimal (tiles too), <0.1% for tiny, 0%; axis ticks stay compact', () => {
     assert.equal(fmtPercent(0.034), '3.4%');
     assert.equal(fmtPercent(0.0025), '0.3%');
     assert.equal(fmtPercent(0.0004), '<0.1%');
     assert.equal(fmtPercent(0), '0%');
     assert.equal(fmtPercent(0.05), '5.0%');
     assert.equal(fmtPercent(0.23), '23.0%');
-    assert.equal(fmtPercent(0.05, { tile: true }), '5%');
+    assert.equal(fmtPercent(0.05, { tile: true }), '5.0%'); // r10: a tile keeps the digit its comparison has
     assert.equal(fmtPercent(0.4412), '44.1%');
-    assert.equal(fmtPercent(0.4412, { tile: true }), '44%');
+    assert.equal(fmtPercent(0.4412, { tile: true }), '44.1%');
+    assert.equal(fmtPercent(0.0298, { tile: true }), '3.0%'); // judge r9 item 4: CTR "3%" next to "2.9%"
+    assert.equal(fmtPercent(0.652, { tile: true }), '65.2%');
+    assert.equal(fmtPercent(0.05, { axis: true }), '5%');
+    assert.equal(fmtPercent(0.4412, { axis: true }), '44%');
+    assert.equal(fmtPercent(0.0264, { decimals: 2 }), '2.64%');
     assert.equal(fmtPercent(0.034, { tile: true }), '3.4%');
     assert.equal(fmtPercent(null), '–');
 });
@@ -113,18 +120,52 @@ test('rate deltas: percentage points', () => {
     assert.equal(d.srText, 'down 0.1 percentage points');
 });
 
-test('position delta: absolute, 1 decimal, arrow = improvement', () => {
+test('position delta: absolute, 1 decimal, arrow = improvement ', () => {
     assert.equal(fmtDeltaPosition(8.4, 8.8), '▲ 0.4'); // rank improved
     assert.equal(fmtDeltaPosition(23.2, 17.1), '▼ 6.1'); // rank got worse
     const better = computeDelta(8.4, 8.8, { mode: 'absolute', better: 'down' });
     assert.equal(better.direction, 'up');
     assert.equal(better.tone, 'good');
     const worse = computeDelta(23.2, 17.1, { mode: 'absolute', better: 'down' });
-    assert.equal(worse.tone, 'bad');
+        assert.equal(worse.tone, 'bad');
     const flat = computeDelta(16.21, 16.19, { mode: 'absolute', better: 'down' });
     assert.equal(flat.state, 'flat');
     assert.equal(flat.text, '–');
     assert.equal(flat.srText, 'no change');
+});
+
+test('pairDecimals + deltas: a value, its comparison and the delta never contradict (judge r9 items 3-4)', () => {
+    // Item 3: "Key event rate 2.6%  0 pt  vs 2.7%".
+    assert.equal(pairDecimals('percent', 0.0264, 0.0268), 2);
+    const kev = fmtValuePair('percent', 0.0264, 0.0268, { tile: true });
+    assert.deepEqual(kev, { value: '2.64%', previous: '2.68%' });
+    assert.equal(computeDelta(0.0264, 0.0268, { mode: 'points' }).text, '0.04 pt');
+    // Item 4: "65% ▼0.3 pt vs 65%", "35% ▲0.5 pt vs 35%": one decimal always, so the values differ.
+    assert.deepEqual(fmtValuePair('percent', 0.6522, 0.6551, { tile: true }), { value: '65.2%', previous: '65.5%' });
+    assert.equal(computeDelta(0.6522, 0.6551, { mode: 'points' }).text, '0.3 pt');
+    assert.deepEqual(fmtValuePair('percent', 0.3549, 0.35, { tile: true }), { value: '35.5%', previous: '35.0%' });
+    assert.equal(computeDelta(0.3549, 0.35, { mode: 'points' }).text, '0.5 pt');
+    // "3% ▲0.1 pt vs 2.9%"
+    assert.deepEqual(fmtValuePair('percent', 0.0298, 0.0289, { tile: true }), { value: '3.0%', previous: '2.9%' });
+    // Equal at 1 decimal but the delta would say 0.1: more decimals.
+    assert.equal(pairDecimals('percent', 0.6516, 0.6524), 2);
+    assert.equal(computeDelta(0.6516, 0.6524, { mode: 'points' }).text, '0.08 pt');
+    // Equal even at 2 decimals: "no change", shown values equal.
+    assert.equal(computeDelta(0.26401, 0.26404, { mode: 'points' }).state, 'flat');
+    assert.equal(computeDelta(0.4, 0.4, { mode: 'points' }).text, '0 pt');
+    // Positions: 17.16 vs 17.04 shows 17.2 vs 17.0 and 0.1; 17.04 vs 17.06 would show 17.0 / 17.1 / 0.0, so 2 decimals.
+    assert.equal(pairDecimals('position', 17.06, 17.04), 2);
+    assert.deepEqual(fmtValuePair('position', 17.06, 17.04), { value: '17.06', previous: '17.04' });
+    assert.equal(computeDelta(17.06, 17.04, { mode: 'absolute', better: 'down' }).text, '0.02');
+    assert.deepEqual(fmtValuePair('position', 17.2, 17.1), { value: '17.2', previous: '17.1' });
+    // The pt delta follows the same decimals as the values everywhere (shared by MetricDelta, email, share cards).
+    assert.equal(computeDelta(0.0264, 0.0268, { mode: 'points', decimals: 1 }).state, 'flat');
+});
+
+test('decimal ratios: "1.59 ▲0.2% vs 1.59" gets a third decimal', () => {
+    assert.equal(pairDecimals('decimal', 1.5902, 1.5871), 3);
+    assert.equal(pairDecimals('decimal', 1.62, 1.59), 2);
+    assert.equal(pairDecimals('decimal', 1.59, 1.59), 2);
 });
 
 test('computeDelta: polarity, noise floor and screen-reader text', () => {

@@ -20,7 +20,7 @@ import { useBox } from './useBox';
 import { okResult, WidgetFrame, type WidgetViewProps } from '../widgets/WidgetFrame';
 import { dimText } from '../widgets/Charts';
 
-const pct = (v: number) => fmtPercent(v, { tile: true });
+const pct = (v: number) => fmtPercent(v, { axis: true });
 const mix = (color: string, p: number) => `color-mix(in oklab, ${color} ${p}%, var(--color-surface))`;
 
 function groupColor(dim: string | undefined, value: string, index: number): string {

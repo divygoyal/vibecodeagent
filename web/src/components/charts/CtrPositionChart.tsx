@@ -105,7 +105,7 @@ export function CtrPositionChart({ points, curve, maxPosition = 20, height = 300
                     {scales.yTicks.map((t) => (
                         <g key={t}>
                             <line x1={M.left} x2={width - M.right} y1={scales.y(t)} y2={scales.y(t)} stroke="var(--color-chart-grid)" />
-                            <text x={M.left - 8} y={scales.y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--color-chart-tick)">{fmtPercent(t, { tile: true })}</text>
+                            <text x={M.left - 8} y={scales.y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--color-chart-tick)">{fmtPercent(t, { axis: true })}</text>
                         </g>
                     ))}
                     {xTicks.map((t) => (

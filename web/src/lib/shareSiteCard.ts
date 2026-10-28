@@ -6,7 +6,7 @@
  */
 import { storedCredentialsForAsset } from '@/lib/googleAccounts';
 import { getValidAccessToken, resolvePrevRange, resolveRange, runGAReport } from '@/lib/googleApi';
-import { fmtMetricValue, metricDeltaFor } from '@/lib/builder/catalog';
+import { fmtMetricPair, metricDeltaFor } from '@/lib/builder/catalog';
 import { isPresetId, PRESETS } from '@/lib/builder/dates';
 import { cachedCardNumbers, CARD_DATA_BUDGET_MS } from '@/lib/builder/server/shareCard';
 import type { ShareCardNumbers } from '@/lib/builder/shareCard';
@@ -63,7 +63,7 @@ async function load(share: ShareData): Promise<ShareCardNumbers | null> {
         const d = Number.isFinite(old) ? metricDeltaFor(m.id, value, old) : null;
         return [{
             label: labels[i],
-            value: fmtMetricValue(m.id, value, { compact: true, tile: true }),
+            value: fmtMetricPair(m.id, value, Number.isFinite(old) ? old : null, { compact: true, tile: true }).value,
             ...(d && (d.state === 'change' || d.state === 'flat') ? { delta: { text: d.text, dir: d.direction, tone: d.tone } } : {}),
         }];
     });

@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 
 import { cn } from '@/lib/cn';
-import { fmtValue, type MetricFormat } from '@/lib/format';
+import { fmtValuePair, type MetricFormat } from '@/lib/format';
 import { METRICS, type MetricKey } from '@/lib/metrics';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { MetricDelta } from '@/components/ui/MetricDelta';
@@ -59,7 +59,7 @@ export function MetricTile({
             ) : (
                 <>
                     <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="text-stat text-fg">{fmtValue(fmt, value, { compact: true, tile: true, currency, cents })}</span>
+                        <span className="text-stat text-fg">{fmtValuePair(fmt, value, typeof previous === 'number' ? previous : null, { compact: true, tile: true, currency, cents }).value}</span>
                         {previous !== undefined ? (
                             <MetricDelta
                                 current={value}

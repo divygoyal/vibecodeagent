@@ -3,7 +3,7 @@
  * scorecards and KPI strips, picture specs for time series, bar and pie widgets. Pure: no Google,
  * no network, no React, so the tests feed it canned results.
  */
-import { fmtMetricValue, getMetric, metricDeltaFor, metricLabel } from '@/lib/builder/catalog';
+import { fmtMetricPair, fmtMetricValue, getMetric, metricDeltaFor, metricLabel } from '@/lib/builder/catalog';
 import { countryName } from '@/lib/builder/countries';
 import { compareLabel, presetLabel } from '@/lib/builder/dates';
 import { friendlyDimValue } from '@/lib/builder/levelLabels';
@@ -60,7 +60,7 @@ function kpiOf(metricId: string, label: string | undefined, frame: DataFrame | u
     const prev = typeof prevRaw === 'number' ? prevRaw : null;
     const fam = metricId.split(':')[0];
     if (ok.flags.missingFamilies?.includes(fam as 'ga4' | 'gsc')) return null;
-    const kpi: DigestKpi = { label: label || metricLabel(metricId), value: fmtMetricValue(metricId, cur, { compact: true, tile: true, currency: ok.flags.currency, format }) };
+    const kpi: DigestKpi = { label: label || metricLabel(metricId), value: fmtMetricPair(metricId, cur, showDelta ? prev : null, { compact: true, tile: true, currency: ok.flags.currency, format }).value };
     if (showDelta && prevRaw !== undefined) {
         const d = metricDeltaFor(metricId, cur, prev);
         if (d.state !== 'none') {
