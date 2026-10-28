@@ -7,6 +7,7 @@ import { HOME_FAQ } from '@/components/marketing/home/content';
 import { HeroCopy, SECONDARY_CTA } from '@/components/marketing/home/Hero';
 import { HeroPortfolio } from '@/components/marketing/home/HeroPortfolio';
 import { buildHomeData } from '@/components/marketing/home/homeData';
+import { buildHomeLive, type HomeLive } from '@/components/marketing/home/homeLive';
 import { HOME_THEME_SCRIPT } from '@/components/marketing/home/homeTheme';
 import { HomeThemeSync } from '@/components/marketing/home/HomeThemeSync';
 import { WhyFree } from '@/components/marketing/home/HomeSections';
@@ -54,9 +55,15 @@ const appSchema = {
 /** FAQ on the home page: the questions that block a first sign-in. The full list stays in content.tsx. */
 const HOME_FAQ_PICK = [0, 1, 2, 3, 5, 7, 8, 9, 11];
 
-export default function HomePage() {
+export default async function HomePage() {
     const { byRange, story, tour, boardSample } = buildHomeData();
     const p28 = byRange['28d'];
+    // The product tour's live rows: the app's own report code on the same demo data (no network). A row that cannot
+    // be built keeps its static picture.
+    const live: HomeLive | undefined = await buildHomeLive(tour.slug).catch((e) => {
+        console.warn('[home] live tour rows unavailable:', e instanceof Error ? e.message : e);
+        return undefined;
+    });
 
     const features: FeatureRow[] = [
         {
@@ -133,11 +140,11 @@ export default function HomePage() {
                     id="tour-title"
                     eyebrow="Product tour"
                     title="One sign-in. Everything you need."
-                    description="Real screens on sample data. Each one opens in the live demo."
+                    description="Real screens on sample data. Click around, then open any of them in the live demo."
                     align="center"
                 />
                 <div className="mt-12 md:mt-16">
-                    <FeatureRows rows={features} />
+                    <FeatureRows rows={features} live={live} />
                 </div>
                 <CtaRow note="All of it, free, on your own sites." />
             </Section>

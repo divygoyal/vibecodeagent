@@ -5,6 +5,8 @@
  * Token refresh is cached in-memory so we only refresh once per hour.
  */
 
+import { scopedFetch } from '@/lib/demo/sampleScope';
+
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
@@ -371,7 +373,8 @@ async function gaFetch(url: string, token: string, body?: any, signal?: AbortSig
         opts.method = 'POST';
         opts.body = JSON.stringify(body);
     }
-    const res = await fetch(url, opts);
+    // scopedFetch: the global fetch, or the demo generator while the home page renders its sample rows.
+    const res = await scopedFetch()(url, opts);
     if (!res.ok) {
         const err = await res.text();
         throw new Error(`Google API error ${res.status}: ${err}`);

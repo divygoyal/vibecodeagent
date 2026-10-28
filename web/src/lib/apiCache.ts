@@ -9,6 +9,7 @@
  */
 import { DEMO_REQUEST_HEADER } from '@/lib/publicDemo/config';
 import { isDemoMarker } from '@/lib/publicDemo/marker';
+import { inSampleScope } from '@/lib/demo/sampleScope';
 
 interface CacheEntry<T> {
     data: T;
@@ -41,6 +42,8 @@ const pendingFetches = new Map<string, Promise<unknown>>();
 
 /** The bucket of the current request: demo for a request middleware marked as the public demo, else main. */
 async function currentBucket(): Promise<Bucket> {
+    // The home page's sample rows (lib/demo/sampleScope): demo data, and no request headers to read on a static page.
+    if (inSampleScope()) return demo;
     try {
         const { headers } = await import('next/headers');
         const marker = (await headers()).get(DEMO_REQUEST_HEADER);

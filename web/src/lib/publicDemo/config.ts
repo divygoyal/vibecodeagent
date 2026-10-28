@@ -34,6 +34,16 @@ export const DEMO_WORKSPACE = {
     label: 'Acme Analytics',
 } as const;
 
+/**
+ * The chart notes the demo seeds on its workspace property (lib/publicDemo/seed.ts), as days before today; the home
+ * page's sample Traffic row draws the same ones.
+ */
+export const DEMO_NOTES: ReadonlyArray<{ daysAgo: number; category: string; title: string }> = [
+    { daysAgo: 26, category: 'product', title: 'Launched the new pricing page' },
+    { daysAgo: 15, category: 'marketing', title: 'Newsletter: retention guide' },
+    { daysAgo: 6, category: 'algorithm_update', title: 'Google core update rolled out' },
+];
+
 export const DEMO_COOKIE = 'tc_demo';
 /** Demo session lifetime (cookie and JWT). */
 export const DEMO_MAX_AGE_S = 2 * 60 * 60;

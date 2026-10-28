@@ -296,6 +296,24 @@ async function answer(req: Awaited<ReturnType<typeof readRequest>>, host: string
 }
 
 /**
+ * The home page's sample transport (lib/demo/sampleScope.ts): answers Google data requests from the generator with
+ * no faults, no latency and no request context (it never reads cookies or headers, so a static page stays static).
+ * Anything that is not a Google data host is refused: sample rendering never reaches the network.
+ */
+export async function sampleGoogleFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const urlString = requestUrl(input);
+    const url = urlString && /^https:\/\//i.test(urlString) ? new URL(urlString) : null;
+    if (!url || !GOOGLE_HOST.test(url.hostname) || PASS_THROUGH_HOSTS.test(url.hostname) || url.hostname === 'oauth2.googleapis.com') {
+        throw new Error('sample data: network disabled');
+    }
+    const req = await readRequest(input, init);
+    // Yield before the (synchronous) generator answers: the home page's hourly rebuild makes dozens of these calls,
+    // and without a turn of the event loop between them it would hold the server for the whole build (review L1).
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    return answer(req, url.hostname, req.url.pathname);
+}
+
+/**
  * The demo OAuth code exchange (the "Connect another Google account" flow in demo mode): a code
  * 'demo-code:<account>' becomes that demo account's tokens plus an id_token naming it. The
  * id_token is unsigned (alg none), which only a demo server accepts (lib/googleLink.ts).
