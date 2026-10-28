@@ -127,7 +127,7 @@ export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: strin
     );
 }
 
-const D = {
+const DARK = {
     canvas: '#0b0c0f',
     surface: '#15171c',
     surface2: '#1b1e24',
@@ -142,6 +142,21 @@ const D = {
     users: '#8b7ff5',
 };
 
+const L = {
+    canvas: '#f6f7f9',
+    surface: '#ffffff',
+    surface2: '#f6f7f9',
+    border: '#e3e7ec',
+    fg: '#171a20',
+    fg2: '#4b5361',
+    muted: '#636b78',
+    green: '#16825d',
+    up: '#14804f',
+    down: '#d33b3b',
+    clicks: '#1f5bd6',
+    users: '#5b4fe0',
+};
+
 /** One portfolio card row for the home share image: the app's demo sites (sample data, .example hosts). */
 const HOME_SITES = [
     { host: 'acmeanalytics.example', letter: 'A', users: '47.4K', change: 10.3, seed: 0.4, rise: 0.5 },
@@ -149,10 +164,10 @@ const HOME_SITES = [
     { host: 'searchmetrics.example', letter: 'S', users: '291K', change: 1.4, seed: 3.3, rise: 0.15 },
 ];
 
-function Change({ value, size = 22 }: { value: number; size?: number }) {
+function Change({ value, size = 22, up: upC = DARK.up, down: downC = DARK.down }: { value: number; size?: number; up?: string; down?: string }) {
     const up = value >= 0;
     return (
-        <div style={{ display: 'flex', fontSize: size, fontWeight: 700, color: up ? D.up : D.down }}>
+        <div style={{ display: 'flex', fontSize: size, fontWeight: 700, color: up ? upC : downC }}>
             {`${up ? '▲' : '▼'}${Math.abs(value).toFixed(1)}%`}
         </div>
     );
@@ -162,12 +177,13 @@ function Change({ value, size = 22 }: { value: number; size?: number }) {
  * The home page's share card: dark (so it stands out in light feeds), the headline in Geist Bold with "Free." in brand
  * green, and a small portfolio panel in the app's own style (totals strip, three site rows with sparklines).
  */
-export function homeOgImage(): Promise<ImageResponse> {
+export function homeOgImage(theme: 'dark' | 'light' = 'dark'): Promise<ImageResponse> {
+    const D = theme === 'light' ? L : DARK;
     const W = 112;
     const H = 38;
     return render(
         <div style={{ width: '100%', height: '100%', display: 'flex', position: 'relative', background: D.canvas, color: D.fg, fontFamily: 'Geist', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: -260, right: -180, width: 760, height: 760, borderRadius: 999, display: 'flex', background: 'radial-gradient(circle, rgba(67,209,158,0.20) 0%, rgba(67,209,158,0) 65%)' }} />
+            <div style={{ position: 'absolute', top: -260, right: -180, width: 760, height: 760, borderRadius: 999, display: 'flex', background: `radial-gradient(circle, ${theme === 'light' ? 'rgba(22,130,93,0.10)' : 'rgba(67,209,158,0.20)'} 0%, rgba(67,209,158,0) 65%)` }} />
 
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: 600, padding: '64px 0 60px 64px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -184,7 +200,7 @@ export function homeOgImage(): Promise<ImageResponse> {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 21, color: D.fg2 }}>
                     {['Read-only', 'No card', 'ChatGPT & Claude'].map((t) => (
-                        <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 999, border: `1px solid ${D.border}`, background: 'rgba(255,255,255,0.03)' }}>
+                        <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 999, border: `1px solid ${D.border}`, background: theme === 'light' ? '#ffffff' : 'rgba(255,255,255,0.03)' }}>
                             <svg width="18" height="18" viewBox="0 0 18 18"><path d="M3.5 9.5 L7.5 13 L14.5 5" stroke={D.green} strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
                             <div style={{ display: 'flex' }}>{t}</div>
                         </div>
@@ -192,7 +208,7 @@ export function homeOgImage(): Promise<ImageResponse> {
                 </div>
             </div>
 
-            <div style={{ position: 'absolute', top: 86, left: 676, width: 480, display: 'flex', flexDirection: 'column', background: D.surface, border: `1px solid ${D.border}`, borderRadius: 26, padding: 26, boxShadow: '0 30px 80px rgba(0,0,0,0.55)' }}>
+            <div style={{ position: 'absolute', top: 86, left: 676, width: 480, display: 'flex', flexDirection: 'column', background: D.surface, border: `1px solid ${D.border}`, borderRadius: 26, padding: 26, boxShadow: theme === 'light' ? '0 20px 60px rgba(16,19,26,0.12)' : '0 30px 80px rgba(0,0,0,0.55)' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', fontSize: 28, fontWeight: 700 }}>Portfolio</div>
                     <div style={{ display: 'flex', fontSize: 18, color: D.muted }}>11 sites · last 28 days</div>
@@ -209,7 +225,7 @@ export function homeOgImage(): Promise<ImageResponse> {
                             </div>
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 4 }}>
                                 <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: -1 }}>{m.value}</div>
-                                <Change value={m.change} size={19} />
+                                <Change value={m.change} size={19} up={D.up} down={D.down} />
                             </div>
                         </div>
                     ))}
@@ -224,7 +240,7 @@ export function homeOgImage(): Promise<ImageResponse> {
                                 <div style={{ display: 'flex', fontSize: 19, fontWeight: 700 }}>{s.host}</div>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
                                     <div style={{ display: 'flex', fontSize: 18, color: D.fg2 }}>{`${s.users} users`}</div>
-                                    <Change value={s.change} size={16} />
+                                    <Change value={s.change} size={16} up={D.up} down={D.down} />
                                 </div>
                             </div>
                             <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
