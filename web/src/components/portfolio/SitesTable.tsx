@@ -24,12 +24,12 @@ export interface SitesTableProps {
 }
 
 /** Exact value with its delta underneath (keeps the table to 8 columns). */
-function ValueDelta({ metric, value, prev, has, loading }: { metric: MetricKey; value: number | null | undefined; prev: number | null | undefined; has: boolean; loading?: boolean }) {
+function ValueDelta({ metric, value, prev, has, loading, approx }: { metric: MetricKey; value: number | null | undefined; prev: number | null | undefined; has: boolean; loading?: boolean; approx?: boolean }) {
     if (!has) return <span className="text-fg-muted">–</span>;
     if (loading) return <Skeleton className="ml-auto h-3.5 w-14" delay={0} />;
     return (
         <span className="inline-flex flex-col items-end leading-tight">
-            <span>{metric === 'position' ? fmtPosition(value) : fmtFull(value)}</span>
+            <span title={approx ? 'An estimate: daily users added up, higher than the exact count' : undefined}>{approx ? <span aria-hidden className="text-fg-muted">≈</span> : null}{metric === 'position' ? fmtPosition(value) : fmtFull(value)}</span>
             {prev === null || prev === undefined ? null : <MetricDelta metric={metric} current={value} previous={prev} />}
         </span>
     );
@@ -70,7 +70,7 @@ export function SitesTable({ sites, dates, view, syncing, usersPending, onOpen, 
         },
         {
             key: 'users', header: 'Users', align: 'right', sortable: true, sortValue: (s) => s.traffic?.cur.users,
-            cell: (s) => <ValueDelta metric="users" value={s.traffic?.cur.users} prev={s.traffic?.prev?.users} has={Boolean(s.traffic)} loading={usersPending && !s.traffic?.cur.usersExact} />,
+            cell: (s) => <ValueDelta metric="users" value={s.traffic?.cur.users} prev={s.traffic?.prev?.users} has={Boolean(s.traffic)} loading={usersPending && !s.traffic?.cur.usersExact} approx={!usersPending && !s.traffic?.cur.usersExact} />,
         },
         {
             key: 'sessions', header: 'Sessions', align: 'right', sortable: true, sortValue: (s) => s.traffic?.cur.sessions,

@@ -95,27 +95,39 @@ export function sortSites(sites: PortfolioSite[], sort: SortKey): PortfolioSite[
     return [...sites].sort((a, b) => (Number(b.starred) - Number(a.starred)) || by[sort](a, b) || byName(a, b));
 }
 
+/** How long the exact-users job may keep the users numbers as skeletons before the page falls back to labelled estimates. */
+export const USERS_WAIT_MS = 12_000;
+
 /**
- * The portfolio's users total tile. It always shows a number once there is
- * traffic: the exact per-site users added up, or, while those are still
- * loading (or for a site Google would not give them for), the summed daily
- * users with "≈" and a note. It never waits on the exact-users job: when that
- * job could not start, the tile used to stay a skeleton forever.
+ * Users for a site or the total: the exact count when every site has it; a skeleton while the exact-users job runs (for at
+ * most USERS_WAIT_MS); after that, or when the job could not run, the summed daily users, always marked "≈" / "est.", because
+ * a visitor on several days is counted once per day (about 20% above the exact figure on the sample account).
  */
-export function usersTotalTile(traffic: Compared<TrafficTotals> | null | undefined, opts: { usersPending: boolean; siteCount: number }): {
+export function usersLoadState(opts: { exact: boolean; pending: boolean; waitedOut: boolean }): 'exact' | 'loading' | 'estimate' {
+    if (opts.exact) return 'exact';
+    return opts.pending && !opts.waitedOut ? 'loading' : 'estimate';
+}
+
+/**
+ * The portfolio's users total tile (see usersLoadState). The label says "est." whenever the number is an estimate, so
+ * the "≈" is never the only mark; the hint says why.
+ */
+export function usersTotalTile(traffic: Compared<TrafficTotals> | null | undefined, opts: { usersPending: boolean; siteCount: number; waitedOut?: boolean }): {
     label: string;
     approx: boolean;
+    loading: boolean;
     hint: string | undefined;
 } {
     const many = opts.siteCount > 1;
-    const label = many ? 'Users (sum of sites)' : 'Users';
     const approx = Boolean(traffic && !traffic.cur.usersExact);
+    const state = usersLoadState({ exact: !approx, pending: opts.usersPending, waitedOut: Boolean(opts.waitedOut) });
+    const base = many ? 'Users (sum of sites)' : 'Users';
+    const label = state === 'estimate' ? (many ? 'Users (sum, est.)' : 'Users (est.)') : base;
     const notes: string[] = [];
     if (many) notes.push('Summed across sites: a visitor of two sites counts twice');
-    if (approx) {
-        notes.push(opts.usersPending
-            ? 'Exact users are still loading; until then daily users are added up (a visitor on two days counts twice)'
-            : 'Includes daily users added up for sites without an exact count (a visitor on two days counts twice)');
-    }
-    return { label, approx, hint: notes.length ? notes.join('. ') : undefined };
+    if (state === 'loading') notes.push('Exact users are loading');
+    if (state === 'estimate') notes.push(opts.usersPending
+        ? 'Exact users are taking longer than usual; until they arrive, daily users are added up (a visitor on two days counts twice, so this is higher than the exact count)'
+        : 'An estimate: daily users added up for sites without an exact count (a visitor on two days counts twice, so this is higher than the exact count)');
+    return { label, approx: state === 'estimate', loading: state === 'loading', hint: notes.length ? notes.join('. ') : undefined };
 }

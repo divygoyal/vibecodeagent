@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Download, LayoutGrid, List, Loader2, RefreshCw } from 'lucide-react';
 
 import {
@@ -10,7 +10,7 @@ import { cn } from '@/lib/cn';
 import { fmtFull } from '@/lib/format';
 import { RANGE_LABEL } from '@/lib/portfolio/ranges';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite, SitePatch } from '@/lib/portfolio/types';
-import { filterSites, SORT_OPTIONS, sortSites, windowsNote, type FilterKey, type SortKey } from '@/lib/portfolio/view';
+import { filterSites, SORT_OPTIONS, sortSites, USERS_WAIT_MS, windowsNote, type FilterKey, type SortKey } from '@/lib/portfolio/view';
 import { useIsMobile } from '@/lib/useIsMobile';
 import { PageHeader } from '@/components/shell/PageHeader';
 import { AlertsPanel } from './AlertsPanel';
@@ -141,12 +141,14 @@ function Subtitle({ data, range, alerts = 0 }: { data: PortfolioResponse | undef
             true,
         ]);
     }
+    // Wrap between facts, never inside one; the dot ends the line before (lib/subtitleSegments).
+    const shown = parts.map(([p, phone]) => ({ p, phone }));
     return (
-        <span className="inline-flex flex-wrap items-center gap-x-1.5">
-            {parts.map(([p, phone], i) => (
-                <span key={i} className={cn('inline-flex items-center gap-1.5', !phone && 'max-md:hidden')}>
-                    {i > 0 ? <span aria-hidden className="text-fg-muted">·</span> : null}
-                    {p}
+        <span>
+            {shown.map(({ p, phone }, i) => (
+                <span key={i} className={cn(!phone && 'max-md:hidden')}>
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap max-sm:whitespace-normal">{p}</span>
+                    {i < shown.length - 1 ? <span aria-hidden className={cn('text-fg-muted', !shown.slice(i + 1).some((x) => x.phone) && 'max-md:hidden')}> ·</span> : null}{' '}
                 </span>
             ))}
         </span>
@@ -166,6 +168,15 @@ export function PortfolioView(props: PortfolioViewProps) {
         onSyncNow, syncBusy, onConnectGoogle, onRetry, exportHref, className,
     } = props;
     const isMobile = useIsMobile();
+    // Exact users load after the sync: skeletons for at most USERS_WAIT_MS, then labelled estimates (lib/portfolio/view).
+    const usersPending = Boolean(data?.usersPending);
+    const [waitedOut, setWaitedOut] = useState(false);
+    useEffect(() => {
+        if (!usersPending) return;
+        const id = window.setTimeout(() => setWaitedOut(true), USERS_WAIT_MS);
+        return () => { window.clearTimeout(id); setWaitedOut(false); };
+    }, [usersPending]);
+    const usersLoading = usersPending && !waitedOut;
     const [query, setQuery] = useState('');
     const q = useDebouncedValue(query, 120);
     const [showHidden, setShowHidden] = useState(false);
@@ -305,6 +316,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                         metric={activeMetric}
                         onMetricChange={setMetric}
                         comparisonLabel={comparisonLabel}
+                        usersLoading={usersLoading}
                         dimmed={refetching}
                         compact={isMobile}
                         trendOpen={trendOpen}
@@ -373,7 +385,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                                 dates={data.dates}
                                 view={view}
                                 syncing={data.syncing}
-                                usersPending={data.usersPending}
+                                usersPending={usersLoading}
                                 onOpen={readOnly ? undefined : (s) => { onOpenSite?.(s); }}
                                 exportHref={exportHref}
                                 dimmed={refetching}
@@ -392,7 +404,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                                             dates={data.dates}
                                             view={view}
                                             syncing={data.syncing}
-                                            usersPending={data.usersPending}
+                                            usersPending={usersLoading}
                                             href={hrefFor(s)}
                                             onOpen={onOpenSite}
                                             onToggleStar={onToggleStar}

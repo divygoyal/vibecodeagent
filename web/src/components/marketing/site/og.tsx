@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
 
 import { BRAND_NAME, SITE_HOST } from '@/lib/brand';
+import { fitText, fontMeasurer, type FittedText, type Measure } from '@/lib/ogFit';
 
 /** Shared Open Graph card for marketing pages: light, pine mark, big title, a quiet sparkline card. */
 export const OG_SIZE = { width: 1200, height: 630 };
@@ -77,6 +78,24 @@ function ogFonts(): Promise<OgFont[]> {
     return fontsPromise;
 }
 
+/** Rough width when the font files are missing (the renderer then uses its own font): about 0.58 em per character. */
+const approxMeasure: Measure = (text, size, letterSpacing = 0) => [...text].length * (size * 0.58 + letterSpacing);
+
+/** Width measurers for the bold and regular Geist files, so cards can fit text before drawing it. */
+export async function ogMeasure(): Promise<{ bold: Measure; regular: Measure }> {
+    const fonts = await ogFonts();
+    const of = (weight: number): Measure => {
+        const f = fonts.find((x) => x.weight === weight);
+        return f ? fontMeasurer(f.data) : approxMeasure;
+    };
+    return { bold: of(700), regular: of(400) };
+}
+
+/** Fits `text` into `maxWidth` using the bold face: the size steps down, long text wraps, then ends in an ellipsis. */
+export async function ogFitBold(text: string, opts: { maxWidth: number; sizes: number[]; maxLines?: number; letterSpacing?: number; maxLinesAt?: (size: number) => number }): Promise<FittedText> {
+    return fitText(text, (await ogMeasure()).bold, opts);
+}
+
 export async function ogRender(node: React.ReactElement): Promise<ImageResponse> {
     const fonts = await ogFonts();
     return new ImageResponse(node, { ...OG_SIZE, ...(fonts.length ? { fonts } : {}) });
@@ -96,8 +115,8 @@ export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: strin
                     <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: -0.5, color: C.fg }}>{BRAND_NAME}</div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 48 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 660 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 600 }}>
                         {eyebrow ? (
                             <div style={{ display: 'flex', alignSelf: 'flex-start', marginBottom: 24, padding: '8px 18px', borderRadius: 999, background: C.brandSoft, color: C.brandSoftFg, fontSize: 24 }}>
                                 {eyebrow}
@@ -149,16 +168,27 @@ export function OgDelta({ label, size = 24, up = '#157f3c', down = '#c92a2a' }: 
     );
 }
 
+/** Left text column of the share cards, and the chart card beside it: 72 px margins each side, a 44 px gap. */
+const SHARE_TEXT_W = 600;
+const SHARE_CARD_W = 412;
+
+/** Tiles in the decorative share card: a brand-coloured dot and line, then a few bars. Abstract on purpose (not the owner's data). */
+const SHARE_TILES = [
+    { color: '#0d3a2c', bars: [0.45, 0.7, 0.55, 0.9] },
+    { color: C.clicks, bars: [0.6, 0.4, 0.75, 0.65] },
+    { color: C.users, bars: [0.35, 0.55, 0.5, 0.8] },
+];
+
 /**
  * Share card for a public dashboard or share page: the same light look as the marketing cards, with an abstract dashboard
- * (skeleton tiles and one line, no numbers, no labels) on the right, so nothing here can be mistaken for the owner's data.
+ * (coloured tiles and one line, no numbers, no labels) on the right, so nothing here can be mistaken for the owner's data.
+ * The title is fitted to a 600 px column (smaller type, two lines, then an ellipsis), so it never runs under the card.
  */
-export function sharedOgImage({ eyebrow, title, subtitle, lock }: { eyebrow: string; title: string; subtitle?: string; lock?: boolean }): Promise<ImageResponse> {
+export async function sharedOgImage({ eyebrow, title, subtitle, lock }: { eyebrow: string; title: string; subtitle?: string; lock?: boolean }): Promise<ImageResponse> {
     const a = curve(30, 0.7, 0.5);
     const W = 372;
     const H = 150;
-    const t = title.length > 60 ? `${title.slice(0, 57)}...` : title;
-    const titleSize = t.length > 40 ? 54 : t.length > 24 ? 64 : 76;
+    const fit = await ogFitBold(title, { maxWidth: SHARE_TEXT_W, sizes: [76, 64, 54, 46], letterSpacing: -2.5, maxLinesAt: (size) => (size <= 54 ? 2 : 1) });
     const sub = subtitle && subtitle.length > 120 ? `${subtitle.slice(0, 117)}...` : subtitle;
     return ogRender(
         (
@@ -167,21 +197,30 @@ export function sharedOgImage({ eyebrow, title, subtitle, lock }: { eyebrow: str
                     <OgMark />
                     <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: -0.5, color: C.fg }}>{BRAND_NAME}</div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 48 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 640 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', width: SHARE_TEXT_W }}>
                         <div style={{ display: 'flex', alignSelf: 'flex-start', alignItems: 'center', gap: 10, marginBottom: 24, padding: '8px 18px', borderRadius: 999, background: C.brandSoft, color: C.brandSoftFg, fontSize: 24 }}>
                             {lock ? <svg width="20" height="20" viewBox="0 0 20 20"><rect x="4" y="9" width="12" height="8" rx="2" fill={C.brandSoftFg} /><path d="M7 9 V6.5 a3 3 0 0 1 6 0 V9" stroke={C.brandSoftFg} strokeWidth="2" fill="none" /></svg> : null}
                             <div style={{ display: 'flex' }}>{eyebrow}</div>
                         </div>
-                        <div style={{ display: 'flex', fontSize: titleSize, fontWeight: 700, lineHeight: 1.06, letterSpacing: -2.5, color: C.fg }}>{t}</div>
+                        {fit.lines.map((line, i) => (
+                            <div key={i} style={{ display: 'flex', fontSize: fit.size, fontWeight: 700, lineHeight: 1.06, letterSpacing: -2.5, color: C.fg }}>{line}</div>
+                        ))}
                         {sub ? <div style={{ display: 'flex', marginTop: 24, fontSize: 28, lineHeight: 1.35, color: C.fg2 }}>{sub}</div> : null}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', width: 412, padding: 20, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: '0 1px 3px rgba(16,19,26,0.06)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', width: SHARE_CARD_W, padding: 20, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: '0 1px 3px rgba(16,19,26,0.06)' }}>
                         <div style={{ display: 'flex', gap: 12 }}>
-                            {[0, 1, 2].map((i) => (
+                            {SHARE_TILES.map((tile, i) => (
                                 <div key={i} style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10, padding: 12, border: `1px solid ${C.border}`, borderRadius: 12 }}>
-                                    <div style={{ display: 'flex', width: 40, height: 8, borderRadius: 4, background: '#e3e7ec' }} />
-                                    <div style={{ display: 'flex', width: 64 - i * 8, height: 16, borderRadius: 6, background: '#cfd5dd' }} />
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <div style={{ display: 'flex', width: 8, height: 8, borderRadius: 999, background: tile.color }} />
+                                        <div style={{ display: 'flex', width: 28, height: 6, borderRadius: 3, background: tile.color, opacity: 0.35 }} />
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 30 }}>
+                                        {tile.bars.map((h, k) => (
+                                            <div key={k} style={{ display: 'flex', width: 12, height: Math.round(30 * h), borderRadius: 3, background: tile.color, opacity: k === tile.bars.length - 1 ? 0.9 : 0.4 }} />
+                                        ))}
+                                    </div>
                                 </div>
                             ))}
                         </div>

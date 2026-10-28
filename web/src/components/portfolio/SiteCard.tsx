@@ -37,7 +37,7 @@ export interface SiteCardProps {
 /** Previous totals under this are noise: the delta is shown without colour (DESIGN 6.7). */
 const TINY = 20;
 
-function Metric({ metric, value, previous, labelFirst, dot = true, label, small, loading }: {
+function Metric({ metric, value, previous, labelFirst, dot = true, label, small, loading, approx }: {
     metric: MetricKey;
     value: number | null | undefined;
     previous: number | null | undefined;
@@ -48,6 +48,8 @@ function Metric({ metric, value, previous, labelFirst, dot = true, label, small,
     small?: boolean;
     /** Number still loading (exact users being fetched): a bar in its place. */
     loading?: boolean;
+    /** An estimate (summed daily users, past the wait for the exact count): shown with "≈". */
+    approx?: boolean;
 }) {
     const m = METRICS[metric];
     const short = label ?? m.short;
@@ -59,7 +61,10 @@ function Metric({ metric, value, previous, labelFirst, dot = true, label, small,
             {loading ? (
                 <Skeleton className={cn('self-center', small ? 'h-3.5 w-10' : 'h-4 w-12')} delay={0} />
             ) : (
-                <span className={cn('text-fg tabular-nums', small ? 'text-body font-semibold' : 'text-stat-sm')}>{fmtMetric(metric, value, { compact: true })}</span>
+                <span className={cn('text-fg tabular-nums', small ? 'text-body font-semibold' : 'text-stat-sm')} title={approx ? 'An estimate: daily users added up, higher than the exact count' : undefined}>
+                    {approx ? <span aria-hidden className="text-fg-muted">≈</span> : null}
+                    {fmtMetric(metric, value, { compact: true })}
+                </span>
             )}
             {labelFirst ? null : <span className="text-body-sm text-fg-muted">{short}</span>}
             {loading || previous === null || previous === undefined ? null : (
@@ -95,7 +100,7 @@ function TrafficMetrics({ site, withEngagement, small, usersPending }: { site: P
     const t = site.traffic!;
     return (
         <div className={cn('flex flex-wrap items-baseline gap-y-1', small ? 'gap-x-3' : 'gap-x-4')}>
-            <Metric metric="users" value={t.cur.users} previous={t.prev?.users} small={small} loading={usersPending && !t.cur.usersExact} />
+            <Metric metric="users" value={t.cur.users} previous={t.prev?.users} small={small} loading={usersPending && !t.cur.usersExact} approx={!usersPending && !t.cur.usersExact} />
             <Metric metric="sessions" value={t.cur.sessions} previous={t.prev?.sessions} small={small} />
             {withEngagement ? <EngagementMetric value={t.cur.engagementRate} previous={t.prev ? t.prev.engagementRate : undefined} /> : null}
         </div>

@@ -296,6 +296,17 @@ export function RequestSlotButton({ slotId }: { slotId: number }) {
 
 function CopyField({ label, value }: { label: string; value: string }) {
     const [done, setDone] = useState(false);
+    // The box grows to its whole lines (the text wraps at the box width), so no line is cut in half at the bottom.
+    const boxRef = useRef<HTMLTextAreaElement>(null);
+    useEffect(() => {
+        const el = boxRef.current;
+        if (!el) return;
+        const fit = () => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`; };
+        fit();
+        const ro = new ResizeObserver(fit);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [value]);
     return (
         <div>
             <div className="mb-1 flex items-center justify-between">
@@ -311,7 +322,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
                     {done ? 'Copied' : 'Copy'}
                 </Button>
             </div>
-            <textarea readOnly value={value} rows={3} onFocus={(e) => e.currentTarget.select()} className="w-full resize-none rounded-control border border-border bg-surface-sunken p-2.5 font-mono text-meta text-fg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-focus/30" />
+            <textarea ref={boxRef} readOnly value={value} rows={1} onFocus={(e) => e.currentTarget.select()} className="block w-full resize-none overflow-hidden rounded-control border border-border bg-surface-sunken p-2.5 font-mono text-meta text-fg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-focus/30" />
         </div>
     );
 }
@@ -346,7 +357,7 @@ export function EmbedCard({ origin, slug, id, name, liveEnabled }: { origin: str
                     options={[{ value: 'traffic', label: 'Verified traffic' }, { value: 'minimal', label: 'Minimal' }, { value: 'stats', label: 'Stats' }, ...(liveEnabled ? [{ value: 'live' as const, label: 'Live' }] : [])]}
                 />
             </div>
-            <div className={cn('mb-4 flex min-h-24 items-center justify-center rounded-control border border-border-subtle p-4', theme === 'dark' ? 'bg-[#0e1014]' : 'bg-surface-sunken')}>
+            <div className={cn('mb-4 flex min-h-24 items-center justify-center rounded-control border border-border-subtle p-4', theme === 'dark' ? 'bg-[#0e1014]' : 'bg-[#f6f7f9]')}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img key={imgPath} src={imgPath} alt={alt} height={BADGE_HEIGHT[variant]} className="max-w-full" />
             </div>

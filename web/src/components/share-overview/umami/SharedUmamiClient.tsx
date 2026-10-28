@@ -188,7 +188,7 @@ function SharedUmamiPage({
     );
 
     return (
-        <SharePage>
+        <SharePage embed={embedMode}>
             {embedMode ? null : <ShareHeader siteUrl={siteUrl} views={views} label="Shared analytics" />}
             <main className={cn(SHARE_CONTAINER, 'flex flex-col gap-4 md:gap-6', embedMode ? 'py-3 md:py-4' : 'py-4 md:py-6')}>
                 <div className="flex flex-wrap items-center justify-between gap-3">

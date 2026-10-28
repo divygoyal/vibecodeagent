@@ -104,7 +104,7 @@ export default async function SharedDashboardPage({
 
     if (isEmbed) {
         return (
-            <SharePage>
+            <SharePage embed>
                 <main className={`${SHARE_CONTAINER} py-4`}>
                     <SharedDashboardClient
                         token={token}

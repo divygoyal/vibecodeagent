@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 const sync = await import('../src/lib/portfolio/sync.ts');
-const { usersTotalTile } = await import('../src/lib/portfolio/view.ts');
+const { usersTotalTile, usersLoadState, USERS_WAIT_MS } = await import('../src/lib/portfolio/view.ts');
 const { adminRetry } = await import('../src/lib/portfolio/adminStore.ts');
 adminRetry.delays = [1, 1];
 sync.retryTuning.call = [1];
@@ -38,18 +38,30 @@ test('page check and sync agree: whatever needsSync() sees as due, the sync fetc
     }
 });
 
-test('the users total shows a number (≈ while exact users load), never a skeleton', () => {
+test('the users total: skeleton while exact users load, then a labelled estimate, exact once every site has it', () => {
     const traffic = (exact) => ({ cur: { users: 1200, usersExact: exact, sessions: 2000, pageviews: 3000, keyEvents: 0, engagementRate: null }, prev: null });
     const pending = usersTotalTile(traffic(false), { usersPending: true, siteCount: 5 });
-    assert.equal(pending.approx, true);
-    assert.equal(pending.label, 'Users (sum of sites)');
-    assert.match(pending.hint, /still loading/);
-    assert.equal('loading' in pending, false);
+    assert.deepEqual({ approx: pending.approx, loading: pending.loading, label: pending.label }, { approx: false, loading: true, label: 'Users (sum of sites)' });
+    assert.match(pending.hint, /loading/);
+    // Past the wait (or when the job could not run) the number is an estimate and says so in the label.
+    const late = usersTotalTile(traffic(false), { usersPending: true, siteCount: 5, waitedOut: true });
+    assert.deepEqual({ approx: late.approx, loading: late.loading, label: late.label }, { approx: true, loading: false, label: 'Users (sum, est.)' });
+    assert.match(late.hint, /taking longer/);
     const partial = usersTotalTile(traffic(false), { usersPending: false, siteCount: 5 });
     assert.equal(partial.approx, true);
-    assert.match(partial.hint, /without an exact count/);
+    assert.equal(partial.label, 'Users (sum, est.)');
+    assert.match(partial.hint, /An estimate/);
+    assert.equal(usersTotalTile(traffic(false), { usersPending: false, siteCount: 1 }).label, 'Users (est.)');
     const exact = usersTotalTile(traffic(true), { usersPending: true, siteCount: 1 });
-    assert.deepEqual(exact, { label: 'Users', approx: false, hint: undefined });
+    assert.deepEqual(exact, { label: 'Users', approx: false, loading: false, hint: undefined });
+});
+
+test('usersLoadState: exact wins, a skeleton only within the wait', () => {
+    assert.equal(usersLoadState({ exact: true, pending: true, waitedOut: false }), 'exact');
+    assert.equal(usersLoadState({ exact: false, pending: true, waitedOut: false }), 'loading');
+    assert.equal(usersLoadState({ exact: false, pending: true, waitedOut: true }), 'estimate');
+    assert.equal(usersLoadState({ exact: false, pending: false, waitedOut: false }), 'estimate');
+    assert.ok(USERS_WAIT_MS >= 5000 && USERS_WAIT_MS <= 30000);
 });
 
 test('a range-users run that Google ends with 401 backs off instead of restarting on every poll', async () => {
