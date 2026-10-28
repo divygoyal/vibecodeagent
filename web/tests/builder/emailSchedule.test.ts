@@ -203,3 +203,20 @@ test('tokens: no secret in production signs and verifies nothing', () => {
     assert.throws(() => signToken({ k: 'img', c: {} }, null));
     assert.equal(verifyToken('x.y', 0, null), null);
 });
+
+// ── round 9 polish: the dialog's own time select ──
+
+test('email dialog: time options are every quarter hour in 12-hour words, and keep an odd stored time', async () => {
+    const { timeLabel, timeOptions } = await import('@/components/dashboard-builder/EmailScheduleDialog');
+    assert.equal(timeLabel('08:00'), '8:00 AM');
+    assert.equal(timeLabel('00:15'), '12:15 AM');
+    assert.equal(timeLabel('12:00'), '12:00 PM');
+    assert.equal(timeLabel('23:45'), '11:45 PM');
+    const opts = timeOptions('08:00');
+    assert.equal(opts.length, 96);
+    assert.deepEqual(opts[0], { value: '00:00', label: '12:00 AM' });
+    assert.deepEqual(opts[95], { value: '23:45', label: '11:45 PM' });
+    const odd = timeOptions('08:07');
+    assert.equal(odd.length, 97);
+    assert.ok(odd.some((o) => o.value === '08:07' && o.label === '8:07 AM'));
+});

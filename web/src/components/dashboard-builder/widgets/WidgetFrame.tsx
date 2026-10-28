@@ -111,7 +111,7 @@ export function flagNotes(r: WidgetResultOk | undefined, widget: WidgetDef): str
     if (f.usersSummed) out.push('Users are summed across sites');
     if (f.sitesFailed?.length) out.push(`${f.sitesFailed.length} site${f.sitesFailed.length === 1 ? '' : 's'} could not load`);
     if (f.missingFamilies?.length) out.push(f.missingFamilies.includes('ga4') ? 'No Analytics property linked: those numbers show –' : 'No Search Console site linked: those numbers show –');
-    if (f.sortedWithinTop) out.push(`Sorted within the top ${f.sortedWithinTop.toLocaleString('en-US')} rows by clicks`);
+    if (f.sortedWithinTop) out.push(`Sorting covers the top ${f.sortedWithinTop.toLocaleString('en-US')} rows by clicks`);
     return out;
 }
 
