@@ -177,6 +177,8 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                     ) : null}
                 </div>
             ) : null}
+            {/* A widget without a title row still tells the viewer its days. */}
+            {!showTitle && props.dates?.own ? <DateChip widget={widget} dates={props.dates} className="absolute right-2 top-2 z-10 bg-surface/90" /> : null}
             {props.drill && props.drill.depth > 0 ? <DrillCrumbs drill={props.drill} /> : null}
             <div className={cn('relative min-h-0 flex-1', refetching && 'opacity-60 transition-opacity', bodyClassName)}>
                 {loading && !ok ? (

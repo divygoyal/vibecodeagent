@@ -397,6 +397,22 @@ export function fmtDateRange(start: DateInput, end: DateInput, now: Date = new D
 }
 
 /**
+ * The tight form for chips: `Oct 14–20` (same month), `Sep 30–Oct 27`, `Sep 30–Oct 27, 2025` (not this year),
+ * `Dec 3, 2025–Jan 2, 2026` (across years), `Oct 14` (one day). `now` is for tests.
+ */
+export function fmtDateRangeShort(start: DateInput, end: DateInput, now: Date = new Date()): string {
+    const a = toDate(start);
+    const b = toDate(end);
+    const ya = a.getUTCFullYear();
+    const yb = b.getUTCFullYear();
+    if (ya !== yb) return `${fmtDayYear(a)}–${fmtDayYear(b)}`;
+    if (toIsoDay(a) === toIsoDay(b)) return ya === now.getUTCFullYear() ? fmtDay(a) : fmtDayYear(a);
+    const year = ya === now.getUTCFullYear() ? '' : `, ${ya}`;
+    const sameMonth = a.getUTCMonth() === b.getUTCMonth();
+    return `${fmtDay(a)}–${sameMonth ? b.getUTCDate() : fmtDay(b)}${year}`;
+}
+
+/**
  * Tick label maker for a date axis (DESIGN 6.3): ranges of about 3 months or
  * less show `Oct 13`; longer ranges show `Oct`, with the year on January and on
  * the first tick (`Jan 2026`). Ranges crossing a year show the year on the

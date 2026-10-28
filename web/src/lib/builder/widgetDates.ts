@@ -7,6 +7,7 @@
  *
  * One function resolves it for the engine (server) and for the labels and chips (browser), so they never differ.
  */
+import { fmtDateRange, fmtDateRangeShort } from '@/lib/format';
 import { addDays, addMonths, PRESETS, resolveCompare, resolveRange } from './dates';
 import { compareText, type CompareText } from './compare';
 import type { CompareSpec, DatePresetId, DateRangeSpec, DateShift, Iso, WidgetDef } from './types';
@@ -72,6 +73,24 @@ export function overrideLabel(o: DateOverride): string {
         return n === 1 && o.shift.unit === 'year' ? 'Previous year' : `${n === 1 ? '1' : n} ${n === 1 ? u.one : u.many} earlier`;
     }
     return o.compare ? 'Own comparison' : '';
+}
+
+/**
+ * The text of a widget's own-dates chip: the real days ("Oct 14–20", "Sep 30–Oct 27, 2025"), so the chip says
+ * what the widget shows, not how it was set up ("Last 7 days", "2 weeks earlier"). A widget that only has its own
+ * comparison reads the dashboard's days, so its chip says "Own comparison". `now` is for tests.
+ */
+export function chipText(o: DateOverride, dates: Pick<WidgetDates, 'range'>, now?: Date): string {
+    if (!o.range && !o.shift) return o.compare ? 'Own comparison' : '';
+    return fmtDateRangeShort(dates.range.start, dates.range.end, now);
+}
+
+/** Full words for the chip's tooltip and screen readers: the rule and the days ("Own dates: Last 7 days (Oct 14 – Oct 20)"). */
+export function chipTitle(o: DateOverride, dates: WidgetDates): string {
+    const rule = overrideLabel(o);
+    const days = fmtDateRange(dates.range.start, dates.range.end);
+    const own = o.range || o.shift ? `Own dates: ${rule && rule !== days ? `${rule} (${days})` : days}` : 'Own comparison';
+    return dates.compare ? `${own}. ${widgetCompareText(dates).title}` : own;
 }
 
 function rangeText(r: DateRangeSpec): string {
