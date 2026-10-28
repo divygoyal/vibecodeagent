@@ -172,3 +172,20 @@ test('date axis ticks: short ranges by day, long ranges by month with year on Ja
     assert.equal(long('2025-11-01', 1), 'Nov');
     assert.equal(long('2026-01-01', 3), 'Jan 2026');
 });
+
+test('fmtCompact rounds a .5 up the same way everywhere (75,550 is 75.6K like 75,553)', () => {
+    assert.equal(fmtCompact(75550), '75.6K');
+    assert.equal(fmtCompact(75551), '75.6K');
+    assert.equal(fmtCompact(75553), '75.6K');
+    assert.equal(fmtCompact(31616), '31.6K');
+    assert.equal(fmtCompact(31617), '31.6K');
+    assert.equal(fmtCompact(12345), '12.3K');
+    assert.equal(fmtCompact(99950), '100K');
+    assert.equal(fmtCompact(1234500), '1.23M');
+    assert.equal(fmtAxis(75550), '75.6K');
+    assert.equal(fmtAxis(1234567), '1.2M');
+});
+
+test('fmtValue currency compact uses the same rounding', () => {
+    assert.equal(fmtValue('currency', 61750, { compact: true }), '$61.8K');
+});
