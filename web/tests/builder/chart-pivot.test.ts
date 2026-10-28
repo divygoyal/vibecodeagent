@@ -8,11 +8,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { applyViewerControls, compileWidget } from '@/lib/builder/compile';
-import { colValue, pivotLevels, pivotTotalsAvailable, shapePivot, sortPivotRows } from '@/lib/builder/charts/pivot';
+import { colValue, heatPct, HEAT_MAX_PCT, HEAT_MIN_PCT, pivotHeat, pivotTotalsAvailable, PIVOT_TOTALS_PART, shapePivot, sortPivotRows } from '@/lib/builder/charts/pivot';
 import type { PivotWidget } from '@/lib/builder/charts/types';
 import { defaultWidget, widgetMetrics, widgetTitle } from '@/lib/builder/registry';
 import { validateWidgets } from '@/lib/builder/schema';
-import type { DataFrame, MetricControl } from '@/lib/builder/types';
+import type { CellValue, DataFrame, MetricControl } from '@/lib/builder/types';
 import { ACME, controlsOf, calls, runOne } from './chartsHelper';
 
 const both = { families: { ga4: true, gsc: true } };
@@ -93,17 +93,78 @@ test('pivot shaping: a ratio has no totals; empty frames and rows without a key 
     assert.equal(noKey.rows.length, 1);
 });
 
-test('pivot heat: levels against all cells, within a row, within a column, none', () => {
+test('pivot heat: a continuous min-max scale per scope (all cells, a row, a column), none', () => {
     const m = shapePivot(F, pv().config);
-    const all = pivotLevels(m, 'cell');
-    assert.equal(all[0][0], 5); // the biggest cell
-    assert.equal(all[1][2], 0); // no data
-    assert.ok(all[2][0] <= 2); // 5 is small against 100
-    const rows = pivotLevels(m, 'row');
-    assert.ok(rows[2][0] > all[2][0]); // within its own row the big cell of a small row still shows up
-    const cols = pivotLevels(m, 'column');
-    assert.ok(cols[0][0] >= 4 && cols[0][0] > cols[2][0]);
-    assert.ok(pivotLevels(m, 'none').flat().every((v) => v === 0));
+    const all = pivotHeat(m, 'cell');
+    assert.equal(all[0][0], 1); // the biggest cell (100)
+    assert.equal(all[2][2], 0); // the smallest cell (2)
+    assert.equal(all[1][2], null); // no data
+    assert.ok(Math.abs(all[2][0]! - (5 - 2) / 98) < 1e-9); // continuous, not stepped
+    const rows = pivotHeat(m, 'row');
+    assert.equal(rows[0][0], 1);
+    assert.equal(rows[0][2], 0);
+    assert.equal(rows[2][0], 1); // within its own row the big cell of a small row still shows up
+    // A column: every cell of one column used to share one shade; now each cell has its own place on the scale.
+    const cols = pivotHeat(m, 'column');
+    assert.deepEqual([cols[0][0], cols[1][0], cols[2][0]], [1, (40 - 5) / 95, 0]);
+    assert.ok(pivotHeat(m, 'none').flat().every((v) => v === null));
+    // Many different values in one column give many different shades.
+    const wide = shapePivot(frame(['b:a'], [['r1', 9812], ['r2', 5894], ['r3', 5314], ['r4', 3886], ['r5', 330]]), pv().config);
+    const shades = new Set(pivotHeat(wide, 'column').map((r) => heatPct(r[0]!)));
+    assert.equal(shades.size, 5);
+    // All values equal: the middle of the scale, not a divide by zero.
+    assert.deepEqual(pivotHeat(shapePivot(frame(['b:a'], [['x', 7], ['y', 7]]), pv().config), 'cell'), [[0.5], [0.5]]);
+    assert.equal(heatPct(0), HEAT_MIN_PCT);
+    assert.equal(heatPct(1), HEAT_MAX_PCT);
+});
+
+const totalsFrame = (rows: Array<[string, number]>, rowCount = rows.length): DataFrame => ({
+    columns: [{ id: 'd:device', kind: 'dimension', label: 'Device' }, { id: 'm:ga4:sessions', kind: 'metric', label: 'Sessions' }],
+    rows: rows.map(([k, v]): Record<string, CellValue> => (k === '(other)' ? { 'd:device': k, 'm:ga4:sessions': v, __other: 1 } : { 'd:device': k, 'm:ga4:sessions': v })),
+    rowCount,
+});
+
+test('pivot totals: the total row is the true total; the rows not shown become an Other row', () => {
+    // Shown: 3 rows (desktop 145, mobile 113, other 12 = 270). The data holds 200 / 120 / 30 over every row.
+    const m = shapePivot(F, pv().config, totalsFrame([['desktop', 200], ['mobile', 120], ['(other)', 30]]));
+    assert.deepEqual(m.colTotals, [200, 120, 30]);
+    assert.equal(m.grand, 350);
+    assert.deepEqual(m.otherRow, { cells: [55, 7, 18], total: 80 });
+    assert.equal(m.complete, true);
+    // Row totals stay the sums of the shown cells; the other row closes the gap to the grand total.
+    assert.equal(m.rowTotals.reduce<number>((s, v) => s + (v ?? 0), 0) + m.otherRow!.total, m.grand);
+});
+
+test('pivot totals: nothing left over means no Other row; a missing report falls back to the shown rows and says so', () => {
+    const exact = shapePivot(F, pv().config, totalsFrame([['desktop', 145], ['mobile', 113], ['(other)', 12]]));
+    assert.equal(exact.otherRow, null);
+    assert.equal(exact.complete, true);
+    assert.equal(exact.grand, 270);
+    // Reports that differ by rounding (a gap of 1 in 270) are not a row of their own: the total stays the sum of what is shown.
+    const noise = shapePivot(F, pv().config, totalsFrame([['desktop', 146], ['mobile', 113], ['(other)', 12]]));
+    assert.equal(noise.otherRow, null);
+    assert.equal(noise.grand, 270);
+    assert.equal(noise.complete, true);
+    const none = shapePivot(F, pv().config);
+    assert.equal(none.otherRow, null);
+    assert.equal(none.complete, false); // the view labels it "Total (top 3)"
+    assert.equal(none.grand, 270);
+    // A report that does not line up with the pivot's columns is ignored.
+    assert.equal(shapePivot(F, pv().config, totalsFrame([['desktop', 145], ['tablet', 3]])).complete, false);
+    // Columns the pivot dropped (no Other column): the totals say they are partial.
+    const three = frame(['b:desktop', 'b:mobile'], [['Organic', 100, 50]]);
+    const hidden = shapePivot(three, pv({ other: false }).config, totalsFrame([['desktop', 100], ['mobile', 50]], 3));
+    assert.equal(hidden.complete, false);
+});
+
+test('pivot compile: the column totals ride along as one extra small report (counts only)', () => {
+    const ctx = { controlDefs: [], controls: controlsOf() };
+    const qs = compileWidget(pv(), ctx).queries;
+    assert.equal(qs.length, 2);
+    assert.deepEqual([qs[1].part, qs[1].dimensions, qs[1].metrics, qs[1].top, qs[1].pivot], [PIVOT_TOTALS_PART, ['device'], ['ga4:sessions'], { n: 3, other: true }, undefined]);
+    assert.equal(compileWidget(pv({ totals: false }), ctx).queries.length, 1);
+    assert.equal(compileWidget(pv({ metric: { id: RATIO } }), ctx).queries.length, 1);
+    assert.equal(compileWidget(pv({ other: false }), ctx).queries[1].top?.other, false);
 });
 
 test('pivot sorting: by a column or the total, either way, empty cells last, stable', () => {
@@ -127,7 +188,21 @@ test('pivot engine: channels by devices from one Analytics report; rows are the 
     assert.ok(m.rowTotals[0]! >= m.rowTotals[m.rows.length - 1]!);
     const cellSum = m.cells.flat().reduce<number>((s, v) => s + (v ?? 0), 0);
     assert.ok(Math.abs(m.grand! - cellSum) < 1e-6);
-    assert.equal(calls.filter((c) => c.url.includes('analyticsdata')).length, 1);
+    assert.equal(calls.filter((c) => c.url.includes('analyticsdata')).length, 1); // the pivot and the column totals go in one batch
+});
+
+test('pivot engine: the total row is true (equals the whole data) and the Other row closes the gap', async () => {
+    const w = pv({ topRows: 3 });
+    const r = await runOne(w);
+    const t = r.parts[PIVOT_TOTALS_PART];
+    assert.ok(t, 'column totals part');
+    const m = shapePivot(r.parts.rows, w.config, t);
+    assert.equal(m.complete, true);
+    assert.ok(m.otherRow, 'more than 3 channels, so some rows are not shown');
+    const everything = t.rows.reduce((s, x) => s + (x['m:ga4:sessions'] as number), 0);
+    assert.ok(Math.abs(m.grand! - everything) < 1e-6);
+    const shownSum = m.cells.flat().reduce<number>((s, v) => s + (v ?? 0), 0);
+    assert.ok(Math.abs(shownSum + m.otherRow!.total - m.grand!) < 1e-6);
 });
 
 test('pivot engine: a calculated ratio is computed per cell (engagement rate by channel and device)', async () => {

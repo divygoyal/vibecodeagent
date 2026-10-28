@@ -7,7 +7,6 @@
  */
 import { dimLabel, getMetric, metricLabel } from '../catalog';
 import type { CellValue, DataFrame, MetricId, WidgetQuery } from '../types';
-import { heatLevel, heatThresholds } from './heatmap';
 import type { PivotConfig, PivotWidget } from './types';
 import type { QueryBase } from './index';
 
@@ -45,6 +44,27 @@ export function compilePivot(w: PivotWidget, base: QueryBase): WidgetQuery[] {
         // Enough (row, column) pairs that the biggest rows are complete across their columns.
         limit: 2000,
         compare: false,
+    }, ...totalsQueries(w, base)];
+}
+
+/** Part name of the column totals report (every row, not just the biggest ones). */
+export const PIVOT_TOTALS_PART = 'colTotals';
+
+/**
+ * The true column totals: the same metric by the column dimension alone, folded the same way as the pivot's
+ * columns. The pivot only shows its biggest rows, so the "Total" row and the "Other" row come from this
+ * report: total minus the rows shown is what the rest of the rows add up to. Counts only (a ratio has none).
+ */
+function totalsQueries(w: PivotWidget, base: QueryBase): WidgetQuery[] {
+    const c = w.config;
+    if (c.totals === false || !pivotTotalsAvailable(c.metric.id)) return [];
+    const cols = Math.min(8, Math.max(2, Math.round(c.topColumns)));
+    return [{
+        ...base, part: PIVOT_TOTALS_PART, metrics: [c.metric.id], dimensions: [c.columns],
+        sort: { by: c.metric.id, dir: 'desc' },
+        top: { n: cols, other: c.other },
+        limit: 250,
+        compare: false,
     }];
 }
 
@@ -75,6 +95,13 @@ export interface PivotModel {
     grand: number | null;
     min: number;
     max: number;
+    /** What the rows beyond the biggest ones add up to, per column (null = every row is shown, or unknown). */
+    otherRow: { cells: Array<number | null>; total: number } | null;
+    /**
+     * true: the total row and the grand total cover every row (and every column) of the data.
+     * false: they add up the rows and columns shown only, and the view says so ("Total (top 8)").
+     */
+    complete: boolean;
 }
 
 export const colValue = (key: string): string => key.slice(2);
@@ -85,7 +112,31 @@ const sum = (xs: Array<number | null>): number | null => {
     return v.length ? v.reduce((a, b) => a + b, 0) : null;
 };
 
-export function shapePivot(frame: DataFrame, c: PivotConfig): PivotModel {
+/** The true total of every column from the column totals report; null when it does not line up with the pivot. */
+function trueColumnTotals(cols: string[], totals: DataFrame | undefined, c: PivotConfig): { all: number[]; hidden: boolean } | null {
+    if (!totals) return null;
+    const dim = `d:${c.columns}`;
+    const metric = `m:${c.metric.id}`;
+    const byKey = new Map<string, number>();
+    for (const r of totals.rows) {
+        const v = r[metric];
+        const k = r[dim];
+        if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+        if (r.__other || k === '(other)') byKey.set(PIVOT_OTHER, v);
+        else if (k !== null && k !== undefined) byKey.set(`b:${String(k)}`, v);
+    }
+    const all: number[] = [];
+    for (const k of cols) {
+        const v = byKey.get(k);
+        if (v === undefined) return null;
+        all.push(v);
+    }
+    // Columns the pivot dropped (no "Other" column): the totals still cover them, the rows shown do not.
+    const hidden = !cols.includes(PIVOT_OTHER) && (totals.rowCount ?? totals.rows.length) > cols.length;
+    return { all, hidden };
+}
+
+export function shapePivot(frame: DataFrame, c: PivotConfig, totals?: DataFrame): PivotModel {
     const cols = frame.seriesKeys ?? [];
     const rowKey = frame.columns[0]?.id ?? `d:${c.rows}`;
     const rows: string[] = [];
@@ -98,33 +149,56 @@ export function shapePivot(frame: DataFrame, c: PivotConfig): PivotModel {
     }
     const totalsAvailable = pivotTotalsAvailable(c.metric.id);
     const rowTotals = totalsAvailable ? cells.map(sum) : cells.map(() => null);
-    const colTotals = totalsAvailable ? cols.map((_, j) => sum(cells.map((row) => row[j]))) : cols.map(() => null);
+    const shown = totalsAvailable ? cols.map((_, j) => sum(cells.map((row) => row[j]))) : cols.map(() => null);
+    const truth = totalsAvailable ? trueColumnTotals(cols, totals, c) : null;
+    let colTotals: Array<number | null> = shown;
+    let otherRow: PivotModel['otherRow'] = null;
+    let complete = false;
+    if (truth) {
+        const rest = truth.all.map((t, j) => Math.max(0, t - (shown[j] ?? 0)));
+        const restTotal = rest.reduce((a, b) => a + b, 0);
+        const whole = truth.all.reduce((a, b) => a + b, 0);
+        // Two Google reports can differ by a few units (rounding, sampling): a gap of a unit or two, or under 0.2%, is noise, not a row.
+        if (restTotal > Math.max(1.5, whole * 0.002)) {
+            colTotals = truth.all;
+            otherRow = { cells: rest.map((v) => (v > 0 ? v : null)), total: restTotal };
+        }
+        complete = !truth.hidden;
+    }
     const all = cells.flat().filter((v): v is number => v !== null);
     return {
-        rows, cols, cells, totalsAvailable, rowTotals, colTotals,
-        grand: totalsAvailable ? sum(rowTotals) : null,
+        rows, cols, cells, totalsAvailable, rowTotals, colTotals, otherRow, complete,
+        grand: totalsAvailable ? sum(colTotals) : null,
         min: all.length ? Math.min(...all) : 0,
         max: all.length ? Math.max(...all) : 0,
     };
 }
 
 /**
- * Colour level (0 = none, 1..5) of every cell for a heat mode. 'cell' compares with all cells, 'row' and
- * 'column' within one row or column (so a small row still shows its own shape).
+ * Heat of every cell as a position on a continuous scale: 0 = the smallest value in the scope, 1 = the
+ * biggest (null = no value, or heat is off). The scope is all cells, one row or one column; a scope whose
+ * values are all equal sits in the middle. A cell of 0 is a value like any other and takes the low end.
  */
-export function pivotLevels(m: PivotModel, heat: PivotConfig['heat']): number[][] {
-    if (heat === 'none') return m.cells.map((row) => row.map(() => 0));
-    if (heat === 'cell') {
-        const t = heatThresholds(m.cells.flat().filter((v): v is number => v !== null));
-        return m.cells.map((row) => row.map((v) => heatLevel(v, t)));
+export function pivotHeat(m: PivotModel, heat: PivotConfig['heat']): Array<Array<number | null>> {
+    const scale = (v: number | null, lo: number, hi: number): number | null => (v === null ? null : hi > lo ? (v - lo) / (hi - lo) : 0.5);
+    const range = (xs: Array<number | null>) => {
+        const v = xs.filter((x): x is number => x !== null);
+        return v.length ? { lo: Math.min(...v), hi: Math.max(...v) } : { lo: 0, hi: 0 };
+    };
+    if (heat === 'none') return m.cells.map((row) => row.map(() => null));
+    if (heat === 'row') return m.cells.map((row) => { const r = range(row); return row.map((v) => scale(v, r.lo, r.hi)); });
+    if (heat === 'column') {
+        const ranges = m.cols.map((_, j) => range(m.cells.map((row) => row[j])));
+        return m.cells.map((row) => row.map((v, j) => scale(v, ranges[j].lo, ranges[j].hi)));
     }
-    if (heat === 'row') return m.cells.map((row) => {
-        const t = heatThresholds(row.filter((v): v is number => v !== null));
-        return row.map((v) => heatLevel(v, t));
-    });
-    const colT = m.cols.map((_, j) => heatThresholds(m.cells.map((row) => row[j]).filter((v): v is number => v !== null)));
-    return m.cells.map((row) => row.map((v, j) => heatLevel(v, colT[j])));
+    const r = range(m.cells.flat());
+    return m.cells.map((row) => row.map((v) => scale(v, r.lo, r.hi)));
 }
+
+/** How much of the metric colour a cell gets (percent) at a position of the heat scale: pale to strong, dark text stays readable. */
+export const HEAT_MIN_PCT = 8;
+export const HEAT_MAX_PCT = 70;
+export const heatPct = (t: number): number => Math.round((HEAT_MIN_PCT + Math.max(0, Math.min(1, t)) * (HEAT_MAX_PCT - HEAT_MIN_PCT)) * 10) / 10;
 
 /** Row order for a click on a column header: by that column (or the total), biggest first or smallest first. */
 export function sortPivotRows(m: PivotModel, by: number | 'total' | null, dir: 'asc' | 'desc'): number[] {

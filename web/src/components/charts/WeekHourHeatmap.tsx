@@ -31,17 +31,18 @@ export interface WeekHourHeatmapProps {
     unit: string;
     /** Busiest window to outline. */
     highlight?: { day: number; hour: number; length: number } | null;
+    /** A Less - More key at the right of the line under the grid (the colour runs from the quietest to the busiest cell). */
+    legend?: boolean;
+    /** A small note under that line ("Hours are in the property's time zone"). */
+    note?: string;
     className?: string;
 }
 
-export function WeekHourHeatmap({ grid, color, format, unit, highlight, className }: WeekHourHeatmapProps) {
+export function WeekHourHeatmap({ grid, color, format, unit, highlight, legend, note, className }: WeekHourHeatmapProps) {
     const [hover, setHover] = useState<{ d: number; h: number } | null>(null);
     const max = Math.max(0, ...grid.flat());
-    const tint = (v: number) => {
-        if (!v || max <= 0) return 'var(--color-subtle)';
-        const t = (v / max) ** 0.85;
-        return `color-mix(in oklab, ${color} ${Math.round(6 + t * 94)}%, var(--color-surface))`;
-    };
+    const mixAt = (t: number) => `color-mix(in oklab, ${color} ${Math.round(6 + t * 94)}%, var(--color-surface))`;
+    const tint = (v: number) => (!v || max <= 0 ? 'var(--color-subtle)' : mixAt((v / max) ** 0.85));
     const inPeak = (d: number, h: number) => Boolean(highlight && highlight.day === d && h >= highlight.hour && h < highlight.hour + highlight.length);
     const hv = hover ? grid[hover.d]?.[hover.h] ?? 0 : 0;
 
@@ -91,7 +92,8 @@ export function WeekHourHeatmap({ grid, color, format, unit, highlight, classNam
                     ))}
                 </span>
             </div>
-            <p className="mt-2 h-4 text-meta text-fg-muted tabular-nums" aria-live="polite">
+            <div className="mt-2 flex items-center gap-3">
+            <p className="h-4 min-w-0 flex-1 truncate text-meta text-fg-muted tabular-nums" aria-live="polite">
                 {hover ? (
                     <>
                         <span className="text-fg-secondary">{DAY_LONG[hover.d]}, {hourText(hover.h)}–{hourText(hover.h + 1)}:</span>{' '}
@@ -102,6 +104,15 @@ export function WeekHourHeatmap({ grid, color, format, unit, highlight, classNam
                     <><span className="pointer-coarse:hidden">Hover</span><span className="hidden pointer-coarse:inline">Tap</span> a cell for its {unit}.</>
                 )}
             </p>
+            {legend ? (
+                <div aria-hidden className="flex shrink-0 items-center gap-1 text-caption text-fg-muted" title={`Quietest hour ${format(Math.min(...grid.flat()))}, busiest ${format(max)}`}>
+                    <span>Less</span>
+                    {[0.04, 0.28, 0.52, 0.76, 1].map((t) => <span key={t} className="block size-2.5 rounded-[2px]" style={{ background: mixAt(t) }} />)}
+                    <span>More</span>
+                </div>
+            ) : null}
+            </div>
+            {note ? <p className="mt-1 text-caption text-fg-muted">{note}</p> : null}
         </div>
     );
 }

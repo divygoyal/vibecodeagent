@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { applyViewerControls, compileWidget } from '@/lib/builder/compile';
-import { calendarModel, dayIndex, heatLevel, heatThresholds, weekdayHourGrid, weekdayOf } from '@/lib/builder/charts/heatmap';
+import { calendarGeometry, calendarModel, dayIndex, heatLevel, heatThresholds, hourSpan, peakSentence, weekdayHourGrid, weekdayOf } from '@/lib/builder/charts/heatmap';
 import type { HeatmapWidget } from '@/lib/builder/charts/types';
 import { defaultWidget, widgetMetrics, widgetTitle } from '@/lib/builder/registry';
 import { validateWidgets } from '@/lib/builder/schema';
@@ -119,6 +119,32 @@ test('calendar model: weeks start on Monday or Sunday, partial first and last we
     assert.equal(sun.weeks[0][3]?.date, '2026-10-14');
     assert.equal(calendarModel([], 'ga4:sessions'), null);
     assert.equal(calendarModel([{ 'd:date': 'x', 'm:ga4:sessions': 1 }], 'ga4:sessions'), null);
+});
+
+test('calendar geometry: short ranges fill the card with roomy cells that show values; long ranges keep small squares', () => {
+    // 28 days = 5 week columns in a ~560 px card: wide cells, 28 px tall, value inside.
+    const short = calendarGeometry(560, 5);
+    assert.equal(short.roomy, true);
+    assert.equal(short.text, true);
+    assert.ok(short.w >= 80 && short.w <= 120 && short.h === 28);
+    // Very wide card: cells stop growing at 120 px.
+    assert.equal(calendarGeometry(1400, 5).w, 120);
+    // 12 months = 53 columns: squares of 8-18 px, no text, never roomy.
+    const year = calendarGeometry(560, 53);
+    assert.deepEqual([year.roomy, year.text, year.w === year.h, year.w >= 8 && year.w <= 18], [false, false, true, true]);
+    // 3 months (13 columns) in the same card is still readable squares or roomy cells, never below 8 px.
+    assert.ok(calendarGeometry(560, 13).w >= 8);
+    // Not measured yet: the small squares.
+    assert.equal(calendarGeometry(0, 5).roomy, false);
+});
+
+test('heatmap wording: "Fri 1-4 pm is 2.5x busier than an average 3-hour slot"', () => {
+    assert.equal(hourSpan(13, 16), '1–4 pm');
+    assert.equal(hourSpan(10, 13), '10 am–1 pm');
+    assert.equal(hourSpan(22, 25), '10 pm–1 am');
+    assert.equal(peakSentence({ day: 5, hour: 13, length: 3, ratio: 2.46 }, 1000, 'sessions'), 'Fri 1–4 pm is 2.5× busier than an average 3-hour slot.');
+    assert.equal(peakSentence({ day: 2, hour: 9, length: 3, ratio: 1.05 }, 1000, 'sessions'), 'Tue 9 am–12 pm is the busiest 3-hour slot, but not by much.');
+    assert.equal(peakSentence({ day: 2, hour: 9, length: 3, ratio: 3 }, 5, 'key events'), 'Too few key events in this period to show a pattern.');
 });
 
 test('heatmap engine: weekday x hour returns the 168 cells from one Analytics report', async () => {

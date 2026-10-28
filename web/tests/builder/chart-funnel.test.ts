@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { applyViewerControls, compileWidget } from '@/lib/builder/compile';
-import { activeSteps, funnelCsvFrame, shapeFunnel, stepFilter, stepLabel } from '@/lib/builder/charts/funnel';
+import { activeSteps, funnelCsvFrame, funnelWarnings, shapeFunnel, stepFilter, stepLabel } from '@/lib/builder/charts/funnel';
 import type { FunnelWidget } from '@/lib/builder/charts/types';
 import { defaultWidget, widgetMetrics, widgetTitle } from '@/lib/builder/registry';
 import { validateWidgets } from '@/lib/builder/schema';
@@ -102,6 +102,19 @@ test('funnel shaping: a bigger later step is flagged, empty steps are zero, an e
     assert.equal(none.rows[1].ofPrev, null);
     assert.equal(shapeFunnel(parts(0, 0, 0), c).empty, true);
     assert.equal(shapeFunnel({}, funnel({ steps: [SHOP[0], { kind: 'event', value: '' }] }).config).needsSteps, true);
+});
+
+test('funnel warnings: a step that repeats an earlier one, and an event shown by its raw name', () => {
+    assert.deepEqual(funnelWarnings(funnel({ steps: SHOP }).config), []);
+    // The default funnel plus a raw "click" step: the same event as "Clicked", no label.
+    const base = defaultWidget('funnel', both) as FunnelWidget;
+    const w = funnelWarnings({ ...base.config, steps: [...base.config.steps, { kind: 'event', value: 'click' }] });
+    assert.deepEqual(w.map((x) => [x.step, x.kind]), [[5, 'duplicate'], [5, 'raw']]);
+    assert.match(w[0].text, /Step 5 counts the same event as step 4 \(click\)/);
+    assert.match(w[1].text, /raw event name "click"/);
+    // Pages: the same path with a different match is a different step; a blank step is ignored; labels silence "raw".
+    const pages = funnelWarnings({ ...base.config, steps: [{ kind: 'page', value: '/pricing' }, { kind: 'page', value: '/pricing', match: 'starts' }, { kind: 'page', value: '/pricing' }, { kind: 'event', value: '' }] });
+    assert.deepEqual(pages.map((x) => [x.step, x.kind]), [[3, 'duplicate']]);
 });
 
 test('funnel CSV: a row per step with both ratios', () => {

@@ -9,7 +9,7 @@ import { useId, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 
 import { METRIC_LIST, metricFamilies } from '@/lib/builder/catalog';
-import { FUNNEL_MAX_STEPS, FUNNEL_MIN_STEPS, FUNNEL_NOTE } from '@/lib/builder/charts/funnel';
+import { FUNNEL_MAX_STEPS, FUNNEL_MIN_STEPS, FUNNEL_NOTE, funnelWarnings } from '@/lib/builder/charts/funnel';
 import type { ChartWidgetDef, FunnelStep, FunnelWidget, HeatmapWidget, PivotWidget, ScatterWidget, TreemapWidget } from '@/lib/builder/charts/types';
 import type { WidgetDef } from '@/lib/builder/types';
 import { pivotTotalsAvailable } from '@/lib/builder/charts/pivot';
@@ -69,13 +69,13 @@ function ScatterSetup({ widget, edit, source, portfolio }: Props<ScatterWidget>)
         <>
             {source}
             <Field label="One point per"><DimensionPicker value={c.dimension} metrics={scatterMetrics(c)} allowSite={portfolio} onChange={(d) => d && set({ dimension: d })} /></Field>
-            <Field label="Across (x)"><MetricPicker value={c.x.id} ariaLabel="Metric across" exclude={[c.y.id]} noShare onChange={(id) => set({ x: { id } })} /></Field>
-            <Field label="Up (y)"><MetricPicker value={c.y.id} ariaLabel="Metric up" exclude={[c.x.id]} noShare onChange={(id) => set({ y: { id } })} /></Field>
+            <Field label="X axis"><MetricPicker value={c.x.id} ariaLabel="Metric on the X axis" exclude={[c.y.id]} noShare onChange={(id) => set({ x: { id } })} /></Field>
+            <Field label="Y axis"><MetricPicker value={c.y.id} ariaLabel="Metric on the Y axis" exclude={[c.x.id]} noShare onChange={(id) => set({ y: { id } })} /></Field>
             <Toggle label="Size points by a metric" checked={Boolean(c.size)} onChange={(v) => set({ size: v ? { id: c.x.id === 'gsc:clicks' ? 'gsc:impressions' : 'gsc:clicks' } : undefined })} />
             {c.size ? <Field label="Size"><MetricPicker value={c.size.id} ariaLabel="Metric for size" noShare onChange={(id) => set({ size: { id } })} /></Field> : null}
-            <Field label="Points" hint="The biggest ones are plotted (by size, else across)."><NumberInput value={c.top} min={5} max={200} onChange={(n) => set({ top: n }, 'top')} /></Field>
-            <Field label="Across scale" hint="Log spreads out a few huge values."><Choice ariaLabel="Across scale" value={c.xScale ?? 'linear'} onChange={(v) => set({ xScale: v })} options={[{ value: 'linear', label: 'Linear' }, { value: 'log', label: 'Log' }]} /></Field>
-            <Field label="Up scale"><Choice ariaLabel="Up scale" value={c.yScale ?? 'linear'} onChange={(v) => set({ yScale: v })} options={[{ value: 'linear', label: 'Linear' }, { value: 'log', label: 'Log' }]} /></Field>
+            <Field label="Points" hint="The biggest ones are plotted (by size, else by the X metric)."><NumberInput value={c.top} min={5} max={200} onChange={(n) => set({ top: n }, 'top')} /></Field>
+            <Field label="X scale" hint="Log spreads out a few huge values."><Choice ariaLabel="X scale" value={c.xScale ?? 'linear'} onChange={(v) => set({ xScale: v })} options={[{ value: 'linear', label: 'Linear' }, { value: 'log', label: 'Log' }]} /></Field>
+            <Field label="Y scale"><Choice ariaLabel="Y scale" value={c.yScale ?? 'linear'} onChange={(v) => set({ yScale: v })} options={[{ value: 'linear', label: 'Linear' }, { value: 'log', label: 'Log' }]} /></Field>
             <Toggle label="Median guides" description="Dashed lines at the medians split the plot in four." checked={c.quadrants !== false} onChange={(v) => set({ quadrants: v })} />
             {c.quadrants !== false ? (
                 <Field label="Shade a quadrant" hint="It is counted under the chart, with its biggest points.">
@@ -83,7 +83,7 @@ function ScatterSetup({ widget, edit, source, portfolio }: Props<ScatterWidget>)
                         options={[{ value: 'none', label: 'None' }, ...quads.map((q) => ({ value: q, label: quadrantText(q, c) }))]} />
                 </Field>
             ) : null}
-            <Toggle label="Name the biggest points" checked={c.labels} onChange={(v) => set({ labels: v })} />
+            <Toggle label="Name more points" description="The 5 biggest points are always named; this names up to 10." checked={c.labels} onChange={(v) => set({ labels: v })} />
         </>
     );
 }
@@ -101,6 +101,7 @@ function FunnelSetup({ widget, edit, source }: Props<FunnelWidget>) {
         set({ steps });
     };
     const input = 'h-9 w-full rounded-control border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint';
+    const warnings = funnelWarnings(c);
     return (
         <>
             {source}
@@ -125,6 +126,7 @@ function FunnelSetup({ widget, edit, source }: Props<FunnelWidget>) {
                         <input aria-label={`Step ${i + 1} ${st.kind === 'event' ? 'event name' : 'page path'}`} className={input} list={st.kind === 'event' ? listId : undefined} value={st.value} maxLength={200}
                             placeholder={st.kind === 'event' ? 'event name, e.g. add_to_cart' : '/pricing'} onChange={(e) => setStep(i, { value: e.target.value.trim() }, `step${i}v`)} />
                         <input aria-label={`Step ${i + 1} label`} className={input} value={st.label ?? ''} maxLength={40} placeholder="Label (optional)" onChange={(e) => setStep(i, { label: e.target.value || undefined }, `step${i}l`)} />
+                        {warnings.filter((w) => w.step === i + 1).map((w) => <p key={w.kind} role="status" className="text-meta text-warn">{w.text}</p>)}
                     </li>
                 ))}
             </ol>
@@ -145,7 +147,7 @@ function TreemapSetup({ widget, edit, source, portfolio }: Props<TreemapWidget>)
             {source}
             <Field label="Size by" hint="Counts only: the boxes of a group add up to the group."><MetricPicker value={c.metric.id} exclude={NOT_ADDITIVE} calcs={false} noShare onChange={(id) => set({ metric: { id } })} /></Field>
             <Field label="One box per"><DimensionPicker value={c.dimension} metrics={[c.metric.id]} allowSite={portfolio} onChange={(d) => d && set({ dimension: d, parent: d === c.parent ? undefined : c.parent })} /></Field>
-            <Field label="Group under" hint="For example Channel above Source."><DimensionPicker value={c.parent} metrics={[c.metric.id]} allowNone ariaLabel="Group under" onChange={(d) => set({ parent: d && d !== c.dimension ? d : undefined })} /></Field>
+            <Field label="Group under" hint="For example Channel above Source."><DimensionPicker value={c.parent} metrics={[c.metric.id]} allowNone ariaLabel="Group under" onChange={(d) => { const parent = d && d !== c.dimension ? d : undefined; set(parent && !c.parent ? { parent, colorBy: 'group' } : { parent }); }} /></Field>
             <Field label="Boxes" hint="The biggest ones are drawn."><NumberInput value={c.top} min={5} max={60} onChange={(n) => set({ top: n }, 'top')} /></Field>
             <Field label="Colour"><Choice ariaLabel="Colour" value={c.colorBy ?? 'group'} onChange={(v) => set({ colorBy: v })} options={[{ value: 'group', label: c.parent ? 'One colour per group' : 'One colour per box' }, { value: 'value', label: 'Darker for bigger' }]} /></Field>
             <Toggle label="Show values in boxes" checked={c.showValues !== false} onChange={(v) => set({ showValues: v })} />
@@ -166,7 +168,7 @@ function PivotSetup({ widget, edit, source, portfolio }: Props<PivotWidget>) {
             <Field label="Rows shown" hint="The biggest rows by the metric."><NumberInput value={c.topRows} min={3} max={25} onChange={(n) => set({ topRows: n }, 'topRows')} /></Field>
             <Field label="Columns shown"><NumberInput value={c.topColumns} min={2} max={8} onChange={(n) => set({ topColumns: n }, 'topColumns')} /></Field>
             <Toggle label="Group the other columns" description={counts ? 'One Other column holds the rest.' : 'Not for ratios: they cannot be added up.'} disabled={!counts} checked={c.other && counts} onChange={(v) => set({ other: v })} />
-            <Toggle label="Totals" description={counts ? 'A total column and a total row, adding up the cells shown.' : 'Totals need a count: a ratio of totals is not the sum of its cells.'} disabled={!counts} checked={c.totals !== false && counts} onChange={(v) => set({ totals: v })} />
+            <Toggle label="Totals" description={counts ? 'A total column and a total row for all the data; rows beyond the biggest ones are added up as Other.' : 'Totals need a count: a ratio of totals is not the sum of its cells.'} disabled={!counts} checked={c.totals !== false && counts} onChange={(v) => set({ totals: v })} />
             <Field label="Heat colour"><Choice ariaLabel="Heat colour" value={c.heat ?? 'cell'} onChange={(v) => set({ heat: v })} options={[{ value: 'none', label: 'None' }, { value: 'cell', label: 'Against all cells' }, { value: 'row', label: 'Within each row' }, { value: 'column', label: 'Within each column' }]} /></Field>
         </>
     );

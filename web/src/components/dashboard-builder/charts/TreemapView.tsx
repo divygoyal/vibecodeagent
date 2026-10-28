@@ -14,7 +14,7 @@ import { fmtPercent } from '@/lib/format';
 import { CATEGORICAL, CATEGORICAL_OTHER, channelColor, deviceColor } from '@/lib/metrics';
 import { dimLabel, fmtMetricValue, metricColor, metricLabel } from '@/lib/builder/catalog';
 import { heatLevel, heatThresholds } from '@/lib/builder/charts/heatmap';
-import { layoutTreemap, shapeTreemap, type TreemapNode } from '@/lib/builder/charts/treemap';
+import { groupLabel, layoutTreemap, shapeTreemap, tileLabel, type TreemapNode } from '@/lib/builder/charts/treemap';
 import type { TreemapWidget } from '@/lib/builder/charts/types';
 import { useBox } from './useBox';
 import { okResult, WidgetFrame, type WidgetViewProps } from '../widgets/WidgetFrame';
@@ -73,15 +73,14 @@ export function TreemapView(props: WidgetViewProps<TreemapWidget>) {
                                     <li key={g.key || 'all'} className="absolute" style={{ left: g.x, top: g.y, width: g.w, height: g.h, padding: 1 }}>
                                         <div className="relative h-full w-full overflow-hidden" style={grouped ? { borderRadius: 5, background: mix(groupColor(c.parent, g.parent ?? '', g.index), 14) } : undefined}>
                                             {grouped ? (
-                                                <p className={cn('truncate px-1.5 text-caption font-medium text-fg-secondary', g.header ? 'leading-[18px]' : 'sr-only')} style={g.header ? { height: g.header } : undefined}>
-                                                    {groupName(g.parent)}{g.header ? <span className="font-normal text-fg-muted"> · {pct(g.share)}</span> : null}
+                                                <p className={cn('truncate px-1.5 text-caption font-medium text-fg-secondary', g.header ? 'leading-[18px]' : 'sr-only')} style={g.header ? { height: g.header } : undefined} title={`${groupName(g.parent)} · ${pct(g.share)}`}>
+                                                    {g.header ? groupLabel(g.w - 2, groupName(g.parent), pct(g.share)) : groupName(g.parent)}
                                                 </p>
                                             ) : null}
                                             <ul className="m-0 list-none p-0" aria-label={grouped ? `${groupName(g.parent)}: ${fmt(g.amount)}` : undefined}>
                                                 {g.leaves.map((n) => {
                                                     const name = leafName(n, n.other);
-                                                    const showName = n.w >= 44 && n.h >= 24;
-                                                    const showValue = c.showValues && showName && n.h >= 40 && n.w >= 56;
+                                                    const lab = tileLabel(n.w, n.h, name, fmt(n.amount), pct(n.share), c.showValues);
                                                     const text = `${grouped ? `${groupName(g.parent)} › ` : ''}${name}: ${fmt(n.amount)} (${pct(n.share)} of ${fmt(model.total)})`;
                                                     return (
                                                         <li
@@ -92,8 +91,9 @@ export function TreemapView(props: WidgetViewProps<TreemapWidget>) {
                                                             className={cn('absolute overflow-hidden rounded-[4px] px-1.5 py-1 text-fg', hover?.node.key === n.key && 'ring-2 ring-inset ring-fg/60')}
                                                             style={{ left: n.x, top: n.y, width: Math.max(0, n.w - 2), height: Math.max(0, n.h - 2), background: fillOf(n, g.parent) }}
                                                         >
-                                                            <span className={cn('block truncate text-caption font-medium leading-tight', !showName && 'sr-only')}>{name}</span>
-                                                            <span className={cn('block truncate text-caption tabular-nums text-fg-secondary', !showValue && 'sr-only')}>{fmt(n.amount)}<span aria-hidden className="text-fg-muted"> · {pct(n.share)}</span></span>
+                                                            <span className="sr-only">{text}</span>
+                                                            {lab.name ? <span aria-hidden className="block truncate text-caption font-medium leading-tight">{lab.name}</span> : null}
+                                                            {lab.name && lab.detail ? <span aria-hidden className="block truncate text-caption tabular-nums text-fg-secondary">{lab.detail}</span> : null}
                                                         </li>
                                                     );
                                                 })}

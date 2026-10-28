@@ -56,14 +56,14 @@ export const BUILDERS_R9: Record<string, (ctx: BuildCtx) => BuiltR2> = {
             widgets: w,
             controls: [date('28d'), device()],
             pages: [page('p_main', 'When visitors come', [
-                [[text('w_intro', '## When do people visit?\nThe darker the cell, the busier the hour. Post, email and ship changes when it is quiet or when people are there to see them.', 'heading'), 12, 2]],
+                [[text('w_intro', '## When do people visit?\nThe darker the cell, the busier the hour. Post and send emails when people are there; ship risky changes when it is quiet.', 'heading'), 12, 2]],
                 [[kpi('w_kpis', ['ga4:sessions', 'ga4:activeUsers', 'ga4:engagementRate', 'ga4:keyEvents']), 12, 3]],
                 [
                     [heatmap('w_peak', 'Sessions by weekday and hour', 'weekday-hour', 'ga4:sessions'), 6, 8],
                     [heatmap('w_peak_events', 'Key events by weekday and hour', 'weekday-hour', 'ga4:keyEvents'), 6, 8],
                 ],
                 [[heatmap('w_calendar', 'Sessions by day, last 12 months', 'calendar', 'ga4:sessions', { dateOverride: { range: { kind: 'preset', id: '12m' }, compare: { mode: 'none' } } }), 12, 6]],
-                [[text('w_tip', '### How to use this\n- Schedule newsletters and social posts for the busiest weekday and hour.\n- Plan site changes for the quietest cells.\n- Compare key events with sessions: the busiest hour is not always the one that converts.', 'callout'), 12, 4]],
+                [[text('w_tip', '### How to use this\n- Schedule newsletters and social posts for the busiest weekday and hour.\n- Plan risky site changes for the quietest cells.\n- Compare key events with sessions: the busiest hour is not always the one that converts.', 'callout'), 12, 4]],
             ], w)],
         };
     },
@@ -84,7 +84,7 @@ export const BUILDERS_R9: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                     [scatter('w_queries', 'Queries: impressions against position', { dimension: 'query', x: { id: 'gsc:impressions' }, y: { id: 'gsc:position' }, size: { id: 'gsc:clicks' }, xScale: 'log', highlight: 'tr', top: 80 }), 6, 10],
                     [treemap('w_tree', 'Clicks by page', { dimension: 'page', metric: { id: 'gsc:clicks' }, top: 24, colorBy: 'value', showValues: true }), 6, 10],
                 ],
-                [[text('w_how', '### How to read the scatter plots\nThe dashed lines are the medians. **Pages:** the shaded corner holds pages with above-median impressions and below-median CTR: better titles and descriptions win clicks there. **Queries:** the shaded corner holds popular queries where you rank below the median position: a stronger page or better internal links can lift them.', 'callout'), 12, 4]],
+                [[text('w_how', '### How to read the scatter plots\nThe dashed lines are the medians. **Pages:** the shaded corner (bottom right) holds pages with above-median impressions and below-median CTR: better titles and descriptions win clicks there. **Queries:** position 1 is at the top, so the shaded corner (bottom right) holds popular queries where you rank worse than the median position: a stronger page or better internal links can lift them.', 'callout'), 12, 4]],
             ], w)],
         };
     },
@@ -111,7 +111,7 @@ export const BUILDERS_R9: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                     [pivot('w_pivot', 'Sessions by channel and device', { rows: 'channel', columns: 'device', metric: { id: 'ga4:sessions' }, topRows: 8, topColumns: 3, other: true, totals: true, heat: 'row' }), 7, 10],
                 ],
                 [[treemap('w_revenue', 'Revenue by channel and source', { parent: 'channel', dimension: 'source', metric: { id: 'ga4:totalRevenue' }, top: 30, colorBy: 'group', showValues: true }), 12, 9]],
-                [[barList('w_items', 'Items purchased by product', 'itemName', 'ga4:itemsPurchased'), 6, 8], [pivot('w_orders', 'Transactions by country and device', { rows: 'country', columns: 'device', metric: { id: 'ga4:transactions' }, topRows: 8, topColumns: 3, other: true, totals: true, heat: 'cell' }), 6, 8]],
+                [[barList('w_items', 'Items purchased by product', 'itemName', 'ga4:itemsPurchased'), 6, 9], [pivot('w_orders', 'Transactions by country and device', { rows: 'country', columns: 'device', metric: { id: 'ga4:transactions' }, topRows: 8, topColumns: 3, other: true, totals: true, heat: 'cell' }), 6, 9]],
                 [[section('w_note', 'About the funnel', 'Each step is counted on its own (not visitors followed in order), so use it to see where the biggest drop is, not as an exact conversion rate.'), 12, 2]],
             ], w)],
         };
