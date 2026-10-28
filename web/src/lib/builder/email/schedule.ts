@@ -269,3 +269,5 @@ export function ordinal(n: number): string {
 
 /** The UTC day 'YYYY-MM-DD' of an instant (daily caps count per UTC day). */
 export const utcDay = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+export const lowerFirst = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1);

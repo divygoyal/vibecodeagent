@@ -27,6 +27,10 @@ export interface BrevoSendInput {
     params?: Record<string, unknown>;
     subject?: string;
     htmlContent?: string;
+    /** Plain-text alternative (round 9: scheduled dashboard emails). */
+    textContent?: string;
+    /** Extra mail headers, e.g. List-Unsubscribe (round 9). Brevo allows a fixed set of custom headers. */
+    headers?: Record<string, string>;
     /** Optional [{ name, content (base64) }] attachments for things like a PDF report. */
     attachments?: Array<{ name: string; content: string }>;
 }
@@ -72,6 +76,8 @@ export async function sendTransactional(input: BrevoSendInput): Promise<BrevoSen
         params?: Record<string, unknown>;
         subject?: string;
         htmlContent?: string;
+        textContent?: string;
+        headers?: Record<string, string>;
         attachment?: Array<{ name: string; content: string }>;
     };
 
@@ -85,7 +91,9 @@ export async function sendTransactional(input: BrevoSendInput): Promise<BrevoSen
     } else {
         payload.subject = input.subject!;
         payload.htmlContent = input.htmlContent!;
+        if (input.textContent) payload.textContent = input.textContent;
     }
+    if (input.headers && Object.keys(input.headers).length) payload.headers = input.headers;
     if (input.attachments?.length) {
         payload.attachment = input.attachments;
     }

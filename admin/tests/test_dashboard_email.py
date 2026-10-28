@@ -61,6 +61,7 @@ class DashboardEmailTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.text)
         got = self.c.get(self.url(), headers=KEY, params={"user_identifier": self.owner}).json()
         self.assertEqual(got["schedule"]["config"], CONFIG)
+        self.assertEqual(got["ownerEmail"], "owner@x.test")
         after = self.c.get(f"/api/custom-dashboards/{self.dash}", headers=KEY, params={"user_identifier": self.owner}).json()
         self.assertEqual(before["rev"], after["rev"])
         self.assertEqual(before["updatedAt"], after["updatedAt"])

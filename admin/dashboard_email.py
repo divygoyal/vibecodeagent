@@ -185,7 +185,15 @@ def build_dashboard_email_router(get_db: Callable, verify_admin_key: Callable, g
     @router.get("/{dashboard_id}")
     async def get_schedule(dashboard_id: str, user_identifier: str, db=Depends(get_db)):
         d = await owned(db, dashboard_id, user_identifier)
-        return {"schedule": _read(d), "name": d.name, "shareToken": d.share_token if d.is_public else None}
+        owner = await owner_of(db, d)
+        return {
+            "schedule": _read(d),
+            "name": d.name,
+            "shareToken": d.share_token if d.is_public else None,
+            "ownerEmail": getattr(owner, "email", None),
+            "ownerUserId": d.user_id,
+            "ownerIdentifier": user_identifier,
+        }
 
     @router.put("/{dashboard_id}")
     async def put_schedule(dashboard_id: str, body: ConfigBody, user_identifier: str, db=Depends(get_db)):
