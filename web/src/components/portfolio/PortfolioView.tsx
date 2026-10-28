@@ -7,10 +7,10 @@ import {
     Banner, Button, EmptyState, SearchInput, SegmentedControl, Select, Tooltip, useDebouncedValue,
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
-import { fmtDay, fmtFull } from '@/lib/format';
+import { fmtFull } from '@/lib/format';
 import { RANGE_LABEL } from '@/lib/portfolio/ranges';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite, SitePatch } from '@/lib/portfolio/types';
-import { filterSites, SORT_OPTIONS, sortSites, type FilterKey, type SortKey } from '@/lib/portfolio/view';
+import { filterSites, SORT_OPTIONS, sortSites, windowsNote, type FilterKey, type SortKey } from '@/lib/portfolio/view';
 import { useIsMobile } from '@/lib/useIsMobile';
 import { PageHeader } from '@/components/shell/PageHeader';
 import { AlertsPanel } from './AlertsPanel';
@@ -131,9 +131,8 @@ function Subtitle({ data, range, alerts = 0 }: { data: PortfolioResponse | undef
     }
     parts.push([`${RANGE_LABEL[range]} vs previous`, true]);
     // The two sources' windows end on different days (lib/dateRange: GA4 yesterday, Search Console 2 days ago).
-    const t = data?.windows.traffic;
-    const s = data?.windows.search;
-    if (t && s && t.curEnd !== s.curEnd) parts.push([`traffic to ${fmtDay(t.curEnd)}, search to ${fmtDay(s.curEnd)}`, false]);
+    const windows = windowsNote(data);
+    if (windows) parts.push([windows, false]);
     if (alerts > 0) {
         parts.push([
             <a key="alerts" href={`#${ALERTS_ID}`} onClick={scrollToAlerts} className="tap-area font-medium text-down underline-offset-2 hover:underline">
