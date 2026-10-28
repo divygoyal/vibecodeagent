@@ -13,6 +13,7 @@ import { buildChartMarks, resolveRefLines } from '@/lib/builder/chartMarks';
 import { fmtAxis, fmtDay } from '@/lib/format';
 import { channelColor, deviceColor, CATEGORICAL, CATEGORICAL_OTHER } from '@/lib/metrics';
 import { fmtMetricValue, getMetric, metricColor, metricLabel, dimLabel } from '@/lib/builder/catalog';
+import { AXIS_LABEL_GAP, AXIS_LAST_TICK_PAD, categoryAxisWidth, fitLabel } from '@/lib/builder/axisLabels';
 import { countryName } from '@/lib/builder/countries';
 import { friendlyDimValue } from '@/lib/builder/levelLabels';
 import { autoGranularity, toDay } from '@/lib/builder/dates';
@@ -137,6 +138,17 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
 
 // ── Bar ──────────────────────────────────────────────────────────────────
 
+/** A y axis label that is never wrapped or clipped: cut with an ellipsis to the axis width, the full text in a tooltip. */
+function CategoryTick({ x, y, payload, maxPx }: { x?: number; y?: number; payload?: { value: string }; maxPx: number }) {
+    const full = String(payload?.value ?? '');
+    return (
+        <text x={(x ?? 0) - 4} y={y} dy={4} textAnchor="end" fill={AXIS_TICK.fill} fontSize={AXIS_TICK.fontSize}>
+            <title>{full}</title>
+            {fitLabel(full, maxPx)}
+        </text>
+    );
+}
+
 function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, labels, onPick }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; height: number; currency?: string; labels?: Record<string, string>; onPick?: (value: string) => void }) {
     const c = widget.config;
     const anim = !useReducedMotion();
@@ -174,13 +186,14 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, lab
     }
     const valFmt = getMetric(metrics[0])?.format;
     const nice = niceAxis(valMax, { format: valFmt === 'percent' || valFmt === 'duration' ? valFmt : valFmt === 'integer' ? 'count' : 'number' });
+    const yWidth = categoryAxisWidth(data.map((d) => String(d.__label)));
     const catAxis = { dataKey: '__label', type: 'category' as const, tick: AXIS_TICK, tickLine: false, axisLine: AXIS_LINE, interval: 0 as const };
     const valAxis = { type: 'number' as const, tickFormatter: fmtV(metrics[0]), tick: AXIS_TICK, tickLine: false, axisLine: false, domain: nice.domain, ticks: nice.ticks, interval: 0 as const };
     return (
         <BarChart responsive data={data} layout={vertical ? 'horizontal' : 'vertical'} style={{ width: '100%', height, ...(onPick ? { cursor: 'pointer' } : {}) }}
-            onClick={onPick ? (st: { activeLabel?: string | number; activeIndex?: number | string | null }) => { const r = typeof st?.activeIndex === 'number' ? rows[st.activeIndex] : rows.find((x) => dimText(dim, x[`d:${dim}`], labels) === st?.activeLabel); const raw = r?.[`d:${dim}`]; if (raw !== undefined && raw !== null && raw !== '(other)') onPick(String(raw)); } : undefined} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barCategoryGap="24%" accessibilityLayer>
+            onClick={onPick ? (st: { activeLabel?: string | number; activeIndex?: number | string | null }) => { const r = typeof st?.activeIndex === 'number' ? rows[st.activeIndex] : rows.find((x) => dimText(dim, x[`d:${dim}`], labels) === st?.activeLabel); const raw = r?.[`d:${dim}`]; if (raw !== undefined && raw !== null && raw !== '(other)') onPick(String(raw)); } : undefined} margin={{ top: 4, right: vertical ? 8 : AXIS_LAST_TICK_PAD, bottom: 0, left: 0 }} barCategoryGap="24%" accessibilityLayer>
             <CartesianGrid horizontal={vertical} vertical={!vertical} stroke={GRID_STROKE} />
-            {vertical ? <XAxis {...catAxis} tickFormatter={(v: string) => (v.length > 12 ? `${v.slice(0, 11)}…` : v)} /> : <YAxis {...catAxis} width={Math.min(140, Math.max(60, Math.max(...data.map((d) => String(d.__label).length)) * 6.5))} tickFormatter={(v: string) => (v.length > 20 ? `${v.slice(0, 19)}…` : v)} />}
+            {vertical ? <XAxis {...catAxis} tickFormatter={(v: string) => (v.length > 12 ? `${v.slice(0, 11)}…` : v)} /> : <YAxis {...catAxis} width={yWidth} tick={<CategoryTick maxPx={yWidth - AXIS_LABEL_GAP} />} />}
             {vertical ? <YAxis {...valAxis} width={44} /> : <XAxis {...valAxis} />}
             <RTooltip content={tooltip} cursor={{ fill: 'var(--color-subtle)' }} isAnimationActive={false} />
             {stacked
