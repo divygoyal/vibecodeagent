@@ -78,7 +78,7 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
     const phone = props.bp === 'sm';
     const pageSize = phone
         ? Math.max(2, Math.min(5, Math.floor((props.height - 230) / 64)))
-        : Math.max(3, Math.min(c.pageSize, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (flagNotes(ok, widget).length ? 26 : 0) - 36 - 57) / 36)));
+        : Math.max(3, Math.min(c.pageSize, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (flagNotes(ok, widget).length ? 26 : 0) - 36 - 48) / 36)));
     // TV: no pager, just the top rows that fit the card (round 4).
     const tv = Boolean(useTvScreen());
     const tvRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - 36 - 18) / 36));
