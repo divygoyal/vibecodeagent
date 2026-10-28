@@ -36,5 +36,9 @@ export function chartWidgetSchemas({ base, metricRef, dimId }: SchemaShared) {
                 showDropoff: z.boolean().optional(),
             }),
         }),
+        z.object({
+            ...base, type: z.literal('treemap'),
+            config: z.looseObject({ dimension: dimId, parent: dimId.optional(), metric: metricRef, top: z.number().int().min(5).max(60), colorBy: z.enum(['group', 'value']).optional(), showValues: z.boolean().optional() }),
+        }),
     ] as const;
 }

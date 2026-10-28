@@ -8,9 +8,9 @@
 import { useId, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 
-import { metricFamilies } from '@/lib/builder/catalog';
+import { METRIC_LIST, metricFamilies } from '@/lib/builder/catalog';
 import { FUNNEL_MAX_STEPS, FUNNEL_MIN_STEPS, FUNNEL_NOTE } from '@/lib/builder/charts/funnel';
-import type { ChartWidgetDef, FunnelStep, FunnelWidget, HeatmapWidget, ScatterWidget } from '@/lib/builder/charts/types';
+import type { ChartWidgetDef, FunnelStep, FunnelWidget, HeatmapWidget, ScatterWidget, TreemapWidget } from '@/lib/builder/charts/types';
 import type { WidgetDef } from '@/lib/builder/types';
 import { quadrantText, scatterMetrics } from '@/lib/builder/charts/scatter';
 import type { Quadrant } from '@/lib/builder/charts/types';
@@ -32,6 +32,7 @@ export function ChartSetup(props: Props<ChartWidgetDef>) {
         case 'heatmap': return <HeatmapSetup {...props} widget={widget} />;
         case 'scatter': return <ScatterSetup {...props} widget={widget} />;
         case 'funnel': return <FunnelSetup {...props} widget={widget} />;
+        case 'treemap': return <TreemapSetup {...props} widget={widget} />;
         default: return null;
     }
 }
@@ -127,6 +128,25 @@ function FunnelSetup({ widget, edit, source }: Props<FunnelWidget>) {
             </ol>
             <Button size="sm" variant="secondary" icon={Plus} disabled={c.steps.length >= FUNNEL_MAX_STEPS} onClick={() => set({ steps: [...c.steps, { kind: 'event', value: '' }] })}>Add a step</Button>
             <Toggle label="Show conversion between steps" checked={c.showDropoff} onChange={(v) => set({ showDropoff: v })} />
+        </>
+    );
+}
+
+/** Metrics whose boxes cannot be added up (rates, averages, users): a treemap does not offer them. */
+const NOT_ADDITIVE = METRIC_LIST.filter((m) => !m.additive).map((m) => m.id);
+
+function TreemapSetup({ widget, edit, source, portfolio }: Props<TreemapWidget>) {
+    const c = widget.config;
+    const set = (p: Partial<TreemapWidget['config']>, key?: string) => edit((w) => patch(w as TreemapWidget, p), key);
+    return (
+        <>
+            {source}
+            <Field label="Size by" hint="Counts only: the boxes of a group add up to the group."><MetricPicker value={c.metric.id} exclude={NOT_ADDITIVE} calcs={false} noShare onChange={(id) => set({ metric: { id } })} /></Field>
+            <Field label="One box per"><DimensionPicker value={c.dimension} metrics={[c.metric.id]} allowSite={portfolio} onChange={(d) => d && set({ dimension: d, parent: d === c.parent ? undefined : c.parent })} /></Field>
+            <Field label="Group under" hint="For example Channel above Source."><DimensionPicker value={c.parent} metrics={[c.metric.id]} allowNone ariaLabel="Group under" onChange={(d) => set({ parent: d && d !== c.dimension ? d : undefined })} /></Field>
+            <Field label="Boxes" hint="The biggest ones are drawn."><NumberInput value={c.top} min={5} max={60} onChange={(n) => set({ top: n }, 'top')} /></Field>
+            <Field label="Colour"><Choice ariaLabel="Colour" value={c.colorBy ?? 'group'} onChange={(v) => set({ colorBy: v })} options={[{ value: 'group', label: c.parent ? 'One colour per group' : 'One colour per box' }, { value: 'value', label: 'Darker for bigger' }]} /></Field>
+            <Toggle label="Show values in boxes" checked={c.showValues !== false} onChange={(v) => set({ showValues: v })} />
         </>
     );
 }

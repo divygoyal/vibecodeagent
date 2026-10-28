@@ -76,10 +76,31 @@ export interface FunnelConfig {
 }
 export type FunnelWidget = WidgetBase<'funnel', FunnelConfig>;
 
+// ── Treemap ──────────────────────────────────────────────────────────────
+
+/**
+ * Treemap (round 9): boxes sized by one additive metric, one per value of a dimension, optionally
+ * grouped under a parent dimension (Channel, then Source). Counts only: the boxes of a group add up to
+ * the group, which a rate or an average cannot do.
+ */
+export interface TreemapConfig {
+    dimension: DimId;
+    /** Groups the boxes (channel -> source). Missing = one flat set of boxes. */
+    parent?: DimId;
+    metric: MetricRef;
+    /** Boxes drawn (the biggest by the metric). */
+    top: number;
+    /** 'group' = a colour per group (per box without a parent); 'value' = one colour, darker for bigger. */
+    colorBy: 'group' | 'value';
+    /** Name boxes with their value when they are big enough. */
+    showValues: boolean;
+}
+export type TreemapWidget = WidgetBase<'treemap', TreemapConfig>;
+
 // ── union ────────────────────────────────────────────────────────────────
 
-export type ChartWidgetDef = HeatmapWidget | ScatterWidget | FunnelWidget;
+export type ChartWidgetDef = HeatmapWidget | ScatterWidget | FunnelWidget | TreemapWidget;
 export type ChartType = ChartWidgetDef['type'];
-export const CHART_TYPES: ChartType[] = ['heatmap', 'scatter', 'funnel'];
+export const CHART_TYPES: ChartType[] = ['heatmap', 'scatter', 'funnel', 'treemap'];
 
 export type { DimId };

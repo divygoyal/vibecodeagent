@@ -35,6 +35,10 @@ export function chartThumb(type: string, x: number, y: number, w: number, h: num
                 return <rect key={i} x={x + (w - bw) / 2} y={y + 3 + i * ((h - 6) / n)} width={bw} height={Math.max(1.2, (h - 6) / n - 1.2)} rx={0.6} fill={color} opacity={0.75 - i * 0.12} />;
             });
         }
+        case 'treemap': {
+            const cells = [[0, 0, 0.55, 0.6], [0.55, 0, 0.45, 0.35], [0.55, 0.35, 0.25, 0.25], [0.8, 0.35, 0.2, 0.25], [0, 0.6, 0.3, 0.4], [0.3, 0.6, 0.4, 0.4], [0.7, 0.6, 0.3, 0.4]];
+            return cells.map(([cx, cy, cw, ch], i) => <rect key={i} x={x + 2 + cx * (w - 4)} y={y + 2 + cy * (h - 4)} width={Math.max(1, cw * (w - 4) - 0.8)} height={Math.max(1, ch * (h - 4) - 0.8)} rx={0.6} fill={color} opacity={0.3 + (i % 3) * 0.15} />);
+        }
         default: return null;
     }
 }
