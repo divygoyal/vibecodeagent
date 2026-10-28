@@ -71,7 +71,8 @@ test('demo Ask "improve first" answer starts with the Actions list\'s first clic
     const { buildActions } = await import('../src/app/api/site/_lib/actions.ts');
     const { auditActions } = await import('../src/components/site/lib/auditActions.ts');
     const { getDemoAuditReport } = await import('../src/lib/demoWorkspaceData.ts');
-    const { resolveDateRange } = await import('../src/lib/dateRange.ts');
+    const { resolveWindow } = await import('../src/lib/dateRange.ts');
+    const { quickWinWindows } = await import('../src/lib/publicDemo/ask.ts');
     const { demoAccessToken } = await import('../src/lib/demo/catalog.ts');
     const { sampleGoogleFetch } = await import('../src/lib/demo/fetchShim.ts');
     const { runWithSampleGoogle } = await import('../src/lib/demo/sampleScope.ts');
@@ -80,9 +81,15 @@ test('demo Ask "improve first" answer starts with the Actions list\'s first clic
     const answer = (await demoAskSamples(t)).find((s) => s.id === 'quick-wins').answer;
     const p = (r) => ({ cur: { start: r.start, end: r.end }, cmp: r.prevStart ? { start: r.prevStart, end: r.prevEnd } : null });
     const range = { preset: '28d', compare: 'prev' };
+    // The Actions page's windows on "Last 28 days" (DateRangeControl: resolveWindow, the one window rule).
+    const search = p(resolveWindow(range, 'gsc', { now: new Date(t) }));
+    const traffic = p(resolveWindow(range, 'ga4', { now: new Date(t) }));
+    assert.deepEqual(quickWinWindows(t), { search, traffic });
+    assert.equal(traffic.cur.end, new Date(t - 86_400_000).toISOString().slice(0, 10), 'Analytics through yesterday');
+    assert.equal(search.cur.end, new Date(t - 2 * 86_400_000).toISOString().slice(0, 10), 'Search Console through 2 days ago');
     const res = await runWithSampleGoogle(sampleGoogleFetch, () => buildActions({
         userId: 'test-r7wc', token: demoAccessToken('main'), label: 'acmeanalytics.example', siteUrl: 'sc-domain:acmeanalytics.example',
-        property: 'properties/412300101', search: p(resolveDateRange(range, { now: new Date(t), lagDays: 2 })), traffic: p(resolveDateRange(range, { now: new Date(t) })),
+        property: 'properties/412300101', search, traffic,
     }));
     const open = rankByImpact([...res.actions, ...auditActions(getDemoAuditReport('https://acmeanalytics.example/'), 'acmeanalytics.example')]);
     const first = topClickTasks(open)[0];

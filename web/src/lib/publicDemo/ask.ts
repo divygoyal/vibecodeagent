@@ -8,7 +8,7 @@ import type { RangeParams } from '@/app/api/site/_lib/params';
 import { rankByImpact, shortImpact, topClickGain, topClickTasks } from '@/components/site/lib/actionText';
 import { auditActions } from '@/components/site/lib/auditActions';
 import { displayPage, pageRef } from '@/components/site/lib/rules';
-import { resolveDateRange, type DateRangeValue } from '@/lib/dateRange';
+import { resolveWindow, type DateRangeValue } from '@/lib/dateRange';
 import { demoAccessToken } from '@/lib/demo/catalog';
 import { sampleGoogleFetch } from '@/lib/demo/fetchShim';
 import { demoRunReport } from '@/lib/demo/ga4';
@@ -125,14 +125,19 @@ function channels(now: number): string {
  * homepage audit, rankByImpact) with the windows the site pages use, so the first task and the "top 5" total read the
  * same on both screens.
  */
-async function quickWins(now: number): Promise<string> {
-    const today = new Date(now);
+/**
+ * The windows the Actions page asks for on "Last 28 days" (components/shell/DateRangeControl: lib/dateRange
+ * resolveWindow, the app's one window rule): Analytics through yesterday, Search Console through 2 days ago.
+ */
+export function quickWinWindows(now: number): { traffic: RangeParams; search: RangeParams } {
     const range: DateRangeValue = { preset: '28d', compare: 'prev' };
-    // The site pages' windows (components/shell/DateRangeControl): Analytics through today, Search Console 2 days back.
     const params = (r: { start: string; end: string; prevStart: string | null; prevEnd: string | null }): RangeParams =>
         ({ cur: { start: r.start, end: r.end }, cmp: r.prevStart && r.prevEnd ? { start: r.prevStart, end: r.prevEnd } : null });
-    const traffic = params(resolveDateRange(range, { now: today }));
-    const search = params(resolveDateRange(range, { now: today, lagDays: 2 }));
+    return { traffic: params(resolveWindow(range, 'ga4', { now: new Date(now) })), search: params(resolveWindow(range, 'gsc', { now: new Date(now) })) };
+}
+
+async function quickWins(now: number): Promise<string> {
+    const { traffic, search } = quickWinWindows(now);
     const res = await runWithSampleGoogle(sampleGoogleFetch, () => buildActions({
         userId: ASK_SAMPLE_USER, token: demoAccessToken(DEMO_ACCOUNT_KEY), label: ACME_HOST, siteUrl: ACME_GSC, property: ACME_GA4, search, traffic,
     }));
