@@ -4,6 +4,8 @@
  * migration and the tests all import from here.
  */
 
+import type { ChartWidgetDef } from './charts/types';
+
 export type Iso = string; // 'YYYY-MM-DD'
 export type WidgetId = string;
 export type PageId = string;
@@ -530,7 +532,9 @@ export type PortfolioGridWidget = WidgetBase<'portfolio-grid', PortfolioGridConf
 
 export type WidgetDef =
     | ScorecardWidget | KpiStripWidget | TimeSeriesWidget | BarWidget | PieWidget | TableWidget
-    | GeoWidget | TextWidget | ImageWidget | SectionWidget | PortfolioGridWidget;
+    | GeoWidget | TextWidget | ImageWidget | SectionWidget | PortfolioGridWidget
+    // Round 9 charts (heatmap, scatter, funnel, treemap, pivot): charts/types.ts
+    | ChartWidgetDef;
 
 export type WidgetType = WidgetDef['type'];
 

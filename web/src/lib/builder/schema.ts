@@ -5,6 +5,8 @@
  */
 import { z } from 'zod';
 import { parseCalcId } from './calc';
+import { chartProblem } from './charts';
+import { chartWidgetSchemas } from './charts/schema';
 import { drillProblem } from './drill';
 import { widgetSearchTypeProblem } from './searchType';
 import type { DashboardDocV2, WidgetDef } from './types';
@@ -105,6 +107,8 @@ export const widgetSchema = z.discriminatedUnion('type', [
     z.object({ ...base, type: z.literal('image'), config: z.looseObject({ src: httpsUrl, alt: z.string().max(300), fit: z.enum(['contain', 'cover']), href: httpsUrl.optional() }) }),
     z.object({ ...base, type: z.literal('section'), config: z.looseObject({ title: z.string().max(200), subtitle: z.string().max(300).optional(), divider: z.boolean() }) }),
     z.object({ ...base, type: z.literal('portfolio-grid'), config: z.looseObject({ metrics: z.array(metricRef).min(1).max(4), limit: z.number().int().min(1).max(500) }) }),
+    // Round 9 charts (heatmap, scatter, funnel, treemap, pivot): charts/schema.ts
+    ...chartWidgetSchemas({ base, metricRef, dimId }),
 ]);
 
 const layoutItem = z.object({ i: id, x: z.number().int().min(0).max(24), y: z.number().int().min(0).max(5000), w: z.number().int().min(1).max(12), h: z.number().int().min(1).max(100) });
@@ -183,7 +187,7 @@ function fmtIssues(err: z.ZodError): string {
 
 /** Settings a widget cannot honour as saved (a drill list its metrics cannot show, a search type it cannot read). */
 function widgetProblem(w: WidgetDef): string | null {
-    const p = drillProblem(w) ?? widgetSearchTypeProblem(w);
+    const p = drillProblem(w) ?? widgetSearchTypeProblem(w) ?? chartProblem(w);
     return p ? `widget ${w.id}: ${p}` : null;
 }
 

@@ -9,6 +9,7 @@
  */
 import { expandCalcs } from './calc';
 import { getMetric, metricFamilies } from './catalog';
+import { chartDimensions } from './charts';
 import { widgetMetrics } from './registry';
 import type { FilterClause, SearchType, WidgetDef } from './types';
 
@@ -83,7 +84,7 @@ export function widgetDimensions(w: WidgetDef): string[] {
         case 'table': return w.config.dimensions;
         case 'timeseries': return w.config.breakdown ? [w.config.breakdown.dimension] : [];
         case 'geo': return ['country'];
-        default: return [];
+        default: return chartDimensions(w);
     }
 }
 
