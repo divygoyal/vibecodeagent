@@ -184,22 +184,22 @@ export function GoalsPanel() {
                                     )}
                                 </div>
                                 <dl className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                                    <div><dt className="text-meta text-fg-muted">Conversions</dt><dd className="flex items-baseline gap-2"><span className="text-stat text-fg">{fmtFull(g.summary.conversions)}</span><MetricDelta current={g.summary.conversions} previous={g.summary.change > -100 ? g.summary.conversions / (1 + g.summary.change / 100) : null} metric="conversions" /></dd></div>
-                                    <div><dt className="text-meta text-fg-muted">Conversion rate</dt><dd className="text-stat text-fg">{g.summary.rate.toFixed(2)}%</dd></div>
+                                    <div><dt className="text-meta text-fg-muted">Goal completions</dt><dd className="flex items-baseline gap-2"><span className="text-stat text-fg">{fmtFull(g.summary.conversions)}</span><MetricDelta current={g.summary.conversions} previous={g.summary.change > -100 ? g.summary.conversions / (1 + g.summary.change / 100) : null} metric="conversions" /></dd></div>
+                                    <div><dt className="text-meta text-fg-muted">Completion rate</dt><dd className="text-stat text-fg">{g.summary.rate.toFixed(2)}%</dd></div>
                                     <div><dt className="text-meta text-fg-muted">Sessions</dt><dd className="text-stat text-fg">{fmtFull(g.summary.totalSessions)}</dd></div>
                                 </dl>
                                 {g.explanation ? <p className="text-body-sm text-fg-secondary">{g.explanation}</p> : null}
-                                <ChartCard title="Conversions per day" height="compact" state={g.trend.length ? 'ready' : 'empty'} bare>
-                                    <TimeSeriesChart data={g.trend as unknown as Record<string, number | string>[]} series={[{ metric: 'conversions', key: 'conversions', label: 'Conversions' }]} height={200} ariaLabel={`${current.item.name} conversions per day`} />
+                                <ChartCard title="Completions per day" height="compact" state={g.trend.length ? 'ready' : 'empty'} bare>
+                                    <TimeSeriesChart data={g.trend as unknown as Record<string, number | string>[]} series={[{ metric: 'conversions', key: 'conversions', label: 'Goal completions' }]} height={200} ariaLabel={`${current.item.name} completions per day`} />
                                 </ChartCard>
                                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                     <div>
                                         <p className="mb-2 text-body-sm font-medium text-fg">By source</p>
-                                        <BarList items={g.sourceContribution.map((s) => ({ key: s.source, label: s.source, text: s.source, value: s.conversions }))} metric="conversions" limit={6} labelHeader="Source" empty={<EmptyState variant="inline" title="No conversions yet" />} />
+                                        <BarList items={g.sourceContribution.map((s) => ({ key: s.source, label: s.source, text: s.source, value: s.conversions }))} metric="conversions" limit={6} labelHeader="Source" valueHeader="Completions" empty={<EmptyState variant="inline" title="No completions yet" />} />
                                     </div>
                                     <div>
                                         <p className="mb-2 text-body-sm font-medium text-fg">By page</p>
-                                        <BarList items={g.pageContribution.map((s) => ({ key: s.page, label: s.page, text: s.page, value: s.conversions }))} metric="conversions" limit={6} labelHeader="Page" empty={<EmptyState variant="inline" title="No conversions yet" />} />
+                                        <BarList items={g.pageContribution.map((s) => ({ key: s.page, label: s.page, text: s.page, value: s.conversions }))} metric="conversions" limit={6} labelHeader="Page" valueHeader="Completions" empty={<EmptyState variant="inline" title="No completions yet" />} />
                                     </div>
                                 </div>
                             </div>
@@ -211,7 +211,7 @@ export function GoalsPanel() {
                 open={Boolean(editor)}
                 onOpenChange={(o) => { if (!o) setEditor(null); }}
                 title={editor?.mode === 'edit' ? 'Edit goal' : 'New goal'}
-                description="Count a page visit or a GA4 event as a conversion."
+                description="Count a page visit or a GA4 event as a goal completion."
                 footer={<><Button variant="secondary" onClick={() => setEditor(null)}>Cancel</Button><Button variant="primary" loading={saving} onClick={() => void save()}>Save goal</Button></>}
             >
                 {editor ? (

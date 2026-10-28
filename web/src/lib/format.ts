@@ -14,7 +14,7 @@
  * null / undefined / NaN always format as an en dash '–'.
  */
 
-export type MetricFormat = 'count' | 'percent' | 'position' | 'duration';
+export type MetricFormat = 'count' | 'percent' | 'position' | 'duration' | 'currency';
 
 export const DASH = '–';
 const ARROW_UP = '▲';
@@ -123,9 +123,56 @@ export function fmtDuration(seconds: Num): string {
     return `${Math.floor(t / 3600)}h ${pad(Math.floor((t % 3600) / 60))}m`;
 }
 
-/** Format a value by its metric format. Counts are full unless `compact`. */
-export function fmtValue(format: MetricFormat, value: Num, opts: { compact?: boolean; tile?: boolean } = {}): string {
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
+
+function currencyFormatter(currency: string, digits: 0 | 2): Intl.NumberFormat {
+    const key = `${currency}:${digits}`;
+    let f = currencyFormatters.get(key);
+    if (!f) {
+        try {
+            f = new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits });
+        } catch {
+            // Not an ISO 4217 code: a plain number with the code after it.
+            const plain = new Intl.NumberFormat('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+            f = { format: (n: number) => `${plain.format(n)} ${currency}` } as Intl.NumberFormat;
+        }
+        currencyFormatters.set(key, f);
+    }
+    return f;
+}
+
+export interface CurrencyOptions {
+    /** Tiles and cards: `$61.8K` from 10,000 up (like fmtCompact). */
+    compact?: boolean;
+    /** Two decimals (`$1.12`), for small per-session or per-user values. Default: whole units, so a column never mixes `$27,056` with `$45.20`. */
+    cents?: boolean;
+}
+
+/**
+ * Money in the GA4 property's currency (ISO 4217, default USD): `$27,056` · `€1,204` · `$61.8K` (compact) ·
+ * `$1.12` (cents).
+ */
+export function fmtCurrency(n: Num, currency: string | null | undefined = 'USD', opts: CurrencyOptions = {}): string {
+    if (!isNum(n)) return DASH;
+    const code = (currency || 'USD').toUpperCase();
+    const abs = Math.abs(n);
+    const sign = n < 0 ? '-' : '';
+    if (opts.compact && abs >= 10_000) {
+        // "$" + "61.8K": the symbol from the formatter, the number from compactParts (same rounding as fmtCompact).
+        const parts = currencyFormatter(code, 0).formatToParts?.(1) ?? [];
+        const sym = parts.find((p) => p.type === 'currency')?.value;
+        const symFirst = parts.findIndex((p) => p.type === 'currency') < parts.findIndex((p) => p.type === 'integer');
+        if (sym) return symFirst ? `${sign}${sym}${compactParts(abs, null)}` : `${sign}${compactParts(abs, null)} ${sym}`;
+        return `${sign}${compactParts(abs, null)} ${code}`;
+    }
+    return sign + currencyFormatter(code, opts.cents ? 2 : 0).format(abs);
+}
+
+/** Format a value by its metric format. Counts are full unless `compact`; money uses `currency` (default USD). */
+export function fmtValue(format: MetricFormat, value: Num, opts: { compact?: boolean; tile?: boolean; currency?: string | null; cents?: boolean } = {}): string {
     switch (format) {
+        case 'currency':
+            return fmtCurrency(value, opts.currency, { compact: opts.compact, cents: opts.cents });
         case 'percent':
             return fmtPercent(value, { tile: opts.tile });
         case 'position':

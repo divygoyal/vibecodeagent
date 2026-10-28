@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ChevronsUpDown, LayoutGrid, Plus, Search } from 'lucide-react';
 
@@ -21,8 +21,14 @@ function kindBadge(e: SiteEntry) {
     return 'GA4';
 }
 
+/** Portfolio is the one app page about all sites at once. */
+export function isPortfolioPath(pathname: string): boolean {
+    return pathname === '/dashboard' || pathname === '/dashboard/portfolio';
+}
+
 /**
- * Picks the current site (DESIGN 3.1). Shows "All sites" on Portfolio.
+ * Picks the current site (DESIGN 3.1). Shows "All sites" on Portfolio (and when no site is picked yet); every
+ * other page shows the current site, the same one the sidebar's Site links and Ask use.
  * Keyboard: Enter/Space opens, typing filters, arrows move, Enter selects; `g s` opens it from anywhere.
  */
 export function SiteSwitcher({ collapsed = false, onNavigate, open, onOpenChange }: {
@@ -33,6 +39,7 @@ export function SiteSwitcher({ collapsed = false, onNavigate, open, onOpenChange
     onOpenChange?: (open: boolean) => void;
 }) {
     const router = useRouter();
+    const pathname = usePathname() ?? '';
     const { site, sites, loading, fromRoute, selectSite } = useCurrentSite();
     const shell = useShell();
     const controlled = open !== undefined && onOpenChange !== undefined;
@@ -41,7 +48,7 @@ export function SiteSwitcher({ collapsed = false, onNavigate, open, onOpenChange
     const [query, setQuery] = useState('');
     const [active, setActive] = useState(0);
     const listRef = useRef<HTMLDivElement>(null);
-    const showAll = !fromRoute;
+    const showAll = !fromRoute && (isPortfolioPath(pathname) || (!site && !loading));
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();

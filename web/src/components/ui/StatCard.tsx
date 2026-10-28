@@ -91,6 +91,8 @@ export interface KpiItem {
     loading?: boolean;
     /** The value is an estimate (shown with a leading "≈"; say why in `hint`). */
     approx?: boolean;
+    /** Money metrics (revenue): the property's currency, ISO 4217. */
+    currency?: string;
 }
 
 export interface KpiStripProps {
@@ -170,7 +172,7 @@ export function KpiStrip({ items, selected, onSelect, comparisonLabel = 'previou
                                     <span className={cn('flex flex-wrap items-baseline gap-x-1.5', slim ? 'mt-0.5' : 'mt-1')}>
                                         <span className={cn('text-fg tabular-nums', slim ? 'text-stat-sm' : 'text-stat')}>
                                             {it.approx ? <span aria-hidden className="text-fg-muted">≈</span> : null}
-                                            {fmtMetric(it.metric, it.value, { compact: true, tile: true })}
+                                            {fmtMetric(it.metric, it.value, { compact: true, tile: true, currency: it.currency })}
                                         </span>
                                         <MetricDelta metric={it.metric} current={it.value} previous={it.previous} comparisonLabel={`versus ${comparisonLabel}`} />
                                     </span>

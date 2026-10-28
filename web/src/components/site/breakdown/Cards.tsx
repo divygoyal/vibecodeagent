@@ -46,8 +46,11 @@ function AiCount() {
     return n > 0 ? <>{fmtFull(n)}</> : null;
 }
 
-/** Channels / Sources / AI assistants in one card (sessions). */
+/** Channels / Sources / AI assistants in one card (sessions), plus Revenue by source for sites with GA4 revenue. */
 export function SourcesCard({ className }: { className?: string }) {
+    // Same report (and SWR cache) as the Sources tab: no extra request.
+    const referrers = useGa4<Ga4BreakdownResponse>('referrers');
+    const money = Boolean(referrers.data?.rows.some((r) => (r.cur.totalRevenue ?? 0) > 0));
     return (
         <TabbedCard
             id="sources"
@@ -69,6 +72,10 @@ export function SourcesCard({ className }: { className?: string }) {
                             emptyTitle="No AI referrals yet" emptyDescription="Visits from ChatGPT, Perplexity, Claude and Gemini show up here." />
                     ),
                 },
+                ...(money ? [{
+                    value: 'revenue' as const, label: 'Revenue', meta: listMeta('revenue'),
+                    content: <Ga4List report="referrers" dim="sessionSource" metric="revenue" filterKey="source" render={sourceRender} limit={SIDE_ROWS} fill labelHeader="Source" viewAllTitle="Revenue by source" emptyTitle="No revenue in this period" />,
+                }] : []),
             ]}
         />
     );
@@ -78,7 +85,7 @@ function LandingList() {
     const { siteHost } = useSite();
     const render = useMemo(() => (r: Ga4Row) => {
         const path = displayPage(pageRef(r.dims.landingPage, siteHost), siteHost);
-        return { label: <PagePath path={path} />, text: pageLabel(path) };
+        return { label: <PagePath path={path} title={r.dims.pageTitle} />, text: `${r.dims.pageTitle ?? ''} ${pageLabel(path)}`.trim() };
     }, [siteHost]);
     return (
         <Ga4List report="landing" dim="landingPage" metric="sessions" filterKey="landing" render={render} include={(r) => Boolean(r.dims.landingPage) && r.dims.landingPage !== '(not set)'}

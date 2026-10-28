@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
-import { findSite, siteForSelection, type SiteEntry } from '@/lib/sites/siteDirectory';
+import { resolveSite, siteForSelection, type SiteEntry } from '@/lib/sites/siteDirectory';
 import { parseSitePath, siteHref, type SiteSection } from './nav';
 import { useWorkspace } from './workspaceContext';
 
@@ -16,6 +16,8 @@ export interface CurrentSite {
     fromRoute: boolean;
     /** The URL names a host the user has no access to. */
     unknownHost: boolean;
+    /** The URL names the site by another name (a GA4 stream host, 'www.'): redirect to `site.host`. */
+    aliasHost: boolean;
     /** Section of the current site page ('' = overview). */
     section: SiteSection | null;
     /** Every site (sorted by label). */
@@ -38,10 +40,12 @@ export function useCurrentSite(): CurrentSite {
     const ws = useWorkspace();
     const parsed = parseSitePath(pathname);
 
+    const routeHost = parsed?.host ?? null;
+    const resolved = useMemo(() => (routeHost ? resolveSite(ws.siteDirectory, routeHost) : null), [routeHost, ws.siteDirectory]);
     const site = useMemo(() => {
-        if (parsed) return findSite(ws.siteDirectory, parsed.host);
+        if (routeHost) return resolved?.site ?? null;
         return siteForSelection(ws.siteDirectory, ws.resolvedSiteUrl || ws.selectedSite, ws.resolvedPropertyId || ws.selectedProperty);
-    }, [parsed, ws.siteDirectory, ws.resolvedSiteUrl, ws.selectedSite, ws.resolvedPropertyId, ws.selectedProperty]);
+    }, [routeHost, resolved, ws.siteDirectory, ws.resolvedSiteUrl, ws.selectedSite, ws.resolvedPropertyId, ws.selectedProperty]);
 
     const { saveWorkspace } = ws;
     const selectSite = useCallback((entry: SiteEntry, opts: { navigate?: boolean; section?: SiteSection } = {}) => {
@@ -56,6 +60,7 @@ export function useCurrentSite(): CurrentSite {
         host: site?.host ?? parsed?.host ?? null,
         fromRoute: Boolean(parsed),
         unknownHost: Boolean(parsed) && !ws.siteDirectoryLoading && !site,
+        aliasHost: Boolean(resolved?.alias),
         section: parsed?.section ?? null,
         sites: ws.siteDirectory,
         loading: ws.siteDirectoryLoading,

@@ -283,7 +283,7 @@ async function trafficActions(inp: ActionsInput, partial: string[]): Promise<Sit
                     evidence: [
                         { label: 'Sessions', value: `${fmtFull(prev.sessions)} → ${fmtFull(summary.totals.sessions)}` },
                         { label: 'Users', value: `${fmtFull(prev.users)} → ${fmtFull(summary.totals.users)}` },
-                        { label: 'Conversions', value: `${fmtFull(prev.conversions)} → ${fmtFull(summary.totals.conversions)}` },
+                        { label: 'Key events', value: `${fmtFull(prev.conversions)} → ${fmtFull(summary.totals.conversions)}` },
                     ],
                     expectedImpact: `Recover up to ${fmtFull(per28(lost, days))} sessions a month`,
                     score: per28(lost, days),

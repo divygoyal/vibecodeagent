@@ -16,9 +16,14 @@ export interface Ga4Totals {
     sessions: number;
     engagedSessions: number;
     pageviews: number;
+    /** GA4 key events (formerly "conversions"; the field keeps its old name). */
     conversions: number;
     engagementRate: number;
     avgDuration: number;
+    /** GA4 totalRevenue (purchases, subscriptions, ads), in the property's currency. 0 when the site sells nothing. */
+    revenue: number;
+    /** GA4 transactions (completed purchases). */
+    transactions: number;
     /** Sessions referred by AI assistants (ChatGPT, Perplexity, Claude, Gemini, Copilot ...). */
     ai: number;
 }
@@ -29,6 +34,7 @@ export interface Ga4SeriesPoint {
     sessions: number;
     pageviews: number;
     conversions: number;
+    revenue: number;
     ai: number;
     engagementRate: number;
     /** Comparison values aligned by day index. */
@@ -37,6 +43,7 @@ export interface Ga4SeriesPoint {
     prev_sessions?: number | null;
     prev_pageviews?: number | null;
     prev_conversions?: number | null;
+    prev_revenue?: number | null;
     prev_ai?: number | null;
 }
 
@@ -48,6 +55,8 @@ export interface Ga4Summary {
     interval?: 'day' | 'week' | 'month';
     /** The GA4 property's reporting time zone. */
     timeZone?: string;
+    /** The GA4 property's currency (ISO 4217, e.g. 'USD'), from the report metadata. */
+    currency?: string;
 }
 
 export interface Ga4Heatmap {
@@ -91,7 +100,8 @@ export type Ga4Breakdown =
 export interface Ga4Row {
     /** Stable key (dimension values joined). */
     key: string;
-    /** Dimension values by GA4 dimension name. */
+    /** Dimension values by GA4 dimension name. Page reports (pages, landing) add `pageTitle` (most-viewed title,
+     *  brand suffix removed) when GA4 has one. */
     dims: Record<string, string>;
     /** Metrics by GA4 metric name. */
     cur: Record<string, number>;
@@ -103,6 +113,8 @@ export interface Ga4BreakdownResponse {
     rows: Ga4Row[];
     /** True when GA4 had more rows than were returned. */
     truncated: boolean;
+    /** The property's currency (ISO 4217) for `totalRevenue`, from the report metadata. */
+    currency?: string;
 }
 
 export interface RealtimeResponse {

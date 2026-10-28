@@ -12,7 +12,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { BrandMark, Wordmark } from './BrandMark';
 import { BOTTOM_ITEMS, GROW_ITEMS, MAIN_ITEMS, PORTFOLIO_ITEM, SITE_NAV, siteHref, type NavItem } from './nav';
 import { useShell } from './ShellContext';
-import { SiteSwitcher } from './SiteSwitcher';
+import { isPortfolioPath, SiteSwitcher } from './SiteSwitcher';
 import { useCurrentSite } from './useCurrentSite';
 import { UserMenu } from './UserMenu';
 import { useDemoSession } from '@/components/demo/useDemoSession';
@@ -127,6 +127,8 @@ export function Sidebar({ collapsed = false, inDrawer = false, onNavigate, local
     );
     const supportUnread = Math.max(0, Number(unread?.unread || 0));
     const onSitePage = pathname.startsWith('/dashboard/s/');
+    // The switcher reads "All sites" only on Portfolio; there the Site links go to the last site, and say so.
+    const lastSite = isPortfolioPath(pathname) && site ? site.label : null;
     // Public live demo: no AI meter or Plan (nothing to buy on the shared demo account).
     const { demo } = useDemoSession();
     const bottomItems = demo ? BOTTOM_ITEMS.filter((item) => item.href !== '/dashboard/plan') : BOTTOM_ITEMS;
@@ -168,8 +170,8 @@ export function Sidebar({ collapsed = false, inDrawer = false, onNavigate, local
             <div className={cn('mt-3 flex-1 pb-3', !inDrawer && 'min-h-0 overflow-y-auto overscroll-contain')}>
                 <NavLink {...PORTFOLIO_ITEM} active={isActive(pathname, PORTFOLIO_ITEM)} collapsed={collapsed} onClick={onNavigate} />
 
-                {/* Off the site pages the switcher says "All sites", so name the site these links open. */}
-                <GroupLabel collapsed={collapsed} detail={!onSitePage && site ? site.label : null}>Site</GroupLabel>
+                {/* Everywhere but Portfolio the switcher above names the current site, so the header does not repeat it. */}
+                <GroupLabel collapsed={collapsed} detail={lastSite}>{lastSite ? 'Last site' : 'Site'}</GroupLabel>
                 {SITE_NAV.map((item) => (
                     <NavLink
                         key={item.section || 'overview'}

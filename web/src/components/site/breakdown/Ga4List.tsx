@@ -4,16 +4,17 @@ import { useMemo, type ReactNode } from 'react';
 
 import { BarList, type BarListItem } from '@/components/charts/BarList';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { fmtCurrency } from '@/lib/format';
 import type { FilterKey } from '../lib/filters';
 import type { Ga4Breakdown, Ga4BreakdownResponse, Ga4Row } from '../lib/types';
 import { useFilterClick } from '../filters/SiteFilters';
 import { LoadError } from '../SiteStates';
 import { useActiveFilters, useGa4 } from '../useSiteData';
 
-export type Ga4ListMetric = 'sessions' | 'users';
+export type Ga4ListMetric = 'sessions' | 'users' | 'revenue';
 
-const METRIC_FIELD: Record<Ga4ListMetric, string> = { sessions: 'sessions', users: 'activeUsers' };
-const METRIC_LABEL: Record<Ga4ListMetric, string> = { sessions: 'Sessions', users: 'Users' };
+const METRIC_FIELD: Record<Ga4ListMetric, string> = { sessions: 'sessions', users: 'activeUsers', revenue: 'totalRevenue' };
+const METRIC_LABEL: Record<Ga4ListMetric, string> = { sessions: 'Sessions', users: 'Users', revenue: 'Revenue' };
 
 export interface Ga4ListProps {
     report: Ga4Breakdown;
@@ -46,7 +47,9 @@ export function Ga4List({
     const click = useFilterClick();
     const active = useActiveFilters()[filterKey];
     const { items, raw } = useMemo(() => {
-        const rows = (q.data?.rows ?? []).filter((r) => (include ? include(r) : true));
+        // Revenue lists leave out rows that sold nothing.
+        const rows = (q.data?.rows ?? []).filter((r) => (include ? include(r) : true) && (metric !== 'revenue' || (r.cur.totalRevenue ?? 0) > 0))
+            .sort((a, b) => (metric === 'revenue' ? (b.cur.totalRevenue ?? 0) - (a.cur.totalRevenue ?? 0) : 0));
         const rawMap = new Map<string, string>();
         const list: BarListItem[] = rows.map((r) => {
             const value = r.dims[dim] ?? '';
@@ -63,6 +66,7 @@ export function Ga4List({
             items={items}
             metric="users"
             valueHeader={METRIC_LABEL[metric]}
+            formatValue={metric === 'revenue' ? (n) => fmtCurrency(n, q.data?.currency, { compact: true }) : undefined}
             limit={limit}
             showShare={showShare}
             loading={q.state === 'loading'}

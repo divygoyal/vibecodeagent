@@ -32,6 +32,8 @@ export interface TrendInput {
     drivers?: Driver[];
     /** Daily series for the "busiest day" fallback. */
     series?: { date: string; value: number }[];
+    /** Money and other non-count values: formats the amounts in the sentence ("$1,204"); counts use fmtFull/fmtCompact. */
+    fmt?: (n: number) => string;
     /** Ignore the last point of `series` for the busiest day (today is partial). */
     partialLast?: boolean;
     /** Lower is better (position). */
@@ -47,8 +49,8 @@ function fmtPct(p: number): string {
     return a >= 10 ? `${Math.round(a)}%` : `${a.toFixed(1).replace(/\.0$/, '')}%`;
 }
 
-function signed(n: number): string {
-    return `${n >= 0 ? '+' : '−'}${fmtCompact(Math.abs(Math.round(n)))}`;
+function signed(n: number, fmt?: (n: number) => string): string {
+    return `${n >= 0 ? '+' : '−'}${fmt ? fmt(Math.abs(n)) : fmtCompact(Math.abs(Math.round(n)))}`;
 }
 
 /** The driver with the biggest change in the same direction, if it explains at least a fifth of it. */
@@ -71,12 +73,13 @@ export function topDriver(drivers: Driver[] | undefined, direction: 1 | -1): Dri
 
 /** "Users up 18% vs previous 28 days, led by Organic Search (+1.2K sessions)." */
 export function trendFinding(input: TrendInput): Finding | null {
-    const { metric, cur, prev, compareText, drivers, driverUnit, lowerIsBetter } = input;
+    const { metric, cur, prev, compareText, drivers, driverUnit, lowerIsBetter, fmt } = input;
     if (cur === null || cur === undefined || !Number.isFinite(cur)) return null;
+    const amount = (n: number) => (fmt ? fmt(n) : fmtFull(n));
     const vs = compareText ? ` vs ${compareText}` : '';
     if (prev !== undefined && prev !== null && Number.isFinite(prev)) {
         if (prev === 0) {
-            return cur > 0 ? { text: `${metric}: ${fmtFull(cur)}, up from none${vs}.`, tone: lowerIsBetter ? 'info' : 'good' } : null;
+            return cur > 0 ? { text: `${metric}: ${amount(cur)}, up from none${vs}.`, tone: lowerIsBetter ? 'info' : 'good' } : null;
         }
         const p = pct(cur, prev);
         if (Math.abs(p) < 2) {
@@ -85,7 +88,7 @@ export function trendFinding(input: TrendInput): Finding | null {
         const up = p > 0;
         const good = lowerIsBetter ? !up : up;
         const d = topDriver(drivers, up ? 1 : -1);
-        const lead = d ? `, ${up ? 'led by' : 'mostly from'} ${d.label} (${signed(d.cur - d.prev)}${driverUnit ? ` ${driverUnit}` : ''})` : '';
+        const lead = d ? `, ${up ? 'led by' : 'mostly from'} ${d.label} (${signed(d.cur - d.prev, fmt)}${driverUnit ? ` ${driverUnit}` : ''})` : '';
         return { text: `${metric} ${up ? 'up' : 'down'} ${fmtPct(p)}${vs}${lead}.`, tone: good ? 'good' : 'bad' };
     }
     // No comparison: name the busiest day.
@@ -95,7 +98,7 @@ export function trendFinding(input: TrendInput): Finding | null {
         const avg = s.reduce((a, b) => a + b.value, 0) / s.length;
         if (best.value > 0 && avg > 0) {
             const x = best.value / avg;
-            return { text: `Busiest day: ${fmtDayLong(best.date).replace(/, \d{4}$/, '')}, ${fmtFull(best.value)} ${metric.toLowerCase()}${x >= 1.2 ? ` (${x.toFixed(1)}× the average day)` : ''}.`, tone: 'info' };
+            return { text: `Busiest day: ${fmtDayLong(best.date).replace(/, \d{4}$/, '')}, ${fmt ? `${amount(best.value)} in ${metric.toLowerCase()}` : `${fmtFull(best.value)} ${metric.toLowerCase()}`}${x >= 1.2 ? ` (${x.toFixed(1)}× the average day)` : ''}.`, tone: 'info' };
         }
     }
     return null;

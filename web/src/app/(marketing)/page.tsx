@@ -63,10 +63,10 @@ export default function HomePage() {
             key: 'site',
             label: 'Site page',
             title: 'Every number for one site',
-            bullets: ['Users, sessions, pageviews, conversions', 'A trend line on every tile', 'Search Console on the same page'],
+            bullets: ['Users, sessions, pageviews, key events', 'A trend line on every tile', 'Search Console on the same page'],
             href: tour.site,
             cta: 'Open a site page',
-            alt: `Site overview for ${tour.host}: users, sessions, pageviews and conversions with trend lines`,
+            alt: `Site overview for ${tour.host}: users, sessions, pageviews and key events with trend lines`,
         },
         {
             key: 'traffic',

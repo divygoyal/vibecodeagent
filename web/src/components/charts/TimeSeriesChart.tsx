@@ -32,6 +32,8 @@ export interface TimeSeriesSeries {
     compareKey?: string;
     /** Legend / tooltip label (defaults to the metric label). */
     label?: string;
+    /** ISO 4217 code for a money metric (revenue): tooltip values read `$1,204`. Default USD. */
+    currency?: string;
 }
 
 export interface TimeSeriesAnnotation {
@@ -154,7 +156,7 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
         const out: Record<string, ReturnType<typeof niceAxis>> = {};
         for (const s of series) {
             const format = METRICS[s.metric].format;
-            out[s.key] = niceAxis(maxOf(data, [s.key, withCompare ? s.compareKey : undefined]), { format: format === 'count' ? 'count' : format });
+            out[s.key] = niceAxis(maxOf(data, [s.key, withCompare ? s.compareKey : undefined]), { format: format === 'count' || format === 'currency' ? 'count' : format });
         }
         return out;
     }, [data, series, withCompare]);
@@ -176,10 +178,10 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
                 key: s.key,
                 label: s.label ?? m.label,
                 color: m.color,
-                value: fmtMetric(s.metric, v ?? null),
+                value: fmtMetric(s.metric, v ?? null, { currency: s.currency }),
                 delta: pv !== undefined ? <MetricDelta metric={s.metric} current={v} previous={pv} /> : undefined,
             });
-            if (pv !== undefined) tRows.push({ key: `${s.key}-prev`, label: 'Previous period', color: m.color, dashed: true, value: fmtMetric(s.metric, pv ?? null) });
+            if (pv !== undefined) tRows.push({ key: `${s.key}-prev`, label: 'Previous period', color: m.color, dashed: true, value: fmtMetric(s.metric, pv ?? null, { currency: s.currency }) });
         }
         const cd = compareDateKey ? row[compareDateKey] : undefined;
         return (

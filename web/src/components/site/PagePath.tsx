@@ -5,23 +5,30 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { splitPagePath } from './lib/pagePath';
 
 /**
- * A page path on one line, shortened in the middle when it does not fit: the
- * head ("/es/tools/ai-ima…") gives way first and the last segment
- * ("/generator") stays readable. "/" reads "/ (home)". With a `title`, hovering
- * shows the page title and the full path in a tooltip; without one, the full path
- * is the native title.
+ * A page path on one line, shortened in the middle when it does not fit: the head ("/es/tools/ai-ima…")
+ * gives way first and the last segment ("/generator") stays readable; the tail is cut only once the head
+ * is down to a few characters, so the whole width of the cell is used. "/" reads "/ (home)".
+ */
+function PathLine({ path, className, nativeTitle }: { path: string; className?: string; nativeTitle?: string }) {
+    const [head, tail] = splitPagePath(path);
+    return (
+        <span className={cn('flex min-w-0 items-baseline whitespace-nowrap', className)} title={nativeTitle}>
+            {/* shrink-[1000]: the head absorbs nearly all the shrinking until it reaches its minimum. */}
+            <span className={cn('truncate', tail ? 'min-w-[2.5ch] shrink-[1000]' : 'min-w-0')}>{head}</span>
+            {tail ? <span className="min-w-0 truncate">{tail}</span> : null}
+        </span>
+    );
+}
+
+/**
+ * The page cell of every page list (Traffic › Pages, Pages, the Overview "Pages" card, Journeys), as in
+ * OpenPanel: the page's title (GA4 pageTitle, brand suffix removed) over its path in muted text. Without a
+ * title, the path alone is the main line. Hovering shows the full title and path.
  */
 export function PagePath({ path, title, className }: { path: string; title?: string | null; className?: string }) {
     const [head, tail] = splitPagePath(path);
     const full = head + tail;
-    const text = (
-        <span className={cn('flex min-w-0 items-baseline whitespace-nowrap', className)} title={title ? undefined : full}>
-            <span className="min-w-0 truncate">{head}</span>
-            {/* The last segment keeps up to 70% of the width; a very long one is cut at its end. */}
-            {tail ? <span className="max-w-[70%] shrink-0 truncate">{tail}</span> : null}
-        </span>
-    );
-    if (!title) return text;
+    if (!title) return <PathLine path={path} className={className} nativeTitle={full} />;
     return (
         <Tooltip
             content={(
@@ -32,7 +39,10 @@ export function PagePath({ path, title, className }: { path: string; title?: str
             )}
             className="max-w-80"
         >
-            {text}
+            <span className={cn('flex min-w-0 flex-col', className)}>
+                <span className="truncate">{title}</span>
+                <PathLine path={path} className="text-meta font-normal text-fg-muted" />
+            </span>
         </Tooltip>
     );
 }
