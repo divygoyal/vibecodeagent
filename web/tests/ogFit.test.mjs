@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const { fontMeasurer, fitText, fitSize, wrapLines, ellipsize, noLigatures } = await import('../src/lib/ogFit.ts');
+const { fontMeasurer, fitText, fitSize, wrapLines, ellipsize } = await import('../src/lib/ogFit.ts');
 const bold = fontMeasurer(readFileSync(new URL('../public/og-fonts/Geist-Bold.ttf', import.meta.url)));
 const regular = fontMeasurer(readFileSync(new URL('../public/og-fonts/Geist-Regular.ttf', import.meta.url)));
 
@@ -59,10 +59,4 @@ test('wrapLines and ellipsize basics', () => {
     assert.deepEqual(wrapLines('a b', bold, 40, 1000), ['a b']);
     assert.equal(ellipsize('short', bold, 40, 1000), 'short');
     assert.ok(ellipsize('x'.repeat(100), bold, 40, 200).endsWith('…'));
-});
-
-test('noLigatures puts a zero-width non-joiner inside f-ligatures only', () => {
-    assert.equal(noLigatures('Verified traffic'), 'Verif‌ied traf‌f‌ic');
-    assert.equal(noLigatures('Google leaderboard'), 'Google leaderboard');
-    assert.equal(noLigatures('0%'), '0%');
 });

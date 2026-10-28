@@ -118,11 +118,3 @@ export function fitSize(text: string, measure: Measure, opts: { maxWidth: number
     const { maxWidth, sizes, letterSpacing = 0 } = opts;
     return sizes.find((s) => measure(text, s, letterSpacing) <= maxWidth) ?? sizes[sizes.length - 1];
 }
-
-/**
- * Geist's f-ligatures (fi, fl, ff, ffi) are measured as separate glyphs by the image renderer but drawn as one, which
- * leaves a gap after the word ("Verified  traffic"). A zero-width non-joiner between the letters keeps them separate glyphs.
- */
-export function noLigatures(text: string): string {
-    return text.replace(/f(?=[fijlt])/g, 'f‌');
-}

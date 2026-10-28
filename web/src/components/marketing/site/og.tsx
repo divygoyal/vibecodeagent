@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
 
 import { BRAND_NAME, SITE_HOST } from '@/lib/brand';
-import { fitText, fontMeasurer, noLigatures, type FittedText, type Measure } from '@/lib/ogFit';
+import { fitText, fontMeasurer, type FittedText, type Measure } from '@/lib/ogFit';
 
 /** Shared Open Graph card for marketing pages: light, pine mark, big title, a quiet sparkline card. */
 export const OG_SIZE = { width: 1200, height: 630 };
@@ -96,22 +96,9 @@ export async function ogFitBold(text: string, opts: { maxWidth: number; sizes: n
     return fitText(text, (await ogMeasure()).bold, opts);
 }
 
-/** Geist's f-ligatures leave a gap after the word in the renderer; break them in every text node (see noLigatures). */
-function unligature(node: React.ReactNode): React.ReactNode {
-    if (typeof node === 'string') return noLigatures(node);
-    if (Array.isArray(node)) return node.map(unligature);
-    if (node && typeof node === 'object' && 'props' in node) {
-        const el = node as React.ReactElement<{ children?: React.ReactNode }>;
-        const children = el.props.children;
-        if (children === undefined) return el;
-        return { ...el, props: { ...el.props, children: unligature(children) } };
-    }
-    return node;
-}
-
 export async function ogRender(node: React.ReactElement): Promise<ImageResponse> {
     const fonts = await ogFonts();
-    return new ImageResponse(unligature(node) as React.ReactElement, { ...OG_SIZE, ...(fonts.length ? { fonts } : {}) });
+    return new ImageResponse(node, { ...OG_SIZE, ...(fonts.length ? { fonts } : {}) });
 }
 
 export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }): Promise<ImageResponse> {
