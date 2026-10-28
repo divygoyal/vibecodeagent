@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
 
 import { BRAND_NAME, SITE_HOST } from '@/lib/brand';
@@ -54,18 +56,44 @@ function Mark() {
     );
 }
 
-export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }): ImageResponse {
+type OgFont = { name: string; data: ArrayBuffer; weight: 400 | 700; style: 'normal' };
+let fontsPromise: Promise<OgFont[]> | null = null;
+
+/**
+ * Geist Regular + Bold from public/og-fonts (OFL), so share images use the site's face with a real bold. public/ ships
+ * next to the standalone server, so process.cwd() finds it in dev and in the container. Missing files fall back to
+ * the renderer's built-in font rather than failing the image.
+ */
+function ogFonts(): Promise<OgFont[]> {
+    fontsPromise ??= Promise.all(
+        ([['Geist-Regular.ttf', 400], ['Geist-Bold.ttf', 700]] as const).map(async ([file, weight]) => {
+            const buf = await readFile(join(process.cwd(), 'public', 'og-fonts', file));
+            return { name: 'Geist', data: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer, weight, style: 'normal' as const };
+        }),
+    ).catch(() => {
+        fontsPromise = null;
+        return [];
+    });
+    return fontsPromise;
+}
+
+async function render(node: React.ReactElement): Promise<ImageResponse> {
+    const fonts = await ogFonts();
+    return new ImageResponse(node, { ...OG_SIZE, ...(fonts.length ? { fonts } : {}) });
+}
+
+export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }): Promise<ImageResponse> {
     const a = curve(28, 1, 0.55);
     const b = curve(28, 2.4, 0.35);
     const W = 360;
     const H = 120;
     const titleSize = title.length > 46 ? 56 : title.length > 30 ? 64 : 72;
-    return new ImageResponse(
+    return render(
         (
-            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: C.canvas, padding: 72, color: C.fg }}>
+            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: C.canvas, padding: 72, color: C.fg, fontFamily: 'Geist' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
                     <Mark />
-                    <div style={{ display: 'flex', fontSize: 34, letterSpacing: -0.5, color: C.fg }}>{BRAND_NAME}</div>
+                    <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: -0.5, color: C.fg }}>{BRAND_NAME}</div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 48 }}>
@@ -75,7 +103,7 @@ export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: strin
                                 {eyebrow}
                             </div>
                         ) : null}
-                        <div style={{ display: 'flex', fontSize: titleSize, lineHeight: 1.08, letterSpacing: -2, color: C.fg }}>{title}</div>
+                        <div style={{ display: 'flex', fontSize: titleSize, fontWeight: 700, lineHeight: 1.06, letterSpacing: -2.5, color: C.fg }}>{title}</div>
                         {subtitle ? <div style={{ display: 'flex', marginTop: 24, fontSize: 28, lineHeight: 1.35, color: C.fg2 }}>{subtitle}</div> : null}
                     </div>
 
@@ -96,6 +124,119 @@ export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: strin
                 </div>
             </div>
         ),
-        OG_SIZE,
+    );
+}
+
+const D = {
+    canvas: '#0b0c0f',
+    surface: '#15171c',
+    surface2: '#1b1e24',
+    border: '#2a2e36',
+    fg: '#f4f5f7',
+    fg2: '#a3aab6',
+    muted: '#7c8492',
+    green: '#43d19e',
+    up: '#3fcf8e',
+    down: '#f16d6d',
+    clicks: '#4c86f0',
+    users: '#8b7ff5',
+};
+
+/** One portfolio card row for the home share image: the app's demo sites (sample data, .example hosts). */
+const HOME_SITES = [
+    { host: 'acmeanalytics.example', letter: 'A', users: '47.4K', change: 10.3, seed: 0.4, rise: 0.5 },
+    { host: 'healthinsights.example', letter: 'H', users: '49.5K', change: -2.9, seed: 2.1, rise: -0.1 },
+    { host: 'searchmetrics.example', letter: 'S', users: '291K', change: 1.4, seed: 3.3, rise: 0.15 },
+];
+
+function Change({ value, size = 22 }: { value: number; size?: number }) {
+    const up = value >= 0;
+    return (
+        <div style={{ display: 'flex', fontSize: size, fontWeight: 700, color: up ? D.up : D.down }}>
+            {`${up ? '▲' : '▼'}${Math.abs(value).toFixed(1)}%`}
+        </div>
+    );
+}
+
+/**
+ * The home page's share card: dark (so it stands out in light feeds), the headline in Geist Bold with "Free." in brand
+ * green, and a small portfolio panel in the app's own style (totals strip, three site rows with sparklines).
+ */
+export function homeOgImage(): Promise<ImageResponse> {
+    const W = 112;
+    const H = 38;
+    return render(
+        <div style={{ width: '100%', height: '100%', display: 'flex', position: 'relative', background: D.canvas, color: D.fg, fontFamily: 'Geist', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: -260, right: -180, width: 760, height: 760, borderRadius: 999, display: 'flex', background: 'radial-gradient(circle, rgba(67,209,158,0.20) 0%, rgba(67,209,158,0) 65%)' }} />
+
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: 600, padding: '64px 0 60px 64px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <Mark />
+                    <div style={{ display: 'flex', fontSize: 32, fontWeight: 700, letterSpacing: -0.5 }}>{BRAND_NAME}</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', fontSize: 74, fontWeight: 700, lineHeight: 1.02, letterSpacing: -3 }}>All your sites.</div>
+                    <div style={{ display: 'flex', fontSize: 74, fontWeight: 700, lineHeight: 1.02, letterSpacing: -3 }}>One screen.</div>
+                    <div style={{ display: 'flex', fontSize: 74, fontWeight: 700, lineHeight: 1.02, letterSpacing: -3, color: D.green }}>Free.</div>
+                    <div style={{ display: 'flex', marginTop: 26, fontSize: 27, lineHeight: 1.35, color: D.fg2 }}>
+                        Google Analytics 4 and Search Console for every site you own.
+                    </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 21, color: D.fg2 }}>
+                    {['Read-only', 'No card', 'ChatGPT & Claude'].map((t) => (
+                        <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 999, border: `1px solid ${D.border}`, background: 'rgba(255,255,255,0.03)' }}>
+                            <svg width="18" height="18" viewBox="0 0 18 18"><path d="M3.5 9.5 L7.5 13 L14.5 5" stroke={D.green} strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            <div style={{ display: 'flex' }}>{t}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div style={{ position: 'absolute', top: 86, left: 676, width: 480, display: 'flex', flexDirection: 'column', background: D.surface, border: `1px solid ${D.border}`, borderRadius: 26, padding: 26, boxShadow: '0 30px 80px rgba(0,0,0,0.55)' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', fontSize: 28, fontWeight: 700 }}>Portfolio</div>
+                    <div style={{ display: 'flex', fontSize: 18, color: D.muted }}>11 sites · last 28 days</div>
+                </div>
+                <div style={{ display: 'flex', marginTop: 16, border: `1px solid ${D.border}`, borderRadius: 16, background: D.surface2 }}>
+                    {[
+                        { label: 'Clicks', value: '408K', change: -3.8, dot: D.clicks },
+                        { label: 'Users', value: '470K', change: 2.4, dot: D.users },
+                    ].map((m, i) => (
+                        <div key={m.label} style={{ display: 'flex', flexDirection: 'column', flex: 1, padding: '14px 18px', borderLeft: i ? `1px solid ${D.border}` : 'none' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: D.fg2 }}>
+                                <div style={{ display: 'flex', width: 10, height: 10, borderRadius: 999, background: m.dot }} />
+                                <div style={{ display: 'flex' }}>{m.label}</div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 4 }}>
+                                <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: -1 }}>{m.value}</div>
+                                <Change value={m.change} size={19} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {HOME_SITES.map((s) => {
+                    const v = curve(24, s.seed, s.rise > 0 ? s.rise : 0.05).map((x, i) => (s.rise < 0 ? x - 0.012 * i : x));
+                    const color = s.change >= 0 ? D.up : D.down;
+                    return (
+                        <div key={s.host} style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 14, padding: '12px 16px', border: `1px solid ${D.border}`, borderRadius: 16 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 9, background: D.surface2, border: `1px solid ${D.border}`, fontSize: 17, fontWeight: 700, color: D.fg2 }}>{s.letter}</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                <div style={{ display: 'flex', fontSize: 19, fontWeight: 700 }}>{s.host}</div>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+                                    <div style={{ display: 'flex', fontSize: 18, color: D.fg2 }}>{`${s.users} users`}</div>
+                                    <Change value={s.change} size={16} />
+                                </div>
+                            </div>
+                            <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+                                <path d={`${path(v, W, H)} L${W} ${H} L0 ${H} Z`} fill={color} fillOpacity={0.12} />
+                                <path d={path(v, W, H)} stroke={color} strokeWidth={2.5} fill="none" strokeLinejoin="round" />
+                            </svg>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div style={{ position: 'absolute', right: 56, bottom: 30, display: 'flex', fontSize: 20, color: D.muted }}>{`${SITE_HOST} · sample data`}</div>
+        </div>,
     );
 }
