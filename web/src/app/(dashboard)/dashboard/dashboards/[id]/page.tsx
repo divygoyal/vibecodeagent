@@ -63,10 +63,10 @@ export default function DashboardViewPage({ params }: { params: Promise<{ id: st
             </div>
         );
     }
-    return <Loaded rec={rec} onRecord={(r) => mutate({ dashboard: r }, { revalidate: false })} openShare={sp.get('share') === '1'} tv={sp.get('tv') === '1'} router={router} />;
+    return <Loaded rec={rec} onRecord={(r) => mutate({ dashboard: r }, { revalidate: false })} openShare={sp.get('share') === '1'} tv={sp.get('tv') === '1'} created={sp.get('created') === '1'} router={router} />;
 }
 
-function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord; onRecord: (r: DashboardRecord) => void; openShare: boolean; tv: boolean; router: ReturnType<typeof useRouter> }) {
+function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: DashboardRecord; onRecord: (r: DashboardRecord) => void; openShare: boolean; tv: boolean; created: boolean; router: ReturnType<typeof useRouter> }) {
     const doc = rec.doc;
     const appMode = useResolvedTheme();
     const ctl = useUrlControls(doc, { date: true, compare: true, filters: true });
@@ -164,7 +164,11 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
                     </DropdownMenu>
                 </div>
             </div>
-            {!wide && editNote ? (
+            {created ? (
+                <Banner variant="success" title="Dashboard created" onDismiss={() => router.replace(`/dashboard/dashboards/${rec.id}`, { scroll: false })}>
+                    It shows your live data now, and you can share it from here. To change its widgets and layout, open it on a computer.
+                </Banner>
+            ) : !wide && editNote ? (
                 <Banner variant="neutral" onDismiss={() => setEditNote(false)}>Editing works on larger screens. Open this dashboard on a computer to change its widgets and layout.</Banner>
             ) : null}
         </div>

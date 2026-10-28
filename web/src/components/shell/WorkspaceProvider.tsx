@@ -258,6 +258,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
                         sessionStorage.setItem('tc-registered', 'true');
                         sessionStorage.setItem('tc-registered-user', session.user?.email || session.user?.name || '');
                         setRegistrationState({ isRegistered: true, isRegistering: false, registrationError: null });
+                    } else if (data?.skipped) {
+                        // Nothing to sync for this session (no token for the provider): remember it for the tab like a
+                        // success, so the next pages do not post again (round 7 audit #15).
+                        sessionStorage.setItem('tc-registered', 'true');
+                        sessionStorage.setItem('tc-registered-user', session.user?.email || session.user?.name || '');
+                        setRegistrationState({ isRegistered: true, isRegistering: false, registrationError: null });
                     } else if (data?.registered || data?.degraded) {
                         applyDegradedRegistration(data?.reason);
                     } else {

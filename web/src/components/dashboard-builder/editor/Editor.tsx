@@ -34,7 +34,7 @@ import { DateControl, FilterControlView } from '../Controls';
 import { ShareDialog } from '../ShareDialog';
 import { textVars } from '../DashboardView';
 import { useElementHeight, useElementWidth } from '../useElementWidth';
-import { fetchJson, useInlineResult, QueryHttpError, type InlineCtx } from '../useWidgetData';
+import { fetchJson, useInlineResult, type InlineCtx } from '../useWidgetData';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
 import { LeftPanel } from './LeftPanel';
 import { VersionsDialog } from './VersionsDialog';
@@ -42,6 +42,7 @@ import { openAppearance, PropertiesPanel } from './PropertiesPanel';
 import { notifyReadOnly } from '@/components/demo/DemoBar';
 import { useDemoSession } from '@/components/demo/useDemoSession';
 import type { SiteOption } from './Fields';
+import { createAutosave } from './autosave';
 
 const VIEWPORT_W: Record<Viewport, number | null> = { desktop: null, tablet: 768, phone: 390 };
 /** Narrowest desktop canvas: about what the dashboard page gets on a 1280 px screen with the sidebar open. */
@@ -113,28 +114,19 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
         useEditorStore.getState().load(initial);
     }, [initial]);
 
-    // ── autosave (800 ms after the last change) ──
-    const save = useCallback(async (force?: boolean) => {
-        const st = useEditorStore.getState();
-        if (!st.doc || !st.id) return;
-        const docToSave = st.doc;
-        let rev = st.rev;
-        if (force) {
-            const cur = await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${st.id}`);
-            rev = cur.dashboard.rev;
-        }
-        st.setStatus('saving');
-        try {
-            const r = await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${st.id}`, { method: 'PUT', headers: { 'If-Match': String(rev) }, body: JSON.stringify({ doc: docToSave }) });
-            useEditorStore.getState().markSaved(r.dashboard.rev, docToSave);
-        } catch (e) {
-            if (e instanceof QueryHttpError && e.status === 412) useEditorStore.getState().setStatus('conflict');
-            else {
-                useEditorStore.getState().setStatus('error');
-                toast.error(e instanceof Error ? e.message : 'Could not save');
-            }
-        }
-    }, []);
+    // ── autosave (800 ms after the last change), one PUT at a time with the latest rev (editor/autosave.ts) ──
+    const [save] = useState(() => createAutosave<DashboardDocV2>({
+        get: () => useEditorStore.getState(),
+        put: async (id, doc, rev) => (await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${id}`, { method: 'PUT', headers: { 'If-Match': String(rev) }, body: JSON.stringify({ doc }) })).dashboard.rev,
+        latestRev: async (id) => (await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${id}`)).dashboard.rev,
+        setSaving: () => useEditorStore.getState().setStatus('saving'),
+        markSaved: (rev, doc) => useEditorStore.getState().markSaved(rev, doc),
+        conflict: () => useEditorStore.getState().setStatus('conflict'),
+        failed: (e) => {
+            useEditorStore.getState().setStatus('error');
+            toast.error(e instanceof Error ? e.message : 'Could not save');
+        },
+    }));
     // Public live demo: edits stay in this tab (nothing is saved, no "leave page?" prompt); say so once.
     const { demo } = useDemoSession();
     const demoNoticeShown = useRef(false);

@@ -30,6 +30,19 @@ export async function POST(req: NextRequest) {
     try {
         const sync = await ensureAdminUserSynced(session, targetProvider)
 
+        if (!sync.synced && 'skipped' in sync && sync.skipped) {
+            // Nothing to sync, not a failure (round 7 audit #15): a session without that provider's token (a GitHub-only
+            // user has no Google token to store) or a setup without the admin key. 200, so the browser logs no error;
+            // `skipped` tells the app not to post again for this session.
+            return NextResponse.json({
+                registered: false,
+                synced: false,
+                degraded: true,
+                skipped: true,
+                reason: sync.reason,
+            })
+        }
+
         if (!sync.synced) {
             console.warn("Register provider degraded:", sync.reason)
             const status = 'status' in sync && typeof sync.status === 'number' && sync.status >= 400

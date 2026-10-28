@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { mutate } from 'swr';
 
 import { Button } from '@/components/ui/Button';
 import { DEMO_HEADER, DEMO_READONLY_MESSAGE } from '@/lib/publicDemo/config';
@@ -16,6 +17,19 @@ export function notifyReadOnly() {
         description: 'Connect Google to do this on your own sites. It is free.',
         action: { label: 'Connect Google', onClick: connectGoogleFromDemo },
         duration: 6000,
+    });
+}
+
+/**
+ * The demo's API limit (middleware demoTooFast: 429, `x-tc-demo: busy`) can trip for a shared office or school IP.
+ * Cards would wait on skeletons or show a generic error; this says what happened and retries everything on the page.
+ */
+function notifyBusy() {
+    toast.info('Too many demo visitors right now', {
+        id: 'tc-demo-busy',
+        description: 'Some numbers could not load. Try again in a minute.',
+        action: { label: 'Try again', onClick: () => { void mutate(() => true); } },
+        duration: 15000,
     });
 }
 
@@ -44,6 +58,7 @@ function useDemoActionNotice(active: boolean) {
                 const flag = res.headers.get(DEMO_HEADER);
                 if (flag === 'readonly') notifyReadOnly();
                 else if (flag === 'ended') notifyEnded();
+                else if (flag === 'busy') notifyBusy();
             } catch { /* opaque responses */ }
             return res;
         };
