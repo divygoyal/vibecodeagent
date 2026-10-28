@@ -76,6 +76,8 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
     const [share, setShare] = useState(openShare);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [wide, setWide] = useState(true);
+    // Phones and small tablets: the "editing needs a larger screen" note only after a tap on Edit (round 5 audit #28).
+    const [editNote, setEditNote] = useState(false);
     const exportRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const mq = window.matchMedia('(min-width: 1024px)');
@@ -145,7 +147,9 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
                 </div>
                 <div className="flex items-center gap-2" data-pdf-ignore="true">
                     <Button variant="ghost" size="md" icon={RefreshCw} iconOnly aria-label="Refresh data" onClick={() => { setFresh(true); void page.mutate().finally(() => setFresh(false)); }} />
-                    {wide ? <Button asChild variant="secondary" icon={Pencil}><Link href={`/dashboard/dashboards/${rec.id}/edit`} onClick={() => noteOlderDashboard(rec)}>Edit</Link></Button> : null}
+                    {wide
+                        ? <Button asChild variant="secondary" icon={Pencil}><Link href={`/dashboard/dashboards/${rec.id}/edit`} onClick={() => noteOlderDashboard(rec)}>Edit</Link></Button>
+                        : <Button variant="secondary" icon={Pencil} aria-expanded={editNote} onClick={() => setEditNote((v) => !v)}>Edit</Button>}
                     <Button variant="primary" icon={Share2} onClick={() => setShare(true)}>Share</Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" iconOnly icon={MoreHorizontal} aria-label="More actions" /></DropdownMenuTrigger>
@@ -160,7 +164,9 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
                     </DropdownMenu>
                 </div>
             </div>
-            {!wide ? <Banner variant="neutral">Editing works on larger screens.</Banner> : null}
+            {!wide && editNote ? (
+                <Banner variant="neutral" onDismiss={() => setEditNote(false)}>Editing works on larger screens. Open this dashboard on a computer to change its widgets and layout.</Banner>
+            ) : null}
         </div>
     );
 

@@ -227,7 +227,9 @@ export function PortfolioGridView(props: WidgetViewProps<PortfolioGridWidget>) {
         }
         return m;
     }, [spark, metrics]);
-    const shown = showAll ? sorted : sorted.slice(0, c.limit);
+    // Phones: the card grows with its content (DashboardCanvas growsOnPhone), so show the first few and "Show all".
+    const limit = props.bp === 'sm' ? Math.min(c.limit, c.show === 'compact' ? 8 : 4) : c.limit;
+    const shown = showAll ? sorted : sorted.slice(0, limit);
     const cols = c.columns === 'auto' ? (props.bp === 'sm' ? 1 : props.bp === 'md' ? 2 : 3) : c.columns;
     return (
         <WidgetFrame props={props} bodyClassName="overflow-y-auto">
@@ -245,7 +247,11 @@ export function PortfolioGridView(props: WidgetViewProps<PortfolioGridWidget>) {
                                 <>
                                     <div className="flex min-w-0 items-center gap-2">
                                         <Favicon host={site.replace(/--\d+$/, '')} size={16} />
-                                        <span className="truncate text-title-sm text-fg">{sites.labels?.[site] ?? site}</span>
+                                        <span className="truncate text-title-sm text-fg" title={sites.sublabels?.[site] ? `${sites.labels?.[site] ?? site} · ${sites.sublabels[site]}` : undefined}>
+                                            {sites.labels?.[site] ?? site}
+                                            {/* Host first, the GA4 property name after it in muted text (round 5 audit #14). */}
+                                            {sites.sublabels?.[site] ? <span className="ml-1.5 text-body-sm font-normal text-fg-muted">{sites.sublabels[site]}</span> : null}
+                                        </span>
                                         {alert ? <span className="ml-auto shrink-0 rounded-badge bg-down-soft px-1.5 text-caption text-down">Drop</span> : null}
                                     </div>
                                     <div className={cn('mt-2 grid gap-x-3 gap-y-1', c.show === 'compact' ? 'grid-cols-4' : 'grid-cols-2')}>
@@ -274,7 +280,7 @@ export function PortfolioGridView(props: WidgetViewProps<PortfolioGridWidget>) {
                                 : <div key={site} className={cls}>{body}</div>;
                         })}
                     </div>
-                    {sorted.length > c.limit ? (
+                    {sorted.length > limit ? (
                         <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-3 text-body-sm font-medium text-brand-text hover:underline">{showAll ? 'Show fewer' : `Show all ${sorted.length} sites`}</button>
                     ) : null}
                 </>

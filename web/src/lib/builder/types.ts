@@ -492,6 +492,8 @@ export interface DataFrame {
     seriesKeys?: string[];
     /** Display names for 'site' values (and site series keys): siteId -> name. */
     labels?: Record<string, string>;
+    /** Owner views only: the GA4 property name under a site's host (siteId -> name), when it says more than the host. */
+    sublabels?: Record<string, string>;
 }
 
 export interface ResultFlags {

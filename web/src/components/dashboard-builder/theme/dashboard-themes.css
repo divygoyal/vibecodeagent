@@ -322,3 +322,22 @@
    ===================================================================== */
 [data-tv-root] { cursor: default; }
 [data-tv-root][data-tv-idle="1"], [data-tv-root][data-tv-idle="1"] * { cursor: none !important; }
+
+/* =====================================================================
+   9. Theme picker thumbnails (ThemeSwatch, round 5 audit #22): the same tokens and card rules as a
+      dashboard, scaled down so a 130 px card still shows its shape, pattern and glow.
+   ===================================================================== */
+[data-dash-swatch] { --tc-dash-canvas-size: 8px 8px; }
+[data-dash-swatch] [data-dash-widget] { border-radius: calc(var(--tc-dash-radius) / 3); }
+[data-dash-swatch][data-dash-card="ruled"] [data-dash-widget] { border-radius: 0; }
+[data-dash-swatch][data-dash-theme="executive"] [data-dash-widget] { border-top-width: 2px; }
+[data-dash-swatch][data-dash-theme="contrast"] [data-dash-widget] { border-width: 1.5px; }
+[data-dash-swatch][data-dash-pattern="dots"] { --tc-dash-canvas-size: 6px 6px; }
+[data-dash-swatch][data-dash-pattern="glow"] {
+  --tc-dash-canvas-image: radial-gradient(140px 54px at 50% -14px, color-mix(in oklab, var(--tc-brand) 34%, transparent), transparent);
+  --tc-dash-canvas-size: auto;
+}
+[data-dash-swatch][data-dash-card="glass"] [data-dash-widget] { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 3px 8px -4px rgb(0 0 0 / 0.5); }
+[data-dash-swatch][data-dash-theme="studio"] [data-dash-header] { border-bottom-width: 2px; }
+[data-dash-swatch] [data-swatch-num] { font-size: calc(10.5px * var(--tc-dash-stat-scale)); font-family: var(--tc-dash-font-num, inherit); letter-spacing: -0.02em; }
+[data-dash-swatch][data-dash-theme="executive"] [data-swatch-num] { font-family: var(--font-source-serif), Georgia, serif; }

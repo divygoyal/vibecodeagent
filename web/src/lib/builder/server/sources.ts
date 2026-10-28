@@ -31,14 +31,31 @@ export interface SiteDirectory {
     errors: Inventory['errors'];
 }
 
+const isHostname = (h: string | undefined): h is string => Boolean(h && /^[a-z0-9.-]+$/.test(h) && h.includes('.'));
+
 function siteIdFor(pair: SitePair): string {
     const host = pair.host;
-    if (host && /^[a-z0-9.-]+$/.test(host) && host.includes('.')) return host;
+    if (isHostname(host)) return host;
     const digits = pair.ga4?.property.replace(/\D/g, '');
     return digits ? `ga4-${digits}` : `site-${pair.key.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
 }
 
-/** Deterministic site ids: the host, '--2', '--3' for collisions (DESIGN.md 4.2). */
+/** What tells a second Search Console property for the same host apart, without its URL. */
+function variantOf(siteUrl: string | undefined): string | null {
+    if (!siteUrl) return 'Analytics';
+    if (siteUrl.startsWith('sc-domain:')) return 'domain';
+    if (/^http:\/\//i.test(siteUrl)) return 'http';
+    if (/^https?:\/\/www\./i.test(siteUrl)) return 'www';
+    return null;
+}
+
+/**
+ * Deterministic site ids: the host, '--2', '--3' for collisions (DESIGN.md 4.2).
+ *
+ * One naming rule (round 5, audit #14): a site is named by its host, also when it has only a GA4
+ * property (its web stream host); the GA4 display name is kept apart (`ga4Name`) for a subtitle. A
+ * second property on the same host says which one it is ("acme.com (http)").
+ */
 export function buildDirectory(inv: Inventory): SiteDirectory {
     const pairs = pairSites(inv.properties, inv.sites);
     const rank = (p: SitePair) => (p.ga4 && p.gsc ? 0 : p.gsc ? 1 : 2);
@@ -50,12 +67,13 @@ export function buildDirectory(inv: Inventory): SiteDirectory {
         const n = (used.get(id) ?? 0) + 1;
         used.set(id, n);
         if (n > 1) id = `${id}--${n}`;
-        // Two Search Console properties for one host (http vs https, www): number them. The
+        // Two Search Console properties for one host (http vs https, www): name the variant. The
         // label never contains the property URL (labels reach public viewers).
-        const base = p.gsc ? normalizeHost(p.gsc.siteUrl) : p.ga4?.displayName ?? id;
+        const host = p.gsc ? normalizeHost(p.gsc.siteUrl) : isHostname(p.host) ? p.host : undefined;
+        const base = host ?? p.ga4?.displayName ?? id;
         sites.push({
             siteId: id,
-            label: n > 1 ? `${base} (${n})` : base,
+            label: n > 1 ? `${base} (${variantOf(p.gsc?.siteUrl) ?? n})` : base,
             ga4: p.ga4?.property,
             gsc: p.gsc?.siteUrl,
             ga4Name: p.ga4?.displayName,
@@ -131,8 +149,21 @@ export function sourceLabel(src: SourceRef, dir: SiteDirectory | null, defaultLa
     }
     if (src.type === 'default') return defaultLabel ?? 'Default site';
     const known = dir?.byId.get(src.siteId);
-    if (known) return known.gsc ? known.label : known.ga4Name ?? known.label;
+    if (known) return known.label;
     if (src.gsc) return normalizeHost(src.gsc);
     // Never show property digits (siteId 'ga4-123') as a name.
     return src.siteId.startsWith('ga4-') ? 'Analytics property' : src.siteId;
+}
+
+/**
+ * The GA4 property name as a subtitle under a site's host, unless it only repeats the host
+ * ("Puzzle Hub" for puzzlehub.example, "Acme.com" for acme.com): "Search Metrics – Marketing site".
+ */
+export function siteSubLabel(site: Pick<ResolvedSite, 'label' | 'ga4Name'>): string | undefined {
+    const name = site.ga4Name?.trim();
+    if (!name) return undefined;
+    const flat = (v: string) => v.toLowerCase().replace(/^www\./, '').replace(/[^a-z0-9]/g, '');
+    const host = site.label.replace(/ \(.*\)$/, '');
+    const n = flat(name);
+    return n === flat(host) || n === flat(host.replace(/\.[a-z0-9-]+$/i, '')) ? undefined : name;
 }
