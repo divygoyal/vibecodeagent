@@ -9,8 +9,9 @@
  */
 import { GOOGLE_UPDATES, type GoogleUpdate } from '@/lib/googleUpdates';
 import { getMetric } from './catalog';
+import { applyViewerControls, type CompileCtx } from './compile';
 import { daysBetween, resolveRange } from './dates';
-import type { AnnotationMode, CellValue, Iso, MetricId, RefLine, ResolvedDates, WidgetDef } from './types';
+import type { AnnotationMode, CellValue, Iso, MetricId, RefLine, ResolvedDates, SourceRef, WidgetDef } from './types';
 
 // ── Ranges ───────────────────────────────────────────────────────────────
 
@@ -27,6 +28,16 @@ export const showsNotes = (mode: AnnotationMode | undefined) => ['all', 'notes']
 export const showsGoogle = (mode: AnnotationMode | undefined) => ['all', 'google'].includes(annotationMode(mode));
 
 // ── Notes scope ──────────────────────────────────────────────────────────
+
+/**
+ * The source a chart's notes are read for: the source the widget's data comes from once the viewer's
+ * site switcher is applied (applyViewerControls, the same resolution the engine plans Google calls
+ * with), else the dashboard's default source. `view` absent = the widget as saved.
+ */
+export function notesSourceOf(widget: WidgetDef, defaultSource: SourceRef, view?: CompileCtx): SourceRef {
+    const w = view ? applyViewerControls(widget, view) : widget;
+    return w.source && w.source.type !== 'default' ? w.source : defaultSource;
+}
 
 /** Where a site's notes live: its GA4 property, else its Search Console property (as on the site pages). */
 export function noteScopeOf(site: { ga4?: string | null; gsc?: string | null } | null | undefined): string | null {
@@ -180,7 +191,8 @@ const PER_SUFFIX = { day: '/day', week: '/week', month: '/month' } as const;
 
 /**
  * Lines to draw on a chart. A line whose metric is not on the chart, or without a usable value, is
- * skipped. `fmt` formats a value of a metric for the label.
+ * skipped. Per-day / week / month / period values scale only for additive metrics (getMetric: a
+ * calculated difference of additive metrics is additive; ratios, per 1,000 and % of total are not). `fmt` formats a value of a metric for the label.
  */
 export function resolveRefLines(lines: RefLine[] | undefined, ctx: {
     rows: Array<Record<string, CellValue>>;
@@ -197,7 +209,9 @@ export function resolveRefLines(lines: RefLine[] | undefined, ctx: {
     const rangeDays = daysBetween(ctx.range.start, ctx.range.end);
     const out: ResolvedRefLine[] = [];
     lines.slice(0, 3).forEach((l, i) => {
-        const metric = l.metric && ctx.metrics.includes(l.metric) ? l.metric : l.metric && !ctx.breakdown ? null : ctx.metrics[0];
+        // A line set for a metric the chart does not plot (a breakdown shows its first metric only; the
+        // editor or the metric switcher changed it) is skipped, never drawn on another metric's scale.
+        const metric = l.metric ? (ctx.metrics.includes(l.metric) ? l.metric : null) : ctx.metrics[0];
         if (!metric) return;
         const name = l.label?.trim() || DEFAULT_LABEL[l.kind];
         let y: number | null;

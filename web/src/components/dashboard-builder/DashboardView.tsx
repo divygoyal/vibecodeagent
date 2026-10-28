@@ -225,7 +225,7 @@ export function DashboardView({
     };
 
     return (
-        <ChartNotesProvider value={notes ?? { kind: 'none' }}>
+        <ChartNotesProvider value={notes?.kind === 'owner' ? { ...notes, view: { controlDefs: doc.controls, controls: state, pageId: page?.id } } : notes ?? { kind: 'none' }}>
         <div ref={exportRef} {...root?.attrs} {...(root ? { 'data-dash-panel': '' } : {})} style={root?.style} className={cn('flex flex-col gap-4', contained && 'mx-auto w-full max-w-[1440px]', root?.className)}>
             {tv ? null : themed ? <div data-dash-header="">{header}</div> : header}
             {cover ? (

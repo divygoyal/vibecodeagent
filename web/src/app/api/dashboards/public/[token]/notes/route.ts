@@ -1,21 +1,21 @@
 import { NextResponse } from 'next/server';
-import { annotationMode, showsNotes, toPublicNotes, widgetRange, type PublicNote } from '@/lib/builder/chartMarks';
+import { toPublicNotes, widgetRange, type PublicNote } from '@/lib/builder/chartMarks';
 import { resolveRange, todayIn } from '@/lib/builder/dates';
-import { publicControlsFromQuery } from '@/lib/builder/publicDoc';
 import { checkUnlockKey, clientIp, rateLimited, unlockKeyFrom } from '@/lib/builder/server/access';
-import { ownerNotes, noteScopesFor } from '@/lib/builder/server/notes';
-import { directoryFor, jsonError, pageWidgets } from '@/lib/builder/server/service';
+import { ownerNotes, noteScopesFor, publicNoteTargets } from '@/lib/builder/server/notes';
+import { directoryFor, jsonError } from '@/lib/builder/server/service';
 import { getPublicRow, isShareToken, toRecord } from '@/lib/builder/server/store';
-import type { SourceRef } from '@/lib/builder/types';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/dashboards/public/[token]/notes?page=&range=&compare=&f.<controlId>=
+ * GET /api/dashboards/public/[token]/notes?page=&range=&compare=&f.<controlId>=&s.<controlId>=
  * The owner's chart notes on one page of a shared dashboard, by time series widget: { notes: { [widgetId]: [{ date, title }] } }.
  * Only when the owner switched "Show my chart notes" on (doc.settings.shareNotes); otherwise empty.
  * Dates follow the same viewer state rules as the data query (only what the owner allows), so a
- * viewer can never read notes outside the ranges the dashboard can show. No ids, scopes or descriptions.
+ * viewer can never read notes outside the ranges the dashboard can show, and a site switcher pick maps to
+ * a site exactly as on the query route (opaque keys of allowed sites only, when viewers may switch), so
+ * a viewer never reads notes of a site the share does not offer. No ids, scopes or descriptions.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
@@ -34,18 +34,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     const out: Record<string, PublicNote[]> = {};
     if (!rec.doc.settings.shareNotes) return NextResponse.json({ notes: out }, { headers });
 
-    const controls = publicControlsFromQuery(new URL(req.url).searchParams, rec.doc, rec.share);
-    const widgets = pageWidgets(rec.doc, controls.pageId).map((x) => x.widget)
-        .filter((w) => w.type === 'timeseries' && showsNotes(annotationMode(w.config.annotations)));
-    if (!widgets.length) return NextResponse.json({ notes: out }, { headers });
     try {
         const owner = row.ownerIdentifier;
         const dir = await directoryFor(owner);
+        const { controls, targets } = publicNoteTargets(rec.doc, rec.share, new URL(req.url).searchParams, dir, token);
+        if (!targets.length) return NextResponse.json({ notes: out }, { headers });
         const today = todayIn(rec.doc.settings.timezone);
         const resolved = { range: resolveRange(controls.date.range, today), today };
         const cache = new Map<string, Promise<PublicNote[]>>();
-        await Promise.all(widgets.map(async (w) => {
-            const src = (w.source?.type === 'default' || !w.source ? rec.doc.defaultSource : w.source) as Exclude<SourceRef, { type: 'default' }>;
+        await Promise.all(targets.map(async ({ widget: w, src }) => {
             const { scopes } = noteScopesFor(src, dir);
             const range = widgetRange(w, resolved);
             const key = `${scopes.join('|')}@${range.start}..${range.end}`;

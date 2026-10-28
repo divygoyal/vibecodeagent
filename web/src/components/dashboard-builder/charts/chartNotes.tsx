@@ -2,19 +2,22 @@
 
 /**
  * Where a dashboard's time series read chart notes from (round 7). The owner's view and editor read
- * the signed-in user's notes per widget source (/api/dashboards/notes); a share link reads the
- * owner's notes for the whole page, and only when the owner switched them on
- * (/api/dashboards/public/[token]/notes). Anything else (marketing previews) draws no markers.
+ * the signed-in user's notes per widget source, after the viewer's site switcher pick
+ * (/api/dashboards/notes); a share link reads the owner's notes for the whole page, and only when
+ * the owner switched them on (/api/dashboards/public/[token]/notes, which maps the viewer's opaque
+ * site key like the query route). Anything else (marketing previews) draws no markers.
  */
 import { createContext, useContext, type ReactNode } from 'react';
 import useSWR from 'swr';
 
-import { showsGoogle, showsNotes, widgetRange } from '@/lib/builder/chartMarks';
+import { notesSourceOf, showsGoogle, showsNotes, widgetRange } from '@/lib/builder/chartMarks';
+import type { CompileCtx } from '@/lib/builder/compile';
 import type { ResolvedDates, SourceRef, TimeSeriesWidget } from '@/lib/builder/types';
 import { fetchJson } from '../useWidgetData';
 
 export type ChartNotesSource =
-    | { kind: 'owner'; defaultSource: SourceRef; canAdd: boolean }
+    /** `view`: the viewer's switcher picks (DashboardView and the editor add them), so notes follow the site switcher. */
+    | { kind: 'owner'; defaultSource: SourceRef; canAdd: boolean; view?: CompileCtx }
     | { kind: 'public'; token: string; query: string; unlockKey?: string | null; enabled: boolean }
     | { kind: 'none' };
 
@@ -41,7 +44,8 @@ export function useWidgetNotes(widget: TimeSeriesWidget, resolved: ResolvedDates
     let key: string | null = null;
     let init: RequestInit | undefined;
     if (wantNotes && src.kind === 'owner') {
-        const s = widget.source?.type && widget.source.type !== 'default' ? widget.source : src.defaultSource;
+        // The source the chart's data comes from after the site switcher (the engine's own resolution).
+        const s = notesSourceOf(widget, src.defaultSource, src.view);
         if (s.type !== 'default') key = `/api/dashboards/notes?${new URLSearchParams({ src: JSON.stringify(s), start: range.start, end: range.end }).toString()}`;
     } else if (wantNotes && src.kind === 'public' && src.enabled) {
         key = `/api/dashboards/public/${src.token}/notes?${src.query}`;

@@ -83,7 +83,7 @@ function EditorWidget({ widget: raw, ctx, height, bp, vars }: { widget: WidgetDe
     const q = useInlineResult(applyViewerControls(raw, cctx), ctx);
     return (
         // Round 7: time series show your chart notes here too (adding one is on the dashboard page).
-        <ChartNotesProvider value={{ kind: 'owner', defaultSource: ctx.defaultSource, canAdd: false }}>
+        <ChartNotesProvider value={{ kind: 'owner', defaultSource: ctx.defaultSource, canAdd: false, view: cctx }}>
         <WidgetRenderer
             widget={widget}
             result={q.data?.result ?? (q.error ? { status: 'error', code: 'UPSTREAM', message: q.error instanceof Error ? q.error.message : 'Could not load', retryable: true } : undefined)}
