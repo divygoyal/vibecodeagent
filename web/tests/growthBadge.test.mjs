@@ -82,3 +82,15 @@ test('snippets link to the profile with ?ref=badge', () => {
     assert.equal(html, '<a href="https://trafficclaw.com/leaderboard/acme?ref=badge" target="_blank" rel="noopener"><img src="https://trafficclaw.com/badge/acme.svg?theme=dark" alt="Verified traffic on TrafficClaw" height="32" /></a>');
     assert.equal(md, '[![Verified traffic on TrafficClaw](https://trafficclaw.com/badge/acme.svg?theme=dark)](https://trafficclaw.com/leaderboard/acme?ref=badge)');
 });
+
+test('next.config: the 1-year immutable asset cache skips /badge/*.svg but still covers other images', async () => {
+    const fs = await import('node:fs');
+    const { createRequire } = await import('node:module');
+    const { pathToRegexp } = createRequire(import.meta.url)('next/dist/compiled/path-to-regexp');
+    const cfg = fs.readFileSync(new URL('../next.config.ts', import.meta.url), 'utf8');
+    const m = /source: '(\/:path\(\(\?!badge\/\)\.\*\)\.\([^']*\))'/.exec(cfg);
+    assert.ok(m, 'asset cache rule excludes badge/');
+    const re = pathToRegexp(m[1]);
+    assert.equal(re.test('/badge/acme.svg'), false);
+    for (const p of ['/logo.svg', '/a/b/c.png', '/x.woff2']) assert.equal(re.test(p), true, p);
+});

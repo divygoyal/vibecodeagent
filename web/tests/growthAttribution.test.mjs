@@ -57,3 +57,37 @@ test('sign_up parameters always name the method and add the touch', () => {
     assert.deepEqual(A.signUpParams(null), { method: 'google' });
     assert.deepEqual(A.signUpParams({ ref: 'embed', utm_source: 'trafficclaw' }), { method: 'google', ref: 'embed', utm_source: 'trafficclaw' });
 });
+
+const E = await import('../src/lib/growth/events.ts');
+
+test('sign_up carries method google|github and the first touch', () => {
+    assert.deepEqual(E.signUpEvent(null, 'github'), { name: 'sign_up', params: { method: 'github' } });
+    assert.deepEqual(E.signUpEvent({ ref: 'badge' }, 'google'), { name: 'sign_up', params: { method: 'google', ref: 'badge' } });
+    assert.equal(E.signUpMethod(undefined), 'google');
+    assert.equal(E.signUpMethod('github'), 'github');
+});
+
+test('mcp_connected: one-shot cookie from the consent decision, event with the first touch', () => {
+    assert.deepEqual(E.mcpConnectedEvent({ ref: 'embed', utm_source: 'trafficclaw' }), { name: 'mcp_connected', params: { method: 'oauth', ref: 'embed', utm_source: 'trafficclaw' } });
+    assert.deepEqual(E.mcpConnectedEvent(null), { name: 'mcp_connected', params: { method: 'oauth' } });
+    const set = E.mcpEventSetCookie(true);
+    assert.match(set, /^tc_ev_mcp=1; Max-Age=2592000; Path=\/; SameSite=Lax; Secure$/);
+    assert.doesNotMatch(E.mcpEventSetCookie(false), /Secure/);
+    assert.doesNotMatch(set, /HttpOnly/); // the page must be able to read it
+    assert.equal(E.hasMcpEventCookie('a=1; tc_ev_mcp=1; b=2'), true);
+    assert.equal(E.hasMcpEventCookie('a=1; tc_ev_mcp=0'), false);
+    assert.equal(E.hasMcpEventCookie(null), false);
+    assert.match(E.clearMcpEventCookie(), /Max-Age=0/);
+});
+
+test('the consent decision sets the cookie only for a first, non-demo approval; the shell sends both events', async () => {
+    const fs = await import('node:fs');
+    const src = (p) => fs.readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8');
+    const decision = src('app/oauth/authorize/decision/route.ts');
+    assert.match(decision, /firstConnection = await adminStore\.listGrants/);
+    assert.match(decision, /seeOther\(location, firstConnection \? mcpEventSetCookie/);
+    assert.equal((decision.match(/mcpEventSetCookie/g) || []).length, 2); // import + one use: the demo branch never sets it
+    const shell = src('components/shell/AppShell.tsx');
+    assert.match(shell, /trackSignUpWhenReady\(provider\)/);
+    assert.match(shell, /trackMcpConnectedWhenReady\(\)/);
+});
