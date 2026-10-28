@@ -139,6 +139,8 @@ export function OgDelta({ label, size = 24, up = '#157f3c', down = '#c92a2a' }: 
     const isUp = !label.includes('▼') && !label.trim().startsWith('-');
     const color = isUp ? up : down;
     const text = label.replace(/[▲▼+\-−\s]/g, '');
+    // No change: no arrow, muted.
+    if (/^0(\.0+)?%?$/.test(text)) return <div style={{ display: 'flex', fontSize: size, fontWeight: 700, color: '#636b78' }}>{text}</div>;
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: size, fontWeight: 700, color }}>
             <svg width={size * 0.7} height={size * 0.7} viewBox="0 0 12 12">{isUp ? <path d="M6 1.5 L11 10.5 L1 10.5 Z" fill={color} /> : <path d="M6 10.5 L11 1.5 L1 1.5 Z" fill={color} />}</svg>
