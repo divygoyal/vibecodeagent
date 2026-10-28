@@ -8,6 +8,7 @@ import { Menu } from 'lucide-react';
 
 import { Button, Drawer } from '@/components/ui';
 import { cn } from '@/lib/cn';
+import { HomeThemeToggle } from '@/components/marketing/home/HomeThemeToggle';
 import { BrandMark } from './BrandMark';
 import { ConnectGoogleButton } from './ConnectGoogleButton';
 import { HEADER_NAV, SIGN_IN_CALLBACK } from './nav';
@@ -83,6 +84,8 @@ export function MarketingHeader() {
                 </nav>
 
                 <div className="ml-auto flex items-center gap-2 xl:ml-0">
+                    {/* Only the home page follows the visitor's theme; the rest of the marketing site stays light. */}
+                    {pathname === '/' ? <HomeThemeToggle /> : null}
                     {signedIn ? null : <span className="hidden sm:block"><SignInButton /></span>}
                     <span className="hidden md:block"><ConnectGoogleButton size="md" mark /></span>
                     <span className="xl:hidden">
