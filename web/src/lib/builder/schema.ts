@@ -77,12 +77,20 @@ const base = {
     mobile: z.object({ hidden: z.boolean().optional(), minHeight: z.number().optional() }).optional(),
 };
 
+const refLine = z.object({
+    kind: z.enum(['goal', 'reference', 'average']),
+    value: z.number().finite().optional(),
+    per: z.enum(['point', 'day', 'week', 'month', 'period']).optional(),
+    label: z.string().max(40).optional(),
+    metric: metricId.optional(),
+});
+
 const tableColumn = z.looseObject({ id: z.string().max(100), kind: z.enum(['dimension', 'metric']), ref: z.string().max(100), visual: z.enum(['none', 'bar', 'heat', 'delta']) });
 
 export const widgetSchema = z.discriminatedUnion('type', [
     z.object({ ...base, type: z.literal('scorecard'), config: z.looseObject({ metric: metricRef, comparison, sparkline }) }),
     z.object({ ...base, type: z.literal('kpi-strip'), config: z.looseObject({ metrics: z.array(metricRef).min(1).max(6), comparison, sparkline }) }),
-    z.object({ ...base, type: z.literal('timeseries'), config: z.looseObject({ granularity: z.enum(['auto', 'day', 'week', 'month']), series: z.array(z.looseObject({ metric: metricRef, kind: z.enum(['line', 'area', 'bar']) })).min(1).max(4), breakdown: z.object({ dimension: dimId, top: z.number().int().min(1).max(8), other: z.boolean() }).optional() }) }),
+    z.object({ ...base, type: z.literal('timeseries'), config: z.looseObject({ granularity: z.enum(['auto', 'day', 'week', 'month']), series: z.array(z.looseObject({ metric: metricRef, kind: z.enum(['line', 'area', 'bar']) })).min(1).max(4), breakdown: z.object({ dimension: dimId, top: z.number().int().min(1).max(8), other: z.boolean() }).optional(), annotations: z.enum(['all', 'notes', 'google', 'off']).optional(), refLines: z.array(refLine).max(3).optional() }) }),
     z.object({ ...base, type: z.literal('bar'), config: z.looseObject({ dimension: dimId, metrics: z.array(metricRef).min(1).max(3), stackBy: dimId.optional(), top: z.number().int().min(1).max(25) }) }),
     z.object({ ...base, type: z.literal('pie'), config: z.looseObject({ dimension: dimId, metric: metricRef, top: z.number().int().min(1).max(5) }) }),
     z.object({ ...base, type: z.literal('table'), config: z.looseObject({ dimensions: z.array(dimId).min(1).max(3), columns: z.array(tableColumn).min(1).max(14), maxRows: z.number().int().min(1).max(5000), rowFilters: z.array(metricClause).max(10).optional() }) }),
@@ -143,6 +151,7 @@ export const docSchema = z.object({
         autoRefreshSec: z.union([z.literal(0), z.literal(300), z.literal(900), z.literal(1800), z.literal(3600)]),
         timezone: z.string().max(64).optional(),
         tv: z.object({ rotateSec: z.union([z.literal(0), z.literal(15), z.literal(30), z.literal(60), z.literal(120)]), hideControls: z.boolean() }).optional(),
+        shareNotes: z.boolean().optional(),
     }),
     meta: z.object({ createdFrom: z.string().max(64).optional(), migratedFromV1: z.object({ at: z.string(), propertyId: z.string(), siteUrl: z.string().optional() }).optional() }),
     calcs: z.array(calculatedMetric).max(30).optional(),

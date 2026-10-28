@@ -23,6 +23,7 @@ import type { ControlState, DashboardDocV2, DashboardQueryResponse, FilterContro
 import { DashboardCanvas, bpForWidth, type Bp } from './DashboardCanvas';
 import { ControlsBar, DateControl, PageTabs, switchSummary, ViewerSwitches, type OptionsSource, type ViewerSwitchHandlers } from './Controls';
 import { DashboardCover } from './DashboardCover';
+import { ChartNotesProvider, type ChartNotesSource } from './charts/chartNotes';
 import { InteractionChips, interactionToParam, VariableInput } from './Interactions';
 import { dashRootProps } from './theme/DashTheme';
 import { WidgetRenderer } from './widgets/WidgetRenderer';
@@ -162,10 +163,12 @@ export interface DashboardViewProps {
     onInteraction?: (clauses: import('@/lib/builder/types').FilterClause[]) => void;
     /** Round 7: site, metric and Day / Week / Month switchers (view only, kept in the URL). */
     switches?: ViewerSwitchHandlers;
+    /** Round 7: where time series read chart notes (default: no markers). */
+    notes?: ChartNotesSource;
 }
 
 export function DashboardView({
-    doc, mode, siteLabel: defaultSiteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv, fitHeight, onVariable, onInteraction, switches,
+    doc, mode, siteLabel: defaultSiteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv, fitHeight, onVariable, onInteraction, switches, notes,
 }: DashboardViewProps) {
     // Names of the dashboard's calculated metrics, before any widget or the cover renders (round 7).
     registerCalcs(doc.calcs);
@@ -222,6 +225,7 @@ export function DashboardView({
     };
 
     return (
+        <ChartNotesProvider value={notes ?? { kind: 'none' }}>
         <div ref={exportRef} {...root?.attrs} {...(root ? { 'data-dash-panel': '' } : {})} style={root?.style} className={cn('flex flex-col gap-4', contained && 'mx-auto w-full max-w-[1440px]', root?.className)}>
             {tv ? null : themed ? <div data-dash-header="">{header}</div> : header}
             {cover ? (
@@ -276,5 +280,6 @@ export function DashboardView({
             {credits && !tv ? <p className="text-center text-meta text-fg-muted" data-dash-credits="">{credits}</p> : null}
             {footer}
         </div>
+        </ChartNotesProvider>
     );
 }

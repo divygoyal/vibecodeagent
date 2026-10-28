@@ -40,6 +40,7 @@ import { textVars } from '../DashboardView';
 import { useElementHeight, useElementWidth } from '../useElementWidth';
 import { fetchJson, useInlineResult, QueryHttpError, type InlineCtx } from '../useWidgetData';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
+import { ChartNotesProvider } from '../charts/chartNotes';
 import { LeftPanel } from './LeftPanel';
 import { VersionsDialog } from './VersionsDialog';
 import { openAppearance, PropertiesPanel } from './PropertiesPanel';
@@ -81,6 +82,8 @@ function EditorWidget({ widget: raw, ctx, height, bp, vars }: { widget: WidgetDe
     const widget = applyViewerControls(raw, cctx, { site: false });
     const q = useInlineResult(applyViewerControls(raw, cctx), ctx);
     return (
+        // Round 7: time series show your chart notes here too (adding one is on the dashboard page).
+        <ChartNotesProvider value={{ kind: 'owner', defaultSource: ctx.defaultSource, canAdd: false }}>
         <WidgetRenderer
             widget={widget}
             result={q.data?.result ?? (q.error ? { status: 'error', code: 'UPSTREAM', message: q.error instanceof Error ? q.error.message : 'Could not load', retryable: true } : undefined)}
@@ -95,6 +98,7 @@ function EditorWidget({ widget: raw, ctx, height, bp, vars }: { widget: WidgetDe
             onRetry={() => void q.mutate()}
             onChooseSource={() => useEditorStore.getState().select(widget.id)}
         />
+        </ChartNotesProvider>
     );
 }
 

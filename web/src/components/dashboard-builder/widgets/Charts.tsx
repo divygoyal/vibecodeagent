@@ -1,19 +1,23 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useElementWidth } from '../useElementWidth';
+import { StickyNote } from 'lucide-react';
+import { useElementHeight, useElementWidth } from '../useElementWidth';
 import { useReducedMotion } from 'framer-motion';
 import { Bar, BarChart, CartesianGrid, Tooltip as RTooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts';
 
 import { AXIS_LINE, AXIS_TICK, BarList, ChartTooltipCard, Donut, GRID_STROKE, niceAxis, type ChartTooltipRow } from '@/components/charts';
 import { EmptyState } from '@/components/ui';
-import { fmtAxis } from '@/lib/format';
+import { NotesPopover } from '@/components/site/chart/ChartExtras';
+import { buildChartMarks, resolveRefLines } from '@/lib/builder/chartMarks';
+import { fmtAxis, fmtDay } from '@/lib/format';
 import { channelColor, deviceColor, CATEGORICAL, CATEGORICAL_OTHER } from '@/lib/metrics';
 import { fmtMetricValue, getMetric, metricColor, metricLabel, dimLabel } from '@/lib/builder/catalog';
 import { countryName } from '@/lib/builder/countries';
 import { autoGranularity, toDay } from '@/lib/builder/dates';
 import type { BarWidget, CellValue, PieWidget, TimeSeriesWidget } from '@/lib/builder/types';
 import { BuilderTimeSeries, breakdownColor, breakdownLabel } from '../charts/BuilderTimeSeries';
+import { useWidgetNotes } from '../charts/chartNotes';
 import { okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { dsFormat, dsKey } from './metricUi';
 
@@ -60,10 +64,54 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
     }, [ok, rows, c.markPreliminary, granularity]);
     const breakdown = c.breakdown && frame?.seriesKeys ? { metric: c.series[0].metric.id, dimension: c.breakdown.dimension, keys: frame.seriesKeys, stacked: c.stacked !== false, labels: frame.labels } : undefined;
     const compare = props.compare !== 'none' && c.compare === 'inherit' && !breakdown && rows.some((r) => `m:${c.series[0]?.metric.id}:prev` in r);
-    const h = plotHeight(props.height, widget.showTitle !== false);
+    // The plot fits the card body: a themed card (larger padding or title) or a footnote line leaves
+    // less room than plotHeight assumes, and the x axis then ran under the footnote (round 7).
+    const [bodyRef, bodyH] = useElementHeight<HTMLDivElement>();
+    const h = bodyH > 80 ? Math.min(plotHeight(props.height, widget.showTitle !== false), bodyH) : plotHeight(props.height, widget.showTitle !== false);
+
+    // Round 7: markers (your notes, Google updates) and goal / reference / average lines.
+    const notes = useWidgetNotes(widget, resolved);
+    const range = notes.range;
+    const rowDates = rows.map((r) => String(r['d:date'] ?? ''));
+    const { marks, hidden } = notes.markers && range ? buildChartMarks({ rowDates, range, mode: c.annotations, notes: notes.notes }) : { marks: [], hidden: 0 };
+    const currency = ok?.flags.currency;
+    const refLines = range ? resolveRefLines(c.refLines, {
+        rows,
+        metrics: breakdown ? [breakdown.metric] : c.series.map((s) => s.metric.id),
+        breakdown,
+        granularity,
+        range,
+        partialFrom,
+        fmt: (id, v) => fmtMetricValue(id, v, { compact: true, currency }),
+    }) : [];
+    // Plain text, so it ellipsises on phones (numbers match the glyphs on the chart; the tooltip has the details).
+    const footnoteText = marks.map((m) => `${m.n} ${m.label}`).join(' · ');
+    const footnote = marks.length ? {
+        text: `${hidden ? `${hidden} earlier marker${hidden === 1 ? '' : 's'} not shown · ` : ''}${marks.map((m) => `${m.n} ${m.label} (${fmtDay(m.date)})`).join(' · ')}`,
+        node: footnoteText,
+    } : undefined;
+    const addNote = notes.canAdd && props.mode === 'view' && range ? (
+        <NotesPopover
+            start={range.start}
+            end={range.end}
+            scope={notes.scope}
+            notes={marks.filter((m) => m.kind === 'note')}
+            failed={notes.failed}
+            onChanged={notes.refresh}
+            hint={notes.scope ? 'A launch, a campaign, a site change. It shows on this site’s charts and dashboards.' : 'A launch, a campaign, a site change. It shows on the charts of all your sites.'}
+            trigger={(
+                // Same size as the CSV button next to it (a 44 px touch target via tap-area, no taller title row).
+                <button type="button" aria-label="Add a note to this chart" title="Add a note"
+                    className="tap-area rounded p-0.5 text-fg-faint opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-fg pointer-coarse:opacity-100">
+                    <StickyNote aria-hidden size={14} />
+                </button>
+            )}
+        />
+    ) : null;
     return (
-        <WidgetFrame props={props}>
+        <WidgetFrame props={props} footnote={footnote} actions={addNote ?? undefined}>
             {frame && rows.length ? (
+                <div ref={bodyRef} className="h-full min-h-0">
                 <BuilderTimeSeries
                     rows={rows}
                     series={c.series.map((s) => ({ metric: s.metric.id, kind: s.kind, label: s.metric.label, axis: s.axis }))}
@@ -72,9 +120,12 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
                     granularity={granularity}
                     partialFrom={partialFrom}
                     height={h}
-                    currency={ok?.flags.currency}
+                    currency={currency}
                     showLegend={c.legend !== 'none'}
+                    marks={marks}
+                    refLines={refLines}
                 />
+                </div>
             ) : ok ? <EmptyState variant="inline" title="No data in this period" /> : null}
         </WidgetFrame>
     );

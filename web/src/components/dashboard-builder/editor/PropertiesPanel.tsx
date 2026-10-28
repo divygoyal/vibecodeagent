@@ -18,6 +18,7 @@ import { useEditorStore } from '@/stores/dashboardEditorStore';
 import { useResolvedTheme } from '@/lib/theme';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { Choice, DimensionPicker, Field, MetricList, MetricPicker, NumberInput, SourcePicker, TextInput, Toggle, type SiteOption } from './Fields';
+import { ChartMarksEditor } from './ChartMarksEditor';
 import { RulesEditor } from './RulesEditor';
 import { GrainControlProps, MetricControlProps, SiteControlProps } from './SwitchControlProps';
 import { VariablesEditor } from './VariablesEditor';
@@ -147,6 +148,7 @@ function Setup({ widget, edit, sites, defaultLabel, doc }: { widget: WidgetDef; 
                     </Field>
                     <Field label="Comparison"><Choice ariaLabel="Comparison" value={c.compare} onChange={(v) => edit((w) => cfg(w as typeof widget, { compare: v }))} options={[{ value: 'inherit', label: 'Follow the dashboard' }, { value: 'off', label: 'Off' }]} /></Field>
                     <Toggle label="Mark Search Console days still being processed" checked={c.markPreliminary} onChange={(v) => edit((w) => cfg(w as typeof widget, { markPreliminary: v }))} />
+                    <div className="border-t border-border-subtle pt-4"><ChartMarksEditor widget={widget} edit={edit} doc={doc} /></div>
                 </>
             );
         }

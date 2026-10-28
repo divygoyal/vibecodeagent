@@ -15,6 +15,8 @@ import {
     CartesianGrid,
     ComposedChart,
     Line,
+    ReferenceArea,
+    ReferenceLine,
     Tooltip as RTooltip,
     XAxis,
     YAxis,
@@ -28,6 +30,7 @@ import { AXIS_LINE, AXIS_TICK, CURSOR, ChartTooltipCard, GRID_STROKE, dateAxisTi
 import { MetricDelta, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { fmtMetricValue, getMetric, metricColor, metricLabel } from '@/lib/builder/catalog';
 import { countryName } from '@/lib/builder/countries';
+import type { ChartMark, ResolvedRefLine } from '@/lib/builder/chartMarks';
 import type { CellValue } from '@/lib/builder/types';
 import { useElementWidth } from '../useElementWidth';
 import { useTvScreen } from '../TvMode';
@@ -53,6 +56,63 @@ export interface BuilderTimeSeriesProps {
     currency?: string;
     showLegend?: boolean;
     className?: string;
+    /** Round 7: numbered markers (your notes, Google updates) on their row dates. */
+    marks?: ChartMark[];
+    /** Round 7: horizontal goal / reference / average lines (each on its metric's axis). */
+    refLines?: ResolvedRefLine[];
+}
+
+// Theme tokens (--tc-*), not the --color-* aliases: those resolve on :root, so a dark dashboard theme
+// inside the light app would get light colours (dashboard-themes.css section 0).
+export const MARK_COLOR: Record<ChartMark['kind'], string> = { note: 'var(--tc-brand-text)', google: 'var(--tc-warn)' };
+const REF_STYLE: Record<ResolvedRefLine['kind'], { stroke: string; dash: string; width: number }> = {
+    goal: { stroke: 'var(--tc-up)', dash: '6 4', width: 1.5 },
+    reference: { stroke: 'var(--tc-fg-muted)', dash: '4 4', width: 1.25 },
+    average: { stroke: 'var(--tc-fg-secondary)', dash: '2 3', width: 1.25 },
+};
+
+/** The number badge of a marker, as HTML (tooltip and footnote); the chart draws the same in SVG. */
+export function MarkBadge({ mark }: { mark: Pick<ChartMark, 'n' | 'kind'> }) {
+    return (
+        <span aria-hidden className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none tabular-nums" style={{ background: MARK_COLOR[mark.kind], color: 'var(--color-surface)' }}>
+            {mark.n}
+        </span>
+    );
+}
+
+/** Marker glyph on top of a dashed line: one pill per row date, numbered (several on one date: "2,3" or "2+"). */
+function markGlyph(group: ChartMark[], drop = 0) {
+    const text = group.length === 1 ? String(group[0].n) : group.length === 2 ? `${group[0].n},${group[1].n}` : `${group[0].n}+`;
+    const color = MARK_COLOR[group.some((m) => m.kind === 'note') ? 'note' : 'google'];
+    const label = group.map((m) => `${m.n}: ${m.label}`).join('; ');
+    const Glyph = (p: { viewBox?: { x?: number; y?: number } }) => {
+        const x = p.viewBox?.x ?? 0;
+        const y = (p.viewBox?.y ?? 0) + 1 + drop;
+        const w = 8 + text.length * 6;
+        return (
+            <g role="img" aria-label={label}>
+                <title>{label}</title>
+                <rect x={x - w / 2} y={y} width={w} height={14} rx={7} fill={color} />
+                <text x={x} y={y + 10.5} textAnchor="middle" fontSize={10} fontWeight={600} fill="var(--color-surface)" style={{ fontVariantNumeric: 'tabular-nums' }}>{text}</text>
+            </g>
+        );
+    };
+    return Glyph;
+}
+
+/** Ref line label at the right end, above the line (below it near the top edge), with a halo. */
+function refLabel(text: string, color: string, side: 'left' | 'right') {
+    const Label = (p: { viewBox?: { x?: number; y?: number; width?: number } }) => {
+        const vb = p.viewBox ?? {};
+        const x = side === 'right' ? (vb.x ?? 0) + (vb.width ?? 0) - 4 : (vb.x ?? 0) + 4;
+        const y = (vb.y ?? 0) < 18 ? (vb.y ?? 0) + 13 : (vb.y ?? 0) - 5;
+        return (
+            <text x={x} y={y} textAnchor={side === 'right' ? 'end' : 'start'} fontSize={11} fontWeight={500} fill={color} stroke="var(--color-surface)" strokeWidth={3} strokeLinejoin="round" style={{ paintOrder: 'stroke' }}>
+                {text}
+            </text>
+        );
+    };
+    return Label;
 }
 
 function axisFmt(metricId: string, currency?: string): (v: number) => string {
@@ -165,7 +225,7 @@ export function BuilderTimeSeries(props: BuilderTimeSeriesProps) {
                             <span aria-hidden className="size-2 rounded-full" style={{ background: metricColor(s.metric) }} />
                             {s.label ?? metricLabel(s.metric)}
                         </p>
-                        <Plot {...props} series={[s]} height={each} />
+                        <Plot {...props} series={[s]} height={each} refLines={props.refLines?.filter((l) => l.metric === s.metric)} />
                     </div>
                 ))}
             </div>
@@ -179,7 +239,7 @@ export function BuilderTimeSeries(props: BuilderTimeSeriesProps) {
     return <Plot {...props} />;
 }
 
-function Plot({ rows, series, breakdown, compare, granularity, partialFrom, height, currency, showLegend, className }: BuilderTimeSeriesProps) {
+function Plot({ rows, series, breakdown, compare, granularity, partialFrom, height, currency, showLegend, className, marks, refLines }: BuilderTimeSeriesProps) {
     const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
     const reduce = useReducedMotion();
     // TV screens keep the y axis down to a 120 px plot (round 4): numbers read from across the room.
@@ -234,7 +294,21 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
             }
         }
         const pd = row['d:date:prev'];
-        return <ChartTooltipCard title={row['d:date'] ? fmtDate(String(row['d:date'])) : undefined} subtitle={compare && pd ? `vs ${fmtDate(String(pd))}` : undefined} rows={out} partial={hasPartial && idx >= (partialFrom as number)} />;
+        const here = marks?.filter((m) => m.at === row['d:date']) ?? [];
+        const footer = here.length ? (
+            <ul className="flex max-w-[260px] flex-col gap-1">
+                {here.map((m) => (
+                    <li key={m.key} className="flex items-start gap-1.5 text-meta text-fg-secondary">
+                        <MarkBadge mark={m} />
+                        <span className="min-w-0">
+                            <span className="text-fg">{m.label}</span>
+                            <span className="text-fg-muted">{m.kind === 'google' ? ' · Google update' : m.date !== m.at ? ` · ${fmtDayLong(m.date)}` : ''}</span>
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        ) : undefined;
+        return <ChartTooltipCard title={row['d:date'] ? fmtDate(String(row['d:date'])) : undefined} subtitle={compare && pd ? `vs ${fmtDate(String(pd))}` : undefined} rows={out} partial={hasPartial && idx >= (partialFrom as number)} footer={footer} />;
     };
 
     const yAxes = useMemo(() => {
@@ -250,12 +324,49 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     max = Math.max(max, maxOf([r], breakdown.keys));
                 }
             }
+            for (const l of refLines ?? []) if (l.y > max) max = l.y;
             out.b = niceAxis(max, { format: axisKind(breakdown.metric) });
         } else {
-            for (const s of series) out[s.metric] = niceAxis(maxOf(data, [`m:${s.metric}`, compare ? `m:${s.metric}:prev` : undefined]), { format: axisKind(s.metric) });
+            for (const s of series) {
+                // A goal above the data still shows: the axis reaches it.
+                const lineMax = Math.max(0, ...(refLines ?? []).filter((l) => l.metric === s.metric).map((l) => l.y));
+                out[s.metric] = niceAxis(Math.max(maxOf(data, [`m:${s.metric}`, compare ? `m:${s.metric}:prev` : undefined]), lineMax), { format: axisKind(s.metric) });
+            }
         }
         return out;
-    }, [data, breakdown, series, compare]);
+    }, [data, breakdown, series, compare, refLines]);
+    // One glyph per row date; a glyph too close to the previous one drops a row so both stay readable.
+    const markGroups = useMemo(() => {
+        const by = new Map<string, ChartMark[]>();
+        for (const m of marks ?? []) by.set(m.at, [...(by.get(m.at) ?? []), m]);
+        const step = ((figW || 640) - 60) / Math.max(1, rows.length);
+        const index = new Map(rows.map((r, i) => [String(r['d:date'] ?? ''), i]));
+        const sorted = [...by.entries()].sort(([a], [b]) => (index.get(a) ?? 0) - (index.get(b) ?? 0));
+        const out: Array<{ at: string; group: ChartMark[]; drop: number }> = [];
+        for (const [at, group] of sorted) {
+            const last = out[out.length - 1];
+            const close = last && ((index.get(at) ?? 0) - (index.get(last.at) ?? 0)) * step < 24;
+            out.push({ at, group, drop: close && last.drop === 0 ? 16 : 0 });
+        }
+        return out;
+    }, [marks, rows, figW]);
+    const markAxis = breakdown ? 'b' : first?.metric;
+    // Two line labels closer than ~14 px: the next one moves to the left end, so they never overlap.
+    const refSides = useMemo(() => {
+        const plotH = Math.max(60, height - 40);
+        const px = (l: ResolvedRefLine) => {
+            const top = (breakdown ? yAxes.b : yAxes[l.metric])?.domain?.[1];
+            return typeof top === 'number' && top > 0 ? (l.y / top) * plotH : 0;
+        };
+        const sides = new Map<string, 'left' | 'right'>();
+        const sorted = [...(refLines ?? [])].sort((a, b) => px(a) - px(b));
+        sorted.forEach((l, i) => {
+            const prev = sorted[i - 1];
+            const close = prev && Math.abs(px(l) - px(prev)) < 14;
+            sides.set(l.key, close && sides.get(prev.key) === 'right' ? 'left' : 'right');
+        });
+        return sides;
+    }, [refLines, yAxes, breakdown, height]);
 
     const allZero = !breakdown && first ? rows.every((r) => !r[`m:${first.metric}`]) : false;
     const anim = !reduce;
@@ -303,6 +414,16 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     );
                 })}
                 <RTooltip content={renderTooltip} cursor={CURSOR} isAnimationActive={false} offset={12} />
+
+                {(marks ?? []).filter((m) => m.kind === 'google' && m.endAt).map((m) => (
+                    <ReferenceArea key={`area-${m.key}`} x1={m.at} x2={m.endAt} yAxisId={markAxis} fill={MARK_COLOR.google} fillOpacity={0.07} stroke="none" ifOverflow="hidden" />
+                ))}
+                {markGroups.map(({ at, group, drop }) => (
+                    <ReferenceLine key={`mark-${at}`} x={at} yAxisId={markAxis} stroke={MARK_COLOR[group.some((m) => m.kind === 'note') ? 'note' : 'google']} strokeOpacity={0.7} strokeDasharray="3 3" label={markGlyph(group, drop)} />
+                ))}
+                {(refLines ?? []).map((l) => (
+                    <ReferenceLine key={l.key} y={l.y} yAxisId={breakdown ? 'b' : l.metric} stroke={REF_STYLE[l.kind].stroke} strokeWidth={REF_STYLE[l.kind].width} strokeDasharray={REF_STYLE[l.kind].dash} label={refLabel(l.label, REF_STYLE[l.kind].stroke, refSides.get(l.key) ?? 'right')} />
+                ))}
 
                 {breakdown
                     ? breakdown.keys.map((k, i) => {

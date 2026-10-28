@@ -100,12 +100,14 @@ export function flagNotes(r: WidgetResultOk | undefined, widget: WidgetDef): str
  * Card chrome shared by chart, table and map widgets: title with optional info tooltip,
  * loading skeleton, refetch dimming with a 2px progress bar, per-widget errors, footnotes.
  */
-export function WidgetFrame({ props, children, actions, bodyClassName, skeleton = 'chart' }: {
+export function WidgetFrame({ props, children, actions, bodyClassName, skeleton = 'chart', footnote }: {
     props: WidgetViewProps;
     children: ReactNode;
     actions?: ReactNode;
     bodyClassName?: string;
     skeleton?: 'chart' | 'table' | 'none';
+    /** Leads the footnote line (round 7: the chart's numbered markers); `text` is its plain form for the tooltip. */
+    footnote?: { node: ReactNode; text: string };
 }) {
     const { widget, result, loading, refetching, onRetry, onChooseSource } = props;
     const ok = okResult(result);
@@ -168,8 +170,10 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                     <WidgetError result={result} onRetry={onRetry} onChooseSource={onChooseSource} />
                 ) : children}
             </div>
-            {notes.length ? (
-                <p className="mt-2 truncate text-caption text-fg-muted" title={notes.join(' · ')}>{notes.join(' · ')}</p>
+            {notes.length || footnote ? (
+                <p className="mt-2 truncate text-caption text-fg-muted" title={[footnote?.text, ...notes].filter(Boolean).join(' · ')}>
+                    {footnote?.node}{footnote && notes.length ? ' · ' : ''}{notes.join(' · ')}
+                </p>
             ) : null}
         </div>
     );

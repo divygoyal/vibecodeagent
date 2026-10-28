@@ -222,6 +222,8 @@ export interface DashboardSettings {
     timezone?: string;
     /** TV mode (round 2): page rotation in seconds (0 = off) and whether filters hide. */
     tv?: { rotateSec: 0 | 15 | 30 | 60 | 120; hideControls: boolean };
+    /** Round 7: show the owner's chart notes on share links and embeds (off unless set). */
+    shareNotes?: boolean;
 }
 
 export interface DashboardDocV2 {
@@ -327,6 +329,35 @@ export interface TimeSeriesConfig {
     legend: 'auto' | 'top' | 'bottom' | 'none';
     yAxis: { min?: 'zero' | 'auto' };
     markPreliminary: boolean;
+    /**
+     * Round 7: dated markers on the chart. 'all' (also when missing) = your chart notes (the site
+     * pages' notes, /api/annotations) and Google ranking updates; 'off' draws none.
+     */
+    annotations?: AnnotationMode;
+    /** Round 7: horizontal goal / reference / average lines (at most 3). */
+    refLines?: RefLine[];
+}
+
+export type AnnotationMode = 'all' | 'notes' | 'google' | 'off';
+
+/**
+ * A horizontal line on a time series (round 7). Values use the metric's units (ratios as
+ * fractions, like ScorecardConfig.target). 'average' is computed from the plotted points.
+ */
+export interface RefLine {
+    kind: 'goal' | 'reference' | 'average';
+    /** goal / reference only. */
+    value?: number;
+    /**
+     * What the value counts (additive metrics only; others are drawn as entered): 'point' = one
+     * point of the chart (default); 'day' / 'week' / 'month' = a rate scaled to the chart's
+     * granularity; 'period' = a total for the whole date range, like a scorecard target.
+     */
+    per?: 'point' | 'day' | 'week' | 'month' | 'period';
+    /** Up to 40 characters; default "Goal", "Reference" or "Average". */
+    label?: string;
+    /** The series it is measured on (default: the first one). */
+    metric?: MetricId;
 }
 export type TimeSeriesWidget = WidgetBase<'timeseries', TimeSeriesConfig>;
 

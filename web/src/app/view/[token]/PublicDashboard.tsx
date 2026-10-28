@@ -140,6 +140,8 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
     }, [ctl.state]);
     const page = usePageResults(`pub:${token}:${pub.rev}:${canonicalJson(ctl.state)}:${unlockKey ?? ''}`, publicPageLoader(token, query, unlockKey), tv ? tvRefreshMs(doc) : doc.settings.autoRefreshSec ? doc.settings.autoRefreshSec * 1000 : 300_000);
     const rootRef = useRef<HTMLDivElement>(null);
+    // Round 7: the owner's chart notes, only when they switched them on for share links.
+    const notes = useMemo(() => ({ kind: 'public' as const, token, query: query.toString(), unlockKey, enabled: Boolean(doc.settings.shareNotes) }), [token, query, unlockKey, doc.settings.shareNotes]);
 
     // Embeds report their height so the host page can size the iframe (PostHog-style).
     useEffect(() => {
@@ -173,7 +175,7 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
             <TvFrame doc={doc} pageId={ctl.state.pageId} onPage={ctl.setPage} onExit={() => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); ctl.setTv(false); }}
                 resolved={page.data?.resolved} updatedAt={updatedAt} themeAttrs={tv.attrs} themeStyle={tv.style} themeClass={tv.className} selection={selection}>
                 {(fit) => <DashboardView fitHeight={fit} doc={doc} mode="public" siteLabel={siteLabel} switches={switches} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter} allow={allow}
-                    data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)} onRetry={() => void page.mutate()} options={{}} shell="inherit" tv />}
+                    data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)} onRetry={() => void page.mutate()} options={{}} shell="inherit" tv notes={notes} />}
             </TvFrame>
         );
     }
@@ -213,6 +215,7 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
                 header={header}
                 footer={pub.share?.badge ? <div className="flex justify-center pt-2"><MadeWithBadge /></div> : null}
                 shell="inherit"
+                notes={notes}
             />
             {page.error ? <p className="mt-4 text-center text-body-sm text-fg-muted">{page.error instanceof Error ? page.error.message : 'Data is temporarily unavailable.'}</p> : null}
         </div>
