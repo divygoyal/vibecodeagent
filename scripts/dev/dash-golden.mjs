@@ -104,6 +104,8 @@ async function capture() {
             await context.route('**/*', (route) => {
                 const u = route.request().url();
                 if (u.startsWith(base) || u.startsWith('data:') || u.startsWith('blob:')) return route.continue();
+                // The showcase image widget points at the live site's logo; serve the same file from this checkout.
+                if (u === 'https://trafficclaw.com/icon.svg') return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: fs.readFileSync(path.join(HERE, '..', '..', 'web', 'public', 'icon.svg')) });
                 return route.abort();
             });
             const page = await context.newPage();

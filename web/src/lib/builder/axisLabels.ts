@@ -38,3 +38,23 @@ export function categoryAxisWidth(labels: string[], opts: { min?: number; cap?: 
     const longest = Math.max(0, ...labels.map((l) => textWidth(l, fontSize)));
     return Math.min(cap, Math.max(min, longest + AXIS_LABEL_GAP));
 }
+
+/**
+ * A label broken into at most `maxLines` lines of `maxPx` each (round 10: "Organic Sea…" under a column chart).
+ * Breaks at spaces; a single word wider than the line is cut with an ellipsis, and so is the last line.
+ */
+export function wrapLabel(label: string, maxPx: number, maxLines = 2, fontSize = 11): string[] {
+    if (textWidth(label, fontSize) <= maxPx) return [label];
+    const words = label.split(/\s+/).filter(Boolean);
+    const lines: string[] = [];
+    let cur = '';
+    for (let i = 0; i < words.length; i++) {
+        const next = cur ? `${cur} ${words[i]}` : words[i];
+        if (textWidth(next, fontSize) <= maxPx || !cur) { cur = next; continue; }
+        lines.push(cur);
+        cur = words[i];
+        if (lines.length === maxLines - 1) { cur = words.slice(i).join(' '); break; }
+    }
+    lines.push(cur);
+    return lines.slice(0, maxLines).map((l, i, all) => (i === all.length - 1 || textWidth(l, fontSize) > maxPx ? fitLabel(l, maxPx, fontSize) : l));
+}

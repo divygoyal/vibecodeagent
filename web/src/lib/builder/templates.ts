@@ -182,7 +182,7 @@ const BUILDERS_V1: Record<string, () => Built> = {
             controls: [DATE, filter('channel'), filter('country'), filter('device')],
             pages: [page('p_main', 'Traffic', [
                 [[kpi('w_kpis', ['ga4:activeUsers', 'ga4:sessions', 'ga4:engagementRate', 'ga4:averageSessionDuration', 'ga4:keyEvents']), 12, 3]],
-                [[breakdownTs('w_bychannel', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 8], [pie('w_channels', 'Channels', 'channel', 'ga4:sessions'), 4, 8]],
+                [[breakdownTs('w_bychannel', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 10], [pie('w_channels', 'Channels', 'channel', 'ga4:sessions'), 4, 10]],
                 [[table('w_sources', 'Source / medium', ['sourceMedium'], ['ga4:sessions', 'ga4:activeUsers', 'ga4:engagementRate', 'ga4:keyEvents']), 6, 9],
                     [table('w_campaigns', 'Campaigns', ['campaign'], ['ga4:sessions', 'ga4:keyEvents', 'ga4:sessionKeyEventRate']), 6, 9]],
                 [[table('w_landing', 'Landing pages', ['landingPage'], ['ga4:sessions', 'ga4:engagementRate', 'ga4:bounceRate', 'ga4:keyEvents']), 12, 9]],
@@ -238,10 +238,10 @@ const BUILDERS_V1: Record<string, () => Built> = {
                 page('p_search', 'Search', [
                     [[ts('w_s_trend', 'Clicks and impressions', ['gsc:clicks', 'gsc:impressions']), 12, 7]],
                     [[table('w_s_queries', 'Top queries', ['query'], SEARCH_COLS, { bars: ['gsc:clicks'] }), 6, 9], [table('w_s_pages', 'Top pages', ['page'], SEARCH_COLS, { bars: ['gsc:clicks'] }), 6, 9]],
-                    [[pie('w_s_devices', 'Devices', 'device', 'gsc:clicks'), 4, 7], [barList('w_s_countries', 'Countries', 'country', 'gsc:clicks'), 8, 7]],
+                    [[pie('w_s_devices', 'Devices', 'device', 'gsc:clicks'), 4, 7], [barList('w_s_countries', 'Countries by clicks', 'country', 'gsc:clicks'), 8, 7]],
                 ], w),
                 page('p_traffic', 'Traffic', [
-                    [[breakdownTs('w_t_channel', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 8], [pie('w_t_channels', 'Channels', 'channel', 'ga4:sessions'), 4, 8]],
+                    [[breakdownTs('w_t_channel', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 10], [pie('w_t_channels', 'Channels', 'channel', 'ga4:sessions'), 4, 10]],
                     [[table('w_t_sources', 'Source / medium', ['sourceMedium'], ['ga4:sessions', 'ga4:activeUsers', 'ga4:engagementRate', 'ga4:keyEvents']), 6, 9],
                         [table('w_t_landing', 'Landing pages', ['landingPage'], ['ga4:sessions', 'ga4:engagementRate', 'ga4:keyEvents']), 6, 9]],
                 ], w),
@@ -255,10 +255,12 @@ const BUILDERS_V1: Record<string, () => Built> = {
             controls: [DATE, filter('country'), filter('device')],
             pages: [page('p_main', 'Audience', [
                 [[kpi('w_kpis', ['ga4:activeUsers', 'ga4:newUsers', 'ga4:engagementRate', 'ga4:sessionsPerUser']), 12, 3]],
-                [[geo('w_geo', 'Users by country', 'ga4:activeUsers'), 8, 10], [barList('w_countries', 'Top countries', 'country', 'ga4:activeUsers', { showShare: true }), 4, 10]],
+                // Round 10: the map keeps the picture; the card beside it adds what the map cannot (change, engagement) instead of repeating its top five.
+                [[{ ...geo('w_geo', 'Users by country', 'ga4:activeUsers'), config: { ...geo('w_geo', '', 'ga4:activeUsers').config, topList: 0 } }, 8, 10],
+                    [table('w_countries', 'Countries', ['country'], ['ga4:activeUsers', 'ga4:engagementRate', 'ga4:newUsers'], { pageSize: 10 }), 4, 10]],
                 [[table('w_cities', 'Cities', ['city', 'country'], ['ga4:activeUsers', 'ga4:sessions', 'ga4:engagementRate']), 6, 9], [barList('w_lang', 'Languages', 'language', 'ga4:activeUsers'), 3, 9], [pie('w_nvr', 'New vs returning', 'newVsReturning', 'ga4:sessions'), 3, 9]],
                 [[pie('w_devices', 'Devices', 'device', 'ga4:sessions'), 4, 7], [barList('w_browsers', 'Browsers', 'browser', 'ga4:activeUsers'), 4, 7], [barList('w_os', 'Operating systems', 'os', 'ga4:activeUsers'), 4, 7]],
-                [[barList('w_dow', 'When visitors arrive', 'dayOfWeek', 'ga4:sessions', { variant: 'chart', orientation: 'vertical', top: 7 }), 12, 7]],
+                [[barList('w_dow', 'When visitors arrive', 'dayOfWeek', 'ga4:sessions', { variant: 'chart', orientation: 'vertical', top: 7, sort: { by: 'dimension', dir: 'asc' } }), 12, 7]],
             ], w)],
         };
     },

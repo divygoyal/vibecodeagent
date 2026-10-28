@@ -315,7 +315,7 @@ async function seedRecords(webUrl, cookie, user, userKey, admin) {
         const lg = parts.map(p => p.layout);
         const dash = await call('dashboard', 'POST', '/api/dashboards', {
             name: 'Weekly growth review',
-            description: 'Seeded by scripts/dev/login.mjs',
+            description: 'Weekly check on traffic, engagement and where visitors come from.',
             propertyId,
             siteUrl: user.site,
             widgets: parts.map(p => p.widget),

@@ -13,7 +13,9 @@ import { buildChartMarks, resolveRefLines } from '@/lib/builder/chartMarks';
 import { fmtAxis, fmtDay } from '@/lib/format';
 import { channelColor, deviceColor, CATEGORICAL, CATEGORICAL_OTHER } from '@/lib/metrics';
 import { fmtMetricValue, getMetric, metricColor, metricLabel, dimLabel } from '@/lib/builder/catalog';
-import { AXIS_LABEL_GAP, AXIS_LAST_TICK_PAD, categoryAxisWidth, fitLabel } from '@/lib/builder/axisLabels';
+import { AXIS_LABEL_GAP, AXIS_LAST_TICK_PAD, categoryAxisWidth, fitLabel, wrapLabel } from '@/lib/builder/axisLabels';
+import { pieLayout } from '@/lib/builder/pieLayout';
+import { mondayFirst } from '@/lib/builder/dayOrder';
 import { countryName } from '@/lib/builder/countries';
 import { friendlyDimValue } from '@/lib/builder/levelLabels';
 import { autoGranularity, toDay } from '@/lib/builder/dates';
@@ -27,7 +29,7 @@ import { dsFormat, dsKey } from './metricUi';
 
 /** Display text for a dimension value. */
 export function dimText(dim: string, v: CellValue, labels?: Record<string, string>): string {
-    if (v === null || v === undefined || v === '') return '(not set)';
+    if (v === null || v === undefined || v === '') return dim === 'newVsReturning' ? 'Unknown' : '(not set)';
     const s = String(v);
     if (labels?.[s]) return labels[s];
     const friendly = friendlyDimValue(dim, s);
@@ -94,7 +96,9 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
     }) : [];
     // Plain text, so it ellipsises on phones (numbers match the glyphs on the chart; the tooltip has the details).
     const footnoteText = marks.map((m) => `${m.n} ${m.label}`).join(' · ');
-    const footnote = marks.length ? {
+    // An empty (all-zero) chart draws no markers, so it lists none either.
+    const emptySeries = !breakdown && rows.length > 0 && rows.every((r) => !r[`m:${c.series[0]?.metric.id}`]);
+    const footnote = marks.length && !emptySeries ? {
         text: `${hidden ? `${hidden} earlier marker${hidden === 1 ? '' : 's'} not shown · ` : ''}${marks.map((m) => `${m.n} ${m.label} (${fmtDay(m.date)})`).join(' · ')}`,
         node: footnoteText,
     } : undefined;
@@ -153,6 +157,18 @@ function CategoryTick({ x, y, payload, maxPx }: { x?: number; y?: number; payloa
     );
 }
 
+/** A column chart's x label: broken over two lines to the width of its column; the full text stays in a tooltip. */
+function WrapTick({ x, y, payload, band }: { x?: number; y?: number; payload?: { value: string }; band: number }) {
+    const full = String(payload?.value ?? '');
+    const lines = wrapLabel(full, Math.max(36, band - 6), 2);
+    return (
+        <text x={x ?? 0} y={(y ?? 0) + 4} textAnchor="middle" fill={AXIS_TICK.fill} fontSize={AXIS_TICK.fontSize}>
+            <title>{full}</title>
+            {lines.map((l, i) => <tspan key={i} x={x ?? 0} dy={i === 0 ? 8 : 13}>{l}</tspan>)}
+        </text>
+    );
+}
+
 function BarChartPlot({ widget, rows, seriesKeys, compare, compareName = 'Previous period', height, currency, labels, onPick }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; compareName?: string; height: number; currency?: string; labels?: Record<string, string>; onPick?: (value: string) => void }) {
     const c = widget.config;
     const anim = !useReducedMotion();
@@ -193,11 +209,21 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, compareName = 'Previo
     const yWidth = categoryAxisWidth(data.map((d) => String(d.__label)));
     const catAxis = { dataKey: '__label', type: 'category' as const, tick: AXIS_TICK, tickLine: false, axisLine: AXIS_LINE, interval: 0 as const };
     const valAxis = { type: 'number' as const, tickFormatter: fmtV(metrics[0]), tick: AXIS_TICK, tickLine: false, axisLine: false, domain: nice.domain, ticks: nice.ticks, interval: 0 as const };
+    // Two bars per category (this period, the comparison) need a key (round 10: no legend for light vs dark bars).
+    const legend = compare && !stacked && metrics.length === 1 && vertical;
+    const LEGEND_PX = 22;
     return (
-        <BarChart responsive data={data} layout={vertical ? 'horizontal' : 'vertical'} style={{ width: '100%', height, ...(onPick ? { cursor: 'pointer' } : {}) }}
+        <>
+        {legend ? (
+            <div className="mb-1 flex h-[18px] items-center gap-4 text-meta text-fg-muted">
+                <span className="flex items-center gap-1.5"><span aria-hidden className="size-2 rounded-sm" style={{ background: metricColor(metrics[0]) }} />This period</span>
+                <span className="flex items-center gap-1.5"><span aria-hidden className="size-2 rounded-sm" style={{ background: metricColor(metrics[0]), opacity: 0.3 }} />{compareName}</span>
+            </div>
+        ) : null}
+        <BarChart responsive data={data} layout={vertical ? 'horizontal' : 'vertical'} style={{ width: '100%', height: legend ? height - LEGEND_PX : height, ...(onPick ? { cursor: 'pointer' } : {}) }}
             onClick={onPick ? (st: { activeLabel?: string | number; activeIndex?: number | string | null }) => { const r = typeof st?.activeIndex === 'number' ? rows[st.activeIndex] : rows.find((x) => dimText(dim, x[`d:${dim}`], labels) === st?.activeLabel); const raw = r?.[`d:${dim}`]; if (raw !== undefined && raw !== null && raw !== '(other)') onPick(String(raw)); } : undefined} margin={{ top: 4, right: vertical ? 8 : AXIS_LAST_TICK_PAD, bottom: 0, left: 0 }} barCategoryGap="24%" accessibilityLayer>
             <CartesianGrid horizontal={vertical} vertical={!vertical} stroke={GRID_STROKE} />
-            {vertical ? <XAxis {...catAxis} tickFormatter={(v: string) => (v.length > 12 ? `${v.slice(0, 11)}…` : v)} /> : <YAxis {...catAxis} width={yWidth} tick={<CategoryTick maxPx={yWidth - AXIS_LABEL_GAP} />} />}
+            {vertical ? <XAxis {...catAxis} height={data.some((d) => String(d.__label).length > 9) ? 42 : 30} tick={(tp) => <WrapTick x={Number(tp.x)} y={Number(tp.y)} payload={{ value: String(tp.payload?.value ?? '') }} band={(Number(tp.width) || 480) / Math.max(1, data.length)} />} /> : <YAxis {...catAxis} width={yWidth} tick={<CategoryTick maxPx={yWidth - AXIS_LABEL_GAP} />} />}
             {vertical ? <YAxis {...valAxis} width={44} /> : <XAxis {...valAxis} />}
             <RTooltip content={tooltip} cursor={{ fill: 'var(--color-subtle)' }} isAnimationActive={false} />
             {stacked
@@ -207,6 +233,7 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, compareName = 'Previo
                     <Bar key={id} dataKey={`m:${id}`} fill={metricColor(id)} maxBarSize={24} radius={vertical ? [4, 4, 0, 0] : [0, 4, 4, 0]} isAnimationActive={anim} animationDuration={400} />,
                 ])}
         </BarChart>
+        </>
     );
 }
 
@@ -216,7 +243,9 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
     const frame = ok?.parts.rows;
     const c = widget.config;
     const metric = c.metrics[0]?.id ?? 'gsc:clicks';
-    const rows = frame?.rows ?? [];
+    const rawRows = c.sort.by === 'dimension' ? mondayFirst(frame?.rows ?? [], c.dimension) : (frame?.rows ?? []);
+    // All-zero values are an empty chart, like no rows (round 10).
+    const rows = frame?.seriesKeys?.length || !c.metrics.length || rawRows.some((r) => c.metrics.some((m) => Boolean(r[`m:${m.id}`]) || Boolean(r[`m:${m.id}:prev`]))) ? rawRows : [];
     const compare = props.compare !== 'none' && c.compare === 'inherit' && rows.some((r) => `m:${metric}:prev` in r);
     const h = plotHeight(props.height, widget.showTitle !== false, true, Boolean(props.drill?.depth));
     const useList = c.variant === 'list' && !c.stackBy && c.metrics.length === 1;
@@ -264,13 +293,11 @@ export function PieView(props: WidgetViewProps<PieWidget>) {
     const frame = ok?.parts.rows;
     const c = widget.config;
     const id = c.metric.id;
-    const rows = frame?.rows ?? [];
+    const rawRows = frame?.rows ?? [];
+    const rows = rawRows.some((r) => Boolean(r[`m:${id}`])) ? rawRows : [];
     const h = plotHeight(props.height, widget.showTitle !== false, true, Boolean(props.drill?.depth));
     const bottom = props.bp === 'sm' || c.legend === 'bottom' || (width > 0 && width < 380);
-    // Legend below (phones, narrow cells): the donut, a 20px gap and legend rows (28px + 4px gap) must fit
-    // the cell, or the centred content was cut at both ends. Keep room for 3 rows; fold the rest into "Other".
-    const size = bottom ? Math.max(72, Math.min(160, h - 20 - 3 * 32, width - 16)) : Math.max(96, Math.min(180, h - 8, width - 230));
-    const maxSlices = bottom ? Math.min(6, Math.max(2, Math.floor((h - size - 20 + 4) / 32))) : 6;
+    const { size, maxSlices } = pieLayout(h, width, bottom, rows.length);
     return (
         <WidgetFrame props={props}>
             {!frame ? null : !rows.length ? (

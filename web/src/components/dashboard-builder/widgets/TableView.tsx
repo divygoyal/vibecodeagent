@@ -5,7 +5,7 @@ import { ExternalLink, Maximize2 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Sparkline } from '@/components/charts';
-import { fmtDay } from '@/lib/format';
+import { fmtDay, fmtFull } from '@/lib/format';
 import { Button, EmptyState, MetricDelta, Modal, SearchInput, Table, type TableColumn as UiColumn } from '@/components/ui';
 import { dimLabel, fmtMetricValue, metricHeatbar, metricLabel } from '@/lib/builder/catalog';
 import { cellStyle } from '@/lib/builder/cfRules';
@@ -30,6 +30,9 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
  * and DataFast's breakdown cards).
  */
 export const NARROW_TABLE_PX = 640;
+/** Height a search box (with its gap) and a totals line take out of the rows' room (round 10: the pager was cut off). */
+const SEARCH_PX = 44;
+const TOTALS_PX = 38;
 /** Narrow cards keep the trend column from this width (name, number, change and a 72 px line fit). */
 export const NARROW_TREND_PX = 360;
 
@@ -93,14 +96,14 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
     const phone = props.bp === 'sm';
     // A table that does not paginate used to scroll inside its card, which left the last row cut through its text
     // (round 8 judge). It now pages by whole rows that fit, like a paginated one; a short table shows no pager.
-    const fitRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (flagNotes(ok, widget).length ? 26 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - 36 - 48) / 36));
+    const fitRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (flagNotes(ok, widget).length ? 26 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - (c.search ? SEARCH_PX : 0) - (footer ? TOTALS_PX : 0) - 36 - 48) / 36));
     const pageSize = phone ? 5 : c.pagination ? Math.min(c.pageSize, fitRows) : fitRows;
     // TV: no pager, just the top rows that fit the card (round 4).
     const tv = Boolean(useTvScreen());
     const tvRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - 36 - 18) / 36));
     const canOpen = hidden > 0 && Boolean(frame?.rows.length) && !tv;
     const sortRef = c.columns.find((col) => col.id === c.sort.by && col.kind === 'metric')?.ref;
-    const changeOrder = c.sortByChange && !c.changeOnly && sortRef && props.compare !== 'none' && frame?.rows.length
+    const changeOrder = c.sortByChange && sortRef && props.compare !== 'none' && frame?.rows.length
         ? `Biggest ${c.sort.dir === 'asc' ? 'drop' : 'rise'} in ${metricLabel(sortRef).toLowerCase()} first`
         : null;
 
@@ -213,7 +216,10 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
     const [q, setQ] = useState('');
     const metricCols = cols.filter((col) => col.kind === 'metric');
     const compare = props.compare !== 'none' && Boolean(frame?.rows.some((r) => metricCols.some((m) => `m:${m.ref}:prev` in r)));
-    const all = (frame?.rows ?? []) as Row[];
+    // Rows that are all zero in every metric say nothing: same empty state as no rows at all (round 10: "No rows" next to seven $0.00 rows).
+    const rawRows = (frame?.rows ?? []) as Row[];
+    const allZero = metricCols.length > 0 && rawRows.length > 0 && rawRows.every((r) => metricCols.every((m) => !r[`m:${m.ref}`]));
+    const all = allZero ? [] : rawRows;
     const needle = q.trim().toLowerCase();
     const d0 = c.dimensions[0];
     const rows = needle ? all.filter((r) => `${dimText(d0, r[`d:${d0}`], frame?.labels)} ${frame?.sublabels?.[String(r[`d:${d0}`])] ?? ''}`.toLowerCase().includes(needle)) : all;
@@ -291,6 +297,26 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
         };
     });
 
+    // Rising / Declining lists are ordered by the absolute change in the sort metric: say it in a column (round 10 judge).
+    const changeRef = c.sortByChange && c.changeOnly && compare ? c.columns.find((col) => col.id === c.sort.by && col.kind === 'metric')?.ref : undefined;
+    if (changeRef && columns.some((col) => col.key === c.sort.by)) {
+        const at = columns.findIndex((col) => col.key === c.sort.by);
+        columns.splice(at + 1, 0, {
+            key: '__change',
+            header: <span title={`Change in ${metricLabel(changeRef).toLowerCase()} against the comparison period`}>Change</span>,
+            align: 'right',
+            className: 'whitespace-nowrap',
+            cell: (r) => {
+                const cur = r[`m:${changeRef}`];
+                const prev = r[`m:${changeRef}:prev`];
+                if (typeof cur !== 'number') return <span className="text-fg-muted">–</span>;
+                const diff = cur - (typeof prev === 'number' ? prev : 0);
+                const tone = diff === 0 ? 'text-fg-muted' : (diff > 0) === (metricBetter(changeRef) !== 'down') ? 'text-up' : 'text-down';
+                return <span className={cn('tabular-nums font-medium', tone)}>{diff > 0 ? '+' : diff < 0 ? '−' : ''}{fmtFull(Math.abs(diff))}</span>;
+            },
+        });
+    }
+
     if (trend) {
         // Right after the column it draws (else at the end); phones put it at the end of the row's first line.
         const at = columns.findIndex((col) => col.key === c.sort.by);
@@ -318,7 +344,7 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                     // Phones grow the card with its rows, so every number can wrap onto its row's second line;
                     // fixed-height cards (a narrow viewport with a wider canvas) keep one faded meta line.
                     mobileList={inDialog || props.bp === 'sm' ? true : 'compact'}
-                    footer={footer}
+                    footer={allZero ? undefined : footer}
                     empty={widget.filters?.length || c.rowFilters?.length
                         ? <EmptyState variant="inline" title="Nothing matches yet" description={widget.filters?.length ? 'No rows match this widget’s filter in this period. Rows appear here as soon as they do.' : 'No rows pass this table’s thresholds in this period.'} />
                         : c.sortByChange && c.changeOnly

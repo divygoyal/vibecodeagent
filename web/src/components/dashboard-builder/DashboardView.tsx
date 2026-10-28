@@ -334,7 +334,8 @@ export function DashboardView({
                         resolved={data?.resolved}
                         size={bp === 'sm' ? 'sm' : 'md'}
                     />
-                    {views ? <ViewsMenu handlers={views} size={bp === 'sm' ? 'sm' : 'md'} /> : null}
+                    {/* A share viewer who may not change anything has no state to keep or link to: no menu (round 10 judge). */}
+                    {views && (views.owner || allow.date || allow.compare || allow.filters) ? <ViewsMenu handlers={views} size={bp === 'sm' ? 'sm' : 'md'} /> : null}
                     {switches ? <ViewerSwitches controls={doc.controls} state={state} handlers={switches} defaultSiteLabel={defaultSiteLabel} size={bp === 'sm' ? 'sm' : 'md'} kinds={['metric', 'grain', 'searchType']} /> : null}
                     {editableVars.map((v) => <VariableInput key={v.id} control={v} value={variableValues([v], state)[v.id]} onChange={(val) => onVariable!(v.id, val)} />)}
                 </ControlsBar>

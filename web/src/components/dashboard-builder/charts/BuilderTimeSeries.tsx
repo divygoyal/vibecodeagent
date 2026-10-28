@@ -372,6 +372,8 @@ function Plot({ rows, series, breakdown, compare, compareName = 'Previous period
     }, [refLines, yAxes, breakdown, height]);
 
     const allZero = !breakdown && first ? rows.every((r) => !r[`m:${first.metric}`]) : false;
+    // Round 10: an all-zero chart draws no $0 to $4 axis and no markers or goal lines through its "No revenue" message.
+    const empty = allZero && rows.length > 0 && Boolean(first);
     const anim = !reduce;
     const legend = showLegend && (breakdown || series.length > 1);
     const legendItems: LegendItem[] = breakdown
@@ -402,10 +404,10 @@ function Plot({ rows, series, breakdown, compare, compareName = 'Previous period
                 <CartesianGrid vertical={false} stroke={GRID_STROKE} />
                 <XAxis dataKey="d:date" ticks={xTicks} interval={0} tick={xTick} tickLine={false} axisLine={AXIS_LINE} tickMargin={8} />
                 {breakdown ? (
-                    <YAxis yAxisId="b" hide={!showY} width={showY ? 44 : 0} domain={yAxes.b.domain} ticks={yAxes.b.ticks} interval={0} tickFormatter={axisFmt(breakdown.metric, currency)} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                    <YAxis yAxisId="b" hide={!showY || empty} width={showY ? 44 : 0} domain={yAxes.b.domain} ticks={yAxes.b.ticks} interval={0} tickFormatter={axisFmt(breakdown.metric, currency)} tick={AXIS_TICK} tickLine={false} axisLine={false} />
                 ) : series.map((s, i) => {
                     const isPos = getMetric(s.metric)?.format === 'position';
-                    const visible = showY && (i === 0 || s.axis === 'right');
+                    const visible = showY && !empty && (i === 0 || s.axis === 'right');
                     return (
                         <YAxis
                             key={s.metric} yAxisId={s.metric} hide={!visible} width={visible ? 44 : 0} orientation={s.axis === 'right' ? 'right' : 'left'}
@@ -418,13 +420,13 @@ function Plot({ rows, series, breakdown, compare, compareName = 'Previous period
                 })}
                 <RTooltip content={renderTooltip} cursor={CURSOR} isAnimationActive={false} offset={12} />
 
-                {(marks ?? []).filter((m) => m.kind === 'google' && m.endAt).map((m) => (
+                {(empty ? [] : marks ?? []).filter((m) => m.kind === 'google' && m.endAt).map((m) => (
                     <ReferenceArea key={`area-${m.key}`} x1={m.at} x2={m.endAt} yAxisId={markAxis} fill={MARK_COLOR.google} fillOpacity={0.07} stroke="none" ifOverflow="hidden" />
                 ))}
-                {markGroups.map(({ at, group, drop }) => (
+                {(empty ? [] : markGroups).map(({ at, group, drop }) => (
                     <ReferenceLine key={`mark-${at}`} x={at} yAxisId={markAxis} stroke={MARK_COLOR[group.some((m) => m.kind === 'note') ? 'note' : 'google']} strokeOpacity={0.7} strokeDasharray="3 3" label={markGlyph(group, drop)} />
                 ))}
-                {(refLines ?? []).map((l) => (
+                {(empty ? [] : refLines ?? []).map((l) => (
                     <ReferenceLine key={l.key} y={l.y} yAxisId={breakdown ? 'b' : l.metric} stroke={REF_STYLE[l.kind].stroke} strokeWidth={REF_STYLE[l.kind].width} strokeDasharray={REF_STYLE[l.kind].dash} label={refLabel(l.label, REF_STYLE[l.kind].stroke, refSides.get(l.key) ?? 'right')} />
                 ))}
 
@@ -465,8 +467,8 @@ function Plot({ rows, series, breakdown, compare, compareName = 'Previous period
                     ];
                 }) : null}
             </ComposedChart>}
-            {allZero && rows.length > 0 && first ? (
-                <p className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-body-sm text-fg-muted">No {metricLabel(first.metric).toLowerCase()} in this period</p>
+            {empty ? (
+                <p className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-body-sm text-fg-muted">No {metricLabel(first!.metric).toLowerCase()} in this period</p>
             ) : null}
         </figure>
     );
