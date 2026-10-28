@@ -51,7 +51,8 @@ function Img({ pair, form, alt, sizes, className, eager }: { pair: Pair; form: F
             height={form.height}
             alt={alt}
             loading={eager ? 'eager' : 'lazy'}
-            decoding="async"
+            // No-JS copies decode with the page (async ones stayed unpainted below the fold in a full-page capture).
+            decoding={eager ? 'sync' : 'async'}
             className={className}
         />
     );

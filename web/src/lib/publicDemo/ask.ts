@@ -5,7 +5,7 @@
  */
 import { buildActions } from '@/app/api/site/_lib/actions';
 import type { RangeParams } from '@/app/api/site/_lib/params';
-import { rankByImpact, topClickGain, topClickTasks } from '@/components/site/lib/actionText';
+import { rankByImpact, shortImpact, topClickGain, topClickTasks } from '@/components/site/lib/actionText';
 import { auditActions } from '@/components/site/lib/auditActions';
 import { displayPage, pageRef } from '@/components/site/lib/rules';
 import { resolveDateRange, type DateRangeValue } from '@/lib/dateRange';
@@ -147,11 +147,12 @@ async function quickWins(now: number): Promise<string> {
     for (const a of top) if (a.page) perPage.set(a.page, (perPage.get(a.page) ?? 0) + 1);
     const repeat = [...perPage].find(([, c]) => c > 1);
     return [
-        `Start with **${first.title}**: about +${n(first.gain ?? 0)} clicks a month. It is the first of the top five search tasks on the Actions page for **${ACME_HOST}**; finishing all five could bring about **+${fmtCompact(total)} clicks a month**.`,
+        `Start with **${first.title}**: ${shortImpact(first.expectedImpact)?.value.replace(/^\+/, 'about +') ?? `about +${n(first.gain ?? 0)}`} clicks a month. It is the first of the top five search tasks on the Actions page for **${ACME_HOST}**; finishing all five could bring about **+${fmtCompact(total)} clicks a month**.`,
         '',
         '| # | Task | Page | Extra clicks a month |',
         '|---:|---|---|---:|',
-        ...top.map((a, i) => `| ${i + 1} | ${a.title.replace(/\|/g, '/')} | ${path(a.page)} | +${n(a.gain ?? 0)} |`),
+        // The number as the Actions row prints it ("+8,727", or "up to 1,500" for a win-back).
+        ...top.map((a, i) => `| ${i + 1} | ${a.title.replace(/\|/g, '/')} | ${path(a.page)} | ${shortImpact(a.expectedImpact)?.value ?? `+${n(a.gain ?? 0)}`} |`),
         '',
         repeat ? `**${path(repeat[0])}** has ${repeat[1]} of these tasks, so improving that one page covers ${repeat[1] === 2 ? 'both' : `those ${repeat[1]}`}.` : '',
         '',

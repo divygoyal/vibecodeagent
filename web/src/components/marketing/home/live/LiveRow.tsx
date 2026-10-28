@@ -66,7 +66,10 @@ export function LiveRow<K extends LiveKind>({ kind, data, reserve, children }: {
         if (!el) return;
         const promote = () => {
             for (const img of el.querySelectorAll<HTMLImageElement>('img[loading="lazy"]')) {
-                if (img.getClientRects().length) img.loading = 'eager';
+                if (!img.getClientRects().length) continue;
+                img.loading = 'eager';
+                // Decode ahead too: an async-decoded picture below the fold stays unpainted in full-page captures.
+                img.decode().catch(() => { /* the picture still shows when it is painted */ });
             }
         };
         if (kind === 'site') {

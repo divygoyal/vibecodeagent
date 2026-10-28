@@ -86,6 +86,7 @@ test('demo Ask "improve first" answer starts with the Actions list\'s first clic
     }));
     const open = rankByImpact([...res.actions, ...auditActions(getDemoAuditReport('https://acmeanalytics.example/'), 'acmeanalytics.example')]);
     const first = topClickTasks(open)[0];
-    assert.ok(answer.startsWith(`Start with **${first.title}**: about +${fmtFull(first.gain)} clicks a month`), answer.slice(0, 200));
+    const shown = first.expectedImpact.startsWith('+') ? `about +${fmtFull(first.gain)}` : `up to ${fmtFull(first.gain)}`;
+    assert.ok(answer.startsWith(`Start with **${first.title}**: ${shown} clicks a month`), answer.slice(0, 200));
     assert.match(answer, new RegExp(`\\+${fmtCompact(topClickGain(open)).replace('.', '\\.')} clicks a month`));
 });
