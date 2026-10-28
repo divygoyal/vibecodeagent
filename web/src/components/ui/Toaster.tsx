@@ -36,6 +36,8 @@ export function Toaster() {
     return (
         <Sonner
             position={isMobile || dialogOpen ? 'top-center' : inEditor ? 'bottom-center' : 'bottom-right'}
+            // Tight to the top while a dialog is open: its title row starts about 67px down, so the toast clears it.
+            offset={dialogOpen && !isMobile ? 6 : undefined}
             visibleToasts={3}
             gap={8}
             duration={4000}
