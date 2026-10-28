@@ -152,11 +152,9 @@ export const SiteCard = memo(function SiteCard({
             ? { s: [{ metric: 'clicks' as const, values: site.series.clicks ?? [] }, { metric: 'impressions' as const, values: site.series.impressions ?? [] }], d: dates.search }
             : null;
     const window = trafficFirst && hasTraffic ? windows.traffic : hasSearch ? windows.search : windows.traffic;
-    // A paired card shows numbers from both sources, whose windows end on different days (GA4 yesterday,
-    // Search Console 2 days ago): name the other one's last day too, the full pair in the tooltip.
-    const other = hasTraffic && hasSearch ? (window === windows.traffic ? windows.search : windows.traffic) : null;
-    const otherLabel = window && other && other.curEnd !== window.curEnd ? `${window === windows.traffic ? 'search' : 'traffic'} to ${fmtDay(other.curEnd)}` : null;
-    const windowTitle = otherLabel && windows.traffic && windows.search
+    // A paired card shows numbers from both sources, whose windows end on different days (GA4 yesterday, Search
+    // Console 2 days ago): the footer names the leading source's days, the tooltip both (the page subtitle says so too).
+    const windowTitle = hasTraffic && hasSearch && windows.traffic && windows.search && windows.traffic.curEnd !== windows.search.curEnd
         ? `Traffic ${fmtDateRange(windows.traffic.curStart, windows.traffic.curEnd)} · Search ${fmtDateRange(windows.search.curStart, windows.search.curEnd)}`
         : undefined;
     const chip = alertChipText(site);
@@ -259,7 +257,7 @@ export const SiteCard = memo(function SiteCard({
                     </Tooltip>
                 ) : window && !loadingData ? (
                     <span className="min-w-0 truncate text-meta whitespace-nowrap text-fg-muted" title={greyed ? undefined : windowTitle}>
-                        {greyed && site.lastSyncedAt ? `Last data ${fmtDay(new Date(site.lastSyncedAt * 1000))}` : `${fmtDateRange(window.curStart, window.curEnd)}${otherLabel ? ` · ${otherLabel}` : ''}`}
+                        {greyed && site.lastSyncedAt ? `Last data ${fmtDay(new Date(site.lastSyncedAt * 1000))}` : fmtDateRange(window.curStart, window.curEnd)}
                     </span>
                 ) : null}
                 <span className="flex-1" />
