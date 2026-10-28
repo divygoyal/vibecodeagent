@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import NumberFlow from '@number-flow/react';
-import { Monitor, Smartphone, Tablet, Tv } from 'lucide-react';
 
 import { fmtFull } from '@/lib/format';
 import { METRICS } from '@/lib/metrics';
@@ -19,6 +18,7 @@ import { deviceLabel, geoLabel } from '../lib/sources';
 import type { RealtimeLiveRow, RealtimeResponse } from '../lib/types';
 import { LoadError } from '../SiteStates';
 import { FlagIcon } from '../SourceIcon';
+import { DeviceIcon } from '../TechIcon';
 import { useGa4, useSite } from '../useSiteData';
 
 const GeoChoropleth = dynamic(() => import('@/components/charts/GeoChoropleth'), {
@@ -47,12 +47,6 @@ export function LiveCount() {
             </span>
         </Link>
     );
-}
-
-function DeviceIcon({ device }: { device: string }) {
-    const d = device.toLowerCase();
-    const Icon = d === 'mobile' ? Smartphone : d === 'tablet' ? Tablet : d === 'smart tv' ? Tv : Monitor;
-    return <Icon aria-hidden size={14} strokeWidth={1.75} className="shrink-0 text-fg-muted" />;
 }
 
 function ago(m: number): string {

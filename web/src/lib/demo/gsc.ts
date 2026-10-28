@@ -398,7 +398,9 @@ export function demoUrlInspection(body: { inspectionUrl?: string; siteUrl?: stri
     const url = String(body.inspectionUrl || siteOrigin(site) + '/');
     const today = todayIndex(opts.now);
     const r = unit(site.key, 'inspect', url);
-    const indexed = site.shape === 'new' ? r < 0.6 : r < 0.9;
+    // The home page is always indexed (a site whose home page is not in Google is a different demo story).
+    const isHome = url.replace(/\/$/, '') === siteOrigin(site);
+    const indexed = isHome || (site.shape === 'new' ? r < 0.6 : r < 0.9);
     const daysAgo = 1 + Math.floor(unit(site.key, 'crawl', url) * 20);
     const crawlTime = `${dayToIso(today - daysAgo)}T${String(3 + (hashString(url) % 18)).padStart(2, '0')}:14:52Z`;
     const origin = siteOrigin(site);

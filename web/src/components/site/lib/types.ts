@@ -140,6 +140,19 @@ export interface RealtimeLiveRow {
     users: number;
 }
 
+/** Traffic › Journeys (round 5): how sessions arrive, where they land and what they do next. All from GA4. */
+export interface JourneysResponse {
+    /** Sessions by channel and landing page, and how many of them had a key event (GA4 sessionKeyEventRate). */
+    entries: { channel: string; landing: string; sessions: number; keySessions: number }[];
+    /**
+     * Page views opened from the landing page in sessions that started there: GA4 page referrer = the landing page
+     * on the same host. Reloads of the landing page are left out.
+     */
+    next: { landing: string; next: string; views: number }[];
+    /** GA4 cut off one of the two reports (very large sites): the smallest flows are missing. */
+    truncated: boolean;
+}
+
 export interface RetentionResponse {
     mode: 'daily' | 'weekly' | 'monthly';
     cohorts: { date: string; users: number; retention: (number | null)[] }[];
@@ -257,6 +270,32 @@ export interface InspectResponse {
     richResultsVerdict: string | null;
     richResultTypes: string[];
     link: string | null;
+}
+
+/** Search clicks by query and page (Traffic › Journeys "From Google search"). */
+export interface SearchFlowResponse {
+    rows: { query: string; page: string; clicks: number }[];
+    /** Clicks of every query + page row with clicks (anonymised queries are not in it). */
+    totalClicks: number;
+}
+
+/** One top page's daily URL Inspection (Search › Indexing, round 5). */
+export interface IndexStatusPage extends Partial<InspectResponse> {
+    url: string;
+    clicks: number;
+    impressions: number;
+    /** ok: inspected; error: Google refused this URL; skipped: the quota ran out before it. */
+    status: 'ok' | 'error' | 'skipped';
+    /** When Google was asked (ISO), cached for a day. */
+    checkedAt: string | null;
+}
+
+export interface IndexStatusResponse {
+    pages: IndexStatusPage[];
+    /** Most pages checked per site per day. */
+    limit: number;
+    /** Pages with clicks in the range (the top `limit` are checked). */
+    pagesWithClicks: number;
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────

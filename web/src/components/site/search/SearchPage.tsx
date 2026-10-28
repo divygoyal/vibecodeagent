@@ -17,7 +17,7 @@ const loading = () => <PageSkeleton />;
 const OpportunitiesTab = dynamic(() => import('./OtherTabs').then((m) => m.OpportunitiesTab), { loading });
 const CannibalizationTab = dynamic(() => import('./OtherTabs').then((m) => m.CannibalizationTab), { loading });
 const MoversTab = dynamic(() => import('./OtherTabs').then((m) => m.MoversTab), { loading });
-const IndexingTab = dynamic(() => import('./OtherTabs').then((m) => m.IndexingTab), { loading });
+const IndexingTab = dynamic(() => import('./IndexingTab').then((m) => m.IndexingTab), { loading });
 
 export const SEARCH_TABS = ['performance', 'opportunities', 'cannibalization', 'movers', 'indexing'] as const;
 type SearchTab = (typeof SEARCH_TABS)[number];

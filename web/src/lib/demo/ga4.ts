@@ -6,9 +6,9 @@
  */
 
 import type { DemoSite } from './catalog';
-import { findSiteByPropertyId } from './catalog';
+import { findSiteByPropertyId, siteOrigin } from './catalog';
 import { DEMO_HISTORY_DAYS, WEEKDAY_NAMES, dayOfWeek, dayToCompact, dayToDate, isoWeek, pad, parseDateToken, sundayWeek, todayIndex } from './dates';
-import { DIMENSION_GROUP, type Entity, type Factors, siteGroup } from './entities';
+import { DIMENSION_GROUP, type Entity, type Factors, siteGroup, sitePages } from './entities';
 import { noise, unit } from './rng';
 import { dailySeries, hourProfile, siteRates } from './series';
 
@@ -439,6 +439,8 @@ export function demoRunReport(propertyId: string, request: GaReportRequest, opts
     const ranges = resolveRanges(request.dateRanges, today);
     const multiRange = ranges.length > 1;
 
+    if (dims.includes('pageReferrer') && dims.includes('pagePath')) return transitionReport(site, request, dims, mets, ranges, today);
+
     const rows = buildRows(site, dims, request.dimensionFilter, ranges, today);
 
     // Derive metrics; drop all-zero rows like GA4 does.
@@ -495,6 +497,68 @@ export function demoRunReport(propertyId: string, request: GaReportRequest, opts
                 metricValues: mets.map((_, i) => ({ value: formatMetric(metricHeaders[i].type, pickFn(...out.map(r => r.values[i]))) })),
             }];
         }
+    }
+    return response;
+}
+
+/**
+ * Page-to-page views: pageReferrer + pagePath (Traffic › Journeys, round 5). On a click inside the site GA4 sets
+ * page_referrer to the page the visitor came from, so these rows carry internal transitions. The generic crossing
+ * pairs pages with the sources' external referrers only, so this builds a small, stable link graph instead: each
+ * landing page's sessions continue to about 6 pages (weights from page views and a per-pair affinity), and the
+ * landing view itself has an external referrer. Totals follow the site's sessions for the range.
+ */
+function transitionReport(site: DemoSite, request: GaReportRequest, dims: string[], mets: string[], ranges: ResolvedRange[], today: number): any {
+    const origin = siteOrigin(site);
+    const rates = siteRates(site);
+    const table = compTable(site, today);
+    const windowStart = today - DEMO_HISTORY_DAYS + 1;
+    const pages = [...sitePages(site)].sort((a, b) => b.views - a.views).slice(0, 40);
+    const baseCont = Math.max(0.15, Math.min(0.75, (rates.pagesPerSession - 1) / rates.pagesPerSession));
+    const out: Array<{ dims: string[]; values: number[] }> = [];
+    for (const range of ranges) {
+        const s = Math.max(range.start, windowStart);
+        const e = Math.min(range.end, today);
+        if (e < s) continue;
+        const sessions = rangeComps(table, s, e).S;
+        const push = (landing: string, referrer: string, path: string, views: number) => {
+            if (views < 0.5) return;
+            const vals: Record<string, string> = { landingPage: landing, landingPagePlusQueryString: landing, pageReferrer: referrer, pagePath: path, pagePathPlusQueryString: path, hostName: site.host };
+            const scaled = views * noise(0.08, site.key, 'tr', landing, path, range.start, range.end);
+            out.push({
+                dims: [...dims.map(d => vals[d] ?? '(not set)'), ...(ranges.length > 1 ? [range.name] : [])],
+                values: mets.map(m => (m === 'activeUsers' || m === 'totalUsers' ? scaled * 0.82 : m === 'sessions' ? scaled * 0.9 : scaled)),
+            });
+        };
+        for (const l of pages) {
+            const sessL = sessions * l.landing;
+            if (sessL < 1) continue;
+            push(l.path, 'https://www.google.com/', l.path, sessL);
+            const cont = baseCont * (0.7 + 0.6 * unit(site.key, 'cont', l.path));
+            const next = pages.filter(p => p.path !== l.path)
+                .map(p => ({ p, w: p.views * (0.15 + 3 * unit(site.key, 'link', l.path, p.path) ** 2) }))
+                .sort((a, b) => b.w - a.w)
+                .slice(0, 6);
+            const sum = next.reduce((a, x) => a + x.w, 0) || 1;
+            for (const x of next) push(l.path, `${origin}${l.path}`, x.p.path, sessL * cont * (x.w / sum));
+        }
+    }
+    sortRows(out, dims, mets, request.orderBys, ranges.length > 1);
+    const limit = Math.min(250_000, Math.max(1, Number(request.limit) || 10_000));
+    const metricHeaders = mets.map(name => ({ name, type: metricDef(name).type }));
+    const response: any = {
+        dimensionHeaders: [...dims, ...(ranges.length > 1 ? ['dateRange'] : [])].map(name => ({ name })),
+        metricHeaders,
+        metadata: { currencyCode: site.ga!.currencyCode, timeZone: site.ga!.timeZone },
+        kind: 'analyticsData#runReport',
+    };
+    const page = out.slice(0, limit);
+    if (page.length) {
+        response.rows = page.map(r => ({
+            dimensionValues: r.dims.map(value => ({ value })),
+            metricValues: r.values.map((v, i) => ({ value: formatMetric(metricHeaders[i].type, v) })),
+        }));
+        response.rowCount = out.length;
     }
     return response;
 }
