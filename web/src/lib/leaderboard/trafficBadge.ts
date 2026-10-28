@@ -5,6 +5,7 @@
  * Nothing but the brand mark, the label and that number is ever drawn; no site name, no private data.
  */
 import { BRAND_NAME } from '@/lib/brand';
+import { trafficBadgeTitle } from './claims';
 import { escapeXml, FONT, PALETTE, type BadgeTheme } from './badgeSvg';
 import { metricText } from './format';
 import type { EmbedPayload } from './types';
@@ -27,7 +28,7 @@ export function trafficBadgeText(d: EmbedPayload | null, brand: string = BRAND_N
     if (!d || !badgeEligible(d)) return null;
     const n = trafficBadgeNumber(d);
     return n
-        ? { label: 'Verified traffic', value: n, tail: 'visitors/mo', title: `Verified traffic: ${n} visitors in the last 28 days, confirmed with Google Search Console on ${brand}` }
+        ? { label: 'Verified traffic', value: n, tail: 'visitors/mo', title: trafficBadgeTitle(n, brand) }
         : { label: 'Verified traffic', value: '', tail: `on ${brand}`, title: `Verified traffic on ${brand}` };
 }
 

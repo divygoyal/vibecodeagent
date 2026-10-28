@@ -38,6 +38,10 @@ test('text: number when shared, plain "Verified traffic" when not, nothing when 
     const t = trafficBadgeText(payload(), 'TrafficClaw');
     assert.deepEqual([t.label, t.value, t.tail], ['Verified traffic', '12.3K', 'visitors/mo']);
     assert.match(t.title, /last 28 days/);
+    // Visitors are Google Analytics; Search Console proves ownership only.
+    assert.match(t.title, /visitors in the last 28 days, from Google Analytics/);
+    assert.match(t.title, /ownership verified in Google Search Console/i);
+    assert.doesNotMatch(t.title, /confirmed with Google Search Console/);
     const hidden = trafficBadgeText(payload({ visitors: null }), 'TrafficClaw');
     assert.deepEqual([hidden.label, hidden.value, hidden.tail], ['Verified traffic', '', 'on TrafficClaw']);
     assert.equal(trafficBadgeText(payload({ verification: ver({ ranked: false }) })), null);

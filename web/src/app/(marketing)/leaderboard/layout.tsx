@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
     title: 'Verified traffic leaderboard',
-    description: 'Real Google Analytics and Search Console numbers from sites whose owners are verified, checked daily.',
+    description: 'Visitors from Google Analytics and clicks from Search Console, for sites whose owners are verified in Google Search Console, checked daily.',
 };
 
 /**
