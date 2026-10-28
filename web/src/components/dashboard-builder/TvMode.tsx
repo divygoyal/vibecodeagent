@@ -207,8 +207,8 @@ export function TvFrame({ doc, pageId, onPage, onExit, resolved, updatedAt, them
         <div data-tv-root="" data-tv-idle={idle ? '1' : '0'} {...themeAttrs} style={themeStyle}
             className={cn('fixed inset-0 z-[70] flex flex-col bg-canvas text-fg', themeClass)} role="dialog" aria-modal="true" aria-label={`${doc.name}, TV mode`}>
             <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border-subtle px-5 max-sm:px-3 sm:gap-4">
-                {/* Narrow screens drop the name first, so the clock never wraps (round 4). */}
-                <p className="min-w-0 shrink truncate text-title text-fg max-sm:hidden">{doc.name}</p>
+                {/* Narrow screens shorten the name (it truncates and its text is smaller), so the clock never wraps. */}
+                <p className="min-w-0 shrink truncate text-title text-fg max-sm:text-body-sm max-sm:font-medium" title={doc.name}>{doc.name}</p>
                 {pages.length > 1 || screens > 1 ? (
                     <div className="flex min-w-0 shrink items-center gap-2">
                         {pages.length > 1 ? <span className="truncate text-body text-fg-secondary max-sm:hidden">{pages[idx]?.title}</span> : null}

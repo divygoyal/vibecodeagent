@@ -226,6 +226,21 @@ test('every template evaluates against the demo data without errors', async () =
     }
 });
 
+test('mover lists (changeOnly) keep only rows that moved their way: "Declining pages" never lists a rising page', async () => {
+    reset();
+    const doc = buildFromTemplate('content-performance', { name: 'Content', defaultSource: ACME });
+    const widgets = doc.pages.flatMap((p) => p.layouts.lg.map((l) => ({ widget: doc.widgets[l.i], pageId: p.id })));
+    const res = await evaluateWidgets({ widgets, defaultSource: doc.defaultSource, controlDefs: doc.controls, controls: controls() }, deps());
+    const moved = (r: Record<string, unknown>) => Number(r['m:gsc:clicks'] ?? 0) - Number(r['m:gsc:clicks:prev'] ?? 0);
+    for (const [id, sign] of [['w_rising', 1], ['w_declining', -1]] as const) {
+        const r = res.results[id];
+        assert.equal(r.status, 'ok', `${id}: ${JSON.stringify(r)}`);
+        if (r.status !== 'ok') continue;
+        const rows = Object.values(r.parts)[0].rows;
+        for (const row of rows) assert.ok(Math.sign(moved(row)) === sign, `${id}: ${JSON.stringify(row)}`);
+    }
+});
+
 // ── migration ──
 test('v1 dashboards migrate to valid v2 docs (layout doubled, metrics fixed, ids pinned)', () => {
     const v1 = {

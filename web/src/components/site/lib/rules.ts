@@ -104,6 +104,15 @@ export function isLowCtr(r: GscMetrics, minImpressions = 100): boolean {
 /** Position used for striking-distance estimates: solidly on page one, not a top-3 promise. */
 export const STRIKING_TARGET = 5;
 
+/**
+ * Striking-distance task title. A query whose average position already rounds onto page one (under
+ * 10.5) is not told to reach "the first page": it is moved up into the top 5 (round 4 polish).
+ */
+export function strikingTitle(query: string, position: number, quote: [string, string] = ['"', '"']): string {
+    const q = `${quote[0]}${query}${quote[1]}`;
+    return position < 10.5 ? `Move ${q} up into the top ${STRIKING_TARGET}` : `Push ${q} onto the first page`;
+}
+
 /** Extra clicks if a query reached position 5 at the usual CTR. */
 export function strikingPotential(r: GscMetrics): number {
     return Math.max(0, Math.round(r.impressions * expectedCtr(STRIKING_TARGET) - r.clicks));

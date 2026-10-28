@@ -104,9 +104,9 @@ export function PagesPage() {
     const columns: TableColumn<Row>[] = [
         {
             key: 'page', header: 'Page', width: '38%', sortable: true, firstSortDir: 'asc', sortValue: (r) => r.label,
-            cell: (r) => <PagePath path={r.label} title={titleOf(r)} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto md:max-w-none" />,
+            cell: (r) => <PagePath path={r.label} title={titleOf(r)} className="w-full font-medium text-fg md:w-auto" />,
             // Rows with trend bars read better without a heat bar; keep it for GSC-only sites.
-            heat: site.hasGa4 ? undefined : { metric: 'clicks', value: (r) => r.clicks },
+            heat: site.hasGa4 ? undefined : { metric: 'clicks', value: (r) => r.clicks, style: 'underline' },
         },
         ...(site.hasGa4 ? [{
             key: 'trend', header: 'Trend', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
@@ -129,7 +129,7 @@ export function PagesPage() {
             { key: 'pos', header: 'Pos', align: 'right' as const, sortable: true, firstSortDir: 'asc' as const, sortValue: (r: Row) => (r.impressions ? r.position : 9999), cell: (r: Row) => (r.impressions ? fmtPosition(r.position) : '–') },
         ] : []),
         ...(compareOn ? [{
-            key: 'delta', header: site.hasGa4 ? 'Δ views' : 'Δ clicks', align: 'right' as const, sortable: true,
+            key: 'delta', header: site.hasGa4 ? 'Δ views' : 'Δ clicks', mobileLabel: site.hasGa4 ? 'Views change' : 'Clicks change', align: 'right' as const, sortable: true,
             sortValue: (r: Row) => { const c = change(r, site.hasGa4); return c.prev === undefined || c.prev === null ? null : c.cur - c.prev; },
             cell: (r: Row) => { const c = change(r, site.hasGa4); return c.prev === undefined ? '' : <MetricDelta metric={site.hasGa4 ? 'pageviews' : 'clicks'} current={c.cur} previous={c.prev} variant="chip" />; },
         }] : []),
@@ -156,7 +156,9 @@ export function PagesPage() {
                     const active = segment === s.value;
                     return (
                         <button key={s.value} type="button" aria-pressed={active} disabled={disabled}
-                            title={disabled ? 'Turn on a comparison period' : s.value === 'decaying' ? 'Search clicks fell in each of the last three 28-day periods, 30%+ in total' : undefined}
+                            title={disabled ? 'Turn on a comparison period' : s.value === 'decaying' ? 'Search clicks fell in each of the last three 28-day periods, 30%+ in total'
+                                : s.value === 'gaining' ? `${site.hasGa4 ? 'Views' : 'Clicks'} up 20% or more (and by 5 or more) vs the comparison period`
+                                    : s.value === 'declining' ? `${site.hasGa4 ? 'Views' : 'Clicks'} down 20% or more (and by 5 or more) vs the comparison period` : undefined}
                             onClick={() => void setSeg(s.value === 'all' ? null : s.value)}
                             className={cn('inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-body-sm pointer-coarse:h-8 transition-colors duration-120 disabled:opacity-50',
                                 active ? 'border-transparent bg-brand-soft text-brand-soft-fg' : 'border-border-subtle bg-surface text-fg-secondary hover:bg-subtle')}>
@@ -167,6 +169,8 @@ export function PagesPage() {
                 })}
             </div>
             <Table<Row>
+                // Title over path in every row: room above and below the two lines (round 4 polish).
+                density="comfortable"
                 caption="Pages"
                 rows={shown}
                 rowKey={(r) => r.key}

@@ -143,8 +143,10 @@ export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit
                     const w = doc.widgets[l.i];
                     if (!w) return null;
                     const h = Math.max(pxHeight(l.h, rowH, gap), w.mobile?.minHeight ?? 0);
-                    // Text grows with its content on phones (a heading that wraps was cut inside a fixed box).
-                    return <div key={l.i} style={w.type === 'text' ? { minHeight: h } : { height: h }} className="min-w-0">{renderWidget(w, h, bp)}</div>;
+                    // Text grows with its content on phones (a heading that wraps was cut inside a fixed box); so does
+                    // the KPI strip, which wraps into a 2-column grid there (round 4 polish).
+                    const grows = w.type === 'text' || w.type === 'kpi-strip';
+                    return <div key={l.i} style={grows ? { minHeight: w.type === 'text' ? h : undefined } : { height: h }} className="min-w-0">{renderWidget(w, h, bp)}</div>;
                 })}
             </div>
         );

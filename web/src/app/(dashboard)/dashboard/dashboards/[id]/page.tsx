@@ -18,7 +18,7 @@ import { fetchJson, ownerPageLoader, usePageResults } from '@/components/dashboa
 import { canonicalJson } from '@/lib/builder/compile';
 import { presetLabel } from '@/lib/builder/dates';
 import { cssToHex, exportReportPdf, hasReportKit } from '@/lib/builder/reportPdf';
-import { themePreset } from '@/lib/builder/themes';
+import { themeMode } from '@/lib/builder/themes';
 import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
 import { useResolvedTheme } from '@/lib/theme';
 import type { DashboardDocV2, DashboardRecord, FilterControl, ShareState } from '@/lib/builder/types';
@@ -165,7 +165,9 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
     );
 
     if (tv) {
-        const tvMode = doc.theme.mode === 'auto' ? (themePreset(doc.theme.id).preferredMode ?? appMode) : doc.theme.mode;
+        // The owner's TV view follows the app theme like the dashboard page does (theme.mode is the shared
+        // links' appearance); a preset with one mode keeps it (round 4 polish: TV ignored dark mode).
+        const tvMode = themeMode(doc.theme, appMode);
         const r = dashRootProps(doc.theme, tvMode);
         return (
             <TvFrame doc={doc} pageId={ctl.state.pageId} onPage={ctl.setPage} onExit={() => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); ctl.setTv(false); }}

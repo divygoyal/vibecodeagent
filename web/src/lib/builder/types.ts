@@ -350,6 +350,11 @@ export interface TableConfig {
     rules?: ConditionalRule[];
     /** Sort by change vs the comparison period ("Rising pages"). */
     sortByChange?: boolean;
+    /**
+     * With sortByChange: keep only rows that moved in the sort direction (desc: rose, asc: fell),
+     * so "Declining pages" never lists a page that held steady or grew (round 4 polish).
+     */
+    changeOnly?: boolean;
 }
 export type TableWidget = WidgetBase<'table', TableConfig>;
 

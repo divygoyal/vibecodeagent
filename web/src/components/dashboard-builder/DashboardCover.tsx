@@ -79,7 +79,7 @@ export function DashboardCover({ theme, name, vars, pages, currentPageId, onPage
             {center ? <span aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-brand" /> : null}
             <div className={cn('px-6 py-8 sm:px-10 sm:py-12', c.layout === 'left' && 'pl-8 sm:pl-12')}>
                 {text}
-                {kpis ? <div className="mt-6 h-[120px] text-left">{kpis}</div> : null}
+                {kpis ? <div className="mt-6 flex min-h-[120px] flex-col text-left [&>*]:flex-1">{kpis}</div> : null}
             </div>
             {c.layout === 'split' ? (
                 <div className="relative min-h-[180px] bg-brand">

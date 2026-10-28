@@ -141,11 +141,13 @@ export function ChannelsDonut() {
 
 export function DevicesDonut() {
     const q = useGa4<Ga4BreakdownResponse>('devices');
+    // The centre shows the site's users (the header number); the slices can add up to more (several devices).
+    const summary = useGa4<Ga4Summary>('summary');
     const items = (q.data?.rows ?? []).map((r) => ({ key: r.key, label: cap(r.dims.deviceCategory), value: r.cur.activeUsers ?? 0, color: deviceColor(r.dims.deviceCategory) }));
     return (
         <SectionCard title="Devices" description="Users">
             {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : q.state === 'loading' ? <DonutSkeleton /> : items.length ? (
-                <Donut items={items} centerLabel="Users" size={136} legend="bottom" />
+                <Donut items={items} centerLabel="Users" centerValue={summary.data?.totals.users} size={136} legend="bottom" />
             ) : <EmptyState variant="inline" title="No users in this period" />}
         </SectionCard>
     );

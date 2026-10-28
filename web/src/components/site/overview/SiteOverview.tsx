@@ -109,7 +109,11 @@ function AlertsCard() {
     }), [gsc.data, gscWindow, ga.data, dr.resolved, compareOn, queries.data]);
     const loading = (site.hasGsc && gsc.state === 'loading') || (site.hasGa4 && ga.state === 'loading');
     const openTypes = new Set(open.map((a) => a.type));
-    const span = windowText(site.hasGsc ? gscWindow : dr.resolved);
+    // Search Console runs ~2 days behind, so its comparison ends earlier than the page range: say so instead
+    // of showing a window that does not match the header (round 4 polish).
+    const span = site.hasGsc && site.hasGa4 && windowText(gscWindow) !== windowText(dr.resolved)
+        ? `${windowText(dr.resolved)} (search: ${windowText(gscWindow)}, as Search Console data lags)`
+        : windowText(site.hasGsc ? gscWindow : dr.resolved);
     const name = site.siteHost ?? site.label;
 
     if (loading && list.length === 0) return <Skeleton className="h-12 rounded-card" />;

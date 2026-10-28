@@ -83,7 +83,9 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
     if (!features) return <div className="skeleton" style={{ width, height: mapH }} />;
 
     return (
-        <div className="relative" style={{ width, height }}>
+        // shrink-0: in a column with the country list, the map box (legend included) never gives up height, so
+        // the legend cannot ride over the first country row (round 4 polish).
+        <div className="relative shrink-0" style={{ width, height }}>
             <svg ref={ref} width={width} height={mapH} className="block" role="img" aria-label={`${label} by country`} onMouseLeave={() => setHover(null)}>
                 {features.map((f, i) => {
                     const code = f.id !== undefined ? numericToAlpha2(f.id) : null;

@@ -197,8 +197,8 @@ const BUILDERS_V1: Record<string, () => Built> = {
                 [[kpi('w_kpis', ['gsc:clicks', 'gsc:impressions', 'ga4:screenPageViews', 'ga4:engagementRate', 'ga4:keyEvents']), 12, 3]],
                 [[table('w_pages', 'Pages', ['page'], ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position', 'ga4:sessions', 'ga4:engagementRate', 'ga4:keyEvents'], { bars: ['gsc:clicks', 'ga4:keyEvents'] }), 12, 10]],
                 [[ts('w_views', 'Pageviews', ['ga4:screenPageViews']), 6, 7], [ts('w_clicks', 'Clicks', ['gsc:clicks']), 6, 7]],
-                [[table('w_rising', 'Rising pages', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'desc' } }), 6, 9],
-                    [table('w_declining', 'Declining pages', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' } }), 6, 9]],
+                [[table('w_rising', 'Rising pages', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'desc' } }), 6, 9],
+                    [table('w_declining', 'Declining pages', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'asc' } }), 6, 9]],
             ], w)],
         };
     },

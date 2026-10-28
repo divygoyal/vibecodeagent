@@ -14,8 +14,12 @@ function compareText(mode: WidgetViewProps['compare']): string {
     return compareLabel(mode === 'previous_year' ? { mode } : mode === 'previous_period' ? { mode } : { mode: 'none' });
 }
 
-function Tile({ m, total, spark, showDelta, showSpark, sparkHeight, big, mode, currency, missing }: {
+function Tile({ m, total, spark, showDelta, showSpark, sparkHeight, big, mode, currency, missing, wrapCompare, compareLine = true }: {
     m: MetricRef; total?: DataFrame; spark?: DataFrame; showDelta: boolean; showSpark: boolean; sparkHeight: number; big?: boolean; mode: WidgetViewProps['compare']; currency?: string; missing?: boolean;
+    /** Phones: the "vs 20.7K previous period" line wraps instead of being cut. */
+    wrapCompare?: boolean;
+    /** false: no "vs …" line (a titled strip of 3 rows has no room for it; it was cut in half). */
+    compareLine?: boolean;
 }) {
     const def = getMetric(m.id);
     const row = total?.rows[0] ?? {};
@@ -46,8 +50,8 @@ function Tile({ m, total, spark, showDelta, showSpark, sparkHeight, big, mode, c
                     <MetricDelta current={value} previous={prev} format={dsFormat(m.id)} better={metricBetter(m.id)} variant="chip" comparisonLabel={cmp ? cmp.replace(/^vs /, 'versus ') : undefined} />
                 ) : null}
             </div>
-            {showDelta && prev !== undefined && cmp && !missing ? (
-                <p className="truncate text-meta text-fg-muted">vs {fmtMetricValue(m.id, prev, { compact: true, tile: true, currency })} {cmp.replace(/^vs /, '')}</p>
+            {showDelta && compareLine && prev !== undefined && cmp && !missing ? (
+                <p className={cn('text-meta text-fg-muted', wrapCompare ? 'line-clamp-2' : 'truncate')}>vs {fmtMetricValue(m.id, prev, { compact: true, tile: true, currency })} {cmp.replace(/^vs /, '')}</p>
             ) : null}
             {showSpark && values.length > 1 && !missing ? (
                 <div className="mt-auto pt-1">
@@ -118,21 +122,33 @@ export function KpiStripView(props: WidgetViewProps<KpiStripWidget>) {
     const ok = okResult(result);
     const c = widget.config;
     const notes = flagNotes(ok, widget);
+    const phone = props.bp === 'sm' && props.mode !== 'edit';
     return (
         <div data-dash-widget="strip" className="relative flex h-full flex-col overflow-hidden rounded-card border border-border-subtle bg-surface shadow-card">
             {widget.showTitle && widget.title ? <h3 className="px-4 pt-3 text-title-sm text-fg">{widget.title}</h3> : null}
             {result?.status === 'error' && !ok ? (
                 <WidgetError result={result} onRetry={props.onRetry} onChooseSource={props.onChooseSource} compact />
             ) : (
-                <div className={cn('flex min-h-0 flex-1 snap-x overflow-x-auto [scrollbar-width:none]', refetching && 'opacity-60')} role="list">
+                <div
+                    className={cn(
+                        // Phones: a 2-column grid that grows with its tiles (a scrolling row cut the third tile mid-number,
+                        // round 4 polish); an odd last tile spans both columns. Wider: one row.
+                        phone
+                            ? 'grid min-h-0 flex-1 grid-cols-2 gap-px bg-border-subtle [&>*:last-child:nth-child(odd)]:col-span-2'
+                            : 'flex min-h-0 flex-1 snap-x overflow-x-auto [scrollbar-width:none]',
+                        refetching && 'opacity-60',
+                    )}
+                    role="list"
+                >
                     {c.metrics.map((m) => (
-                        <div key={m.id} role="listitem" className="flex min-w-[150px] flex-1 snap-start border-r border-border-subtle p-4 last:border-r-0">
+                        <div key={m.id} role="listitem" className={phone ? 'flex min-w-0 bg-surface p-3' : 'flex min-w-[150px] flex-1 snap-start border-r border-border-subtle p-4 last:border-r-0'}>
                             {loading && !ok ? (
                                 <div className="flex flex-col gap-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-7 w-24" /></div>
                             ) : (
                                 <Tile
                                     m={m} total={ok?.parts.total} spark={ok?.parts.spark}
-                                    showDelta={c.comparison.show && props.compare !== 'none'} showSpark={c.sparkline.show && height >= 170}
+                                    showDelta={c.comparison.show && props.compare !== 'none'} showSpark={c.sparkline.show && (phone ? false : height >= 170)} wrapCompare={phone}
+                                    compareLine={phone || !(widget.showTitle && widget.title) || height >= 150}
                                     sparkHeight={28} mode={props.compare} currency={ok?.flags.currency}
                                     missing={ok?.flags.missingFamilies?.includes(m.id.split(':')[0] as 'ga4' | 'gsc')}
                                 />

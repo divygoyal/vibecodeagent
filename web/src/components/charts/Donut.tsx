@@ -21,6 +21,11 @@ export interface DonutProps {
     items: DonutItem[];
     /** Under the total in the centre: "Sessions". */
     centerLabel?: string;
+    /**
+     * The number in the centre when it is not the sum of the slices: users per device add up to more
+     * than the site's users (one person, two devices), so the centre shows the real total (round 4 polish).
+     */
+    centerValue?: number | null;
     format?: MetricFormat;
     /** Diameter in px (default 160). */
     size?: number;
@@ -35,7 +40,7 @@ export interface DonutProps {
  * Parts of a whole, 6 slices max (top 5 + Other), inner radius 64%, 2px
  * surface gaps, total in the centre, legend with value and % (DESIGN 3.7).
  */
-export function Donut({ items, centerLabel, format = 'count', size = 160, maxSlices = 6, legend = 'right', className }: DonutProps) {
+export function Donut({ items, centerLabel, centerValue, format = 'count', size = 160, maxSlices = 6, legend = 'right', className }: DonutProps) {
     const [active, setActive] = useState<string | null>(null);
     const slices = useMemo(() => {
         const sorted = [...items].filter((i) => i.value > 0).sort((a, b) => b.value - a.value);
@@ -82,7 +87,7 @@ export function Donut({ items, centerLabel, format = 'count', size = 160, maxSli
                     {slices.length ? <RTooltip content={renderTooltip} isAnimationActive={false} /> : null}
                 </PieChart>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className={size < 120 ? 'text-body-sm font-semibold tabular-nums text-fg' : 'text-stat-sm text-fg'}>{format === 'count' ? fmtCompact(total) : fmtValue(format, total)}</span>
+                    <span className={size < 120 ? 'text-body-sm font-semibold tabular-nums text-fg' : 'text-stat-sm text-fg'}>{format === 'count' ? fmtCompact(centerValue ?? total) : fmtValue(format, centerValue ?? total)}</span>
                     {centerLabel && size >= 120 ? <span className="text-meta text-fg-muted">{centerLabel}</span> : null}
                 </div>
             </div>

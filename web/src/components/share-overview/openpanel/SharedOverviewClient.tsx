@@ -29,6 +29,7 @@ import {
 import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ChartColumn, ExternalLink, TableProperties, X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
+import { eventDisplayName } from '@/lib/eventNames';
 import { fmtAxis, fmtCompact, fmtDuration, fmtFull, fmtPercent, makeDateTickFormatter, type MetricFormat } from '@/lib/format';
 import { categoricalColor, METRICS as METRIC_DEFS, type MetricKey } from '@/lib/metrics';
 import { Button } from '@/components/ui/Button';
@@ -510,9 +511,11 @@ function BreakdownTable<T>({ rows, rowKey, labelHeader, label, labelText, column
     const heatValue = columns[0]?.value;
     const max = Math.max(1, ...visible.map((r) => heatValue?.(r) ?? 0));
     const heat = heatMetric === 'neutral' ? 'heatbar-neutral' : METRIC_DEFS[heatMetric].heatbar;
+    // Phones lay out only the columns they show (desktopOnly ones are hidden there), so a page title gets the room.
+    const phoneCols = columns.filter((c) => !c.desktopOnly).length;
     const grid = cn(
         'grid items-center gap-3 px-4',
-        columns.length === 1 ? 'grid-cols-[minmax(0,1fr)_72px]' : 'grid-cols-[minmax(0,1fr)_64px_64px]',
+        phoneCols <= 1 ? 'grid-cols-[minmax(0,1fr)_72px]' : 'grid-cols-[minmax(0,1fr)_64px_64px]',
         columns.length >= 3 && 'md:grid-cols-[minmax(0,1fr)_72px_72px_84px]',
         columns.length === 2 && 'md:grid-cols-[minmax(0,1fr)_72px_72px]',
     );
@@ -596,12 +599,12 @@ function BreakdownTable<T>({ rows, rowKey, labelHeader, label, labelText, column
     );
 }
 
-function RowLabel({ icon, prefix, text, trailing }: { icon?: ReactNode; prefix?: string | null; text: string; trailing?: ReactNode }) {
+function RowLabel({ icon, prefix, text, hint, trailing }: { icon?: ReactNode; prefix?: string | null; text: string; hint?: string; trailing?: ReactNode }) {
     return (
         <>
             {icon ? <span className="flex shrink-0 items-center">{icon}</span> : null}
             {prefix ? <span className="max-w-[40%] shrink-0 truncate text-fg-muted">{prefix} /</span> : null}
-            <span className="truncate text-fg">{text}</span>
+            <span className="truncate text-fg" title={hint}>{text}</span>
             {trailing}
         </>
     );
@@ -1115,9 +1118,10 @@ function TopPagesWidget() {
     const hasOrigin = (row: PageRow) => Boolean(row.origin && row.origin !== '(not set)');
     const columns: BreakdownColumn<PageRow>[] = [
         { key: 'primary', header: pagesTab === 'page' ? 'Views' : pagesTab === 'entry' ? 'Entries' : 'Exits', value: (r) => (pagesTab === 'page' ? r.pageviews : r.sessions) },
+        // Phones show one number per page, so the title is readable (it was cut at about 15 characters).
         pagesTab === 'page'
-            ? { key: 'secondary', header: 'Sessions', value: (r) => r.sessions }
-            : { key: 'secondary', header: 'Bounce', value: (r) => r.bounceRate, format: (r) => fmtPercent(r.bounceRate / 100) },
+            ? { key: 'secondary', header: 'Sessions', desktopOnly: true, value: (r) => r.sessions }
+            : { key: 'secondary', header: 'Bounce', desktopOnly: true, value: (r) => r.bounceRate, format: (r) => fmtPercent(r.bounceRate / 100) },
         ...(showRevenue ? [{
             key: 'revenue', header: 'Revenue', desktopOnly: true, value: (r: PageRow) => Number(r.revenue || 0),
             format: (r: PageRow) => (r.revenue ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(r.revenue) : '–'),
@@ -1266,10 +1270,12 @@ function TopEventsWidget({ token }: { token: string }) {
                     label={(r) => (
                         <RowLabel
                             icon={<OverviewValueIcon column={eventTab === 'link_out' ? 'link_out' : eventTab === 'conversions' ? 'conversions' : 'event'} value={r.name} />}
-                            text={r.name}
+                            // Readable names for clients ("Page view"); the GA4 name shows on hover. Links stay URLs.
+                            text={eventTab === 'link_out' ? r.name : eventDisplayName(r.name)}
+                            hint={eventTab === 'link_out' ? undefined : r.name}
                         />
                     )}
-                    labelText={(r) => r.name}
+                    labelText={(r) => (eventTab === 'link_out' ? r.name : `${eventDisplayName(r.name)} ${r.name}`)}
                     columns={[{ key: 'count', header: 'Count', value: (r) => r.count }]}
                     heatMetric="conversions"
                     onRowClick={(r) => openEventReport(r.name)}

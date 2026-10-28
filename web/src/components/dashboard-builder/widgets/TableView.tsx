@@ -243,7 +243,9 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                     footer={footer}
                     empty={widget.filters?.length || c.rowFilters?.length
                         ? <EmptyState variant="inline" title="Nothing matches yet" description={widget.filters?.length ? 'No rows match this widget’s filter in this period. Rows appear here as soon as they do.' : 'No rows pass this table’s thresholds in this period.'} />
-                        : <EmptyState variant="inline" title="No rows in this period" />}
+                        : c.sortByChange && c.changeOnly
+                            ? <EmptyState variant="inline" title={c.sort.dir === 'asc' ? 'Nothing fell in this period' : 'Nothing rose in this period'} description="Rows show here when they move against the comparison period." />
+                            : <EmptyState variant="inline" title="No rows in this period" />}
                     caption={widget.title}
                 />
             </div>

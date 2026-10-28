@@ -27,6 +27,19 @@ import { SearchDetailDrawer } from './SearchDetailDrawer';
 // ─── Opportunities ──────────────────────────────────────────────────────────
 
 /** Search > Opportunities: striking distance and low CTR, with the page that ranks. */
+/**
+ * "rows: 3 queries, 1 page": the Low CTR card counts pages and queries, while Performance's "Low CTR" chip
+ * counts queries, so the card names both parts and its query count matches the chip (round 4 polish).
+ */
+function lowCtrSplit(rows: OpportunityRow[]): string {
+    const queries = rows.filter((r) => r.target === 'query').length;
+    const pages = rows.length - queries;
+    const part = (n: number, one: string, many: string) => `${fmtFull(n)} ${n === 1 ? one : many}`;
+    if (!pages) return queries === 1 ? 'query' : 'queries';
+    if (!queries) return pages === 1 ? 'page' : 'pages';
+    return `rows: ${part(queries, 'query', 'queries')}, ${part(pages, 'page', 'pages')}`;
+}
+
 export function OpportunitiesTab() {
     const site = useSite();
     const { searchDays } = useSiteRange();
@@ -51,7 +64,7 @@ export function OpportunitiesTab() {
                 <Card padding="sm">
                     <p className="text-body-sm font-medium text-fg">Low CTR</p>
                     <p className="mt-0.5 text-meta text-fg-muted">Pages and queries on page one with a CTR under 70% of what that position usually gets. Usually a title or snippet problem.</p>
-                    {q.data ? <p className="mt-2 text-stat-sm text-fg">{fmtFull(q.data.lowCtr.length)} <span className="text-body-sm font-normal text-fg-muted">rows · +{fmtFull(sum(q.data.lowCtr))} clicks a month at the usual CTR</span></p> : <Skeleton className="mt-2 h-6 w-40" />}
+                    {q.data ? <p className="mt-2 text-stat-sm text-fg">{fmtFull(q.data.lowCtr.length)} <span className="text-body-sm font-normal text-fg-muted">{lowCtrSplit(q.data.lowCtr)} · +{fmtFull(sum(q.data.lowCtr))} clicks a month at the usual CTR</span></p> : <Skeleton className="mt-2 h-6 w-40" />}
                 </Card>
             </div>
             <BreakdownTable<OpportunityRow>
@@ -70,6 +83,7 @@ export function OpportunitiesTab() {
                     ),
                 }}
                 heat={{ metric: 'impressions', value: (r) => r.impressions }}
+                twoLine
                 defaultSort="gain"
                 exportName={kind === 'striking' ? 'striking-distance' : 'low-ctr'}
                 searchPlaceholder="Search"
@@ -211,7 +225,7 @@ export function MoversTab() {
                                 columns={[
                                     { key: 'label', header: dim === 'pages' ? 'Page' : 'Query', width: '50%', cell: (r) => <span title={r.key}>{label(r)}</span> },
                                     { key: 'clicks', header: 'Clicks', align: 'right', cell: (r) => <span className="whitespace-nowrap">{fmtFull(r.prev?.clicks ?? 0)} → {fmtFull(r.clicks)}</span> },
-                                    { key: 'delta', header: 'Δ', align: 'right', cell: (r) => <MetricDelta metric="clicks" current={r.clicks} previous={r.prev?.clicks ?? 0} /> },
+                                    { key: 'delta', header: 'Δ', mobileLabel: 'Change', align: 'right', cell: (r) => <MetricDelta metric="clicks" current={r.clicks} previous={r.prev?.clicks ?? 0} /> },
                                     {
                                         key: 'pos', header: 'Position', align: 'right', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
                                         cell: (r) => (r.prev && r.prev.impressions && r.impressions

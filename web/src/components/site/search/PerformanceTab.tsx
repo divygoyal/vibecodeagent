@@ -182,7 +182,7 @@ export function PerformanceTab() {
             cell: (r) => (preset === 'lost' && presetApplies ? <span className="text-fg-muted">0 <span className="text-meta">(was {fmtFull(r.prev?.clicks ?? 0)})</span></span> : fmtFull(r.clicks)),
         },
         ...(compareOn ? [{
-            key: 'delta', header: 'Δ', align: 'right' as const, sortable: true,
+            key: 'delta', header: 'Δ', mobileLabel: 'Change', align: 'right' as const, sortable: true,
             sortValue: (r: GscRow) => r.clicks - (r.prev?.clicks ?? 0),
             cell: (r: GscRow) => (r.prev === undefined ? '' : <MetricDelta metric="clicks" current={r.clicks} previous={r.prev?.clicks ?? null} />),
         }] : []),

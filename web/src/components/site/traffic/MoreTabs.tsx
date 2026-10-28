@@ -79,7 +79,13 @@ export function EventsTab() {
                     ]}
                 />
             )}
-            {trimmed > 0 ? <p className="-mt-2 text-meta text-fg-muted">{fmtFull(trimmed)} {trimmed === 1 ? 'event' : 'events'} with no hits in this period not shown.</p> : null}
+            {trimmed > 0 || hasKey ? (
+                <p className="-mt-2 text-meta text-fg-muted">
+                    {trimmed > 0 ? `${fmtFull(trimmed)} ${trimmed === 1 ? 'event' : 'events'} with no hits in this period not shown. ` : ''}
+                    {/* GA4 can count a key event once per session, so its Event count may be higher than its key events (round 4 polish). */}
+                    {hasKey ? `Key events follow each event’s counting setting in GA4 (once per event or once per session), so a key event’s Event count can be higher than its key events.${keyView ? '' : ' Switch to Key events to see those counts.'}` : ''}
+                </p>
+            ) : null}
             <GoalsPanel />
         </div>
     );
@@ -123,9 +129,10 @@ export function JourneysTab() {
                     label={{
                         header: 'Entry page',
                         text: (x) => `${x.r.dims.pageTitle ?? ''} ${x.label}`.trim(),
-                        cell: (x) => <PagePath path={x.label} title={x.r.dims.pageTitle} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto md:max-w-none" />,
+                        cell: (x) => <PagePath path={x.label} title={x.r.dims.pageTitle} className="w-full font-medium text-fg md:w-auto" />,
                     }}
                     heat={{ metric: 'sessions', value: (x) => v(x.r, 'sessions') }}
+                    twoLine
                     defaultSort="sessions"
                     exportName="entry-pages"
                     searchPlaceholder="Search entry pages"

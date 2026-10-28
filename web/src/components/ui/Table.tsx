@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -36,7 +36,14 @@ export interface TableColumn<T> {
      * Heat bar behind the cell content (one column per table, usually the
      * label column) sized by value / max of the visible rows.
      */
-    heat?: { metric: MetricKey | 'neutral'; value: (row: T) => number | null | undefined };
+    heat?: {
+        metric: MetricKey | 'neutral'; value: (row: T) => number | null | undefined;
+        /**
+         * fill (default): a tint behind the cell. underline: a thin bar under it, with room above and below,
+         * for two-line cells (title over path) where a tint behind half the text read as a stray highlight.
+         */
+        style?: 'fill' | 'underline';
+    };
     className?: string;
     headerClassName?: string;
     /**
@@ -103,6 +110,9 @@ export interface TableProps<T> {
 // Desktop rows 36px by default (critique 2.4); 44px touch rows on phones.
 const ROW_H = { compact: 'h-9', default: 'h-11 md:h-9', comfortable: 'h-12' };
 const ALIGN = { left: 'text-left', right: 'text-right', center: 'text-center' };
+
+/** The underline heat bar: its width, and a stronger tint than a fill (a 3px bar at 12% would not show). */
+const UNDERLINE_HEAT = (pct: number) => ({ width: `${Math.max(pct, 1.5)}%`, ['--tc-heatbar' as string]: '45%' }) as CSSProperties;
 
 function headerText<T>(c: TableColumn<T>): string | null {
     if (c.mobileLabel) return c.mobileLabel;
@@ -270,7 +280,12 @@ export function Table<T>({
                                                     c.className,
                                                 )}
                                             >
-                                                {c.heat ? (
+                                                {c.heat?.style === 'underline' ? (
+                                                    <div className="relative flex min-h-9 items-center py-2">
+                                                        <span className="min-w-0 truncate">{c.cell(row, r)}</span>
+                                                        <span aria-hidden className={cn('absolute bottom-0.5 left-0 h-[3px] rounded-full', heatbarClass(c.heat.metric))} style={UNDERLINE_HEAT(pct)} />
+                                                    </div>
+                                                ) : c.heat ? (
                                                     <div className="relative flex min-h-7 items-center">
                                                         <span
                                                             aria-hidden
@@ -345,8 +360,10 @@ export function Table<T>({
                                 className={cn('flex min-h-11 flex-col justify-center gap-0.5 px-4 py-2', onRowClick && 'cursor-pointer active:bg-subtle/60 focus-visible:-outline-offset-2')}
                             >
                                 <div className="flex min-w-0 items-center gap-3">
-                                    <div className="relative flex min-h-7 min-w-0 flex-1 items-center">
-                                        {titleCol?.heat ? (
+                                    <div className={cn('relative flex min-h-7 min-w-0 flex-1 items-center', titleCol?.heat?.style === 'underline' && 'pb-2')}>
+                                        {titleCol?.heat?.style === 'underline' ? (
+                                            <span aria-hidden className={cn('absolute bottom-0.5 left-0 h-[3px] rounded-full', heatbarClass(titleCol.heat.metric))} style={UNDERLINE_HEAT(pct)} />
+                                        ) : titleCol?.heat ? (
                                             <span
                                                 aria-hidden
                                                 className={cn('absolute inset-y-0 left-[-6px] rounded-md', heatbarClass(titleCol.heat.metric))}

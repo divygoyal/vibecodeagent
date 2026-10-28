@@ -46,6 +46,8 @@ export interface BreakdownTableProps<T> {
     caption?: string;
     /** ISO 4217 code for 'currency' columns (GA4 revenue), from the report metadata. */
     currency?: string;
+    /** Labels on two lines (page title over path): rows get room and the heat bar goes under the label. */
+    twoLine?: boolean;
 }
 
 export function fmtCell(v: number | null | undefined, format: ValueFormat = 'count', currency?: string): string {
@@ -60,7 +62,7 @@ export function fmtCell(v: number | null | undefined, format: ValueFormat = 'cou
 
 /** Sortable, searchable, exportable table for a breakdown (sources, pages, countries ...). */
 export function BreakdownTable<T>({
-    rows, rowKey, label, columns, heat, defaultSort, loading, pageSize = 25, searchPlaceholder = 'Search', exportName, onRowClick, toolbarExtra, empty, caption, currency,
+    rows, rowKey, label, columns, heat, defaultSort, loading, pageSize = 25, searchPlaceholder = 'Search', exportName, onRowClick, toolbarExtra, empty, caption, currency, twoLine,
 }: BreakdownTableProps<T>) {
     const [query, setQuery] = useState('');
     const q = useDebouncedValue(query, 120).trim().toLowerCase();
@@ -73,7 +75,7 @@ export function BreakdownTable<T>({
             sortable: true,
             sortValue: (r) => label.text(r),
             firstSortDir: 'asc',
-            heat,
+            heat: heat && twoLine ? { ...heat, style: 'underline' } : heat,
             width: '40%',
         },
         ...columns.map((c): TableColumn<T> => ({

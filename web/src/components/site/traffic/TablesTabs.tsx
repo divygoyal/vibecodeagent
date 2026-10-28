@@ -14,7 +14,7 @@ import { flagForName } from '../lib/geo';
 import { sourceMediumInfo } from '../lib/sources';
 import { sourceMediumParts } from '../SourceIcon';
 import { displayPage, isAiSource, pageRef } from '../lib/rules';
-import type { Ga4BreakdownResponse, Ga4Row } from '../lib/types';
+import type { Ga4BreakdownResponse, Ga4Row, Ga4Summary } from '../lib/types';
 import { LoadError } from '../SiteStates';
 import { PagePath } from '../PagePath';
 import { useGa4, useSite, useSiteRange } from '../useSiteData';
@@ -55,7 +55,7 @@ export function TrafficPagesTab() {
     const pageLabelCol = (header: string) => ({
         header,
         text: (x: (typeof rows)[number]) => `${x.r.dims.pageTitle ?? ''} ${x.label}`.trim(),
-        cell: (x: (typeof rows)[number]) => <PagePath path={x.label} title={x.r.dims.pageTitle} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto md:max-w-none" />,
+        cell: (x: (typeof rows)[number]) => <PagePath path={x.label} title={x.r.dims.pageTitle} className="w-full font-medium text-fg md:w-auto" />,
     });
     const toggle = (
         <SegmentedControl
@@ -74,6 +74,7 @@ export function TrafficPagesTab() {
                 rows={rows}
                 rowKey={(x) => x.r.key}
                 label={pageLabelCol('Page')}
+                twoLine
                 currency={currency}
                 heat={{ metric: 'pageviews', value: (x) => v(x.r, 'screenPageViews') }}
                 loading={pages.state === 'loading'}
@@ -98,6 +99,7 @@ export function TrafficPagesTab() {
             rows={rows}
             rowKey={(x) => x.r.key}
             label={pageLabelCol('Landing page')}
+            twoLine
             currency={currency}
             heat={{ metric: 'sessions', value: (x) => v(x.r, 'sessions') }}
             loading={pages.state === 'loading'}
@@ -212,6 +214,9 @@ export function TrafficAudienceTab() {
     const nvr = useBreakdown('newReturning');
     const nvrRows = nvr.data?.rows ?? [];
     const totalUsers = nvrRows.reduce((a, r) => a + v(r, 'activeUsers'), 0);
+    // The footnote's total is the site's users (the header tile and the Devices donut), not a sum of rows.
+    const summary = useGa4<Ga4Summary>('summary');
+    const siteUsers = summary.data?.totals.users;
     return (
         <div className="flex flex-col gap-4">
             <GeoCard />
@@ -268,7 +273,7 @@ export function TrafficAudienceTab() {
                     ]}
                 />
             )}
-            <p className="text-meta text-fg-muted">Users per row can add up to more than the total: one person can use several devices or visit from several cities. Totals: {fmtFull(totalUsers)} users.</p>
+            <p className="text-meta text-fg-muted">Users per row can add up to more than the total: one person can use several devices or visit from several cities. {siteUsers !== undefined ? <>Total: {fmtFull(siteUsers)} users.</> : null}</p>
         </div>
     );
 }

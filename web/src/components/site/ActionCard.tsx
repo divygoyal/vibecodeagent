@@ -76,14 +76,23 @@ export function ActionRow({ action, site, onStatus, canSave = true, defaultOpen 
             >
                 <ImpactBars impact={action.impact} />
                 <span className="min-w-0 flex-1">
-                    <span className="block text-body-sm font-medium text-fg max-md:line-clamp-2 md:truncate [overflow-wrap:anywhere]">{action.title}</span>
+                    {/* Phones: the gain sits beside the title, so the page path under them gets the full width (round 4 polish). */}
+                    <span className="flex min-w-0 items-start gap-3">
+                        <span className="block min-w-0 flex-1 text-body-sm font-medium text-fg max-md:line-clamp-2 md:truncate [overflow-wrap:anywhere]">{action.title}</span>
+                        {gain ? (
+                            <span className="shrink-0 text-right leading-tight md:hidden">
+                                <span className="block text-body-sm font-semibold text-fg tabular-nums">{gain.value}</span>
+                                <span className="block text-meta text-fg-muted">{gain.unit}</span>
+                            </span>
+                        ) : null}
+                    </span>
                     <span className="mt-0.5 block truncate text-meta text-fg-muted">
                         {where}
                         {stamp ? <span> · {stamp}</span> : null}
                     </span>
                 </span>
                 {gain ? (
-                    <span className="shrink-0 text-right leading-tight">
+                    <span className="shrink-0 text-right leading-tight max-md:hidden">
                         <span className="block text-body-sm font-semibold text-fg tabular-nums">{gain.value}</span>
                         <span className="block text-meta text-fg-muted">{gain.unit}</span>
                     </span>
