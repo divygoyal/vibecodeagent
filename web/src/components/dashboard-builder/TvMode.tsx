@@ -103,7 +103,7 @@ function useWakeLock() {
     }, []);
 }
 
-export function TvFrame({ doc, pageId, onPage, onExit, resolved, updatedAt, themeAttrs, themeStyle, themeClass, children }: {
+export function TvFrame({ doc, pageId, onPage, onExit, resolved, updatedAt, themeAttrs, themeStyle, themeClass, selection, children }: {
     doc: DashboardDocV2;
     pageId?: string;
     onPage: (id: string) => void;
@@ -113,6 +113,8 @@ export function TvFrame({ doc, pageId, onPage, onExit, resolved, updatedAt, them
     themeAttrs?: Record<string, string>;
     themeStyle?: React.CSSProperties;
     themeClass?: string;
+    /** Round 7: the viewer's switcher picks ("acme.com · Impressions · Weekly"), shown before the dates. */
+    selection?: string;
     /** Render the dashboard for the height (in CSS px, after zoom) one page must fit. */
     children: (fitHeight: number) => ReactNode;
 }) {
@@ -233,6 +235,7 @@ export function TvFrame({ doc, pageId, onPage, onExit, resolved, updatedAt, them
                 </div>
                 {/* Dates, update time and the clock sit at the right edge. */}
                 <div className="flex shrink-0 items-center gap-4 whitespace-nowrap text-body-sm text-fg-muted">
+                    {selection ? <span className="hidden max-w-[360px] truncate md:inline" data-tv-selection="">{selection}</span> : null}
                     {resolved ? <span className="hidden lg:inline">{fmtDateRange(resolved.range.start, resolved.range.end)}</span> : null}
                     {updatedAt ? <span className="hidden xl:inline">Updated {new Date(updatedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span> : null}
                     <span className="tabular-nums text-title-sm text-fg">{clock}</span>

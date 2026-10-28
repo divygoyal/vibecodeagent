@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import {
     ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, LayoutTemplate, Loader2, Monitor, MoreHorizontal, Pencil,
     Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson, ClipboardCopy, ClipboardPaste, MonitorPlay, Palette,
+    Globe, ArrowLeftRight, CalendarRange,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -24,13 +25,15 @@ import { defaultWidget, widgetMeta, widgetTitle, newWidgetId } from '@/lib/build
 import { dimLabel } from '@/lib/builder/catalog';
 import { clipLabel, copyPage, copyWidgets, parseClip, pastePage, pasteWidgets, type Clip } from '@/lib/builder/clipboard';
 import { isDefaultLook, type Mode } from '@/lib/builder/themes';
-import type { DashboardDocV2, DashboardRecord, FilterControl, LayoutItem, WidgetDef, WidgetType } from '@/lib/builder/types';
+import type { ControlDef, DashboardDocV2, DashboardRecord, FilterControl, LayoutItem, SiteControl, WidgetDef, WidgetType } from '@/lib/builder/types';
 import { useResolvedTheme } from '@/lib/theme';
 import { useEditorStore, type Viewport } from '@/stores/dashboardEditorStore';
 import { DashboardCanvas, type Bp } from '../DashboardCanvas';
 import { DashboardCover } from '../DashboardCover';
 import { dashRootProps } from '../theme/DashTheme';
-import { DateControl, FilterControlView } from '../Controls';
+import { DateControl, FilterControlView, GrainSwitch, MetricSwitch, SiteSwitch } from '../Controls';
+import { applyViewerControls, selectedSite } from '@/lib/builder/compile';
+import { newGrainControl, newMetricControl, newSiteControl } from './SwitchControlProps';
 import { ShareDialog } from '../ShareDialog';
 import { textVars } from '../DashboardView';
 import { useElementHeight, useElementWidth } from '../useElementWidth';
@@ -71,8 +74,11 @@ function isTyping(t: EventTarget | null): boolean {
     return Boolean(el.closest('[role="dialog"],[role="listbox"],[role="menu"],[data-radix-popper-content-wrapper]'));
 }
 
-function EditorWidget({ widget, ctx, height, bp, vars }: { widget: WidgetDef; ctx: InlineCtx; height: number; bp: Bp; vars: Record<string, string> }) {
-    const q = useInlineResult(widget, ctx);
+function EditorWidget({ widget: raw, ctx, height, bp, vars }: { widget: WidgetDef; ctx: InlineCtx; height: number; bp: Bp; vars: Record<string, string> }) {
+    // Round 7 switchers: ask for (and draw) the widget as the current picks show it; the stored widget is unchanged.
+    const cctx = { controlDefs: ctx.controlDefs, controls: ctx.controls, pageId: ctx.pageId };
+    const widget = applyViewerControls(raw, cctx, { site: false });
+    const q = useInlineResult(applyViewerControls(raw, cctx), ctx);
     return (
         <WidgetRenderer
             widget={widget}
@@ -176,7 +182,12 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const defaultLabel = doc?.defaultSource.type === 'site' ? (defaultSite?.label ?? doc.defaultSource.siteId) : 'All sites';
 
     const ctx: InlineCtx | null = doc && controls ? { defaultSource: doc.defaultSource, controlDefs: doc.controls, controls: { ...controls, pageId: page?.id }, pageId: page?.id, timezone: doc.settings.timezone } : null;
-    const vars = useMemo(() => textVars(defaultLabel, resolvedDates, page?.title ?? ''), [defaultLabel, resolvedDates, page?.title]);
+    // {{site}} and filter values follow the site switcher's pick in the preview (round 7).
+    const siteCtl = doc?.controls.find((c): c is SiteControl => c.type === 'site');
+    const pickedSiteId = siteCtl && controls ? selectedSite(siteCtl, controls) : undefined;
+    const siteVarLabel = pickedSiteId ? (sites.find((x) => x.siteId === pickedSiteId)?.label ?? pickedSiteId) : defaultLabel;
+    const filterSiteId = pickedSiteId ?? (doc?.defaultSource.type === 'site' ? doc.defaultSource.siteId : undefined);
+    const vars = useMemo(() => textVars(siteVarLabel, resolvedDates, page?.title ?? ''), [siteVarLabel, resolvedDates, page?.title]);
 
     // Resolved dates for {{date_range}} in text widgets and the toolbar: one tiny query.
     useEffect(() => {
@@ -321,6 +332,18 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     if (!doc || !page || !controls || !ctx) return <div className="fixed inset-0 z-[45] flex items-center justify-center bg-canvas"><Loader2 className="animate-spin text-fg-muted" aria-label="Loading editor" /></div>;
 
     const filters = doc.controls.filter((c): c is FilterControl => c.type === 'filter');
+    const switchDefs = doc.controls.filter((c) => c.type === 'site' || c.type === 'metric' || c.type === 'grain');
+    /** A switcher pick in the editor preview (never saved; viewers pick their own). */
+    const setPick = (kind: 'site' | 'metric' | 'grain', id: string, value: string | null) => {
+        const cur = { ...(controls[kind] ?? {}) } as Record<string, string>;
+        if (value === null) delete cur[id];
+        else cur[id] = value;
+        s.setControls({ ...controls, [kind]: Object.keys(cur).length ? cur : undefined });
+    };
+    const addSwitch = (c: ControlDef) => {
+        s.apply((d) => ({ ...d, controls: [...d.controls, c] }), { announce: `Added ${c.type === 'site' ? 'site switcher' : c.type === 'metric' ? 'metric switcher' : 'Day, Week, Month control'}` });
+        s.selectControl(c.id);
+    };
     const customPhone = Boolean(page.layouts.sm?.length);
     const customTablet = Boolean(page.layouts.md?.length);
     const dc = doc.controls.find((c) => c.type === 'date');
@@ -427,18 +450,40 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                             {filters.map((f) => (
                                 <div key={f.id} className={cn('flex items-center rounded-control', s.selectedControlId === f.id && 'outline-2 outline-offset-2 outline-brand')}>
                                     <FilterControlView control={f} value={controls.filters[f.id] ?? []} onChange={(v) => s.setControls({ ...controls, filters: { ...controls.filters, [f.id]: v } })}
-                                        options={{ load: (c, q) => fetchJson<{ options: Array<{ value: string; label: string }> }>(`/api/dashboards/options?dimension=${encodeURIComponent(c.dimension)}&q=${encodeURIComponent(q)}${doc.defaultSource.type === 'site' ? `&siteId=${encodeURIComponent(doc.defaultSource.siteId)}` : ''}`).then((r) => r.options) }} />
+                                        options={{ load: (c, q) => fetchJson<{ options: Array<{ value: string; label: string }> }>(`/api/dashboards/options?dimension=${encodeURIComponent(c.dimension)}&q=${encodeURIComponent(q)}${filterSiteId ? `&siteId=${encodeURIComponent(filterSiteId)}` : ''}`).then((r) => r.options) }} />
                                     {!preview ? <button type="button" aria-label={`Edit ${f.label} control`} onClick={() => s.selectControl(f.id)} className="ml-0.5 rounded p-1 text-fg-faint hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
                                 </div>
                             ))}
+                            {switchDefs.map((c) => (
+                                <div key={c.id} className={cn('flex items-center rounded-control', s.selectedControlId === c.id && 'outline-2 outline-offset-2 outline-brand')}>
+                                    {c.type === 'site' ? (
+                                        <SiteSwitch control={c} value={controls.site?.[c.id] ?? ''} defaultLabel={defaultLabel}
+                                            options={(c.options === 'all' ? sites : sites.filter((x) => (c.options as string[]).includes(x.siteId))).map((x) => ({ value: x.siteId, label: x.label }))}
+                                            onChange={(v) => setPick('site', c.id, v === (c.default || '') ? null : v)} />
+                                    ) : c.type === 'metric' ? (
+                                        <MetricSwitch control={c} state={controls} onChange={(v) => setPick('metric', c.id, v === c.default ? null : v)} />
+                                    ) : c.type === 'grain' ? (
+                                        <GrainSwitch control={c} state={controls} size="sm" onChange={(v) => setPick('grain', c.id, v === c.default ? null : v)} />
+                                    ) : null}
+                                    {!preview ? <button type="button" aria-label={`Edit ${c.label} control`} onClick={() => s.selectControl(c.id)} className="ml-0.5 rounded p-1 text-fg-faint hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
+                                </div>
+                            ))}
                             {!preview ? (
-                                <Button size="sm" variant="ghost" icon={Filter} onClick={() => {
-                                    const used = new Set(filters.map((f) => f.dimension));
-                                    const dim = ['country', 'device', 'channel', 'page'].find((d) => !used.has(d)) ?? 'country';
-                                    const id = `f_${dim}_${Math.random().toString(36).slice(2, 6)}`;
-                                    s.apply((d) => ({ ...d, controls: [...d.controls, { id, type: 'filter', label: dimLabel(dim), dimension: dim, ui: dim === 'page' ? 'search' : 'multiselect', scope: { mode: 'all' }, viewerCanChange: true }] }));
-                                    s.selectControl(id);
-                                }}>Add filter</Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" icon={Plus}>Add control</Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start">
+                                        <DropdownMenuItem icon={Filter} onSelect={() => {
+                                            const used = new Set(filters.map((f) => f.dimension));
+                                            const dim = ['country', 'device', 'channel', 'page'].find((d) => !used.has(d)) ?? 'country';
+                                            const id = `f_${dim}_${Math.random().toString(36).slice(2, 6)}`;
+                                            s.apply((d) => ({ ...d, controls: [...d.controls, { id, type: 'filter', label: dimLabel(dim), dimension: dim, ui: dim === 'page' ? 'search' : 'multiselect', scope: { mode: 'all' }, viewerCanChange: true }] }));
+                                            s.selectControl(id);
+                                        }}>Filter</DropdownMenuItem>
+                                        <DropdownMenuItem icon={Globe} disabled={doc.controls.some((c) => c.type === 'site')} onSelect={() => addSwitch(newSiteControl())}>Site switcher</DropdownMenuItem>
+                                        <DropdownMenuItem icon={ArrowLeftRight} onSelect={() => addSwitch(newMetricControl(doc))}>Metric switcher</DropdownMenuItem>
+                                        <DropdownMenuItem icon={CalendarRange} disabled={doc.controls.some((c) => c.type === 'grain')} onSelect={() => addSwitch(newGrainControl())}>Day / Week / Month</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             ) : null}
                             {dc && dc.type === 'date' && !dc.viewerCanChange ? <span className="text-meta text-fg-muted">Dates are locked for viewers</span> : null}
                         </div>

@@ -78,6 +78,11 @@ export interface FilterControl {
     viewerCanChange: boolean;
 }
 
+/**
+ * Site switcher (round 7): widgets whose source is "Default" (the dashboard's site) read the site picked
+ * here. `options` are the owner's site ids ('all' = every site the owner can read, checked server side on
+ * each request); `default` '' = the dashboard's default site.
+ */
 export interface SiteControl {
     id: ControlId;
     type: 'site';
@@ -85,14 +90,40 @@ export interface SiteControl {
     options: string[] | 'all';
     default: string;
     scope: ControlScope;
+    /** Share-link and embed viewers may switch too (missing = no: only the owner switches). */
+    viewerCanChange?: boolean;
+    /**
+     * Public docs only, filled by the server: opaque option keys and their labels. A public doc never
+     * carries site ids, property ids or the hosts of sites the owner did not allow.
+     */
+    choices?: Array<{ key: string; label: string }>;
 }
 
+/**
+ * Metric switcher (round 7): widgets in scope that show `default` show the viewer's pick from `options`
+ * instead (the other metrics of a widget stay).
+ */
 export interface MetricControl {
     id: ControlId;
     type: 'metric';
     label: string;
     options: MetricId[];
     default: MetricId;
+    scope: ControlScope;
+}
+
+export type Grain = 'day' | 'week' | 'month';
+
+/**
+ * Day / Week / Month control (round 7): time series in scope use the picked granularity; 'auto' keeps
+ * each chart's own setting.
+ */
+export interface GrainControl {
+    id: ControlId;
+    type: 'grain';
+    label: string;
+    options: Array<'auto' | Grain>;
+    default: 'auto' | Grain;
     scope: ControlScope;
 }
 
@@ -109,7 +140,7 @@ export interface VariableControl {
     viewerCanChange: boolean;
 }
 
-export type ControlDef = DateControl | FilterControl | SiteControl | MetricControl | VariableControl;
+export type ControlDef = DateControl | FilterControl | SiteControl | MetricControl | GrainControl | VariableControl;
 
 export type FilterOp = 'eq' | 'neq' | 'in' | 'not_in' | 'contains' | 'not_contains' | 'starts' | 'ends' | 'regex' | 'not_regex';
 export interface FilterClause { dimension: DimId; op: FilterOp; value: string | string[] }
@@ -120,8 +151,12 @@ export interface ControlState {
     date: { range: DateRangeSpec; compare: CompareSpec };
     filters: Record<ControlId, string[]>;
     interaction?: FilterClause[];
+    /** Site control picks (URL s.<id>): owner views hold site ids; public URLs hold opaque keys the server maps. */
     site?: Record<ControlId, string>;
+    /** Metric control picks (URL m.<id>). */
     metric?: Record<ControlId, MetricId>;
+    /** Day / Week / Month picks (URL g.<id>). */
+    grain?: Record<ControlId, 'auto' | Grain>;
     pageId?: PageId;
 }
 
