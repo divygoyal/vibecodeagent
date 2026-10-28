@@ -18,6 +18,7 @@ import { alpha2ToGsc, gscToAlpha2 } from '../countries';
 import { lastCompleteDay, searchWindowOf } from '@/lib/dateRange';
 import { addDays, autoGranularity, eachDay, fromDay, monthStart, resolveCompare, resolveRange, toDay, todayIn, weekStart } from '../dates';
 import { widgetMeta } from '../registry';
+import { searchTypeProblem } from '../searchType';
 import { tableTrendQuery } from '../trend';
 import type {
     CalculatedMetric,
@@ -29,6 +30,7 @@ import type {
     FilterClause,
     Iso,
     ResultFlags,
+    SearchType,
     SourceRef,
     WidgetDef,
     WidgetErrorCode,
@@ -154,6 +156,8 @@ interface LogicalLeaf {
     isPrev?: boolean;
     order?: { kind: 'metric' | 'dim'; field: string; desc: boolean };
     limit: number;
+    /** GSC only (round 8): the Search Console `type`; missing = web. */
+    searchType?: SearchType;
 }
 
 interface PhysicalLeaf {
@@ -285,7 +289,7 @@ function gscBody(l: LogicalLeaf): Record<string, unknown> {
         endDate: l.range.end,
         dimensions: l.apiDims,
         rowLimit: Math.min(25_000, l.limit),
-        type: 'web',
+        type: l.searchType ?? 'web',
         dataState: 'all',
     };
     const f = gscFilters(l.filters);
@@ -661,6 +665,12 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             }
             const families = [...new Set(metricDefs.map((m) => m.family))];
             if (families.includes('gsc')) readsSearch = true;
+            // Round 8: Discover and Google News have no queries and no position; say so instead of asking Google.
+            const stProblem = q.searchType ? searchTypeProblem(q.searchType, { dimensions: q.dimensions, filters: filterOrigins.map((f) => f.clause), metrics: q.metrics }) : null;
+            if (stProblem) {
+                plan.error = errResult('INCOMPATIBLE', stProblem);
+                break;
+            }
             const canonDims = q.dimensions.filter((d) => d !== 'site');
             // Static compatibility (BUILDER.md 9.4)
             const badDim = canonDims.find((d) => !TIME_DIMS.has(d) && families.some((f) => !dimInFamily(d, f)));
@@ -727,6 +737,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
                         family, asset: family === 'ga4' ? site.ga4! : site.gsc!, siteId: site.siteId, siteHost: normalizeHost(site.gsc ?? site.label),
                         apiDims, canonDims: effDims, metrics: leafMetrics, filters: applicable.map((a) => a.clause),
                         order, limit: limitFor(q, effDims, Boolean(qCompare) && family === 'ga4'),
+                        ...(family === 'gsc' && q.searchType && q.searchType !== 'web' ? { searchType: q.searchType } : {}),
                     };
                     if (family === 'ga4') {
                         entry.leaves.push({ site, leaf: { ...common, range, compare: qCompare } });
@@ -754,7 +765,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     const runPlans = async (plans: WidgetPlan[]): Promise<WidgetResult[]> => {
         // 2. Merge leaves into physical calls (identical shape -> one call, GA4 metrics unioned).
         const physical = new Map<string, PhysicalLeaf & { metricSet: Set<string>; logical: LogicalLeaf }>();
-        const shapeOf = (l: LogicalLeaf) => canonicalJson({ f: l.family, a: l.asset, d: l.apiDims, fl: l.filters, r: l.range, c: l.compare, o: l.order, lim: l.limit });
+        const shapeOf = (l: LogicalLeaf) => canonicalJson({ f: l.family, a: l.asset, d: l.apiDims, fl: l.filters, r: l.range, c: l.compare, o: l.order, lim: l.limit, st: l.searchType });
         for (const plan of plans) {
             if (plan.error) continue;
             for (const e of plan.queries) {

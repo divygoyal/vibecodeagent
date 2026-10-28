@@ -15,7 +15,9 @@ import { brandRegex } from '@/lib/builder/templates.round2';
 import { AI_SOURCE_PATTERN } from '@/components/site/lib/rules';
 import { variableControls } from '@/lib/builder/variables';
 import type { DashboardDocV2, FilterClause, FilterControl, FilterOp, WidgetDef } from '@/lib/builder/types';
-import { DimensionPicker, Field, Toggle } from './Fields';
+import { drillOptionsFor } from '@/lib/builder/drill';
+import { SEARCH_TYPES, searchTypeEligible, searchTypesFor } from '@/lib/builder/searchType';
+import { Choice, DimensionPicker, Field, Toggle } from './Fields';
 
 const MAX = 5;
 
@@ -120,6 +122,8 @@ export function WidgetFilters({ widget, doc, edit }: { widget: WidgetDef; doc: D
                     ) : null}
                 </div>
             </Field>
+            <DrillSetting widget={widget} edit={edit} />
+            <SearchTypeSetting widget={widget} edit={edit} />
             {clickable ? (
                 <Toggle label="Click to filter the page" description={widget.type === 'geo' ? 'A click on a country filters the other widgets.' : widget.type === 'table' ? 'A click on a row filters the other widgets by it.' : 'A click on a bar filters the other widgets by it.'}
                     checked={Boolean(widget.interactions?.clickToFilter)} onChange={(v) => edit((w) => ({ ...w, interactions: v ? { ...(w.interactions ?? {}), clickToFilter: true } : undefined }) as WidgetDef)} />
@@ -141,5 +145,46 @@ export function WidgetFilters({ widget, doc, edit }: { widget: WidgetDef; doc: D
                 </Field>
             ) : null}
         </div>
+    );
+}
+
+/** Drill down (round 8): the levels a click on a bar, slice or row opens, from the ready-made hierarchies. */
+function DrillSetting({ widget, edit }: { widget: WidgetDef; edit: (fn: (w: WidgetDef) => WidgetDef, key?: string) => void }) {
+    const options = drillOptionsFor(widget);
+    const current = widget.interactions?.drill;
+    if (!options.length && !current?.length) return null;
+    const match = options.find((o) => JSON.stringify(o.levels) === JSON.stringify(current));
+    const set = (id: string) => {
+        const levels = options.find((o) => o.id === id)?.levels;
+        edit((w) => {
+            const { drill: _drop, ...rest } = w.interactions ?? {};
+            void _drop;
+            const interactions = { ...rest, ...(levels ? { drill: levels } : {}) };
+            return { ...w, interactions: Object.keys(interactions).length ? interactions : undefined } as WidgetDef;
+        });
+    };
+    return (
+        <Field label="Drill down" hint={current?.length
+            ? `A click on a value goes one level down; “Up” in the breadcrumb comes back.${widget.interactions?.clickToFilter ? ' On the last level a click filters the page.' : ''}`
+            : 'Let viewers click a value to see what is inside it, one level at a time.'}>
+            <Choice ariaLabel="Drill down" value={match?.id ?? (current?.length ? '__custom' : '__off')}
+                onChange={(v) => set(v === '__off' ? '' : v)}
+                options={[{ value: '__off', label: 'Off' }, ...options.map((o) => ({ value: o.id, label: o.label })), ...(current?.length && !match ? [{ value: '__custom', label: 'Custom levels' }] : [])]} />
+        </Field>
+    );
+}
+
+/** Search Console search type (round 8): only for widgets that read Search Console alone. */
+function SearchTypeSetting({ widget, edit }: { widget: WidgetDef; edit: (fn: (w: WidgetDef) => WidgetDef, key?: string) => void }) {
+    if (!searchTypeEligible(widget)) return null;
+    const allowed = new Set(searchTypesFor(widget));
+    const current = widget.searchType ?? 'web';
+    const hidden = SEARCH_TYPES.filter((t) => !allowed.has(t.id));
+    return (
+        <Field label="Search type" hint={hidden.length ? `${hidden.map((t) => t.short).join(' and ')} have no search queries or position, so they are not offered while this widget uses them.` : 'Which Google search the numbers come from.'}>
+            <Choice ariaLabel="Search type" value={current}
+                onChange={(v) => edit((w) => ({ ...w, searchType: v === 'web' ? undefined : v }) as WidgetDef)}
+                options={SEARCH_TYPES.filter((t) => allowed.has(t.id) || t.id === current).map((t) => ({ value: t.id, label: t.label }))} />
+        </Field>
     );
 }

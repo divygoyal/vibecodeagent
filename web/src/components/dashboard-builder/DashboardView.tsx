@@ -16,6 +16,8 @@ import { registerCalcs } from '@/lib/builder/calc';
 import { compareFromParam, compareToParam, rangeFromParam, rangeToParam } from '@/lib/builder/dates';
 import { dateControlOf, defaultControlState, viewerSwitchesFromQuery } from '@/lib/builder/publicDoc';
 import { applyViewerControls, selectedSite } from '@/lib/builder/compile';
+import { drillDown, drillFromParams, drillInfo, drillKeyLabel, drillTo, drillToParam, keepDrillKey, resolveDrillValue } from '@/lib/builder/drill';
+import { dimLabel } from '@/lib/builder/catalog';
 import { isDefaultLook, type Mode } from '@/lib/builder/themes';
 import { clickDimension, clickableDims, interactionFromParam, toggleInteraction } from '@/lib/builder/interaction';
 import { variableControls, variableValues } from '@/lib/builder/variables';
@@ -24,12 +26,15 @@ import { DashboardCanvas, bpForWidth, type Bp } from './DashboardCanvas';
 import { ControlsBar, DateControl, PageTabs, switchSummary, ViewerSwitches, type OptionsSource, type ViewerSwitchHandlers } from './Controls';
 import { DashboardCover } from './DashboardCover';
 import { ChartNotesProvider, type ChartNotesSource } from './charts/chartNotes';
+import type { DrillView } from './widgets/DrillCrumbs';
+import { dimText } from './widgets/Charts';
 import { InteractionChips, interactionToParam, VariableInput } from './Interactions';
 import { dashRootProps } from './theme/DashTheme';
 import { WidgetRenderer } from './widgets/WidgetRenderer';
 
 /** Viewer state <-> URL. Only keys the viewer may change are read. */
-export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> & { widgets?: DashboardDocV2['widgets'] }, allow: { date: boolean; compare: boolean; filters: boolean }) {
+export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> & { widgets?: DashboardDocV2['widgets'] }, allow: { date: boolean; compare: boolean; filters: boolean }, opts: { publicKeys?: boolean } = {}) {
+    const publicKeys = Boolean(opts.publicKeys);
     const sp = useSearchParams();
     const router = useRouter();
     const pathname = usePathname();
@@ -62,14 +67,18 @@ export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> &
         const interaction = allow.filters && doc.widgets && sp.get('x') ? interactionFromParam(sp.get('x'), clickableDims({ widgets: doc.widgets })) : [];
         // Round 7 switchers: m.<id> / g.<id> must be an option; s.<id> passes as is (the server checks it).
         const switches = viewerSwitchesFromQuery(sp, doc, (picks) => picks);
+        // Drill down (round 8): a viewer filter like x=, so it follows the same permission. Owner views read the
+        // values; public pages keep the signed keys the server issued (the server verifies them).
+        const drill = allow.filters ? drillFromParams(sp, doc.widgets, publicKeys ? keepDrillKey : resolveDrillValue) : undefined;
         return {
             date: { range: range ?? base.date.range, compare: compare ?? base.date.compare },
             filters,
             pageId: page && visible.some((p) => p.id === page) ? page : visible[0]?.id,
             ...(interaction.length ? { interaction } : {}),
             ...switches,
+            ...(drill ? { drill } : {}),
         };
-    }, [sp, doc, allow.date, allow.compare, allow.filters]);
+    }, [sp, doc, allow.date, allow.compare, allow.filters, publicKeys]);
 
     const set = useCallback((patch: Record<string, string | null>) => {
         const next = new URLSearchParams(sp.toString());
@@ -95,6 +104,9 @@ export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> &
         setSite: (id: string, value: string | null) => set({ [`s.${id}`]: value }),
         setMetric: (id: string, value: string | null) => set({ [`m.${id}`]: value }),
         setGrain: (id: string, value: string | null) => set({ [`g.${id}`]: value }),
+        setSearchType: (id: string, value: string | null) => set({ [`t.${id}`]: value }),
+        /** Drill down (round 8): the values clicked so far on one widget (empty = back to its own dimension). */
+        setDrill: (widgetId: string, path: string[]) => set({ [`d.${widgetId}`]: drillToParam(path) }),
         query: sp,
     };
 }
@@ -161,6 +173,8 @@ export interface DashboardViewProps {
     onVariable?: (id: string, value: string | null) => void;
     /** Round 2: click-to-filter selections changed. */
     onInteraction?: (clauses: import('@/lib/builder/types').FilterClause[]) => void;
+    /** Round 8: drill down or up on one widget (its new path; empty = its own dimension). */
+    onDrill?: (widgetId: string, path: string[]) => void;
     /** Round 7: site, metric and Day / Week / Month switchers (view only, kept in the URL). */
     switches?: ViewerSwitchHandlers;
     /** Round 7: where time series read chart notes (default: no markers). */
@@ -168,7 +182,7 @@ export interface DashboardViewProps {
 }
 
 export function DashboardView({
-    doc, mode, siteLabel: defaultSiteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv, fitHeight, onVariable, onInteraction, switches, notes,
+    doc, mode, siteLabel: defaultSiteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv, fitHeight, onVariable, onInteraction, onDrill, switches, notes,
 }: DashboardViewProps) {
     // Names of the dashboard's calculated metrics, before any widget or the cover renders (round 7).
     registerCalcs(doc.calcs);
@@ -183,7 +197,7 @@ export function DashboardView({
     // {{site}} follows the site switcher.
     const siteCtl = doc.controls.find((c): c is SiteControl => c.type === 'site');
     const siteLabel = (siteCtl && switches?.siteOptions ? pickedSiteLabel(siteCtl, state, switches.siteOptions(siteCtl)) : undefined) ?? defaultSiteLabel;
-    const hasSwitches = Boolean(switches) && doc.controls.some((c) => c.type === 'site' || c.type === 'metric' || c.type === 'grain');
+    const hasSwitches = Boolean(switches) && doc.controls.some((c) => c.type === 'site' || c.type === 'metric' || c.type === 'grain' || c.type === 'searchType');
     const pageTitle = page?.title ?? '';
     const baseVars = textVars(siteLabel, resolved, pageTitle);
     const vars = variables.length ? { ...baseVars, ...Object.fromEntries(Object.entries(variableValues(variables, state)).map(([k, v]) => [`var:${k}`, v])) } : baseVars;
@@ -203,14 +217,52 @@ export function DashboardView({
     const interaction = state.interaction;
     // Not memoised: vars and the data change every render anyway (as before round 2).
     const render = (widget: WidgetDef, heightPx: number, b: Bp) => {
-        const dim = onInteraction ? clickDimension(widget) : null;
-        return (
+        const hasDrill = Boolean(widget.interactions?.drill);
+        const viewed = hasSwitches || hasDrill ? applyViewerControls(widget, { controlDefs: doc.controls, controls: state, pageId: page?.id }, { site: false }) : widget;
+        // Round 8: drill down. A click drills one level; on the last level it filters the page when click to filter is on.
+        const info = hasDrill ? drillInfo(viewed, state.drill) : null;
+        const canDown = Boolean(onDrill && info && info.depth < info.chain.length - 1);
+        const dim = onInteraction && !canDown ? clickDimension(viewed) : null;
+        let result = data?.results[widget.id];
+        let awaiting = false;
+        let drill: DrillView | undefined;
+        if (info && onDrill) {
+            // The page's data was fetched for another level: show the skeleton until this level's rows arrive.
+            const ok = result?.status === 'ok' ? result : result?.status === 'error' ? result.stale : undefined;
+            if (ok && !ok.parts.rows?.columns.some((c) => c.id === `d:${info.chain[info.depth]}`)) { result = undefined; awaiting = true; }
+            // Public views hold signed keys (the server issued them with the data); owner views hold the values.
+            const keys = ok?.parts.rows?.drillKeys;
+            const shown = (v: string) => (mode === 'public' ? drillKeyLabel(v) : v);
+            drill = {
+                levels: info.chain.map((d) => dimLabel(d)),
+                depth: info.depth,
+                values: info.path.map((v, i) => dimText(info.chain[i], shown(v))),
+                canDown,
+                onUp: () => onDrill(widget.id, drillTo(info.path, info.depth - 1)),
+                onTo: (d) => onDrill(widget.id, drillTo(info.path, d)),
+            };
+            if (canDown) {
+                const down = (value: string) => {
+                    const entry = mode === 'public' ? keys?.[value] : value;
+                    if (entry) onDrill(widget.id, drillDown(info.path, info.depth, entry));
+                };
+                return renderWidget(viewed, result, awaiting, heightPx, b, { drill, onFilterClick: down });
+            }
+        }
+        return renderWidget(viewed, result, awaiting, heightPx, b, {
+            drill,
+            onFilterClick: dim ? (value: string) => onInteraction!(toggleInteraction(interaction ?? [], dim, value)) : undefined,
+            selectedValue: dim ? (interaction ?? []).find((c) => c.dimension === dim)?.value as string | undefined : undefined,
+        });
+    };
+    const renderWidget = (widget: WidgetDef, result: DashboardQueryResponse['results'][string] | undefined, awaiting: boolean, heightPx: number, b: Bp, extra: { drill?: DrillView; onFilterClick?: (value: string) => void; selectedValue?: string }) => (
         <WidgetRenderer
-            onFilterClick={dim ? (value: string) => onInteraction!(toggleInteraction(interaction ?? [], dim, value)) : undefined}
-            selectedValue={dim ? (interaction ?? []).find((c) => c.dimension === dim)?.value as string | undefined : undefined}
-            widget={hasSwitches ? applyViewerControls(widget, { controlDefs: doc.controls, controls: state, pageId: page?.id }, { site: false }) : widget}
-            result={data?.results[widget.id]}
-            loading={loading && !data?.results[widget.id]}
+            onFilterClick={extra.onFilterClick}
+            selectedValue={extra.selectedValue}
+            drill={extra.drill}
+            widget={widget}
+            result={result}
+            loading={awaiting || (loading && !result)}
             refetching={refetching}
             resolved={data?.resolved}
             compare={state.date.compare.mode}
@@ -221,8 +273,7 @@ export function DashboardView({
             onRetry={onRetry}
             onChooseSource={onChooseSource}
         />
-        );
-    };
+    );
 
     return (
         <ChartNotesProvider value={notes?.kind === 'owner' ? { ...notes, view: { controlDefs: doc.controls, controls: state, pageId: page?.id } } : notes ?? { kind: 'none' }}>
@@ -251,7 +302,7 @@ export function DashboardView({
                         resolved={data?.resolved}
                         size={bp === 'sm' ? 'sm' : 'md'}
                     />
-                    {switches ? <ViewerSwitches controls={doc.controls} state={state} handlers={switches} defaultSiteLabel={defaultSiteLabel} size={bp === 'sm' ? 'sm' : 'md'} kinds={['metric', 'grain']} /> : null}
+                    {switches ? <ViewerSwitches controls={doc.controls} state={state} handlers={switches} defaultSiteLabel={defaultSiteLabel} size={bp === 'sm' ? 'sm' : 'md'} kinds={['metric', 'grain', 'searchType']} /> : null}
                     {editableVars.map((v) => <VariableInput key={v.id} control={v} value={variableValues([v], state)[v.id]} onChange={(val) => onVariable!(v.id, val)} />)}
                 </ControlsBar>
                 {data?.resolved && doc.theme.header.showDates ? (

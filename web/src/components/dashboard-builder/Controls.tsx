@@ -16,8 +16,9 @@ import { fmtDateRange } from '@/lib/format';
 import { MENU_PRESETS, PRESETS, QUICK_PRESETS, isIso } from '@/lib/builder/dates';
 import { countryName } from '@/lib/builder/countries';
 import { metricLabel } from '@/lib/builder/catalog';
-import { selectedGrain, selectedMetric } from '@/lib/builder/compile';
-import type { CompareSpec, ControlDef, ControlState, DatePresetId, DateRangeSpec, FilterControl, Grain, GrainControl, MetricControl, PageDef, ResolvedDates, SiteControl } from '@/lib/builder/types';
+import { selectedGrain, selectedMetric, selectedSearchType } from '@/lib/builder/compile';
+import { SEARCH_TYPES, searchTypeLabel } from '@/lib/builder/searchType';
+import type { CompareSpec, ControlDef, ControlState, DatePresetId, DateRangeSpec, FilterControl, Grain, GrainControl, MetricControl, PageDef, ResolvedDates, SearchTypeControl, SiteControl } from '@/lib/builder/types';
 
 // ── Date range ───────────────────────────────────────────────────────────
 
@@ -283,16 +284,24 @@ export function GrainSwitch({ control, state, onChange, size = 'md' }: { control
     );
 }
 
+/** Search type switcher (round 8): which Search Console search the widgets in scope read. */
+export function SearchTypeSwitch({ control, state, onChange, disabled }: { control: SearchTypeControl; state: ControlState; onChange: (v: SearchTypeControl['default']) => void; disabled?: boolean }) {
+    const ids = control.options.includes(control.default) ? control.options : [control.default, ...control.options];
+    const options = SEARCH_TYPES.filter((t) => ids.includes(t.id)).map((t) => ({ value: t.id, label: t.label, hint: t.id === 'web' ? 'Default' : undefined }));
+    return <PickOne label={control.label || 'Search type'} value={selectedSearchType(control, state).type} options={options} onChange={(v) => onChange(v as SearchTypeControl['default'])} disabled={disabled} />;
+}
+
 export interface ViewerSwitchHandlers {
     onSite?: (id: string, value: string | null) => void;
     onMetric?: (id: string, value: string | null) => void;
     onGrain?: (id: string, value: string | null) => void;
+    onSearchType?: (id: string, value: string | null) => void;
     /** Allowed sites of a site control (owner: from /api/dashboards/sites; public: the control's opaque choices). */
     siteOptions?: (control: SiteControl) => SwitchOption[];
 }
 
 /** The switchers a dashboard has, in control order; a switcher without a handler is not shown. */
-export function ViewerSwitches({ controls, state, handlers, defaultSiteLabel, size = 'md', kinds = ['site', 'metric', 'grain'] }: { controls: ControlDef[]; state: ControlState; handlers: ViewerSwitchHandlers; defaultSiteLabel: string; size?: 'sm' | 'md'; kinds?: Array<'site' | 'metric' | 'grain'> }) {
+export function ViewerSwitches({ controls, state, handlers, defaultSiteLabel, size = 'md', kinds = ['site', 'metric', 'grain', 'searchType'] }: { controls: ControlDef[]; state: ControlState; handlers: ViewerSwitchHandlers; defaultSiteLabel: string; size?: 'sm' | 'md'; kinds?: Array<'site' | 'metric' | 'grain' | 'searchType'> }) {
     return (
         <>
             {controls.filter((c) => (kinds as string[]).includes(c.type)).map((c) => {
@@ -306,6 +315,9 @@ export function ViewerSwitches({ controls, state, handlers, defaultSiteLabel, si
                 }
                 if (c.type === 'grain' && handlers.onGrain) {
                     return <GrainSwitch key={c.id} control={c} state={state} size={size} onChange={(v) => handlers.onGrain!(c.id, v === c.default ? null : v)} />;
+                }
+                if (c.type === 'searchType' && handlers.onSearchType && c.options.length) {
+                    return <SearchTypeSwitch key={c.id} control={c} state={state} onChange={(v) => handlers.onSearchType!(c.id, v === c.default ? null : v)} />;
                 }
                 return null;
             })}
@@ -325,6 +337,9 @@ export function switchSummary(controls: ControlDef[], state: ControlState, siteL
         } else if (c.type === 'grain') {
             const g = selectedGrain(c, state);
             if (g !== 'auto') parts.push(g === 'day' ? 'Daily' : g === 'week' ? 'Weekly' : 'Monthly');
+        } else if (c.type === 'searchType') {
+            const { type } = selectedSearchType(c, state);
+            if (type !== 'web') parts.push(searchTypeLabel(type));
         }
     }
     return parts.join(' · ');

@@ -140,7 +140,23 @@ export interface VariableControl {
     viewerCanChange: boolean;
 }
 
-export type ControlDef = DateControl | FilterControl | SiteControl | MetricControl | GrainControl | VariableControl;
+/** Search Console search types (the API's `type`): web is the default. */
+export type SearchType = 'web' | 'image' | 'video' | 'news' | 'discover' | 'googleNews';
+
+/**
+ * Search type switcher (round 8): Search Console widgets in scope (every metric from Search Console) read the
+ * viewer's pick instead of their own search type. `default` 'web' with no pick leaves each widget's own setting.
+ */
+export interface SearchTypeControl {
+    id: ControlId;
+    type: 'searchType';
+    label: string;
+    options: SearchType[];
+    default: SearchType;
+    scope: ControlScope;
+}
+
+export type ControlDef = DateControl | FilterControl | SiteControl | MetricControl | GrainControl | SearchTypeControl | VariableControl;
 
 export type FilterOp = 'eq' | 'neq' | 'in' | 'not_in' | 'contains' | 'not_contains' | 'starts' | 'ends' | 'regex' | 'not_regex';
 export interface FilterClause { dimension: DimId; op: FilterOp; value: string | string[] }
@@ -157,6 +173,13 @@ export interface ControlState {
     metric?: Record<ControlId, MetricId>;
     /** Day / Week / Month picks (URL g.<id>). */
     grain?: Record<ControlId, 'auto' | Grain>;
+    /** Search type picks (URL t.<id>, round 8). */
+    searchType?: Record<ControlId, SearchType>;
+    /**
+     * Drill down (round 8, URL d.<widgetId>): the values clicked so far per widget, in level order. Owner
+     * views hold the values; public URLs hold signed keys the server issued with the data (drill.ts).
+     */
+    drill?: Record<WidgetId, string[]>;
     pageId?: PageId;
 }
 
@@ -286,8 +309,29 @@ export interface WidgetBase<T extends string, C> {
     dateOverride?: { range?: DateRangeSpec; compare?: CompareSpec };
     filters?: FilterClause[];
     ignoreControls?: ControlId[];
-    interactions?: { clickToFilter?: boolean };
+    interactions?: WidgetInteractions;
+    /**
+     * Search Console search type (round 8), only read when every metric of the widget comes from Search
+     * Console. Missing = web.
+     */
+    searchType?: SearchType;
     mobile?: { hidden?: boolean; minHeight?: number };
+}
+
+export interface WidgetInteractions {
+    clickToFilter?: boolean;
+    /**
+     * Drill down (round 8): the levels below the widget's own dimension, in order (for a Channel chart:
+     * Source / medium, Campaign). A click on a bar, row or slice filters the widget to that value and
+     * shows the next level; "Up" goes back. Bar, pie and table widgets.
+     */
+    drill?: DimId[];
+    /**
+     * Runtime only, set by applyDrill on the copy a viewer sees and never saved (the schema drops it):
+     * the whole chain (own dimension first) and the level now shown.
+     */
+    drillChain?: DimId[];
+    drillDepth?: number;
 }
 
 export interface ComparisonDisplay {
@@ -584,6 +628,11 @@ export interface DataFrame {
     labels?: Record<string, string>;
     /** Owner views only: the GA4 property name under a site's host (siteId -> name), when it says more than the host. */
     sublabels?: Record<string, string>;
+    /**
+     * Public views of a drill widget only (round 8): a signed key per row value (value -> key). The viewer's
+     * browser sends the key back, never the value; the server accepts only keys it signed (server/access.ts).
+     */
+    drillKeys?: Record<string, string>;
 }
 
 export interface ResultFlags {
@@ -645,5 +694,5 @@ export interface WidgetQuery {
     fillDates?: boolean;
     /** Second dimension pivoted into series columns (time series breakdown, stacked bar). */
     pivot?: { dimension: DimId; top: number; other: boolean };
-    searchType?: 'web' | 'image' | 'video' | 'news' | 'discover' | 'googleNews';
+    searchType?: SearchType;
 }

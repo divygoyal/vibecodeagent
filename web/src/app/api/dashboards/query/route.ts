@@ -4,6 +4,7 @@ import { directoryFor, evaluateDoc, jsonError, ownerDeps } from '@/lib/builder/s
 import { evaluateWidgets } from '@/lib/builder/server/engine';
 import { getDashboard, StoreError, toRecord } from '@/lib/builder/server/store';
 import { controlStateSchema, sourceRefSchema, validateWidgets } from '@/lib/builder/schema';
+import { sanitizeDrill } from '@/lib/builder/drill';
 import { z } from 'zod';
 import type { ControlDef, ControlState, SourceRef } from '@/lib/builder/types';
 
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic';
 const controlDefsSchema = z.array(z.union([
     // Round 2 dashboard variables: strict, their values reach Google filters.
     z.object({ id: z.string().min(1).max(32).regex(/^[a-z0-9_]+$/), type: z.literal('variable'), label: z.string().max(60), kind: z.enum(['text', 'regex', 'number']), default: z.string().max(300), viewerCanChange: z.boolean() }),
-    z.looseObject({ id: z.string().max(64), type: z.enum(['date', 'filter', 'site', 'metric', 'grain']) }),
+    z.looseObject({ id: z.string().max(64), type: z.enum(['date', 'filter', 'site', 'metric', 'grain', 'searchType']) }),
 ])).max(30);
 
 /**
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
             const defs = controlDefsSchema.safeParse(body.controlDefs ?? [{ id: 'date', type: 'date' }]);
             if (!defs.success) return jsonError(422, 'controlDefs are invalid');
             await checkSites(defs.data as unknown as ControlDef[]);
+            controls = { ...controls, drill: sanitizeDrill(v.value, controls.drill) };
             const res = await evaluateWidgets({
                 widgets: v.value.map((widget) => ({ widget, pageId: controls.pageId })),
                 defaultSource: src.data as SourceRef,
@@ -64,6 +66,7 @@ export async function POST(req: Request) {
         if (!row) return jsonError(404, 'Dashboard not found');
         const rec = toRecord(row);
         await checkSites(rec.doc.controls);
+        controls = { ...controls, drill: sanitizeDrill(rec.doc.widgets, controls.drill) };
         const widgetIds = Array.isArray(body.widgetIds) ? body.widgetIds.filter((x): x is string => typeof x === 'string').slice(0, 200) : undefined;
         const res = await evaluateDoc(rec.doc, controls, deps, { pageId: typeof body.pageId === 'string' ? body.pageId : undefined, widgetIds });
         return NextResponse.json(res, { headers: { 'Cache-Control': 'no-store' } });

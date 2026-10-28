@@ -18,6 +18,7 @@ import { autoGranularity, toDay } from '@/lib/builder/dates';
 import type { BarWidget, CellValue, PieWidget, TimeSeriesWidget } from '@/lib/builder/types';
 import { BuilderTimeSeries, breakdownColor, breakdownLabel } from '../charts/BuilderTimeSeries';
 import { useWidgetNotes } from '../charts/chartNotes';
+import { DRILL_CRUMBS_PX, DrillMenu } from './DrillCrumbs';
 import { okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { dsFormat, dsKey } from './metricUi';
 
@@ -43,8 +44,8 @@ function categoryColor(dim: string, value: string, index: number): string {
 }
 
 /** Body height left for the plot inside a WidgetFrame of this cell height. */
-export function plotHeight(cell: number, title: boolean, notes = true): number {
-    return Math.max(80, cell - 32 - (title ? 34 : 0) - (notes ? 18 : 0));
+export function plotHeight(cell: number, title: boolean, notes = true, crumbs = false): number {
+    return Math.max(80, cell - 32 - (title ? 34 : 0) - (notes ? 18 : 0) - (crumbs ? DRILL_CRUMBS_PX : 0));
 }
 
 // ── Time series ──────────────────────────────────────────────────────────
@@ -197,10 +198,15 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
     const metric = c.metrics[0]?.id ?? 'gsc:clicks';
     const rows = frame?.rows ?? [];
     const compare = props.compare !== 'none' && c.compare === 'inherit' && rows.some((r) => `m:${metric}:prev` in r);
-    const h = plotHeight(props.height, widget.showTitle !== false);
+    const h = plotHeight(props.height, widget.showTitle !== false, true, Boolean(props.drill?.depth));
     const useList = c.variant === 'list' && !c.stackBy && c.metrics.length === 1;
+    // Round 8: a bar chart (not the list) is drawn by Recharts, so "Drill into" lists its values as menu items for the keyboard.
+    const drillMenu = props.drill?.canDown && props.onFilterClick && !useList && frame ? (
+        <DrillMenu drill={props.drill} widgetName={widget.title ?? 'this chart'} onPick={props.onFilterClick}
+            items={rows.filter((r) => r[`d:${c.dimension}`] && r[`d:${c.dimension}`] !== '(other)' && !r.__other).map((r) => ({ value: String(r[`d:${c.dimension}`]), label: dimText(c.dimension, r[`d:${c.dimension}`], frame.labels) }))} />
+    ) : undefined;
     return (
-        <WidgetFrame props={props} skeleton={useList ? 'table' : 'chart'}>
+        <WidgetFrame props={props} skeleton={useList ? 'table' : 'chart'} actions={drillMenu}>
             {!frame ? null : !rows.length ? (
                 <EmptyState variant="inline" title={`No ${metricLabel(metric).toLowerCase()} in this period`} />
             ) : useList ? (
@@ -239,7 +245,7 @@ export function PieView(props: WidgetViewProps<PieWidget>) {
     const c = widget.config;
     const id = c.metric.id;
     const rows = frame?.rows ?? [];
-    const h = plotHeight(props.height, widget.showTitle !== false);
+    const h = plotHeight(props.height, widget.showTitle !== false, true, Boolean(props.drill?.depth));
     const bottom = props.bp === 'sm' || c.legend === 'bottom' || (width > 0 && width < 380);
     // Legend below (phones, narrow cells): the donut, a 20px gap and legend rows (28px + 4px gap) must fit
     // the cell, or the centred content was cut at both ends. Keep room for 3 rows; fold the rest into "Other".
@@ -262,6 +268,7 @@ export function PieView(props: WidgetViewProps<PieWidget>) {
                         format={dsFormat(id)}
                         size={size}
                         maxSlices={maxSlices}
+                        onItemClick={props.onFilterClick ? (it) => { const raw = it.key.replace(/-\d+$/, ''); if (raw && raw !== '(other)' && raw !== '__other') props.onFilterClick!(raw); } : undefined}
                         legend={bottom ? 'bottom' : 'right'}
                         className="w-full"
                     /> : null}

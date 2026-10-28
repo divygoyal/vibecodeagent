@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import {
     ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, LayoutTemplate, Loader2, Monitor, MoreHorizontal, Pencil,
     Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson, ClipboardCopy, ClipboardPaste, MonitorPlay, Palette,
-    Globe, ArrowLeftRight, CalendarRange,
+    Globe, ArrowLeftRight, CalendarRange, Search,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -32,9 +32,9 @@ import { useEditorStore, type Viewport } from '@/stores/dashboardEditorStore';
 import { DashboardCanvas, type Bp } from '../DashboardCanvas';
 import { DashboardCover } from '../DashboardCover';
 import { dashRootProps } from '../theme/DashTheme';
-import { DateControl, FilterControlView, GrainSwitch, MetricSwitch, SiteSwitch } from '../Controls';
+import { DateControl, FilterControlView, GrainSwitch, MetricSwitch, SearchTypeSwitch, SiteSwitch } from '../Controls';
 import { applyViewerControls, selectedSite } from '@/lib/builder/compile';
-import { newGrainControl, newMetricControl, newSiteControl } from './SwitchControlProps';
+import { newGrainControl, newMetricControl, newSearchTypeControl, newSiteControl } from './SwitchControlProps';
 import { ShareDialog } from '../ShareDialog';
 import { textVars } from '../DashboardView';
 import { useElementHeight, useElementWidth } from '../useElementWidth';
@@ -331,16 +331,16 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     if (!doc || !page || !controls || !ctx) return <div className="fixed inset-0 z-[45] flex items-center justify-center bg-canvas"><Loader2 className="animate-spin text-fg-muted" aria-label="Loading editor" /></div>;
 
     const filters = doc.controls.filter((c): c is FilterControl => c.type === 'filter');
-    const switchDefs = doc.controls.filter((c) => c.type === 'site' || c.type === 'metric' || c.type === 'grain');
+    const switchDefs = doc.controls.filter((c) => c.type === 'site' || c.type === 'metric' || c.type === 'grain' || c.type === 'searchType');
     /** A switcher pick in the editor preview (never saved; viewers pick their own). */
-    const setPick = (kind: 'site' | 'metric' | 'grain', id: string, value: string | null) => {
+    const setPick = (kind: 'site' | 'metric' | 'grain' | 'searchType', id: string, value: string | null) => {
         const cur = { ...(controls[kind] ?? {}) } as Record<string, string>;
         if (value === null) delete cur[id];
         else cur[id] = value;
         s.setControls({ ...controls, [kind]: Object.keys(cur).length ? cur : undefined });
     };
     const addSwitch = (c: ControlDef) => {
-        s.apply((d) => ({ ...d, controls: [...d.controls, c] }), { announce: `Added ${c.type === 'site' ? 'site switcher' : c.type === 'metric' ? 'metric switcher' : 'Day, Week, Month control'}` });
+        s.apply((d) => ({ ...d, controls: [...d.controls, c] }), { announce: `Added ${c.type === 'site' ? 'site switcher' : c.type === 'metric' ? 'metric switcher' : c.type === 'searchType' ? 'search type switcher' : 'Day, Week, Month control'}` });
         s.selectControl(c.id);
     };
     const customPhone = Boolean(page.layouts.sm?.length);
@@ -463,6 +463,8 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                         <MetricSwitch control={c} state={controls} onChange={(v) => setPick('metric', c.id, v === c.default ? null : v)} />
                                     ) : c.type === 'grain' ? (
                                         <GrainSwitch control={c} state={controls} size="sm" onChange={(v) => setPick('grain', c.id, v === c.default ? null : v)} />
+                                    ) : c.type === 'searchType' ? (
+                                        <SearchTypeSwitch control={c} state={controls} onChange={(v) => setPick('searchType', c.id, v === c.default ? null : v)} />
                                     ) : null}
                                     {!preview ? <button type="button" aria-label={`Edit ${c.label} control`} onClick={() => s.selectControl(c.id)} className="ml-0.5 rounded p-1 text-fg-muted hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
                                 </div>
@@ -481,6 +483,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                         <DropdownMenuItem icon={Globe} disabled={doc.controls.some((c) => c.type === 'site')} onSelect={() => addSwitch(newSiteControl())}>Site switcher</DropdownMenuItem>
                                         <DropdownMenuItem icon={ArrowLeftRight} onSelect={() => addSwitch(newMetricControl(doc))}>Metric switcher</DropdownMenuItem>
                                         <DropdownMenuItem icon={CalendarRange} disabled={doc.controls.some((c) => c.type === 'grain')} onSelect={() => addSwitch(newGrainControl())}>Day / Week / Month</DropdownMenuItem>
+                                        <DropdownMenuItem icon={Search} disabled={doc.controls.some((c) => c.type === 'searchType')} onSelect={() => addSwitch(newSearchTypeControl())}>Search type</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             ) : null}

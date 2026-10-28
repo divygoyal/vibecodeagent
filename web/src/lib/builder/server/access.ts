@@ -9,7 +9,8 @@ import { authOptions } from '@/lib/auth';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
 import { accessForAsset, listLinkedGoogleConnections } from '@/lib/googleAccounts';
 import { clientKey as requestClientKey } from '@/lib/clientIp';
-import type { ControlDef, ControlState, SiteControl } from '../types';
+import { b64urlDecode, b64urlEncode, drillChain, MAX_DRILL_VALUE, type DrillResolver } from '../drill';
+import type { ControlDef, ControlState, DashboardDocV2, DashboardQueryResponse, SiteControl } from '../types';
 import type { ResolvedSite, SiteDirectory } from './sources';
 
 export async function sessionUserId(): Promise<string | null> {
@@ -167,4 +168,69 @@ export function sitePicksFromKeys(controlDefs: ControlDef[], picks: Record<strin
         if (hit) out[c.id] = hit.siteId;
     }
     return out;
+}
+
+// ── drill down on public links (round 8) ─────────────────────────────────
+//
+// A drill value reaches the server as text the viewer's browser sends, so a public link never takes it raw:
+// the server issues a signed key with every drillable row (HMAC of the share token, the widget, the level, the
+// values above it and the value itself) and accepts only keys it can verify. A forged or edited key is
+// ignored, a value the viewer was not shown cannot be asked for, and one share link's keys mean nothing on
+// another. The dimension of every level is never in the key or the URL: it comes from the widget's own list.
+
+const KEY_MAC_LEN = 16;
+const MAX_DRILL_KEY_ROWS = 500;
+
+function drillMac(shareToken: string, widgetId: string, level: number, parents: string[], value: string): string {
+    return createHmac('sha256', secret()).update(`dash-drill|${shareToken}|${widgetId}|${level}|${parents.join('\u0001')}|${value}`).digest('base64url').slice(0, KEY_MAC_LEN);
+}
+
+/** The signed key of one drill value: base64url(value) + '.' + MAC. */
+export function drillKey(shareToken: string, widgetId: string, level: number, parents: string[], value: string): string {
+    return `${b64urlEncode(value)}.${drillMac(shareToken, widgetId, level, parents, value)}`;
+}
+
+/** The value inside a key for this share, widget, level and parents, or null when the key is not ours. */
+export function drillValueFromKey(shareToken: string, widgetId: string, level: number, parents: string[], key: string): string | null {
+    const i = key.lastIndexOf('.');
+    if (i <= 0 || key.length > 300) return null;
+    const value = b64urlDecode(key.slice(0, i));
+    if (!value || value.length > MAX_DRILL_VALUE || value === '(other)') return null;
+    const want = Buffer.from(drillMac(shareToken, widgetId, level, parents, value));
+    const got = Buffer.from(key.slice(i + 1));
+    return want.length === got.length && timingSafeEqual(want, got) ? value : null;
+}
+
+/** The resolver a public request passes to publicControlsFromQuery (verifies every key of d.<widgetId>). */
+export function drillResolver(shareToken: string): DrillResolver {
+    return (widgetId, level, raw, parents) => drillValueFromKey(shareToken, widgetId, level, parents, raw);
+}
+
+/**
+ * Public responses: add the signed keys of the values a drillable widget shows right now, as
+ * `parts.rows.drillKeys` (value -> key), so the viewer can drill without ever sending a raw value.
+ * `controls.drill` holds the verified values of this request.
+ */
+export function attachDrillKeys(res: DashboardQueryResponse, doc: Pick<DashboardDocV2, 'widgets'>, controls: ControlState, shareToken: string): DashboardQueryResponse {
+    for (const [id, result] of Object.entries(res.results)) {
+        const original = doc.widgets[id];
+        const chain = original ? drillChain(original) : null;
+        if (!original || !chain) continue;
+        const path = controls.drill?.[id] ?? [];
+        const depth = Math.min(path.length, chain.length - 1);
+        if (depth >= chain.length - 1) continue;
+        const ok = result.status === 'ok' ? result : result.stale;
+        const frame = ok?.parts.rows;
+        if (!frame) continue;
+        const dim = chain[depth];
+        const col = `d:${dim}`;
+        const keys: Record<string, string> = {};
+        for (const row of frame.rows.slice(0, MAX_DRILL_KEY_ROWS)) {
+            const v = row[col];
+            if (typeof v !== 'string' || !v || v.length > MAX_DRILL_VALUE || v === '(other)' || row.__other) continue;
+            keys[v] = drillKey(shareToken, id, depth, path.slice(0, depth), v);
+        }
+        if (Object.keys(keys).length) frame.drillKeys = keys;
+    }
+    return res;
 }

@@ -73,6 +73,7 @@ export function tableTrendQuery(
         dimensions: ['date', dim],
         granularity: days(range) > TREND_DAILY_MAX_DAYS ? 'week' : 'day',
         filters: [...rowsQuery.filters, filter],
+        ...(rowsQuery.searchType ? { searchType: rowsQuery.searchType } : {}),
         compare: false,
         fillDates: true,
         pivot: { dimension: dim, top: values.length, other: false },

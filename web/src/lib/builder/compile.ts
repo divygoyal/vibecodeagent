@@ -5,8 +5,10 @@
  */
 import { expandCalcs, isCalcId, parseCalcId } from './calc';
 import { getMetric, metricLabel } from './catalog';
+import { applyDrill, drillFilters } from './drill';
 import { clickDimension } from './interaction';
 import { widgetMetrics } from './registry';
+import { isSearchType, searchTypeEligible } from './searchType';
 import { substituteFilters, variableValues } from './variables';
 import type {
     ControlDef,
@@ -20,6 +22,8 @@ import type {
     MetricRef,
     PageId,
     RefLine,
+    SearchType,
+    SearchTypeControl,
     SiteControl,
     SourceRef,
     WidgetDef,
@@ -67,6 +71,9 @@ export function widgetFilters(widget: WidgetDef, ctx: CompileCtx): Array<{ claus
     // Widget filters, with dashboard variables ({{var:name}}) filled in.
     const widgetOwn = widget.filters?.length ? substituteFilters(widget.filters, variableValues(ctx.controlDefs, ctx.controls)) : widget.filters;
     for (const clause of widgetOwn ?? []) out.push({ clause });
+    // Drill down (round 8): the values clicked on the levels above the one shown. After variable
+    // substitution on purpose: a clicked value is data, never a {{var}} to fill in.
+    for (const clause of drillFilters(widget, ctx.controls.drill)) out.push({ clause, controlId: 'drill' });
     return out;
 }
 
@@ -102,6 +109,14 @@ export function selectedGrain(control: GrainControl, controls: ControlState): 'a
     const options = Array.isArray(control.options) ? control.options : [];
     if (pick && options.includes(pick)) return pick;
     return control.default === 'day' || control.default === 'week' || control.default === 'month' ? control.default : 'auto';
+}
+
+/** The search type a search type control shows: the viewer's pick when it is an option, else the control's default. */
+export function selectedSearchType(control: SearchTypeControl, controls: ControlState): { type: SearchType; picked: boolean } {
+    const pick = controls.searchType?.[control.id];
+    const options = Array.isArray(control.options) ? control.options : [];
+    if (isSearchType(pick) && options.includes(pick)) return { type: pick, picked: true };
+    return { type: isSearchType(control.default) ? control.default : 'web', picked: false };
 }
 
 /** Metric ids a widget shows (for "which widgets follow this metric control"). */
@@ -243,7 +258,15 @@ export function applyViewerControls(widget: WidgetDef, ctx: CompileCtx, opts: { 
         const g = gc ? selectedGrain(gc, ctx.controls) : 'auto';
         if (g !== 'auto' && w.config.granularity !== g) w = { ...w, config: { ...w.config, granularity: g } };
     }
-    return w;
+    // Round 8: the search type switcher moves Search Console widgets (every metric from Search Console).
+    // A control left on Web with no pick keeps each widget's own search type.
+    const tc = searchTypeEligible(w) ? controlsFor('searchType', w, ctx)[0] : undefined;
+    if (tc) {
+        const { type, picked } = selectedSearchType(tc, ctx.controls);
+        if ((picked || type !== 'web') && (w.searchType ?? 'web') !== type) w = { ...w, searchType: type === 'web' ? undefined : type };
+    }
+    // Round 8: drill down (the dimension of the level the viewer is on, and the clicked values as filters).
+    return applyDrill(w, ctx.controls.drill);
 }
 
 const timeDim = (g: 'day' | 'week' | 'month'): string => (g === 'day' ? 'date' : g);
@@ -254,7 +277,9 @@ export function compileWidget(rawWidget: WidgetDef, ctx: CompileCtx): CompiledWi
     const filters = filterOrigins.map((f) => f.clause);
     const source: SourceRef = widget.source ?? { type: 'default' };
     const compareOn = ctx.controls.date.compare.mode !== 'none' && !(widget.ignoreControls ?? []).includes('compare');
-    const base = { source, filters };
+    // Search Console search type (round 8): only for widgets that read Search Console alone; web is the API default.
+    const searchType = searchTypeEligible(widget) && isSearchType(widget.searchType) && widget.searchType !== 'web' ? widget.searchType : undefined;
+    const base = { source, filters, ...(searchType ? { searchType } : {}) };
     const queries: WidgetQuery[] = [];
 
     switch (widget.type) {

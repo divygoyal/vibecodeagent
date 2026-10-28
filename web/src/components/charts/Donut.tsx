@@ -33,6 +33,11 @@ export interface DonutProps {
     maxSlices?: number;
     /** Legend right (default) or below. Below is forced under 640px. */
     legend?: 'right' | 'bottom';
+    /**
+     * A click on a slice or a legend row (drill down, round 8). The legend rows become buttons, so the keyboard
+     * reaches them; "Other" is never clickable.
+     */
+    onItemClick?: (item: DonutItem) => void;
     className?: string;
 }
 
@@ -40,7 +45,7 @@ export interface DonutProps {
  * Parts of a whole, 6 slices max (top 5 + Other), inner radius 64%, 2px
  * surface gaps, total in the centre, legend with value and % (DESIGN 3.7).
  */
-export function Donut({ items, centerLabel, centerValue, format = 'count', size = 160, maxSlices = 6, legend = 'right', className }: DonutProps) {
+export function Donut({ items, centerLabel, centerValue, format = 'count', size = 160, maxSlices = 6, legend = 'right', onItemClick, className }: DonutProps) {
     const [active, setActive] = useState<string | null>(null);
     const slices = useMemo(() => {
         const sorted = [...items].filter((i) => i.value > 0).sort((a, b) => b.value - a.value);
@@ -79,6 +84,8 @@ export function Donut({ items, centerLabel, centerValue, format = 'count', size 
                         isAnimationActive={false}
                         onMouseEnter={(_, i) => setActive(slices[i]?.key ?? null)}
                         onMouseLeave={() => setActive(null)}
+                        onClick={onItemClick ? (_, i) => { const s = slices[i]; if (s && s.key !== '__other') onItemClick(s); } : undefined}
+                        style={onItemClick ? { cursor: 'pointer' } : undefined}
                     >
                         {(slices.length ? slices : [{ key: 'empty', color: 'var(--color-subtle)' }]).map((s) => (
                             <Cell key={s.key} fill={s.color} fillOpacity={active && active !== s.key ? 0.55 : 1} />
@@ -92,19 +99,25 @@ export function Donut({ items, centerLabel, centerValue, format = 'count', size 
                 </div>
             </div>
             <ul className="flex w-full min-w-0 flex-col gap-1">
-                {slices.map((s) => (
-                    <li
-                        key={s.key}
-                        onMouseEnter={() => setActive(s.key)}
-                        onMouseLeave={() => setActive(null)}
-                        className={cn('flex h-7 items-center gap-2 rounded-md px-1.5 text-body-sm transition-colors duration-120', active === s.key && 'bg-subtle')}
-                    >
-                        <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: s.color }} />
-                        <span className="min-w-0 flex-1 truncate text-fg-secondary">{s.label}</span>
-                        <span className="text-fg tabular-nums">{format === 'count' ? fmtFull(s.value) : fmtValue(format, s.value)}</span>
-                        <span className="w-10 text-right text-meta text-fg-muted tabular-nums">{total > 0 ? fmtShare(s.value / total) : '–'}</span>
-                    </li>
-                ))}
+                {slices.map((s) => {
+                    const row = (
+                        <>
+                            <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: s.color }} />
+                            <span className="min-w-0 flex-1 truncate text-fg-secondary">{s.label}</span>
+                            <span className="text-fg tabular-nums">{format === 'count' ? fmtFull(s.value) : fmtValue(format, s.value)}</span>
+                            <span className="w-10 text-right text-meta text-fg-muted tabular-nums">{total > 0 ? fmtShare(s.value / total) : '–'}</span>
+                        </>
+                    );
+                    const cls = cn('flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-body-sm transition-colors duration-120', active === s.key && 'bg-subtle');
+                    const hover = { onMouseEnter: () => setActive(s.key), onMouseLeave: () => setActive(null) };
+                    return (
+                        <li key={s.key} {...hover}>
+                            {onItemClick && s.key !== '__other'
+                                ? <button type="button" onClick={() => onItemClick(s)} onFocus={() => setActive(s.key)} onBlur={() => setActive(null)} className={cn(cls, 'cursor-pointer')}>{row}</button>
+                                : <div className={cls}>{row}</div>}
+                        </li>
+                    );
+                })}
             </ul>
         </div>
     );

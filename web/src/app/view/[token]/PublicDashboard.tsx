@@ -23,6 +23,7 @@ import { dashRootProps } from '@/components/dashboard-builder/theme/DashTheme';
 import { fetchJson, publicPageLoader, QueryHttpError, usePageResults } from '@/components/dashboard-builder/useWidgetData';
 import { canonicalJson } from '@/lib/builder/compile';
 import { compareToParam, rangeToParam } from '@/lib/builder/dates';
+import { drillToParam } from '@/lib/builder/drill';
 import type { DashboardDocV2, PublicDashboard, ThemeV2 } from '@/lib/builder/types';
 
 const keyName = (token: string) => `tc_dash_key_${token.slice(0, 12)}`;
@@ -124,7 +125,7 @@ function PasswordGate({ token, name, onUnlocked }: { token: string; name: string
 
 function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string; pub: PublicDashboard; doc: DashboardDocV2; unlockKey: string | null; embed: boolean; dark?: boolean; tv?: { attrs: Record<string, string>; style?: React.CSSProperties; className?: string } }) {
     const allow = pub.share?.viewerControls ?? { date: false, compare: false, filters: false };
-    const ctl = useUrlControls(doc, allow);
+    const ctl = useUrlControls(doc, allow, { publicKeys: true });
     const query = useMemo(() => {
         const q = new URLSearchParams();
         if (ctl.state.pageId) q.set('page', ctl.state.pageId);
@@ -136,6 +137,9 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
         for (const [k, v] of Object.entries(ctl.state.site ?? {})) q.set(`s.${k}`, v);
         for (const [k, v] of Object.entries(ctl.state.metric ?? {})) q.set(`m.${k}`, v);
         for (const [k, v] of Object.entries(ctl.state.grain ?? {})) q.set(`g.${k}`, v);
+        for (const [k, v] of Object.entries(ctl.state.searchType ?? {})) q.set(`t.${k}`, v);
+        // Drill down: signed keys the server issued with the data; it ignores anything it did not sign.
+        for (const [k, v] of Object.entries(ctl.state.drill ?? {})) q.set(`d.${k}`, drillToParam(v) ?? '');
         return q;
     }, [ctl.state]);
     const page = usePageResults(`pub:${token}:${pub.rev}:${canonicalJson(ctl.state)}:${unlockKey ?? ''}`, publicPageLoader(token, query, unlockKey), tv ? tvRefreshMs(doc) : doc.settings.autoRefreshSec ? doc.settings.autoRefreshSec * 1000 : 300_000);
@@ -157,7 +161,7 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
 
     const siteLabel = doc.defaultSource && 'label' in (doc.defaultSource as object) ? String((doc.defaultSource as unknown as { label: string }).label) : '';
     // View-only switchers (round 7): picks stay in this viewer's URL and are never saved.
-    const switches = { onSite: ctl.setSite, onMetric: ctl.setMetric, onGrain: ctl.setGrain, siteOptions: publicSiteOptions };
+    const switches = { onSite: ctl.setSite, onMetric: ctl.setMetric, onGrain: ctl.setGrain, onSearchType: ctl.setSearchType, siteOptions: publicSiteOptions };
     const selection = viewerSelection(doc, ctl.state, publicSiteOptions, siteLabel);
     const copy = async () => {
         try {
@@ -212,6 +216,7 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
                 options={{}}
                 onVariable={allow.filters ? ctl.setVariable : undefined}
                 onInteraction={allow.filters ? ctl.setInteraction : undefined}
+                onDrill={allow.filters ? ctl.setDrill : undefined}
                 header={header}
                 footer={pub.share?.badge ? <div className="flex justify-center pt-2"><MadeWithBadge /></div> : null}
                 shell="inherit"

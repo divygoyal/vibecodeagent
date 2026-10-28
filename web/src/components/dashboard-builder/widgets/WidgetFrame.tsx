@@ -8,6 +8,8 @@ import { Button, Skeleton, Tooltip } from '@/components/ui';
 import { fmtDay } from '@/lib/format';
 import { metricLabel } from '@/lib/builder/catalog';
 import { widgetTitle } from '@/lib/builder/registry';
+import { searchTypeLabel, widgetSearchType } from '@/lib/builder/searchType';
+import { DrillCrumbs, type DrillView } from './DrillCrumbs';
 import type { CompareSpec, ResolvedDates, WidgetDef, WidgetResult, WidgetResultOk } from '@/lib/builder/types';
 
 export interface WidgetViewProps<W extends WidgetDef = WidgetDef> {
@@ -31,6 +33,8 @@ export interface WidgetViewProps<W extends WidgetDef = WidgetDef> {
     onFilterClick?: (value: string) => void;
     /** The value currently selected by click to filter on this widget's dimension. */
     selectedValue?: string;
+    /** Drill down (round 8): the path above the chart and the levels, when the widget has a drill list. */
+    drill?: DrillView;
 }
 
 /** The ok result when there is one (also the stale copy inside an error). */
@@ -83,6 +87,8 @@ export function flagNotes(r: WidgetResultOk | undefined, widget: WidgetDef): str
     if (!r) return [];
     const f = r.flags;
     const out: string[] = [];
+    // Round 8: the title row names a non-web search type; a widget without a title says it here.
+    if (widget.showTitle === false && widgetSearchType(widget) !== 'web') out.push(`Search type: ${searchTypeLabel(widgetSearchType(widget))}`);
     if (f.stale) out.push(`Showing data from ${new Date(r.fetchedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`);
     if (f.sampled) out.push(`Sampled (${f.sampled.pct}% of events)`);
     if (f.thresholded) out.push('Google hides small groups (privacy thresholds)');
@@ -139,6 +145,9 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                             <button type="button" aria-label="About this widget" className="mt-0.5 shrink-0 text-fg-muted hover:text-fg"><Info aria-hidden size={14} strokeWidth={1.75} /></button>
                         </Tooltip>
                     ) : null}
+                    {widgetSearchType(widget) !== 'web' ? (
+                        <span title="Search Console search type" className="mt-0.5 shrink-0 truncate rounded-badge bg-brand-soft px-1.5 text-caption text-brand-soft-fg">{searchTypeLabel(widgetSearchType(widget))}</span>
+                    ) : null}
                     {ok?.sourceLabel && props.mode !== 'public' && widget.source?.type && widget.source.type !== 'default' ? (
                         <span className="mt-0.5 truncate rounded-badge bg-subtle px-1.5 text-caption text-fg-muted">{ok.sourceLabel}</span>
                     ) : null}
@@ -156,6 +165,7 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                     ) : null}
                 </div>
             ) : null}
+            {props.drill && props.drill.depth > 0 ? <DrillCrumbs drill={props.drill} /> : null}
             <div className={cn('relative min-h-0 flex-1', refetching && 'opacity-60 transition-opacity', bodyClassName)}>
                 {loading && !ok ? (
                     skeleton === 'none' ? null : skeleton === 'table' ? (

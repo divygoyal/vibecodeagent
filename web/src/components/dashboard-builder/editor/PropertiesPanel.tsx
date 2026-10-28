@@ -20,7 +20,7 @@ import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { Choice, DimensionPicker, Field, MetricList, MetricPicker, NumberInput, SourcePicker, TextInput, Toggle, type SiteOption } from './Fields';
 import { ChartMarksEditor } from './ChartMarksEditor';
 import { RulesEditor } from './RulesEditor';
-import { GrainControlProps, MetricControlProps, SiteControlProps } from './SwitchControlProps';
+import { GrainControlProps, MetricControlProps, SearchTypeControlProps, SiteControlProps } from './SwitchControlProps';
 import { VariablesEditor } from './VariablesEditor';
 import { CalcList } from './CalcEditor';
 import { TABLE_TREND_ROWS, TREND_DAILY_MAX_DAYS, trendMetric, trendUnsupported } from '@/lib/builder/trend';
@@ -66,7 +66,8 @@ export function PropertiesPanel({ doc, sites, defaultLabel }: { doc: DashboardDo
                     : control && control.type === 'site' ? <SiteControlProps key={control.id} control={control} doc={doc} sites={sites} defaultLabel={defaultLabel} />
                         : control && control.type === 'metric' ? <MetricControlProps key={control.id} control={control} doc={doc} />
                             : control && control.type === 'grain' ? <GrainControlProps key={control.id} control={control} doc={doc} />
-                                : <DashboardSettings doc={doc} sites={sites} />}
+                                : control && control.type === 'searchType' ? <SearchTypeControlProps key={control.id} control={control} doc={doc} />
+                                    : <DashboardSettings doc={doc} sites={sites} />}
         </aside>
     );
 }

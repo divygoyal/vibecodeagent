@@ -101,7 +101,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
     const siteLabel = (siteCtl ? pickedSiteLabel(siteCtl, ctl.state, siteOptions(siteCtl)) : undefined) ?? defaultSiteLabel;
     const pickedSiteId = siteCtl ? selectedSite(siteCtl, ctl.state) : undefined;
     const filterSiteId = pickedSiteId ?? (doc.defaultSource.type === 'site' ? doc.defaultSource.siteId : undefined);
-    const switches = { onSite: ctl.setSite, onMetric: ctl.setMetric, onGrain: ctl.setGrain, siteOptions };
+    const switches = { onSite: ctl.setSite, onMetric: ctl.setMetric, onGrain: ctl.setGrain, onSearchType: ctl.setSearchType, siteOptions };
     const selection = viewerSelection(doc, ctl.state, siteCtl ? siteOptions : undefined, defaultSiteLabel);
     const dateLabel = [presetLabel(ctl.state.date.range), selection].filter(Boolean).join(' · ');
     const updatedAt = page.data ? Object.values(page.data.results).map((r) => (r.status === 'ok' ? r.fetchedAt : '')).filter(Boolean).sort()[0] : undefined;
@@ -220,6 +220,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
                 onFilter={ctl.setFilter}
                 onVariable={ctl.setVariable}
                 onInteraction={ctl.setInteraction}
+                onDrill={ctl.setDrill}
                 allow={{ date: true, compare: true, filters: true }}
                 data={page.data}
                 loading={!page.data && !page.error}
