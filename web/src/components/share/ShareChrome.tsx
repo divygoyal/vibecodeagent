@@ -120,14 +120,14 @@ export function ShareFooter({ compact = false, className }: { compact?: boolean;
 }
 
 /** Invalid or revoked token. */
-export function ShareNotFound({ isEmbed = false, what = 'shared dashboard' }: { isEmbed?: boolean; what?: string }) {
+export function ShareNotFound({ isEmbed = false, what = 'shared dashboard', temporary = false }: { isEmbed?: boolean; what?: string; temporary?: boolean }) {
     return (
         <SharePage className="flex items-center justify-center p-6">
             <EmptyState
                 variant="page"
                 icon={Link2Off}
-                title={`This ${what} is not available`}
-                description="The link is wrong, or the owner stopped sharing it."
+                title={temporary ? `This ${what} could not load right now` : `This ${what} is not available`}
+                description={temporary ? 'We could not reach it just now. Try again in a minute.' : 'The link is wrong, or the owner stopped sharing it.'}
                 actions={isEmbed ? null : (
                     <Link href={HOME_URL} className={buttonClasses({ variant: 'secondary' })}>Visit {BRAND_NAME}</Link>
                 )}

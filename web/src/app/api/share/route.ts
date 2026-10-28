@@ -467,10 +467,14 @@ export async function DELETE(req: Request) {
  * Not an HTTP handler — used via direct function call from the server component.
  * In production, calls the admin API. In dev, uses the in-memory store.
  */
-export async function getShareData(
+/**
+ * A share by token, and whether it is gone: `gone` is true when the token does not exist (wrong, revoked or never
+ * made), false when the share service could not answer (the page then says "could not load", not 404).
+ */
+export async function lookupShare(
     token: string,
     options?: { incrementView?: boolean }
-): Promise<ShareData | null> {
+): Promise<{ share: ShareData | null; gone: boolean }> {
     const incrementView = options?.incrementView ?? true;
 
     // Production: use admin DB
@@ -480,22 +484,30 @@ export async function getShareData(
                 ? `${ADMIN_API_URL}/api/shared-dashboards/${token}/view`
                 : `${ADMIN_API_URL}/api/shared-dashboards/${token}`;
             const res = await fetch(path);
-            if (!res.ok) return null;
-            return normalizeShareData(await res.json());
+            if (!res.ok) return { share: null, gone: res.status >= 400 && res.status < 500 };
+            return { share: normalizeShareData(await res.json()), gone: false };
         } catch {
-            return null;
+            return { share: null, gone: false };
         }
     }
 
+    // No share store: no share link can exist.
     if (!ALLOW_IN_MEMORY_SHARES) {
-        return null;
+        return { share: null, gone: true };
     }
 
     // Dev fallback: in-memory store
     const share = inMemoryShares.get(token);
-    if (!share) return null;
+    if (!share) return { share: null, gone: true };
     if (incrementView) {
         share.views++;
     }
-    return normalizeShareData({ ...share });
+    return { share: normalizeShareData({ ...share }), gone: false };
+}
+
+export async function getShareData(
+    token: string,
+    options?: { incrementView?: boolean }
+): Promise<ShareData | null> {
+    return (await lookupShare(token, options)).share;
 }

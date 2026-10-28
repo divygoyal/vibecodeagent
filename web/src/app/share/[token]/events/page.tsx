@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
-import { getShareData } from '@/app/api/share/route';
+import { notFound } from 'next/navigation';
+import { lookupShare } from '@/app/api/share/route';
 import SharedEventsReportClient from '@/components/share-overview/openpanel/SharedEventsReportClient';
 import { ShareNotFound } from '@/components/share/ShareChrome';
 import { BRAND_NAME } from '@/lib/brand';
@@ -17,10 +18,11 @@ export default async function SharedEventsReportPage({
     params: Promise<{ token: string }>;
 }) {
     const { token } = await params;
-    const share = await getShareData(token, { incrementView: false });
+    const { share, gone } = await lookupShare(token, { incrementView: false });
 
     if (!share) {
-        return <ShareNotFound what="events report" />;
+        if (gone) notFound();
+        return <ShareNotFound what="events report" temporary />;
     }
 
     return (
