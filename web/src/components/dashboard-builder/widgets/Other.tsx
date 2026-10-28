@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useElementWidth } from '../useElementWidth';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -171,14 +171,21 @@ export function SectionView({ widget }: WidgetViewProps<SectionWidget>) {
 export function ImageView({ widget }: WidgetViewProps<ImageWidget>) {
     const c = widget.config;
     const safe = /^https:\/\//i.test(c.src);
+    const [failed, setFailed] = useState(false);
+    const ref = useRef<HTMLImageElement>(null);
+    // A load error that fired before hydration never reaches onError: check the element once mounted.
+    useEffect(() => {
+        const el = ref.current;
+        setFailed(Boolean(el && el.complete && el.naturalWidth === 0));
+    }, [c.src]);
     const radius = c.radius === 'none' ? '' : c.radius === 'sm' ? 'rounded-md' : c.radius === 'full' ? 'rounded-full' : 'rounded-card';
-    const img = safe ? (
+    const img = safe && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={c.src} alt={c.alt} loading="lazy" referrerPolicy="no-referrer" className={cn('h-full w-full', c.fit === 'cover' ? 'object-cover' : 'object-contain', radius)} />
+        <img ref={ref} src={c.src} alt={c.alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={cn('h-full w-full', c.fit === 'cover' ? 'object-cover' : 'object-contain', radius)} />
     ) : (
-        <div className={cn('flex h-full w-full flex-col items-center justify-center gap-2 border border-dashed border-border bg-surface-sunken text-body-sm text-fg-muted', radius)}>
+        <div className={cn('flex h-full w-full flex-col items-center justify-center gap-2 border border-dashed border-border bg-surface-sunken px-3 text-center text-body-sm text-fg-muted', radius)}>
             <ImageOff aria-hidden size={20} strokeWidth={1.75} />
-            Add an https image URL
+            {safe ? (c.alt ? `${c.alt} (image unavailable)` : 'Image unavailable') : 'Add an https image URL'}
         </div>
     );
     return c.href && /^https:\/\//i.test(c.href) ? <a href={c.href} target="_blank" rel="noopener noreferrer" className="block h-full">{img}</a> : <div className="h-full">{img}</div>;
