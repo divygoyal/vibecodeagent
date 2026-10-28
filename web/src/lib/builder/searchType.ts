@@ -83,7 +83,7 @@ export function widgetDimensions(w: WidgetDef): string[] {
         case 'pie': return [w.config.dimension];
         case 'table': return w.config.dimensions;
         case 'timeseries': return w.config.breakdown ? [w.config.breakdown.dimension] : [];
-        case 'geo': return ['country'];
+        case 'geo': return w.config.level === 'region' ? ['country', 'region'] : w.config.level === 'city' ? ['country', 'city'] : ['country'];
         default: return chartDimensions(w);
     }
 }

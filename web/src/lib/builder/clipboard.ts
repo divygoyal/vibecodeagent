@@ -18,7 +18,7 @@ export const CLIP_PAGE = 'trafficclaw/page';
 const MAX_ITEMS = 40;
 const MAX_BYTES = 400_000;
 
-const TYPES: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', 'table', 'geo', 'text', 'image', 'section', 'portfolio-grid', ...CHART_TYPES];
+const TYPES: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', 'table', 'geo', 'text', 'image', 'section', 'portfolio-grid', 'realtime', 'embed', ...CHART_TYPES];
 
 export interface ClipItem { widget: WidgetDef; layout: { x: number; y: number; w: number; h: number } }
 /** `calcs` (round 7): names of the calculated metrics the items use, so a paste keeps them. */

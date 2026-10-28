@@ -7,6 +7,9 @@ import { KpiStripView, ScorecardView } from './Scorecard';
 import { BarView, PieView, TimeSeriesView } from './Charts';
 import { TableView } from './TableView';
 import { ChartWidgetView } from '../charts/ChartWidgets';
+import { EmbedView } from './EmbedView';
+import { GeoCityView, GeoRegionView } from './GeoRegions';
+import { RealtimeView } from './RealtimeView';
 import { GeoView, ImageView, PortfolioGridView, SectionView, TextView } from './Other';
 
 /** One widget, any type. Props carry the result for this widget from the page or inline query. */
@@ -28,11 +31,13 @@ export function WidgetRenderer(raw: WidgetViewProps) {
         case 'bar': return <BarView {...props} widget={w} />;
         case 'pie': return <PieView {...props} widget={w} />;
         case 'table': return <TableView {...props} widget={w} />;
-        case 'geo': return <GeoView {...props} widget={w} />;
+        case 'geo': return w.config.level === 'region' ? <GeoRegionView {...props} widget={w} /> : w.config.level === 'city' ? <GeoCityView {...props} widget={w} /> : <GeoView {...props} widget={w} />;
         case 'text': return <TextView {...props} widget={w} />;
         case 'section': return <SectionView {...props} widget={w} />;
         case 'image': return <ImageView {...props} widget={w} />;
         case 'portfolio-grid': return <PortfolioGridView {...props} widget={w} />;
+        case 'realtime': return <RealtimeView {...props} widget={w} />;
+        case 'embed': return <EmbedView {...props} widget={w} />;
         default: return <ChartWidgetView {...props} widget={w} />; // round 9 charts
     }
 }

@@ -14,10 +14,10 @@ import type { Feature, Geometry } from 'geojson';
 
 import { numericToAlpha2, countryName } from '@/lib/builder/countries';
 
-type CountryFeature = Feature<Geometry, { name?: string }> & { id?: string | number };
+export type CountryFeature = Feature<Geometry, { name?: string }> & { id?: string | number };
 
 let atlas: Promise<CountryFeature[]> | null = null;
-function loadAtlas(): Promise<CountryFeature[]> {
+export function loadAtlas(): Promise<CountryFeature[]> {
     atlas ??= fetch('/geo/countries-110m.json')
         .then((r) => r.json() as Promise<Topology>)
         .then((topo) => {

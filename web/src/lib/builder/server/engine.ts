@@ -18,7 +18,7 @@ import { alpha2ToGsc, gscToAlpha2 } from '../countries';
 import { lastCompleteDay, searchWindowOf } from '@/lib/dateRange';
 import { addDays, autoGranularity, eachDay, fromDay, monthStart, resolveCompare, resolveRange, toDay, todayIn, weekStart } from '../dates';
 import { resolveWidgetDates } from '../widgetDates';
-import { widgetMeta } from '../registry';
+import { skipsPageQuery, widgetMeta } from '../registry';
 import { searchTypeProblem } from '../searchType';
 import { tableTrendQuery } from '../trend';
 import type {
@@ -585,9 +585,9 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     const stats: ExecStats = { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 };
     const results: Record<string, WidgetResult> = {};
 
-    const dataWidgets = input.widgets.filter((w) => !widgetMeta(w.widget.type).static);
+    const dataWidgets = input.widgets.filter((w) => !skipsPageQuery(w.widget.type));
     for (const w of input.widgets) {
-        if (widgetMeta(w.widget.type).static) results[w.widget.id] = { status: 'ok', fetchedAt: now.toISOString(), cache: 'hit', parts: {}, flags: {} };
+        if (skipsPageQuery(w.widget.type)) results[w.widget.id] = { status: 'ok', fetchedAt: now.toISOString(), cache: 'hit', parts: {}, flags: {} };
     }
     // The header names Search Console's days only when a widget reads Search Console (a GA4-only dashboard has one window).
     let readsSearch = false;

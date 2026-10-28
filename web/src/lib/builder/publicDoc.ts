@@ -69,7 +69,10 @@ export function publicDoc(doc: DashboardDocV2, labelOf: (s: SourceRef) => string
     for (const [id, w] of Object.entries(doc.widgets)) {
         widgets[id] = { ...w, source: redactSource(w.source ?? { type: 'default' }, labelOf) } as PublicDashboardDoc['widgets'][string];
     }
-    const pages = doc.pages.filter((p) => !p.hidden);
+    // Round 9: a web embed reaches share links and embeds only when the owner opted in (its address stays private otherwise).
+    const hiddenEmbeds = new Set(Object.values(doc.widgets).filter((w) => w.type === 'embed' && !w.config.showOnPublic).map((w) => w.id));
+    const withoutHidden = <T extends { i: string }>(l?: T[]) => l?.filter((x) => !hiddenEmbeds.has(x.i));
+    const pages = doc.pages.filter((p) => !p.hidden).map((p) => (hiddenEmbeds.size ? { ...p, layouts: { lg: withoutHidden(p.layouts.lg)!, md: withoutHidden(p.layouts.md), sm: withoutHidden(p.layouts.sm) } } : p));
     const visible = new Set(pages.flatMap((p) => p.layouts.lg.map((l) => l.i)));
     for (const id of Object.keys(widgets)) if (!visible.has(id)) delete widgets[id];
     const theme = { ...doc.theme };

@@ -1,0 +1,16 @@
+places-50k.json: populated places with at least 50,000 people (name, ISO country code, latitude, longitude,
+largest population figure, alternate spellings), cut from Natural Earth "ne_10m_populated_places_simple"
+(https://github.com/nvkelso/natural-earth-vector, naturalearthdata.com), 2026-10-28.
+
+Licence: public domain. From https://www.naturalearthdata.com/about/terms-of-use/ :
+
+  All versions of Natural Earth raster + vector map data found on this website are in the public domain. You may
+  use the maps in any manner, including modifying the content and design, electronic dissemination, and offset
+  printing. The primary authors, Tom Patterson and Nathaniel Vaughn Kelso, and all other contributors renounce
+  all financial claim to the maps and invites you to use them for personal, educational, and commercial purposes.
+  No permission is needed to use Natural Earth. Crediting the authors is unnecessary.
+
+We credit it anyway in the city map footnote ("Made with Natural Earth").
+Coordinates are rounded to 0.01 degree (about 1 km). Kosovo (XK) is kept; Somaliland places are left out.
+
+countries-110m.json (the country outlines) is world-atlas, see LICENSE-world-atlas.txt (ISC; the data is Natural Earth).

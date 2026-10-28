@@ -509,7 +509,14 @@ export interface TableConfig {
 export type TableWidget = WidgetBase<'table', TableConfig>;
 
 export interface GeoConfig {
-    level: 'country';
+    /**
+     * 'country' = shaded world map (the original). Round 9: 'region' = the regions of one country (a list with bars
+     * beside that country's outline: GA4 gives no region shapes), 'city' = bubbles on the map at each city's place
+     * (a small public-domain lookup, lib/builder/geo.ts) with the ranked list under it for cities it does not know.
+     */
+    level: 'country' | 'region' | 'city';
+    /** Region view: the country shown (ISO 3166-1 alpha-2); missing = the country with the most of the metric. */
+    country?: string;
     metric: MetricRef;
     scale: { kind: 'sequential'; bins: 'quantile' | 'linear' | 'log'; steps: 5 | 7 };
     projection: 'naturalEarth' | 'mercator';
@@ -551,11 +558,38 @@ export interface PortfolioGridConfig {
 }
 export type PortfolioGridWidget = WidgetBase<'portfolio-grid', PortfolioGridConfig>;
 
+// ── Round 9: live widgets (lib/builder/realtime.ts) ──
+export type RealtimeBreakdown = 'none' | 'country' | 'city' | 'page' | 'device';
+export interface RealtimeConfig {
+    /** The list under the number. GA4's Realtime API has no source dimension, so no "source" option. */
+    breakdown: RealtimeBreakdown;
+    /** Rows of the list. */
+    top: 3 | 5 | 8;
+    /** Mini bars, one per minute of the last 30. */
+    bars: boolean;
+}
+export type RealtimeWidget = WidgetBase<'realtime', RealtimeConfig>;
+
+/** A web page in a sandboxed iframe (lib/builder/embed.ts). */
+export interface EmbedConfig {
+    /** https only; '' while the widget is new. */
+    url: string;
+    /** Accessible title of the frame. */
+    title: string;
+    /** Height of the page inside the card in pixels (120-2000); missing = fill the card. Setting it also resizes the card. */
+    heightPx?: number;
+    /** Let the page scroll inside the card (default on). */
+    scroll: boolean;
+    /** Share links and embeds show this widget only when the owner turns this on (missing = off). */
+    showOnPublic?: boolean;
+}
+export type EmbedWidget = WidgetBase<'embed', EmbedConfig>;
+
 export type WidgetDef =
     | ScorecardWidget | KpiStripWidget | TimeSeriesWidget | BarWidget | PieWidget | TableWidget
     | GeoWidget | TextWidget | ImageWidget | SectionWidget | PortfolioGridWidget
     // Round 9 charts (heatmap, scatter, funnel, treemap, pivot): charts/types.ts
-    | ChartWidgetDef;
+    | ChartWidgetDef | RealtimeWidget | EmbedWidget;
 
 export type WidgetType = WidgetDef['type'];
 

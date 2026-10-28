@@ -14,6 +14,9 @@ import type { NextConfig } from "next";
 // customer iframes (a silent CSP block there is the desired behaviour).
 const DEFAULT_CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.dodopayments.com https://api.mapbox.com https://www.googletagmanager.com https://www.google-analytics.com https://*.clarity.ms https://*.bing.com https://platform.twitter.com https://embed.reddit.com https://static.cloudflareinsights.com https://embed.tawk.to https://*.tawk.to; style-src 'self' 'unsafe-inline' https://*.tawk.to; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com https://*.tawk.to; connect-src 'self' https: wss:; frame-src 'self' https://checkout.dodopayments.com https://platform.twitter.com https://embed.reddit.com https://*.redditmedia.com https://www.reddit.com https://*.tawk.to; media-src 'self' blob:; worker-src 'self' blob:; child-src 'self' blob: https://embed.reddit.com https://*.redditmedia.com;";
 const EMBED_CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://*.clarity.ms https://*.bing.com https://platform.twitter.com https://embed.reddit.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; frame-src https://platform.twitter.com https://syndication.twitter.com https://embed.reddit.com https://*.redditmedia.com https://www.reddit.com; frame-ancestors *; media-src 'self' blob:; worker-src 'self' blob:; child-src blob: https://embed.reddit.com https://*.redditmedia.com;";
+// Round 9 (web embed widget): dashboards may show any https page in a sandboxed frame, so their routes (and only
+// theirs) list `https:` in frame-src. Every other route keeps the narrow list above.
+const withHttpsFrames = (csp: string) => csp.replace('frame-src ', 'frame-src https: ');
 const BASE_SECURITY_HEADERS = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-XSS-Protection', value: '1; mode=block' },
@@ -28,6 +31,15 @@ const BLOCKED_FRAME_HEADERS = [
 const EMBEDDABLE_HEADERS = [
   ...BASE_SECURITY_HEADERS,
   { key: 'Content-Security-Policy', value: EMBED_CSP },
+];
+const DASHBOARD_FRAME_HEADERS = [
+  ...BASE_SECURITY_HEADERS,
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'Content-Security-Policy', value: withHttpsFrames(DEFAULT_CSP) },
+];
+const DASHBOARD_EMBEDDABLE_HEADERS = [
+  ...BASE_SECURITY_HEADERS,
+  { key: 'Content-Security-Policy', value: withHttpsFrames(EMBED_CSP) },
 ];
 
 const nextConfig: NextConfig = {
@@ -136,6 +148,11 @@ const nextConfig: NextConfig = {
       source: '/embed/:path*',
       headers: EMBEDDABLE_HEADERS,
     },
+    // Round 9: the routes that render dashboards (owner pages, share pages, embedded share pages) may frame https pages.
+    // Later rules win for the same header, so these come last.
+    { source: '/dashboard/dashboards/:path*', headers: DASHBOARD_FRAME_HEADERS },
+    { source: '/view/:path*', headers: DASHBOARD_FRAME_HEADERS },
+    { source: '/embed/d/:path*', headers: DASHBOARD_EMBEDDABLE_HEADERS },
   ],
 };
 

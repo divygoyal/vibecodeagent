@@ -9,6 +9,7 @@ import { chartProblem } from './charts';
 import { chartWidgetSchemas } from './charts/schema';
 import { drillProblem } from './drill';
 import { MAX_VIEW_NAME, MAX_VIEW_QUERY, MAX_VIEWS, savedViewProblem } from './savedViews';
+import { EMBED_HEIGHT_MAX, EMBED_HEIGHT_MIN, EMBED_MAX_PER_DASHBOARD, embedUrlProblem } from './embed';
 import { widgetSearchTypeProblem } from './searchType';
 import type { DashboardDocV2, WidgetDef } from './types';
 
@@ -19,6 +20,8 @@ const metricId = z.string().regex(/^(ga4|gsc|calc):[A-Za-z0-9_:]{1,80}$/);
 /** Round 7: a named calculated metric; the id must describe a valid calculation (calc.ts). */
 const calculatedMetric = z.object({ id: metricId.refine((v) => Boolean(parseCalcId(v)), 'not a calculated metric'), label: z.string().trim().min(1).max(60) });
 const dimId = z.string().regex(/^[A-Za-z0-9_:]{1,80}$/);
+/** Round 9: a web embed address: '' while new, else https, public host, never this app (embed.ts). */
+const embedUrl = z.string().max(2000).refine((v) => v === '' || embedUrlProblem(v) === null, 'not an embeddable https address');
 const httpsUrl = z.string().max(2000).refine((v) => v === '' || /^https:\/\/[^\s]+$/i.test(v), 'https URL only');
 
 const siteRef = z.object({ siteId: z.string().min(1).max(253), ga4: z.string().max(40).optional(), gsc: z.string().max(300).optional() });
@@ -103,10 +106,12 @@ export const widgetSchema = z.discriminatedUnion('type', [
     z.object({ ...base, type: z.literal('bar'), config: z.looseObject({ dimension: dimId, metrics: z.array(metricRef).min(1).max(3), stackBy: dimId.optional(), top: z.number().int().min(1).max(25) }) }),
     z.object({ ...base, type: z.literal('pie'), config: z.looseObject({ dimension: dimId, metric: metricRef, top: z.number().int().min(1).max(5) }) }),
     z.object({ ...base, type: z.literal('table'), config: z.looseObject({ dimensions: z.array(dimId).min(1).max(3), columns: z.array(tableColumn).min(1).max(14), maxRows: z.number().int().min(1).max(5000), rowFilters: z.array(metricClause).max(10).optional() }) }),
-    z.object({ ...base, type: z.literal('geo'), config: z.looseObject({ level: z.literal('country'), metric: metricRef }) }),
+    z.object({ ...base, type: z.literal('geo'), config: z.looseObject({ level: z.enum(['country', 'region', 'city']), country: z.string().regex(/^[A-Z]{2}$/).optional(), metric: metricRef }) }),
     z.object({ ...base, type: z.literal('text'), config: z.looseObject({ markdown: z.string().max(20_000), role: z.enum(['heading', 'subheading', 'body', 'note', 'callout']) }) }),
     z.object({ ...base, type: z.literal('image'), config: z.looseObject({ src: httpsUrl, alt: z.string().max(300), fit: z.enum(['contain', 'cover']), href: httpsUrl.optional() }) }),
     z.object({ ...base, type: z.literal('section'), config: z.looseObject({ title: z.string().max(200), subtitle: z.string().max(300).optional(), divider: z.boolean() }) }),
+    z.object({ ...base, type: z.literal('embed'), config: z.looseObject({ url: embedUrl, title: z.string().max(200), heightPx: z.number().int().min(EMBED_HEIGHT_MIN).max(EMBED_HEIGHT_MAX).optional(), scroll: z.boolean(), showOnPublic: z.boolean().optional() }) }),
+    z.object({ ...base, type: z.literal('realtime'), config: z.looseObject({ breakdown: z.enum(['none', 'country', 'city', 'page', 'device']), top: z.union([z.literal(3), z.literal(5), z.literal(8)]), bars: z.boolean() }) }),
     z.object({ ...base, type: z.literal('portfolio-grid'), config: z.looseObject({ metrics: z.array(metricRef).min(1).max(4), limit: z.number().int().min(1).max(500) }) }),
     // Round 9 charts (heatmap, scatter, funnel, treemap, pivot): charts/schema.ts
     ...chartWidgetSchemas({ base, metricRef, dimId }),
@@ -222,6 +227,7 @@ export function validateDoc(doc: unknown): ValidationResult<DashboardDocV2> {
     if (viewProblem) return { ok: false, error: viewProblem };
     const images = Object.values(d.widgets).filter((w) => w.type === 'image').length;
     if (images > 20) return { ok: false, error: 'At most 20 images per dashboard' };
+    if (Object.values(d.widgets).filter((w) => w.type === 'embed').length > EMBED_MAX_PER_DASHBOARD) return { ok: false, error: `At most ${EMBED_MAX_PER_DASHBOARD} web embeds per dashboard` };
     return { ok: true, value: d };
 }
 
