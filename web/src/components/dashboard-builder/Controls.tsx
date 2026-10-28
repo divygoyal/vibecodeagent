@@ -82,7 +82,7 @@ export function DateControl({ range, compare, onChange, canChange = true, canCom
                         <ChevronDown aria-hidden size={14} />
                     </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-80 p-1" aria-label="Date range">
+                <PopoverContent align="end" className="w-80 max-h-[var(--radix-popover-content-available-height)] overflow-y-auto p-1" aria-label="Date range">
                     <div role="listbox" aria-label="Presets" className="max-h-56 overflow-y-auto">
                         {MENU_PRESETS.map((id) => {
                             const active = range.kind === 'preset' && range.id === id;
