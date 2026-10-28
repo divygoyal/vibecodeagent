@@ -12,11 +12,12 @@ import { Button, Checkbox } from '@/components/ui';
 import { metricFamilies, metricLabel } from '@/lib/builder/catalog';
 import { followsMetricControl } from '@/lib/builder/compile';
 import { widgetMeta } from '@/lib/builder/registry';
-import type { ControlDef, ControlScope, DashboardDocV2, GrainControl, MetricControl, MetricRef, SiteControl } from '@/lib/builder/types';
+import { SEARCH_TYPES, searchTypeEligible } from '@/lib/builder/searchType';
+import type { ControlDef, ControlScope, DashboardDocV2, GrainControl, MetricControl, MetricRef, SearchTypeControl, SiteControl } from '@/lib/builder/types';
 import { useEditorStore } from '@/stores/dashboardEditorStore';
 import { Choice, Field, MetricList, MetricPicker, TextInput, Toggle, type SiteOption } from './Fields';
 
-type SwitchControl = SiteControl | MetricControl | GrainControl;
+type SwitchControl = SiteControl | MetricControl | GrainControl | SearchTypeControl;
 
 function useControlEdit<C extends SwitchControl>(control: C) {
     const apply = useEditorStore((s) => s.apply);
@@ -28,9 +29,9 @@ function useControlEdit<C extends SwitchControl>(control: C) {
         // Drop the editor's current pick for it too.
         const st = useEditorStore.getState();
         if (st.controls) {
-            const { site, metric, grain } = st.controls;
+            const { site, metric, grain, searchType } = st.controls;
             const drop = <T,>(r?: Record<string, T>) => (r && control.id in r ? Object.fromEntries(Object.entries(r).filter(([k]) => k !== control.id)) : r);
-            st.setControls({ ...st.controls, site: drop(site), metric: drop(metric), grain: drop(grain) });
+            st.setControls({ ...st.controls, site: drop(site), metric: drop(metric), grain: drop(grain), searchType: drop(searchType) });
         }
         selectControl(null);
     };
@@ -171,6 +172,33 @@ export function GrainControlProps({ control, doc }: { control: GrainControl; doc
     );
 }
 
+// ── Search type ──────────────────────────────────────────────────────────
+
+export function SearchTypeControlProps({ control, doc }: { control: SearchTypeControl; doc: DashboardDocV2 }) {
+    const { set, remove } = useControlEdit(control);
+    const following = scopedWidgets(doc, control).filter((x) => searchTypeEligible(x.w)).length;
+    const toggle = (t: SearchTypeControl['default'], on: boolean) => {
+        const next = SEARCH_TYPES.map((x) => x.id).filter((v) => (v === t ? on : control.options.includes(v)));
+        if (next.length < 2) return;
+        set({ options: next, ...(next.includes(control.default) ? {} : { default: next[0] }) });
+    };
+    return (
+        <Shell title="Search type" onRemove={remove}>
+            <Field label="Label"><TextInput value={control.label} onChange={(v) => set({ label: v.slice(0, 60) }, 'label')} /></Field>
+            <Field label="Viewers can pick" hint="At least two.">
+                <div className="space-y-1" role="group" aria-label="Search types">
+                    {SEARCH_TYPES.map((t) => <Checkbox key={t.id} checked={control.options.includes(t.id)} onCheckedChange={(c) => toggle(t.id, c)} label={t.label} />)}
+                </div>
+            </Field>
+            <Field label="Starts on" hint="Web search leaves each widget on its own search type until a viewer picks one.">
+                <Choice ariaLabel="Starts on" value={control.default} onChange={(v) => set({ default: v })} options={SEARCH_TYPES.filter((t) => control.options.includes(t.id)).map((t) => ({ value: t.id, label: t.label }))} />
+            </Field>
+            <ScopeField scope={control.scope} doc={doc} onChange={(scope) => set({ scope })} />
+            <p className="text-meta text-fg-muted">{following} widget{following === 1 ? '' : 's'} read only Search Console and follow this control. Widgets that also show Analytics numbers stay as they are. Discover and Google News have no search queries and no position: a widget that needs them says so.</p>
+        </Shell>
+    );
+}
+
 // ── New controls ─────────────────────────────────────────────────────────
 
 const rid = () => Math.random().toString(36).slice(2, 6);
@@ -193,4 +221,8 @@ export function newMetricControl(doc: DashboardDocV2): MetricControl {
 
 export function newGrainControl(): GrainControl {
     return { id: `g_grain_${rid()}`, type: 'grain', label: 'Group by', options: ['auto', 'day', 'week', 'month'], default: 'auto', scope: { mode: 'all' } };
+}
+
+export function newSearchTypeControl(): SearchTypeControl {
+    return { id: `t_search_${rid()}`, type: 'searchType', label: 'Search type', options: ['web', 'image', 'video', 'news', 'discover'], default: 'web', scope: { mode: 'all' } };
 }

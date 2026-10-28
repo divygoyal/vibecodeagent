@@ -16,6 +16,7 @@ import { useTvScreen } from '../TvMode';
 import { sortRows } from '@/components/ui/tableSort';
 import { flagNotes, okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { dimText } from './Charts';
+import { DRILL_CRUMBS_PX } from './DrillCrumbs';
 import { dsFormat, dsKey, metricBetter } from './metricUi';
 
 type Row = Record<string, CellValue>;
@@ -92,10 +93,10 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
     const phone = props.bp === 'sm';
     const pageSize = phone
         ? 5
-        : Math.max(3, Math.min(c.pageSize, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (flagNotes(ok, widget).length ? 26 : 0) - 36 - 48) / 36)));
+        : Math.max(3, Math.min(c.pageSize, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (flagNotes(ok, widget).length ? 26 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - 36 - 48) / 36)));
     // TV: no pager, just the top rows that fit the card (round 4).
     const tv = Boolean(useTvScreen());
-    const tvRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - 36 - 18) / 36));
+    const tvRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - 36 - 18) / 36));
     const canOpen = hidden > 0 && Boolean(frame?.rows.length) && !tv;
     const sortRef = c.columns.find((col) => col.id === c.sort.by && col.kind === 'metric')?.ref;
     const changeOrder = c.sortByChange && !c.changeOnly && sortRef && props.compare !== 'none' && frame?.rows.length
@@ -244,7 +245,7 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                     return (
                         <span className="flex min-w-0 items-center gap-1">
                             {pick ? (
-                                <button type="button" onClick={() => pick(raw)} title={sub ? `Filter the page by ${text} (${sub})` : `Filter the page by ${text}`} className={cn('truncate text-left hover:text-brand-text hover:underline', props.selectedValue === raw && 'font-semibold text-brand-text')}>{text}{subEl}</button>
+                                <button type="button" onClick={() => pick(raw)} title={props.drill?.canDown ? `Drill into ${text}` : sub ? `Filter the page by ${text} (${sub})` : `Filter the page by ${text}`} className={cn('truncate text-left hover:text-brand-text hover:underline', props.selectedValue === raw && 'font-semibold text-brand-text')}>{text}{subEl}</button>
                             ) : <span className="truncate" title={sub ? `${text} · ${sub}` : text}>{text}{subEl}</span>}
                             {href && props.mode !== 'edit' ? <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${text}`} className="shrink-0 text-fg-muted hover:text-fg"><ExternalLink aria-hidden size={12} /></a> : null}
                         </span>
