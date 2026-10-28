@@ -103,16 +103,18 @@ export function ScatterView(props: WidgetViewProps<ScatterWidget>) {
             const rx: LabelRect = { x: left ? mx - 4 - wx : mx + 4, y: plot.y0 + 1, w: wx, h: 12 };
             reserved.push(rx);
             medians.push({ text: tx, x: left ? mx - 4 : mx + 4, y: rx.y + 9, anchor: left ? 'end' : 'start' });
-            const above = my - 15 >= plot.y0;
-            const ry = above ? my - 15 : my + 3;
-            let ryRect: LabelRect = { x: plot.x0 + 4, y: ry, w: wy, h: 12 };
-            let anchor: 'start' | 'end' = 'start';
-            if (ryRect.x < rx.x + rx.w + 2 && rx.x < ryRect.x + wy + 2 && ryRect.y < rx.y + rx.h + 2 && rx.y < ryRect.y + 12 + 2) {
-                ryRect = { x: plot.x1 - 4 - wy, y: ry, w: wy, h: 12 };
-                anchor = 'end';
+            // The y median goes above its line at the left end; when that spot is taken (by the x median label or a point) it tries the
+            // right end, then below the line, and keeps the spot that covers the fewest points.
+            const spots: Array<{ rect: LabelRect; anchor: 'start' | 'end' }> = [];
+            for (const y of [my - 15, my + 3]) {
+                if (y < plot.y0 || y + 12 > plot.y1) continue;
+                spots.push({ rect: { x: plot.x0 + 4, y, w: wy, h: 12 }, anchor: 'start' }, { rect: { x: plot.x1 - 4 - wy, y, w: wy, h: 12 }, anchor: 'end' });
             }
-            reserved.push(ryRect);
-            medians.push({ text: ty, x: anchor === 'start' ? ryRect.x : ryRect.x + wy, y: ry + 9, anchor });
+            const clash = (r: LabelRect) => dots.filter((d) => d.cx + d.r > r.x && d.cx - d.r < r.x + r.w && d.cy + d.r > r.y && d.cy - d.r < r.y + r.h).length;
+            const free = spots.filter((sp) => !(sp.rect.x < rx.x + rx.w + 2 && rx.x < sp.rect.x + wy + 2 && sp.rect.y < rx.y + rx.h + 2 && rx.y < sp.rect.y + 14));
+            const pick = [...(free.length ? free : spots)].sort((p, q) => clash(p.rect) - clash(q.rect))[0] ?? { rect: { x: plot.x0 + 4, y: my - 15, w: wy, h: 12 }, anchor: 'start' as const };
+            reserved.push(pick.rect);
+            medians.push({ text: ty, x: pick.anchor === 'start' ? pick.rect.x : pick.rect.x + wy, y: pick.rect.y + 9, anchor: pick.anchor });
         }
         const count = c.labels ? NAMED_MORE : NAMED_DEFAULT;
         const items = view.ranked.slice(0, count).map((p) => ({ ...dotOf.get(p.key)!, text: text(p) }));
