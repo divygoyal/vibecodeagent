@@ -9,6 +9,8 @@ import { authOptions } from '@/lib/auth';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
 import { accessForAsset, listLinkedGoogleConnections } from '@/lib/googleAccounts';
 import { clientKey as requestClientKey } from '@/lib/clientIp';
+import type { ControlDef, ControlState, SiteControl } from '../types';
+import type { ResolvedSite, SiteDirectory } from './sources';
 
 export async function sessionUserId(): Promise<string | null> {
     const session = (await getServerSession(authOptions)) as { user?: { id?: string } } | null;
@@ -105,4 +107,64 @@ export function clientIp(req: Request): string {
 /** Hash of token + IP, sent to the admin for its own password rate limit (no raw IPs stored). */
 export function clientKey(req: Request, token: string): string {
     return createHash('sha256').update(`${token}|${clientIp(req)}`).digest('hex').slice(0, 24);
+}
+
+// ── site switcher (round 7) ──────────────────────────────────────────────
+//
+// Every request that carries a site pick is checked here against the dashboard OWNER's own site directory
+// (their Google inventory), never against anything the client sends: a pick outside the control's allowed
+// list, or a site the owner cannot read (another user's site), is dropped and the widget falls back to the
+// dashboard's default site. Public share links and embeds never see site ids: each allowed site gets an
+// opaque key (HMAC of the share token and the site id) that only this server can map back.
+
+/** Sites a site control offers, in the owner's directory order ('all' = every site the owner can read). */
+export function allowedSites(control: SiteControl, dir: Pick<SiteDirectory, 'sites'>): ResolvedSite[] {
+    if (control.options === 'all') return dir.sites;
+    const want = new Set(Array.isArray(control.options) ? control.options : []);
+    return dir.sites.filter((s) => want.has(s.siteId));
+}
+
+/** Opaque key of one site option on one share link (stable while the token and site exist). */
+export function siteOptionKey(shareToken: string, controlId: string, siteId: string): string {
+    return createHmac('sha256', secret()).update(`dash-site|${shareToken}|${controlId}|${siteId}`).digest('base64url').slice(0, 12);
+}
+
+/** Public options of a site control: opaque key + label. Empty unless the owner lets share viewers switch. */
+export function publicSiteChoices(control: SiteControl, dir: Pick<SiteDirectory, 'sites'> | null, shareToken: string): Array<{ key: string; label: string; siteId: string }> {
+    if (!control.viewerCanChange || !dir) return [];
+    return allowedSites(control, dir).slice(0, 500).map((s) => ({ key: siteOptionKey(shareToken, control.id, s.siteId), label: s.label, siteId: s.siteId }));
+}
+
+/**
+ * Owner requests (saved and inline editor queries): keep only picks of existing site controls that are in
+ * the control's list and in the owner's own directory. Returns the cleaned state (no `site` when empty).
+ */
+export function checkSitePicks(controlDefs: ControlDef[], controls: ControlState, dir: Pick<SiteDirectory, 'sites' | 'byId'> | null): ControlState {
+    if (!controls.site || !Object.keys(controls.site).length) return controls;
+    const site: Record<string, string> = {};
+    for (const c of controlDefs) {
+        if (c.type !== 'site') continue;
+        const pick = controls.site[c.id];
+        if (typeof pick !== 'string' || !pick || !dir?.byId.has(pick)) continue;
+        if (allowedSites(c, dir).some((s) => s.siteId === pick)) site[c.id] = pick;
+    }
+    const { site: _drop, ...rest } = controls;
+    void _drop;
+    return Object.keys(site).length ? { ...rest, site } : rest;
+}
+
+/**
+ * Public requests: `picks` holds opaque keys from the URL (s.<controlId>). Each key maps to a site id only
+ * when the control lets viewers switch and the key belongs to one of its allowed sites on this share.
+ */
+export function sitePicksFromKeys(controlDefs: ControlDef[], picks: Record<string, string>, dir: Pick<SiteDirectory, 'sites'> | null, shareToken: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const c of controlDefs) {
+        if (c.type !== 'site' || !c.viewerCanChange) continue;
+        const key = picks[c.id];
+        if (typeof key !== 'string' || !/^[A-Za-z0-9_-]{12}$/.test(key)) continue;
+        const hit = publicSiteChoices(c, dir, shareToken).find((o) => o.key === key);
+        if (hit) out[c.id] = hit.siteId;
+    }
+    return out;
 }

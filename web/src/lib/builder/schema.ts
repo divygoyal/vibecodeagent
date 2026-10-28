@@ -39,6 +39,8 @@ const scope = z.union([
     z.object({ mode: z.literal('widgets'), widgetIds: z.array(id).max(200) }),
 ]);
 
+const grainValue = z.enum(['auto', 'day', 'week', 'month']);
+
 const filterOp = z.enum(['eq', 'neq', 'in', 'not_in', 'contains', 'not_contains', 'starts', 'ends', 'regex', 'not_regex']);
 const filterClause = z.object({ dimension: dimId, op: filterOp, value: z.union([z.string().max(500), z.array(z.string().max(500)).max(100)]) });
 const metricClause = z.object({ metric: metricId, op: z.enum(['gt', 'gte', 'lt', 'lte', 'between']), value: z.union([z.number(), z.tuple([z.number(), z.number()])]) });
@@ -46,8 +48,10 @@ const metricClause = z.object({ metric: metricId, op: z.enum(['gt', 'gte', 'lt',
 const controlSchema = z.union([
     z.object({ id: z.literal('date'), type: z.literal('date'), default: dateRangeSchema, defaultCompare: compareSchema, presets: z.array(z.enum(presetIds)).max(20).optional(), viewerCanChange: z.boolean(), viewerCanCompare: z.boolean() }),
     z.object({ id, type: z.literal('filter'), label: shortText, dimension: dimId, ui: z.enum(['multiselect', 'select', 'chips', 'search']), default: z.array(z.string().max(500)).max(100).optional(), source: sourceRefSchema.optional(), scope, viewerCanChange: z.boolean() }),
-    z.object({ id, type: z.literal('site'), label: shortText, options: z.union([z.literal('all'), z.array(z.string().max(253)).max(500)]), default: z.string().max(253), scope }),
+    // Round 7 viewer switchers. A site control's `choices` (public docs only) is not listed, so it never saves.
+    z.object({ id, type: z.literal('site'), label: shortText, options: z.union([z.literal('all'), z.array(z.string().max(253)).max(500)]), default: z.string().max(253), scope, viewerCanChange: z.boolean().optional() }),
     z.object({ id, type: z.literal('metric'), label: shortText, options: z.array(metricId).max(30), default: metricId, scope }),
+    z.object({ id, type: z.literal('grain'), label: shortText, options: z.array(grainValue).min(1).max(4), default: grainValue, scope }),
     z.object({ id: z.string().min(1).max(32).regex(/^[a-z0-9_]+$/), type: z.literal('variable'), label: z.string().min(1).max(60), kind: z.enum(['text', 'regex', 'number']), default: z.string().max(300), viewerCanChange: z.boolean() }),
 ]);
 
@@ -144,8 +148,9 @@ export const controlStateSchema = z.object({
     date: z.object({ range: dateRangeSchema, compare: compareSchema }),
     filters: z.record(z.string(), z.array(z.string().max(500)).max(100)).default({}),
     interaction: z.array(filterClause).max(10).optional(),
-    site: z.record(z.string(), z.string()).optional(),
-    metric: z.record(z.string(), metricId).optional(),
+    site: z.record(z.string().max(64), z.string().max(253)).optional(),
+    metric: z.record(z.string().max(64), metricId).optional(),
+    grain: z.record(z.string().max(64), grainValue).optional(),
     pageId: z.string().max(64).optional(),
 });
 

@@ -3,16 +3,22 @@
  * client can derive a stable SWR key from the same function the server uses to plan Google
  * calls. Dates stay relative here; the server resolves them.
  */
-import { getMetric } from './catalog';
+import { getMetric, metricLabel } from './catalog';
 import { clickDimension } from './interaction';
 import { widgetMetrics } from './registry';
 import { substituteFilters, variableValues } from './variables';
 import type {
     ControlDef,
+    ControlScope,
     ControlState,
     FilterClause,
-    FilterControl,
+    Grain,
+    GrainControl,
+    MetricControl,
+    MetricId,
+    MetricRef,
     PageId,
+    SiteControl,
     SourceRef,
     WidgetDef,
     WidgetQuery,
@@ -31,7 +37,7 @@ export interface CompiledWidget {
     filterOrigins: Array<{ clause: FilterClause; controlId?: string }>;
 }
 
-function inScope(control: FilterControl, widget: WidgetDef, pageId?: PageId): boolean {
+function inScope(control: { scope?: ControlScope }, widget: WidgetDef, pageId?: PageId): boolean {
     const s = control.scope;
     if (!s || s.mode === 'all') return true;
     if (s.mode === 'pages') return pageId ? s.pageIds.includes(pageId) : false;
@@ -62,9 +68,161 @@ export function widgetFilters(widget: WidgetDef, ctx: CompileCtx): Array<{ claus
     return out;
 }
 
+// ── Viewer switchers (round 7): site, metric, Day / Week / Month ─────────────
+
+/** Controls of one type that apply to a widget (scope, and not ignored by the widget). */
+function controlsFor<T extends ControlDef['type']>(type: T, widget: WidgetDef, ctx: CompileCtx): Array<Extract<ControlDef, { type: T }>> {
+    const ignore = new Set(widget.ignoreControls ?? []);
+    return ctx.controlDefs.filter((c): c is Extract<ControlDef, { type: T }> => c.type === type && !ignore.has(c.id) && inScope(c as { scope?: ControlScope }, widget, ctx.pageId));
+}
+
+/**
+ * The site a site control points at: the viewer's pick when the control allows it, else the control's
+ * default; undefined = the dashboard's default site. Only an explicit list is checked here; for
+ * options 'all' (and always, on the server) the owner's site directory decides (server/access.ts).
+ */
+export function selectedSite(control: SiteControl, controls: ControlState): string | undefined {
+    const pick = controls.site?.[control.id];
+    const ok = (v: string | undefined): v is string => typeof v === 'string' && v.length > 0 && v.length <= 253 && (control.options === 'all' || (Array.isArray(control.options) && control.options.includes(v)));
+    if (ok(pick)) return pick;
+    return ok(control.default) ? control.default : undefined;
+}
+
+/** The metric a metric control shows: the viewer's pick when it is one of the options, else the default. */
+export function selectedMetric(control: MetricControl, controls: ControlState): MetricId {
+    const pick = controls.metric?.[control.id];
+    return pick && pick !== control.default && Array.isArray(control.options) && control.options.includes(pick) && getMetric(pick) ? pick : control.default;
+}
+
+/** The granularity a Day / Week / Month control asks for ('auto' = each chart keeps its own). */
+export function selectedGrain(control: GrainControl, controls: ControlState): 'auto' | Grain {
+    const pick = controls.grain?.[control.id];
+    const options = Array.isArray(control.options) ? control.options : [];
+    if (pick && options.includes(pick)) return pick;
+    return control.default === 'day' || control.default === 'week' || control.default === 'month' ? control.default : 'auto';
+}
+
+/** Metric ids a widget shows (for "which widgets follow this metric control"). */
+export function widgetMetricIds(widget: WidgetDef): MetricId[] {
+    switch (widget.type) {
+        case 'scorecard': return [widget.config.metric.id];
+        case 'kpi-strip': return widget.config.metrics.map((m) => m.id);
+        case 'timeseries': return widget.config.series.map((s) => s.metric.id);
+        case 'bar': return widget.config.metrics.map((m) => m.id);
+        case 'pie': return [widget.config.metric.id];
+        case 'geo': return [widget.config.metric.id];
+        case 'table': return widget.config.columns.filter((c) => c.kind === 'metric').map((c) => c.ref);
+        case 'portfolio-grid': return widget.config.metrics.map((m) => m.id);
+        default: return [];
+    }
+}
+
+/** True when a metric control changes this widget (in scope and the widget shows the control's default metric). */
+export function followsMetricControl(control: MetricControl, widget: WidgetDef, ctx: Pick<CompileCtx, 'controlDefs' | 'pageId'>): boolean {
+    if ((widget.ignoreControls ?? []).includes(control.id) || !inScope(control, widget, ctx.pageId)) return false;
+    return widgetMetricIds(widget).includes(control.default);
+}
+
+const escapeRe = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** "Clicks over time" -> "Impressions over time" when the title names the metric that was swapped. */
+function retitle(title: string | undefined, from: MetricId, to: MetricId): string | undefined {
+    if (!title) return title;
+    const a = metricLabel(from);
+    const b = metricLabel(to);
+    const re = new RegExp(`\\b${escapeRe(a)}\\b`, 'gi');
+    return title.replace(re, (m) => (m[0] === m[0].toLowerCase() ? b.charAt(0).toLowerCase() + b.slice(1) : b));
+}
+
+function swapRefs(refs: MetricRef[], from: MetricId, to: MetricId): MetricRef[] {
+    const out: MetricRef[] = [];
+    for (const r of refs) {
+        const next = r.id === from ? { id: to } : r;
+        if (!out.some((o) => o.id === next.id)) out.push(next);
+    }
+    return out;
+}
+
+/** One metric swapped in a widget's config (labels and formats of the old metric are dropped). */
+function swapMetric(widget: WidgetDef, from: MetricId, to: MetricId): WidgetDef {
+    const sortRef = (by: string) => (by === from ? to : by);
+    const base = { ...widget, title: retitle(widget.title, from, to) } as WidgetDef;
+    switch (base.type) {
+        case 'scorecard': {
+            if (base.config.metric.id !== from) return widget;
+            // A target belongs to the metric it was set for.
+            const { target: _t, ...rest } = base.config;
+            void _t;
+            return { ...base, config: { ...rest, metric: { id: to } } };
+        }
+        case 'kpi-strip': return { ...base, config: { ...base.config, metrics: swapRefs(base.config.metrics, from, to) } };
+        case 'timeseries': {
+            const series: typeof base.config.series = [];
+            for (const sd of base.config.series) {
+                const next = sd.metric.id === from ? { ...sd, metric: { id: to } } : sd;
+                if (!series.some((x) => x.metric.id === next.metric.id)) series.push(next);
+            }
+            return { ...base, config: { ...base.config, series } };
+        }
+        case 'bar': return { ...base, config: { ...base.config, metrics: swapRefs(base.config.metrics, from, to), sort: { ...base.config.sort, by: sortRef(base.config.sort.by) } } };
+        case 'pie': return base.config.metric.id === from ? { ...base, config: { ...base.config, metric: { id: to } } } : widget;
+        case 'geo': return base.config.metric.id === from ? { ...base, config: { ...base.config, metric: { id: to } } } : widget;
+        case 'portfolio-grid': return { ...base, config: { ...base.config, metrics: swapRefs(base.config.metrics, from, to), sort: { ...base.config.sort, by: sortRef(base.config.sort.by) as typeof base.config.sort.by } } };
+        case 'table': {
+            const c = base.config;
+            const has = c.columns.some((col) => col.kind === 'metric' && col.ref === to);
+            const swapped = new Set<string>();
+            const columns = c.columns.flatMap((col) => {
+                if (col.kind !== 'metric' || col.ref !== from) return [col];
+                swapped.add(col.id);
+                return has ? [] : [{ ...col, ref: to, label: undefined, format: undefined }];
+            });
+            const sortBy = c.sort.by === from ? to : c.sort.by === `m:${from}` ? `m:${to}` : c.sort.by;
+            return {
+                ...base,
+                config: {
+                    ...c,
+                    columns,
+                    sort: { ...c.sort, by: sortBy },
+                    // Thresholds were set for the old metric.
+                    ...(c.rules ? { rules: c.rules.filter((r) => !swapped.has(r.column)) } : {}),
+                    ...(c.rowFilters ? { rowFilters: c.rowFilters.filter((f) => f.metric !== from) } : {}),
+                },
+            };
+        }
+        default: return widget;
+    }
+}
+
+/**
+ * A widget as the viewer's switchers show it: a widget on the dashboard's default site reads the site
+ * control's pick, metrics follow metric controls and time series follow a Day / Week / Month control.
+ * Pure and idempotent; the server applies it before planning Google calls and the client before
+ * rendering, so both read the same columns. `site: false` keeps the source (rendering only).
+ */
+export function applyViewerControls(widget: WidgetDef, ctx: CompileCtx, opts: { site?: boolean } = {}): WidgetDef {
+    let w = widget;
+    if (opts.site !== false && (!w.source || w.source.type === 'default')) {
+        const sc = controlsFor('site', w, ctx)[0];
+        const siteId = sc ? selectedSite(sc, ctx.controls) : undefined;
+        if (siteId) w = { ...w, source: { type: 'site', siteId } } as WidgetDef;
+    }
+    for (const mc of controlsFor('metric', w, ctx)) {
+        const to = selectedMetric(mc, ctx.controls);
+        if (to !== mc.default && widgetMetricIds(w).includes(mc.default)) w = swapMetric(w, mc.default, to);
+    }
+    if (w.type === 'timeseries') {
+        const gc = controlsFor('grain', w, ctx)[0];
+        const g = gc ? selectedGrain(gc, ctx.controls) : 'auto';
+        if (g !== 'auto' && w.config.granularity !== g) w = { ...w, config: { ...w.config, granularity: g } };
+    }
+    return w;
+}
+
 const timeDim = (g: 'day' | 'week' | 'month'): string => (g === 'day' ? 'date' : g);
 
-export function compileWidget(widget: WidgetDef, ctx: CompileCtx): CompiledWidget {
+export function compileWidget(rawWidget: WidgetDef, ctx: CompileCtx): CompiledWidget {
+    const widget = applyViewerControls(rawWidget, ctx);
     const filterOrigins = widgetFilters(widget, ctx);
     const filters = filterOrigins.map((f) => f.clause);
     const source: SourceRef = widget.source ?? { type: 'default' };

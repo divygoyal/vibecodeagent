@@ -12,7 +12,7 @@ import { runGABatch, runGSCSearchAnalytics } from '@/lib/googleApi';
 import { GoogleBreakerOpenError, reportGoogleOutcome, withGoogleSlot } from '@/lib/googleLimiter';
 import { normalizeHost } from '@/lib/sites/pairing';
 import { dimInFamily, getDim, getMetric, type Family, type MetricDef } from '../catalog';
-import { canonicalJson, compileWidget } from '../compile';
+import { applyViewerControls, canonicalJson, compileWidget } from '../compile';
 import { alpha2ToGsc, gscToAlpha2 } from '../countries';
 import { addDays, autoGranularity, eachDay, fromDay, monthStart, resolveCompare, resolveRange, todayIn, weekStart } from '../dates';
 import { widgetMeta } from '../registry';
@@ -597,7 +597,9 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
 
     // 1. Plan
     const plans: WidgetPlan[] = [];
-    for (const { widget, pageId } of dataWidgets) {
+    for (const { widget: rawWidget, pageId } of dataWidgets) {
+        // Round 7 viewer switchers (site, metric, Day / Week / Month): plan the widget as the viewer sees it.
+        const widget = applyViewerControls(rawWidget, { controlDefs: input.controlDefs, controls: input.controls, pageId });
         const plan: WidgetPlan = { widget, queries: [], flags: {}, sourceLabel: '' };
         plans.push(plan);
         const range = widget.dateOverride?.range ? resolveRange(widget.dateOverride.range, today) : baseRange;

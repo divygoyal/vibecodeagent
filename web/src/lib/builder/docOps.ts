@@ -13,7 +13,9 @@ export function resetSources(doc: DashboardDocV2, defaultSource: DashboardDocV2[
     for (const [id, w] of Object.entries(doc.widgets)) {
         widgets[id] = { ...w, source: w.type === 'portfolio-grid' ? { type: 'portfolio', include: 'all' } : { type: 'default' } } as WidgetDef;
     }
-    const controls = doc.controls.map((c) => (c.type === 'filter' && c.source ? { ...c, source: undefined } : c));
+    // Site switchers (round 7) list the old owner's site ids: a copy starts on "all my sites", owner-only.
+    const controls = doc.controls.map((c) => (c.type === 'filter' && c.source ? { ...c, source: undefined }
+        : c.type === 'site' ? { id: c.id, type: 'site' as const, label: c.label, options: 'all' as const, default: '', scope: c.scope, viewerCanChange: false } : c));
     return { ...doc, defaultSource, widgets, controls, meta: { createdFrom: doc.meta.createdFrom } };
 }
 

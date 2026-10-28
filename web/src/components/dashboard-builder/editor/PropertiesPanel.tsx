@@ -19,6 +19,7 @@ import { useResolvedTheme } from '@/lib/theme';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { Choice, DimensionPicker, Field, MetricList, MetricPicker, NumberInput, SourcePicker, TextInput, Toggle, type SiteOption } from './Fields';
 import { RulesEditor } from './RulesEditor';
+import { GrainControlProps, MetricControlProps, SiteControlProps } from './SwitchControlProps';
 import { VariablesEditor } from './VariablesEditor';
 import { WidgetFilters } from './WidgetFilters';
 
@@ -59,7 +60,10 @@ export function PropertiesPanel({ doc, sites, defaultLabel }: { doc: DashboardDo
         <aside aria-label="Properties" className="flex h-full w-[300px] shrink-0 flex-col border-l border-border-subtle bg-surface">
             {widget ? <WidgetProps key={widget.id} widget={widget} doc={doc} sites={sites} defaultLabel={defaultLabel} />
                 : control && control.type === 'filter' ? <ControlProps key={control.id} control={control} doc={doc} />
-                    : <DashboardSettings doc={doc} sites={sites} />}
+                    : control && control.type === 'site' ? <SiteControlProps key={control.id} control={control} doc={doc} sites={sites} defaultLabel={defaultLabel} />
+                        : control && control.type === 'metric' ? <MetricControlProps key={control.id} control={control} doc={doc} />
+                            : control && control.type === 'grain' ? <GrainControlProps key={control.id} control={control} doc={doc} />
+                                : <DashboardSettings doc={doc} sites={sites} />}
         </aside>
     );
 }

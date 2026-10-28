@@ -13,13 +13,14 @@ import { cn } from '@/lib/cn';
 import { EmptyState } from '@/components/ui';
 import { fmtDateRange } from '@/lib/format';
 import { compareFromParam, compareToParam, rangeFromParam, rangeToParam } from '@/lib/builder/dates';
-import { dateControlOf, defaultControlState } from '@/lib/builder/publicDoc';
+import { dateControlOf, defaultControlState, viewerSwitchesFromQuery } from '@/lib/builder/publicDoc';
+import { applyViewerControls, selectedSite } from '@/lib/builder/compile';
 import { isDefaultLook, type Mode } from '@/lib/builder/themes';
 import { clickDimension, clickableDims, interactionFromParam, toggleInteraction } from '@/lib/builder/interaction';
 import { variableControls, variableValues } from '@/lib/builder/variables';
-import type { ControlState, DashboardDocV2, DashboardQueryResponse, FilterControl, ResolvedDates, WidgetDef } from '@/lib/builder/types';
+import type { ControlState, DashboardDocV2, DashboardQueryResponse, FilterControl, ResolvedDates, SiteControl, WidgetDef } from '@/lib/builder/types';
 import { DashboardCanvas, bpForWidth, type Bp } from './DashboardCanvas';
-import { ControlsBar, DateControl, PageTabs, type OptionsSource } from './Controls';
+import { ControlsBar, DateControl, PageTabs, switchSummary, ViewerSwitches, type OptionsSource, type ViewerSwitchHandlers } from './Controls';
 import { DashboardCover } from './DashboardCover';
 import { InteractionChips, interactionToParam, VariableInput } from './Interactions';
 import { dashRootProps } from './theme/DashTheme';
@@ -57,11 +58,14 @@ export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> &
         const visible = doc.pages.filter((p) => !p.hidden);
         // Click to filter (round 2): only dimensions of widgets that allow it.
         const interaction = allow.filters && doc.widgets && sp.get('x') ? interactionFromParam(sp.get('x'), clickableDims({ widgets: doc.widgets })) : [];
+        // Round 7 switchers: m.<id> / g.<id> must be an option; s.<id> passes as is (the server checks it).
+        const switches = viewerSwitchesFromQuery(sp, doc, (picks) => picks);
         return {
             date: { range: range ?? base.date.range, compare: compare ?? base.date.compare },
             filters,
             pageId: page && visible.some((p) => p.id === page) ? page : visible[0]?.id,
             ...(interaction.length ? { interaction } : {}),
+            ...switches,
         };
     }, [sp, doc, allow.date, allow.compare, allow.filters]);
 
@@ -85,6 +89,10 @@ export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> &
         setVariable: (id: string, value: string | null) => set({ [`f.${id}`]: value }),
         /** Click-to-filter selections (round 2). */
         setInteraction: (clauses: import('@/lib/builder/types').FilterClause[]) => set({ x: interactionToParam(clauses) }),
+        /** Viewer switchers (round 7); null = back to the control's default. Never saved to the dashboard. */
+        setSite: (id: string, value: string | null) => set({ [`s.${id}`]: value }),
+        setMetric: (id: string, value: string | null) => set({ [`m.${id}`]: value }),
+        setGrain: (id: string, value: string | null) => set({ [`g.${id}`]: value }),
         query: sp,
     };
 }
@@ -96,6 +104,23 @@ export function textVars(siteLabel: string, resolved: ResolvedDates | undefined,
         date_range: resolved ? fmtDateRange(resolved.range.start, resolved.range.end) : '',
         compare_range: resolved?.compare ? `compared with ${fmtDateRange(resolved.compare.start, resolved.compare.end)}` : 'no comparison',
     };
+}
+
+/** Label of the site a site control currently shows (undefined = the dashboard's default site). */
+export function pickedSiteLabel(c: SiteControl, state: ControlState, options: Array<{ value: string; label: string }>): string | undefined {
+    // Public docs: the pick is an opaque key and the control's options are those keys.
+    const v = c.choices ? (state.site?.[c.id] && c.options.includes(state.site[c.id]) ? state.site[c.id] : c.default) : selectedSite(c, state);
+    return v ? options.find((o) => o.value === v)?.label : undefined;
+}
+
+/** Site options of a site control on a public doc (opaque keys). */
+export function publicSiteOptions(c: SiteControl): Array<{ value: string; label: string }> {
+    return (c.choices ?? []).map((o) => ({ value: o.key, label: o.label }));
+}
+
+/** "acme.com · Impressions · Weekly": the switcher picks, for the PDF header and the TV bar. */
+export function viewerSelection(doc: Pick<DashboardDocV2, 'controls'>, state: ControlState, siteOptions: ((c: SiteControl) => Array<{ value: string; label: string }>) | undefined, defaultSiteLabel: string): string {
+    return switchSummary(doc.controls, state, (c) => (siteOptions ? pickedSiteLabel(c, state, siteOptions(c)) ?? defaultSiteLabel : undefined));
 }
 
 export interface DashboardViewProps {
@@ -134,10 +159,12 @@ export interface DashboardViewProps {
     onVariable?: (id: string, value: string | null) => void;
     /** Round 2: click-to-filter selections changed. */
     onInteraction?: (clauses: import('@/lib/builder/types').FilterClause[]) => void;
+    /** Round 7: site, metric and Day / Week / Month switchers (view only, kept in the URL). */
+    switches?: ViewerSwitchHandlers;
 }
 
 export function DashboardView({
-    doc, mode, siteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv, fitHeight, onVariable, onInteraction,
+    doc, mode, siteLabel: defaultSiteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv, fitHeight, onVariable, onInteraction, switches,
 }: DashboardViewProps) {
     const [ref, width] = useElementWidth<HTMLDivElement>();
     const bp: Bp = bpForWidth(width || 1200);
@@ -147,6 +174,10 @@ export function DashboardView({
     const filters = doc.controls.filter((c): c is FilterControl => c.type === 'filter');
     const variables = variableControls(doc.controls);
     const resolved = data?.resolved;
+    // {{site}} follows the site switcher.
+    const siteCtl = doc.controls.find((c): c is SiteControl => c.type === 'site');
+    const siteLabel = (siteCtl && switches?.siteOptions ? pickedSiteLabel(siteCtl, state, switches.siteOptions(siteCtl)) : undefined) ?? defaultSiteLabel;
+    const hasSwitches = Boolean(switches) && doc.controls.some((c) => c.type === 'site' || c.type === 'metric' || c.type === 'grain');
     const pageTitle = page?.title ?? '';
     const baseVars = textVars(siteLabel, resolved, pageTitle);
     const vars = variables.length ? { ...baseVars, ...Object.fromEntries(Object.entries(variableValues(variables, state)).map(([k, v]) => [`var:${k}`, v])) } : baseVars;
@@ -171,7 +202,7 @@ export function DashboardView({
         <WidgetRenderer
             onFilterClick={dim ? (value: string) => onInteraction!(toggleInteraction(interaction ?? [], dim, value)) : undefined}
             selectedValue={dim ? (interaction ?? []).find((c) => c.dimension === dim)?.value as string | undefined : undefined}
-            widget={widget}
+            widget={hasSwitches ? applyViewerControls(widget, { controlDefs: doc.controls, controls: state, pageId: page?.id }, { site: false }) : widget}
             result={data?.results[widget.id]}
             loading={loading && !data?.results[widget.id]}
             refetching={refetching}
@@ -203,6 +234,7 @@ export function DashboardView({
                     canFilter={allow.filters}
                     compact={bp === 'sm'}
                 >
+                    {switches ? <ViewerSwitches controls={doc.controls} state={state} handlers={switches} defaultSiteLabel={defaultSiteLabel} kinds={['site']} /> : null}
                     <DateControl
                         range={state.date.range}
                         compare={state.date.compare}
@@ -212,6 +244,7 @@ export function DashboardView({
                         resolved={data?.resolved}
                         size={bp === 'sm' ? 'sm' : 'md'}
                     />
+                    {switches ? <ViewerSwitches controls={doc.controls} state={state} handlers={switches} defaultSiteLabel={defaultSiteLabel} size={bp === 'sm' ? 'sm' : 'md'} kinds={['metric', 'grain']} /> : null}
                     {editableVars.map((v) => <VariableInput key={v.id} control={v} value={variableValues([v], state)[v.id]} onChange={(val) => onVariable!(v.id, val)} />)}
                 </ControlsBar>
                 {data?.resolved && doc.theme.header.showDates ? (

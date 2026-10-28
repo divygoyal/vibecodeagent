@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { checkUnlockKey, clientIp, rateLimited, unlockKeyFrom } from '@/lib/builder/server/access';
+import { checkUnlockKey, clientIp, publicSiteChoices, rateLimited, unlockKeyFrom } from '@/lib/builder/server/access';
 import { directoryFor, jsonError, safeLabeler } from '@/lib/builder/server/service';
 import { getPublicRow, isShareToken, toRecord } from '@/lib/builder/server/store';
 import { publicDoc } from '@/lib/builder/publicDoc';
@@ -24,7 +24,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     const body: PublicDashboard = { name: rec.doc.name, requiresPassword: rec.share.hasPassword, unlocked };
     if (unlocked) {
         const dir = row.ownerIdentifier ? await directoryFor(row.ownerIdentifier) : null;
-        body.doc = publicDoc(rec.doc, safeLabeler(dir));
+        // Site switcher (round 7): only the sites the owner allowed, as opaque keys and labels.
+        body.doc = publicDoc(rec.doc, safeLabeler(dir), { siteChoices: (c) => publicSiteChoices(c, dir, token) });
         body.share = { allowCopy: rec.share.allowCopy, badge: rec.share.badge && rec.doc.theme.badge.show, viewerControls: rec.share.viewerControls };
         body.rev = rec.rev;
         if (!preview) void getPublicRow(token, true).catch(() => null); // count the view
