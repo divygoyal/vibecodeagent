@@ -25,7 +25,7 @@ export interface SitesTableProps {
 
 /** Exact value with its delta underneath (keeps the table to 8 columns). */
 function ValueDelta({ metric, value, prev, has, loading }: { metric: MetricKey; value: number | null | undefined; prev: number | null | undefined; has: boolean; loading?: boolean }) {
-    if (!has) return <span className="text-fg-faint">–</span>;
+    if (!has) return <span className="text-fg-muted">–</span>;
     if (loading) return <Skeleton className="ml-auto h-3.5 w-14" delay={0} />;
     return (
         <span className="inline-flex flex-col items-end leading-tight">

@@ -129,7 +129,7 @@ export default async function AdvertisePage({ searchParams }: { searchParams: Se
                                                             <Link href={`/leaderboard/${s.entry.slug || s.entry.id}?slot=${s.id}#offers`} className="text-fg-secondary after:absolute after:inset-0 hover:underline">{s.entry.startup_name}</Link>
                                                             {s.entry.category ? ` · ${CATEGORY_LABELS[s.entry.category] ?? s.entry.category}` : ''}
                                                         </p>
-                                                        {s.preview_note ? <p className="mt-0.5 line-clamp-1 text-meta text-fg-faint">{s.preview_note}</p> : null}
+                                                        {s.preview_note ? <p className="mt-0.5 line-clamp-1 text-meta text-fg-muted">{s.preview_note}</p> : null}
                                                     </div>
                                                 </div>
                                                 <div className="w-28 text-right">
@@ -138,7 +138,7 @@ export default async function AdvertisePage({ searchParams }: { searchParams: Se
                                                             <p className="text-body font-semibold tabular-nums text-fg">{visitors}</p>
                                                             <p className="text-meta text-fg-muted">visitors / mo {s.entry.visitor_trend !== null ? <PctDelta pct={s.entry.visitor_trend} /> : null}</p>
                                                         </>
-                                                    ) : <p className="text-meta text-fg-faint">Traffic not shared</p>}
+                                                    ) : <p className="text-meta text-fg-muted">Traffic not shared</p>}
                                                 </div>
                                                 <div className="w-32 text-right">
                                                     <p className="text-stat-sm tabular-nums text-fg">{formatCents(s.price_cents)}</p>

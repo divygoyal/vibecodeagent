@@ -207,7 +207,15 @@ export interface CannibalizedQuery {
     totalClicks: number;
     totalImpressions: number;
     bestPosition: number;
+    /**
+     * Priority, the same rule as the Actions tier (lib/actionText cannibalizationImpact): the clicks a month one clear
+     * page could add (`gain`) against the site's own monthly clicks. 'low' also for overlaps too weak to act on.
+     */
     severity: 'high' | 'medium' | 'low';
+    /** How clearly the pages split the query (structure only); 'weak' overlaps never become tasks. */
+    overlap: 'strong' | 'some' | 'weak';
+    /** Extra clicks a month (28 days) if one page ranked one place higher with the usual CTR: the Actions task's number. */
+    gain: number;
 }
 
 export interface OpportunityRow extends GscMetrics {
@@ -300,7 +308,7 @@ export interface IndexStatusResponse {
 
 // ─── Actions ──────────────────────────────────────────────────────────────
 
-export type ActionType = 'decay' | 'striking' | 'low_ctr' | 'cannibalization' | 'traffic_drop' | 'search_drop' | 'audit';
+export type ActionType = 'decay' | 'striking' | 'low_ctr' | 'cannibalization' | 'deindexed' | 'traffic_drop' | 'search_drop' | 'audit';
 export type ActionImpact = 'high' | 'medium' | 'low';
 export type ActionStatus = 'open' | 'done' | 'dismissed';
 
@@ -324,6 +332,11 @@ export interface SiteAction {
     expectedImpact: string;
     /** Sort score (estimated clicks or sessions at stake). */
     score: number;
+    /**
+     * The monthly number the task shows ("+7,681" in "+7,681 clicks a month at position 5"), null when its impact has
+     * no number. Within an impact tier tasks are listed by it (round 7, audit item 8), so the list reads in order.
+     */
+    gain: number | null;
     fix: string[];
     page: string | null;
     query: string | null;

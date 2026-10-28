@@ -25,6 +25,7 @@ export function auditActions(report: AuditReport | undefined, label: string): Si
             ],
             expectedImpact: i.severity === 'critical' ? 'Fixes a problem that can stop pages ranking' : 'Small ranking and click-through gain',
             score: i.severity === 'critical' ? 40 : 10,
+            gain: null,
             fix: i.recommendation ? [i.recommendation] : ['Open the audit for details.'],
             page: report.url,
             query: null,

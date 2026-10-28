@@ -67,7 +67,7 @@ export function Topbar() {
                         const last = i === crumbs.length - 1;
                         return (
                             <li key={`${c.label}-${i}`} className={cn('flex min-w-0 items-center gap-1.5', !last && 'max-md:hidden')}>
-                                {i > 0 ? <span aria-hidden className="text-fg-faint max-md:hidden">/</span> : null}
+                                {i > 0 ? <span aria-hidden className="text-fg-muted max-md:hidden">/</span> : null}
                                 {c.href && !last ? (
                                     <Link href={c.href} className="truncate text-fg-muted hover:text-fg">{c.label}</Link>
                                 ) : (

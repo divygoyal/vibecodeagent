@@ -260,7 +260,7 @@ export function JourneysTab() {
                                     {clipLabel(displayPage(pageRef(x.next.next, siteHost), siteHost), 56)}{' '}
                                     <span className="text-meta text-fg-muted tabular-nums">{fmtShare(x.next.share)}</span>
                                 </span>
-                            ) : <span className="text-fg-faint">–</span>),
+                            ) : <span className="text-fg-muted">–</span>),
                         }] : []),
                         { key: 'rate', header: 'Went deeper', format: 'percent', value: (x) => v(x.r, 'engagementRate'), hideOnMobile: true },
                         { key: 'conv', header: 'Key events', value: (x) => v(x.r, 'keyEvents'), hideOnMobile: true },

@@ -142,7 +142,7 @@ function Subtitle({ data, range, alerts = 0 }: { data: PortfolioResponse | undef
         <span className="inline-flex flex-wrap items-center gap-x-1.5">
             {parts.map(([p, phone], i) => (
                 <span key={i} className={cn('inline-flex items-center gap-1.5', !phone && 'max-md:hidden')}>
-                    {i > 0 ? <span aria-hidden className="text-fg-faint">·</span> : null}
+                    {i > 0 ? <span aria-hidden className="text-fg-muted">·</span> : null}
                     {p}
                 </span>
             ))}

@@ -68,7 +68,7 @@ function MetricToggles({ summary, loading, selected, onToggle }: { summary?: Gsc
                         </span>
                         {loading ? <Skeleton className="h-7 w-20" /> : !summary ? (
                             // Failed (the chart below says why and offers Try again): a dash, not a skeleton forever.
-                            <span className="text-stat text-fg-faint" aria-label="No data">–</span>
+                            <span className="text-stat text-fg-muted" aria-label="No data">–</span>
                         ) : (
                             <span className="flex flex-wrap items-baseline gap-x-2">
                                 <span className={cn('text-stat', on ? 'text-fg' : 'text-fg-muted')}>{fmtMetric(k, summary.totals[k], { compact: true, tile: true })}</span>

@@ -112,7 +112,7 @@ export function PagesPage() {
             key: 'trend', header: 'Trend', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
             cell: (r: Row) => {
                 const t = trendBy.get(r.key);
-                return t ? <TrendBars values={t} max={trendMax} color={METRICS.pageviews.color} partialLast ariaLabel={`Views trend for ${r.label}`} /> : <span className="text-meta text-fg-faint" title="Trend bars show for the top 30 pages by views">–</span>;
+                return t ? <TrendBars values={t} max={trendMax} color={METRICS.pageviews.color} partialLast ariaLabel={`Views trend for ${r.label}`} /> : <span className="text-meta text-fg-muted" title="Trend bars show for the top 30 pages by views">–</span>;
             },
         }] : []),
         ...(site.hasGa4 ? [

@@ -411,7 +411,7 @@ function SignalCard({ label, value, helper, icon }: { label: string; value: stri
         <Card padding="sm" className="min-w-0">
             <div className="mb-1 flex items-center justify-between gap-3 text-body-sm text-fg-muted">
                 <span className="truncate">{label}</span>
-                <span aria-hidden className="shrink-0 text-fg-faint">{icon}</span>
+                <span aria-hidden className="shrink-0 text-fg-muted">{icon}</span>
             </div>
             <p className="truncate text-title-sm text-fg" title={value}>{value}</p>
             <p className="mt-0.5 text-meta text-fg-muted tabular-nums">{helper}</p>
@@ -448,7 +448,7 @@ function PanelFrame<T extends string>({
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={`Open ${row.label}`}
-                    className="shrink-0 text-fg-faint opacity-0 transition-opacity duration-120 group-hover:opacity-100 hover:text-fg focus-visible:opacity-100"
+                    className="shrink-0 text-fg-muted opacity-0 transition-opacity duration-120 group-hover:opacity-100 hover:text-fg focus-visible:opacity-100"
                 >
                     <ExternalLink aria-hidden size={12} strokeWidth={1.75} />
                 </a>

@@ -45,7 +45,7 @@ export function Select<T extends string = string>({
                 className={cn(
                     'tc-control tap-area inline-flex min-w-40 items-center gap-1.5 rounded-control border border-border bg-surface px-3 text-left text-fg',
                     'transition-colors duration-120 hover:border-border-strong data-[state=open]:border-border-strong',
-                    'focus-visible:outline-2 disabled:opacity-50 data-[placeholder]:text-fg-faint',
+                    'focus-visible:outline-2 disabled:opacity-50 data-[placeholder]:text-fg-muted',
                     size === 'md' ? 'h-9 text-body' : 'h-8 text-body-sm',
                     className,
                 )}

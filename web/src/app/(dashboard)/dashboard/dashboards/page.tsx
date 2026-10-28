@@ -169,11 +169,11 @@ export default function DashboardsListPage() {
                             <Link href={`/dashboard/dashboards/${d.id}`} className="flex flex-col focus-visible:outline-offset-[-2px]">
                                 {d.look?.id ? (
                                     <DashThemeRoot theme={{ ...defaultTheme('light'), ...d.look }} mode={appMode} className="flex aspect-[16/9] items-start justify-center overflow-hidden border-b border-border-subtle p-4">
-                                        {d.preview.length ? <Thumbnail items={d.preview} className="w-full" /> : <span className="m-auto text-body-sm text-fg-faint">Empty dashboard</span>}
+                                        {d.preview.length ? <Thumbnail items={d.preview} className="w-full" /> : <span className="m-auto text-body-sm text-fg-muted">Empty dashboard</span>}
                                     </DashThemeRoot>
                                 ) : (
                                     <div className="flex aspect-[16/9] items-start justify-center overflow-hidden border-b border-border-subtle bg-surface-sunken p-4">
-                                        {d.preview.length ? <Thumbnail items={d.preview} className="w-full" /> : <span className="m-auto text-body-sm text-fg-faint">Empty dashboard</span>}
+                                        {d.preview.length ? <Thumbnail items={d.preview} className="w-full" /> : <span className="m-auto text-body-sm text-fg-muted">Empty dashboard</span>}
                                     </div>
                                 )}
                                 <div className="flex flex-col gap-1 p-4 pb-3">
@@ -184,7 +184,7 @@ export default function DashboardsListPage() {
                             <div className="mt-auto flex items-center gap-2 px-4 pb-4">
                                 {d.isTemplate ? <Pill tone="info">Template</Pill> : d.share.enabled ? <Pill tone="brand" dot>{d.share.embed ? 'Embedded' : 'Public link'}</Pill> : <Pill>Private</Pill>}
                                 {d.share.enabled ? <span className="shrink-0 whitespace-nowrap text-meta text-fg-muted">{d.views} {d.views === 1 ? 'view' : 'views'}</span> : null}
-                                <span className="min-w-0 truncate whitespace-nowrap text-meta text-fg-faint" title={d.look?.id ? `${themePreset(d.look.id).name} theme` : undefined}>{d.widgetCount} widgets{d.pageCount > 1 ? ` · ${d.pageCount} pages` : ''}</span>
+                                <span className="min-w-0 truncate whitespace-nowrap text-meta text-fg-muted" title={d.look?.id ? `${themePreset(d.look.id).name} theme` : undefined}>{d.widgetCount} widgets{d.pageCount > 1 ? ` · ${d.pageCount} pages` : ''}</span>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" iconOnly icon={MoreHorizontal} aria-label={`Actions for ${d.name}`} className="ml-auto" /></DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">

@@ -40,7 +40,7 @@ const IMAGES = tourImages as Record<FeatureKey, { desktop: Form; mobile: Form }>
  * A crop as a plain <img> with a 1x/2x srcset: every screen gets exactly the captured pixels (no optimizer
  * re-encode, no upscaling). Lazy, so only the variant on screen (form and theme) is ever fetched.
  */
-function Img({ pair, form, alt, sizes, className }: { pair: Pair; form: Form; alt: string; sizes: string; className: string }) {
+function Img({ pair, form, alt, sizes, className, eager }: { pair: Pair; form: Form; alt: string; sizes: string; className: string; eager?: boolean }) {
     return (
         // eslint-disable-next-line @next/next/no-img-element -- pre-sized 1x/2x WebP pair; next/image would re-encode it softer
         <img
@@ -50,27 +50,39 @@ function Img({ pair, form, alt, sizes, className }: { pair: Pair; form: Form; al
             width={form.width}
             height={form.height}
             alt={alt}
-            loading="lazy"
-            decoding="async"
+            loading={eager ? 'eager' : 'lazy'}
+            // No-JS copies decode with the page (async ones stayed unpainted below the fold in a full-page capture).
+            decoding={eager ? 'sync' : 'async'}
             className={className}
         />
     );
 }
 
+/**
+ * Without JavaScript the lazy pictures may never load (round 7, audit item 13: blank cards in a no-JS capture) and the
+ * theme is always light: each frame then shows its light picture, eager, from a <noscript>, and the lazy pair is hidden
+ * (TOUR_NOJS_STYLE, once per page). With JavaScript, LiveRow loads the rendered variant early.
+ */
+const TOUR_JS = 'tour-js';
+const TOUR_NOJS_STYLE = `.${TOUR_JS}{display:none!important}`;
+
 function Shot({ row }: { row: FeatureRow }) {
     const { desktop, mobile } = IMAGES[row.key];
     const dSizes = `(min-width: 1064px) ${desktop.width}px, 92vw`;
     const mSizes = `(max-width: 432px) 92vw, ${mobile.width}px`;
-    // The crop already carries the app's own page colour and card borders: a hairline frame, no halo in dark.
+    // The crop already carries the app's own page colour and card borders: a hairline frame, no halo in dark. Until a
+    // picture arrives, the frame is a soft grey (bg-subtle), never an empty white card.
     return (
         <figure className="min-w-0">
-            <div className="hidden overflow-hidden rounded-panel border border-border-subtle bg-canvas shadow-[0_20px_48px_-28px_rgb(0_0_0/0.28)] md:block dark:shadow-none">
-                <Img pair={desktop.light} form={desktop} alt={row.alt} sizes={dSizes} className="block h-auto w-full dark:hidden" />
-                <Img pair={desktop.dark} form={desktop} alt={row.alt} sizes={dSizes} className="hidden h-auto w-full dark:block" />
+            <div className="hidden overflow-hidden rounded-panel border border-border-subtle bg-subtle shadow-[0_20px_48px_-28px_rgb(0_0_0/0.28)] md:block dark:shadow-none">
+                <Img pair={desktop.light} form={desktop} alt={row.alt} sizes={dSizes} className={`${TOUR_JS} block h-auto w-full dark:hidden`} />
+                <Img pair={desktop.dark} form={desktop} alt={row.alt} sizes={dSizes} className={`${TOUR_JS} hidden h-auto w-full dark:block`} />
+                <noscript><Img pair={desktop.light} form={desktop} alt={row.alt} sizes={dSizes} className="block h-auto w-full" eager /></noscript>
             </div>
-            <div className="mx-auto max-w-[400px] overflow-hidden rounded-card border border-border-subtle bg-canvas md:hidden">
-                <Img pair={mobile.light} form={mobile} alt={row.alt} sizes={mSizes} className="block h-auto w-full dark:hidden" />
-                <Img pair={mobile.dark} form={mobile} alt={row.alt} sizes={mSizes} className="hidden h-auto w-full dark:block" />
+            <div className="mx-auto max-w-[400px] overflow-hidden rounded-card border border-border-subtle bg-subtle md:hidden">
+                <Img pair={mobile.light} form={mobile} alt={row.alt} sizes={mSizes} className={`${TOUR_JS} block h-auto w-full dark:hidden`} />
+                <Img pair={mobile.dark} form={mobile} alt={row.alt} sizes={mSizes} className={`${TOUR_JS} hidden h-auto w-full dark:block`} />
+                <noscript><Img pair={mobile.light} form={mobile} alt={row.alt} sizes={mSizes} className="block h-auto w-full" eager /></noscript>
             </div>
         </figure>
     );
@@ -111,6 +123,7 @@ function Product({ row, live }: { row: FeatureRow; live?: HomeLive }) {
 export function FeatureRows({ rows, live }: { rows: FeatureRow[]; live?: HomeLive }) {
     return (
         <div className="mx-auto flex max-w-[1016px] flex-col gap-16 md:gap-24">
+            <noscript><style>{TOUR_NOJS_STYLE}</style></noscript>
             {rows.map((row) => {
                 const Icon = ICONS[row.key];
                 return (

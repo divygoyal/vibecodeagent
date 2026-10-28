@@ -3,6 +3,7 @@
  * query+page) are cached per (user, site, range); derived reports
  * (opportunities, cannibalization, decay) reuse them.
  */
+import { cannibalizationGain, cannibalizationImpact, per28, type CannibalizationOverlap } from '@/components/site/lib/actionText';
 import {
     expectedCtr, isLowCtr, isStriking, lowCtrPotential, median, STRIKING_TARGET, strikingPotential, sumGsc,
 } from '@/components/site/lib/rules';
@@ -127,7 +128,10 @@ export async function topPageByQuery(userId: string, token: string, site: string
 }
 
 export async function gscCannibalization(userId: string, token: string, site: string, w: Window): Promise<CannibalizedQuery[]> {
-    const qp = await queryPages(userId, token, site, w);
+    // The site's own monthly clicks set the priority, as on Actions (same cached date report as gscSummary).
+    const [qp, summary] = await Promise.all([queryPages(userId, token, site, w), gscSummary(userId, token, site, { cur: w, cmp: null })]);
+    const days = daysBetween(w.start, w.end);
+    const scale = per28(summary.totals.clicks, days);
     const grouped = new Map<string, (GscMetrics & { page: string })[]>();
     for (const r of qp) {
         const list = grouped.get(r.query) ?? [];
@@ -145,20 +149,24 @@ export async function gscCannibalization(userId: string, token: string, site: st
         const totalClicks = pages.reduce((s, p) => s + p.clicks, 0);
         const competing = sorted.filter((p) => p.impressions / totalImpressions >= 0.1);
         const spread = Math.max(...competing.map((p) => p.position)) - Math.min(...competing.map((p) => p.position));
-        const severity: CannibalizedQuery['severity'] = competing.length >= 3 || (competing.length >= 2 && spread < 3 && totalImpressions >= 200)
-            ? 'high'
-            : competing.length >= 2 && totalImpressions >= 50 ? 'medium' : 'low';
+        const overlap: CannibalizationOverlap = competing.length >= 3 || (competing.length >= 2 && spread < 3 && totalImpressions >= 200)
+            ? 'strong'
+            : competing.length >= 2 && totalImpressions >= 50 ? 'some' : 'weak';
+        const bestPosition = Math.min(...pages.map((p) => p.position));
+        const gain = cannibalizationGain({ totalImpressions, totalClicks, bestPosition }, days);
         out.push({
             query,
             pages: sorted.slice(0, 6).map((p) => ({ ...p, share: totalImpressions > 0 ? p.impressions / totalImpressions : 0 })),
             totalClicks,
             totalImpressions,
-            bestPosition: Math.min(...pages.map((p) => p.position)),
-            severity,
+            bestPosition,
+            overlap,
+            gain,
+            severity: cannibalizationImpact(overlap, gain, scale),
         });
     }
     const order = { high: 3, medium: 2, low: 1 };
-    out.sort((a, b) => order[b.severity] - order[a.severity] || b.totalImpressions - a.totalImpressions);
+    out.sort((a, b) => order[b.severity] - order[a.severity] || b.gain - a.gain || b.totalImpressions - a.totalImpressions);
     return out.slice(0, 100);
 }
 
@@ -279,6 +287,43 @@ function parseInspection(url: string, data: unknown): InspectResponse {
 
 export async function gscInspectUrl(userId: string, token: string, site: string, url: string): Promise<InspectResponse> {
     return parseInspection(url, await gscInspect(userId, token, site, url));
+}
+
+/** A page Google reports as not indexed although it had clicks in the range: it dropped out recently. */
+export interface DroppedPage {
+    url: string;
+    clicks: number;
+    impressions: number;
+    lastCrawlTime: string | null;
+    coverageState: string | null;
+}
+
+/** Not indexed (URL Inspection NEUTRAL or FAIL): Google left the page out of its results at the last crawl. */
+export function isNotIndexed(verdict: string | null | undefined): boolean {
+    return verdict === 'NEUTRAL' || verdict === 'FAIL';
+}
+
+/** Top pages Actions checks for "dropped from Google" (the first of Indexing's daily checks, same cache entries). */
+export const DROP_CHECK_LIMIT = 5;
+
+/**
+ * The site's top pages by clicks that Google now reports as not indexed (round 7, audit item 6): they had clicks in
+ * the range, so they were in Google and dropped out. One URL Inspection per page, cached a day and shared with
+ * Search › Indexing, so the two never disagree and Indexing costs nothing extra. Refused or failed checks are left out.
+ */
+export async function gscDroppedPages(userId: string, token: string, site: string, rows: GscRow[]): Promise<DroppedPage[]> {
+    const top = rows.filter((x) => x.clicks > 0).sort((a, b) => b.clicks - a.clicks).slice(0, DROP_CHECK_LIMIT);
+    const checked = await Promise.all(top.map(async (x) => {
+        try {
+            const res = parseInspection(x.key, (await gscInspectDaily(userId, token, site, x.key)).data);
+            return isNotIndexed(res.verdict)
+                ? { url: x.key, clicks: x.clicks, impressions: x.impressions, lastCrawlTime: res.lastCrawlTime, coverageState: res.coverageState }
+                : null;
+        } catch {
+            return null;
+        }
+    }));
+    return checked.filter((d): d is DroppedPage => d !== null);
 }
 
 /** Top pages by clicks that get a daily inspection (Search › Indexing). */

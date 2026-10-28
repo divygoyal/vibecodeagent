@@ -63,7 +63,7 @@ export const ReasoningTrace = memo(function ReasoningTrace({ lines, active }: Re
                 return (
                     <div
                         key={line.id}
-                        className={`flex animate-fade-in items-center gap-2 text-body-sm ${isLast ? 'text-fg-secondary' : 'text-fg-faint'}`}
+                        className={`flex animate-fade-in items-center gap-2 text-body-sm ${isLast ? 'text-fg-secondary' : 'text-fg-muted'}`}
                     >
                         {isLast && active ? (
                             <span aria-hidden className="flex w-4 shrink-0 items-center justify-center gap-0.5">
@@ -72,7 +72,7 @@ export const ReasoningTrace = memo(function ReasoningTrace({ lines, active }: Re
                                 ))}
                             </span>
                         ) : (
-                            <span aria-hidden className="size-1 w-4 shrink-0 text-center text-fg-faint">·</span>
+                            <span aria-hidden className="size-1 w-4 shrink-0 text-center text-fg-muted">·</span>
                         )}
                         <span>{line.text}</span>
                     </div>

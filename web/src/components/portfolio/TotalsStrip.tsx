@@ -111,7 +111,7 @@ export function TotalsStrip({ data, metric, onMetricChange, comparisonLabel, dim
                             {window ? <span className="text-fg-muted"> · {fmtDateRange(window.curStart, window.curEnd)}</span> : null}
                             {metric === 'users' && total > 1 ? (
                                 <Tooltip content="Users are exact per site and added up across sites, so a visitor of two sites counts twice.">
-                                    <button type="button" aria-label="About the users total" className="ml-0.5 inline-flex rounded text-fg-faint hover:text-fg-muted">
+                                    <button type="button" aria-label="About the users total" className="ml-0.5 inline-flex rounded text-fg-muted hover:text-fg">
                                         <Info aria-hidden size={14} strokeWidth={1.75} />
                                     </button>
                                 </Tooltip>

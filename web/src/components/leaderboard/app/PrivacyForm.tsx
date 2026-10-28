@@ -35,9 +35,9 @@ export function PrivacyForm({ value, onChange, legacy }: { value: PrivacySetting
                     {PRIVACY_METRICS.map((m) => (
                         <li key={m.key} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
                             <div className="min-w-0">
-                                <p className="text-body font-medium text-fg">{m.label} <span className="ml-1 text-meta font-normal text-fg-faint">{m.source}</span></p>
+                                <p className="text-body font-medium text-fg">{m.label} <span className="ml-1 text-meta font-normal text-fg-muted">{m.source}</span></p>
                                 <p className="text-body-sm text-fg-muted">{m.hint}</p>
-                                <p className="mt-0.5 text-meta text-fg-faint">{MODE_HELP[value.metrics[m.key]]}</p>
+                                <p className="mt-0.5 text-meta text-fg-muted">{MODE_HELP[value.metrics[m.key]]}</p>
                             </div>
                             <SegmentedControl ariaLabel={`${m.label} visibility`} size="sm" variant="neutral" value={value.metrics[m.key]} onChange={(v) => setMetric(m.key, v)} options={MODES} />
                         </li>

@@ -85,7 +85,7 @@ export function ErrorScreen({
                     </>
                 }
             >
-                {error?.digest ? <p className="mt-4 font-mono text-caption text-fg-faint">Error ID {error.digest}</p> : null}
+                {error?.digest ? <p className="mt-4 font-mono text-caption text-fg-muted">Error ID {error.digest}</p> : null}
             </EmptyState>
         </div>
     );

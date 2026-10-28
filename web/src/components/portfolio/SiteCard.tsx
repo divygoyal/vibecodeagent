@@ -217,7 +217,7 @@ export const SiteCard = memo(function SiteCard({
                         onClick={() => onToggleStar?.(site)}
                         className={cn(
                             'relative z-[1] -mr-1 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors duration-120 hover:bg-subtle pointer-coarse:size-11',
-                            site.starred ? 'text-star' : 'text-fg-faint hover:text-fg-muted',
+                            site.starred ? 'text-star' : 'text-fg-muted hover:text-fg',
                         )}
                     >
                         <Star aria-hidden size={16} strokeWidth={1.75} className={site.starred ? 'fill-star' : undefined} />
@@ -258,7 +258,7 @@ export const SiteCard = memo(function SiteCard({
                 <span className="flex-1" />
                 {site.ga4 && site.gsc ? (
                     <Tooltip content={`GA4 property ${site.ga4.propertyId} linked${site.pairing === 'manual' ? ' (set by you)' : ''}`}>
-                        <span tabIndex={0} className="relative z-[1] hidden rounded text-fg-faint @[21rem]:inline-flex">
+                        <span tabIndex={0} className="relative z-[1] hidden rounded text-fg-muted @[21rem]:inline-flex">
                             <Link2 aria-label="GA4 linked" size={14} strokeWidth={1.75} />
                         </span>
                     </Tooltip>

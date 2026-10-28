@@ -1,10 +1,21 @@
 /**
  * Ask in the public demo: no model calls. Four suggested questions with answers written from the
  * demo generator's numbers at request time (the same data the demo's pages show), so they stay
- * true day by day. Pure apart from Date.now(); memoised per UTC day.
+ * true day by day. Memoised per UTC day. The "improve first" answer runs the Actions builder on the demo data.
  */
+import { buildActions } from '@/app/api/site/_lib/actions';
+import type { RangeParams } from '@/app/api/site/_lib/params';
+import { rankByImpact, shortImpact, topClickGain, topClickTasks } from '@/components/site/lib/actionText';
+import { auditActions } from '@/components/site/lib/auditActions';
+import { displayPage, pageRef } from '@/components/site/lib/rules';
+import { resolveDateRange, type DateRangeValue } from '@/lib/dateRange';
+import { demoAccessToken } from '@/lib/demo/catalog';
+import { sampleGoogleFetch } from '@/lib/demo/fetchShim';
 import { demoRunReport } from '@/lib/demo/ga4';
-import { ctrForPosition, demoSearchAnalytics } from '@/lib/demo/gsc';
+import { demoSearchAnalytics } from '@/lib/demo/gsc';
+import { runWithSampleGoogle } from '@/lib/demo/sampleScope';
+import { getDemoAuditReport } from '@/lib/demoWorkspaceData';
+import { fmtCompact } from '@/lib/format';
 import { buildDemoPortfolio } from '@/lib/portfolio/demo';
 import type { PortfolioSite } from '@/lib/portfolio/types';
 import { DEMO_ACCOUNT_KEY } from './config';
@@ -18,6 +29,9 @@ export interface DemoAskSample {
 
 const ACME_GSC = 'sc-domain:acmeanalytics.example';
 const ACME_GA4 = 'properties/412300101';
+const ACME_HOST = 'acmeanalytics.example';
+/** Cache identity of these samples in lib/apiCache (never a real user id: those are numeric). */
+const ASK_SAMPLE_USER = 'ask-sample';
 
 const nf = new Intl.NumberFormat('en-US');
 const n = (v: number) => nf.format(Math.round(v));
@@ -105,39 +119,48 @@ function channels(now: number): string {
     ].join('\n').trim();
 }
 
-function quickWins(now: number): string {
-    const end = isoDaysAgo(2, now);
-    const start = isoDaysAgo(29, now);
-    const res = demoSearchAnalytics(ACME_GSC, { startDate: start, endDate: end, dimensions: ['page'], rowLimit: 500 }, { now });
-    const rows = ((res.rows ?? []) as { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }[])
-        .filter((r) => r.position >= 4 && r.position <= 15 && r.impressions >= 200)
-        .map((r) => ({ ...r, gain: Math.max(0, r.impressions * ctrForPosition(3) - r.clicks) }))
-        .sort((a, b) => b.gain - a.gain)
-        .slice(0, 5);
-    // Acme's domain property also covers docs.acmeanalytics.example: name the host when it is not the main one.
-    const path = (u: string) => {
-        try {
-            const url = new URL(u);
-            return url.hostname.replace(/^www\./, '') === 'acmeanalytics.example' ? url.pathname || '/' : `${url.hostname}${url.pathname}`;
-        } catch {
-            return u;
-        }
-    };
-    const extra = rows.reduce((s, r) => s + r.gain, 0);
+/**
+ * "Which pages should I improve first?" from the Actions page's own list (round 7, audit item 7: the sample answer
+ * started with another page and total than Actions). The same server code (buildActions on the demo data, the demo's
+ * homepage audit, rankByImpact) with the windows the site pages use, so the first task and the "top 5" total read the
+ * same on both screens.
+ */
+async function quickWins(now: number): Promise<string> {
+    const today = new Date(now);
+    const range: DateRangeValue = { preset: '28d', compare: 'prev' };
+    // The site pages' windows (components/shell/DateRangeControl): Analytics through today, Search Console 2 days back.
+    const params = (r: { start: string; end: string; prevStart: string | null; prevEnd: string | null }): RangeParams =>
+        ({ cur: { start: r.start, end: r.end }, cmp: r.prevStart && r.prevEnd ? { start: r.prevStart, end: r.prevEnd } : null });
+    const traffic = params(resolveDateRange(range, { now: today }));
+    const search = params(resolveDateRange(range, { now: today, lagDays: 2 }));
+    const res = await runWithSampleGoogle(sampleGoogleFetch, () => buildActions({
+        userId: ASK_SAMPLE_USER, token: demoAccessToken(DEMO_ACCOUNT_KEY), label: ACME_HOST, siteUrl: ACME_GSC, property: ACME_GA4, search, traffic,
+    }));
+    const open = rankByImpact([...res.actions, ...auditActions(getDemoAuditReport(`https://${ACME_HOST}/`), ACME_HOST)]);
+    const top = topClickTasks(open, 5);
+    const total = topClickGain(open, 5);
+    const path = (u: string | null) => (u ? displayPage(pageRef(u), ACME_HOST) : '–');
+    const first = top[0];
+    if (!first) return 'Nothing on Acme Analytics needs fixing right now: the Actions list has no open search tasks.';
+    // A page with more than one of the five tasks is worth naming: one visit fixes several.
+    const perPage = new Map<string, number>();
+    for (const a of top) if (a.page) perPage.set(a.page, (perPage.get(a.page) ?? 0) + 1);
+    const repeat = [...perPage].find(([, c]) => c > 1);
     return [
-        rows.length
-            ? `Start with pages that already rank on page one or two but get few clicks. Moving these five into the top three could bring about **${n(extra)} more clicks** a month.`
-            : 'No page sits just outside the top results right now.',
+        `Start with **${first.title}**: ${shortImpact(first.expectedImpact)?.value.replace(/^\+/, 'about +') ?? `about +${n(first.gain ?? 0)}`} clicks a month. It is the first of the top five search tasks on the Actions page for **${ACME_HOST}**; finishing all five could bring about **+${fmtCompact(total)} clicks a month**.`,
         '',
-        '| Page | Impressions | Position | CTR | Possible extra clicks |',
-        '|---|---:|---:|---:|---:|',
-        ...rows.map((r) => `| ${path(r.keys[0])} | ${n(r.impressions)} | ${r.position.toFixed(1)} | ${pct(r.ctr, 1)} | ${n(r.gain)} |`),
+        '| # | Task | Page | Extra clicks a month |',
+        '|---:|---|---|---:|',
+        // The number as the Actions row prints it ("+8,727", or "up to 1,500" for a win-back).
+        ...top.map((a, i) => `| ${i + 1} | ${a.title.replace(/\|/g, '/')} | ${path(a.page)} | ${shortImpact(a.expectedImpact)?.value ?? `+${n(a.gain ?? 0)}`} |`),
         '',
-        rows[0] ? `First: **${path(rows[0].keys[0])}**. Rewrite its title and description around the query it ranks for, and link to it from your top pages.` : '',
-    ].join('\n').trim();
+        repeat ? `**${path(repeat[0])}** has ${repeat[1]} of these tasks, so improving that one page covers ${repeat[1] === 2 ? 'both' : `those ${repeat[1]}`}.` : '',
+        '',
+        first.fix[0] ? `First step: ${first.fix[0]}` : '',
+    ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-const QUESTIONS: { id: string; question: string; build: (now: number) => string }[] = [
+const QUESTIONS: { id: string; question: string; build: (now: number) => string | Promise<string> }[] = [
     { id: 'movers', question: 'Which of my sites grew the most this month?', build: movers },
     { id: 'queries', question: 'What are the top search queries for Acme Analytics?', build: topQueries },
     { id: 'channels', question: 'Where does Acme Analytics traffic come from?', build: channels },
@@ -147,19 +170,19 @@ const QUESTIONS: { id: string; question: string; build: (now: number) => string 
 let memo: { day: string; samples: DemoAskSample[] } | null = null;
 
 /** The demo's suggested questions with their sample answers (same numbers all day). */
-export function demoAskSamples(now: number = Date.now()): DemoAskSample[] {
+export async function demoAskSamples(now: number = Date.now()): Promise<DemoAskSample[]> {
     const day = new Date(now).toISOString().slice(0, 10);
     if (memo?.day === day) return memo.samples;
-    const samples = QUESTIONS.map((q) => {
+    const samples = await Promise.all(QUESTIONS.map(async (q) => {
         let answer: string;
         try {
-            answer = q.build(now);
+            answer = await q.build(now);
         } catch (err) {
             console.warn(`[public-demo] sample answer ${q.id} failed:`, err instanceof Error ? err.message : err);
             answer = 'This sample answer is not available right now.';
         }
         return { id: q.id, question: q.question, answer };
-    });
+    }));
     memo = { day, samples };
     return samples;
 }

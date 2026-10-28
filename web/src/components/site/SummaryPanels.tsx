@@ -156,7 +156,7 @@ function AiFooter({ value, previous }: { value: number; previous?: number | null
             <span aria-hidden className="size-2 rounded-full" style={{ background: METRICS.ai.color }} />
             AI traffic: <span className="font-medium text-fg tabular-nums">{fmtFull(value)}</span> sessions from AI assistants
             {previous !== undefined ? <MetricDelta metric="ai" current={value} previous={previous} /> : null}
-            <span className="text-fg-faint">· today is partial</span>
+            <span className="text-fg-muted">· today is partial</span>
         </span>
     );
 }

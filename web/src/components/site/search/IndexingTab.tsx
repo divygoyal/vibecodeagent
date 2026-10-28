@@ -23,10 +23,20 @@ type Tone = 'up' | 'warn' | 'down' | 'muted';
 const TONE: Record<Tone, string> = { up: 'text-up', warn: 'text-warn', down: 'text-down', muted: 'text-fg-muted' };
 const DOT: Record<Tone, string> = { up: 'bg-up', warn: 'bg-warn', down: 'bg-down', muted: 'bg-fg-faint' };
 
+/** Not indexed at the last crawl (URL Inspection NEUTRAL or FAIL). */
+const notIn = (v: string | null | undefined) => v === 'FAIL' || v === 'NEUTRAL';
+
+/**
+ * A page Google did not index at its last crawl although it had clicks in the range: it was in Google results during
+ * the range and dropped out (round 7, audit item 6: a page with 3,323 clicks read "Not in Google results now").
+ */
+const droppedOf = (p: Pick<IndexStatusPage, 'status' | 'verdict'> & { clicks?: number }) => p.status === 'ok' && notIn(p.verdict) && (p.clicks ?? 0) > 0;
+
 /** Index status in words: URL Inspection verdicts are PASS / PARTIAL / FAIL / NEUTRAL. */
-function statusOf(p: Pick<IndexStatusPage, 'status' | 'verdict'>): { label: string; tone: Tone; rank: number } {
+function statusOf(p: Pick<IndexStatusPage, 'status' | 'verdict'> & { clicks?: number }): { label: string; tone: Tone; rank: number } {
     if (p.status === 'skipped') return { label: 'Not checked yet', tone: 'muted', rank: 5 };
     if (p.status === 'error') return { label: "Couldn't check", tone: 'muted', rank: 4 };
+    if (droppedOf(p)) return { label: 'Dropped from Google', tone: 'down', rank: 0 };
     switch (p.verdict) {
         case 'PASS': return { label: 'Indexed', tone: 'up', rank: 3 };
         case 'PARTIAL': return { label: 'Indexed, with issues', tone: 'warn', rank: 1 };
@@ -91,6 +101,12 @@ export function InspectionDetails({ result }: { result: InspectResponse }) {
     );
 }
 
+/** "Had 3,323 clicks in this period, but Google did not index it at its last crawl (Oct 13, 2026)." */
+function droppedText(p: IndexStatusPage): string {
+    const crawl = p.lastCrawlTime ? ` (${fmtDayYear(p.lastCrawlTime.slice(0, 10))})` : '';
+    return `Had ${fmtFull(p.clicks)} clicks in this period, but Google did not index it at its last crawl${crawl}: it dropped out of Google recently.`;
+}
+
 function toInspect(p: IndexStatusPage): InspectResponse {
     return {
         url: p.url, verdict: p.verdict ?? 'VERDICT_UNSPECIFIED', coverageState: p.coverageState ?? null, indexingState: p.indexingState ?? null,
@@ -112,7 +128,8 @@ function TopPagesStatus() {
     }), [q.data]);
     const ok = pages.filter((p) => p.status === 'ok');
     const indexed = ok.filter((p) => p.verdict === 'PASS' || p.verdict === 'PARTIAL').length;
-    const notIndexed = ok.filter((p) => p.verdict === 'FAIL' || p.verdict === 'NEUTRAL').length;
+    const notIndexed = ok.filter((p) => notIn(p.verdict)).length;
+    const dropped = ok.filter((p) => droppedOf(p)).length;
     const canon = ok.filter((p) => otherCanonical(p)).length;
     const crawlAges = ok.map((p) => daysAgo(p.lastCrawlTime)).filter((d): d is number => d !== null);
     const oldest = crawlAges.length ? Math.max(...crawlAges) : null;
@@ -128,7 +145,7 @@ function TopPagesStatus() {
                 <MetricTile metric="clicks" label="Indexed" value={q.data ? indexed : null} loading={loading}
                     footer={q.data ? <span className="text-meta text-fg-muted">of {fmtFull(ok.length)} top pages checked</span> : undefined} />
                 <MetricTile metric="clicks" label="Not indexed" value={q.data ? notIndexed : null} loading={loading}
-                    footer={q.data ? <span className={cn('text-meta', notIndexed ? 'text-warn' : 'text-fg-muted')}>{notIndexed ? 'Not in Google results now' : 'All checked pages are in'}</span> : undefined} />
+                    footer={q.data ? <span className={cn('text-meta', notIndexed ? 'text-warn' : 'text-fg-muted')}>{!notIndexed ? 'All checked pages are in' : dropped === notIndexed ? 'Had clicks, dropped at last crawl' : `${fmtFull(dropped)} dropped at last crawl`}</span> : undefined} />
                 <MetricTile metric="clicks" label="Other canonical" value={q.data ? canon : null} loading={loading}
                     footer={q.data ? <span className="text-meta text-fg-muted">Google picked another URL</span> : undefined} />
                 <MetricTile metric="clicks" label="Oldest crawl" format="count" value={q.data ? oldest : null} loading={loading}
@@ -171,8 +188,9 @@ function TopPagesStatus() {
                         cell: (p) => {
                             const s = statusOf(p);
                             const cov = p.status === 'ok' && p.verdict !== 'PASS' ? coverageText(p.coverageState) : null;
+                            const why = droppedOf(p) ? `${droppedText(p)} ` : '';
                             return (
-                                <span className="flex min-w-0 flex-col" title={cov ? `${cov.long} Google: "${p.coverageState}"` : undefined}>
+                                <span className="flex min-w-0 flex-col" title={cov || why ? `${why}${cov ? `${cov.long} Google: "${p.coverageState}"` : ''}`.trim() : undefined}>
                                     <span className={cn('flex items-center gap-1.5 whitespace-nowrap text-body-sm', TONE[s.tone])}><span aria-hidden className={cn('size-2 shrink-0 rounded-full', DOT[s.tone])} />{s.label}</span>
                                     {cov ? <span className="truncate text-meta text-fg-muted max-md:hidden">{cov.short}</span> : null}
                                 </span>
@@ -182,7 +200,7 @@ function TopPagesStatus() {
                     {
                         key: 'canonical', header: 'Canonical', className: 'max-md:hidden', headerClassName: 'max-md:hidden', mobile: 'hidden',
                         cell: (p) => {
-                            if (p.status !== 'ok') return <span className="text-fg-faint">–</span>;
+                            if (p.status !== 'ok') return <span className="text-fg-muted">–</span>;
                             const other = otherCanonical(p);
                             return other
                                 ? <span className="block truncate text-body-sm text-warn" title={`Google chose ${other}`}>Google chose {show(other)}</span>
@@ -196,7 +214,7 @@ function TopPagesStatus() {
                             const d = daysAgo(p.lastCrawlTime);
                             // Google leaves the date out for pages it has not crawled ("Discovered"): say so, not a bare dash.
                             if (d === null && p.status === 'ok') return <span className="text-meta text-fg-muted" title="Google's inspection gave no crawl date for this page">not reported</span>;
-                            return d === null ? <span className="text-fg-faint">–</span> : <span className={cn('whitespace-nowrap tabular-nums', d > 30 ? 'text-warn' : 'text-fg')} title={fmtDayYear(p.lastCrawlTime!.slice(0, 10))}>{agoText(d)}</span>;
+                            return d === null ? <span className="text-fg-muted">–</span> : <span className={cn('whitespace-nowrap tabular-nums', d > 30 ? 'text-warn' : 'text-fg')} title={fmtDayYear(p.lastCrawlTime!.slice(0, 10))}>{agoText(d)}</span>;
                         },
                     },
                     {
@@ -210,7 +228,12 @@ function TopPagesStatus() {
                 <p className="-mt-2 text-meta text-fg-muted">{fmtFull(skipped)} {skipped === 1 ? 'page was' : 'pages were'} not checked: Google refused or limited the inspection. They are tried again on the next load.</p>
             ) : null}
             <Drawer open={Boolean(open)} onOpenChange={(o) => { if (!o) setOpen(null); }} title={open ? show(open.url) : ''} subtitle={open ? `${fmtFull(open.clicks)} clicks in this period` : undefined}>
-                {open ? <div className="p-5"><InspectionDetails result={toInspect(open)} /></div> : null}
+                {open ? (
+                    <div className="flex flex-col gap-4 p-5">
+                        {droppedOf(open) ? <Banner variant="warn">{droppedText(open)} Check what Google saw below, fix the cause, then request indexing in Search Console.</Banner> : null}
+                        <InspectionDetails result={toInspect(open)} />
+                    </div>
+                ) : null}
             </Drawer>
         </>
     );

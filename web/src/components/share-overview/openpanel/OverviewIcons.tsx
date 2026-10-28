@@ -3,6 +3,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { SourceIcon } from '@/components/site/SourceIcon';
+import { flagEmoji, flagForName } from '@/components/site/lib/geo';
 import { sourceInfo } from '@/components/site/lib/sources';
 import { browserIconHost, deviceGlyph, osIconHost } from '@/components/site/TechIcon';
 import {
@@ -171,9 +172,12 @@ function buildFaviconUrl(site: string) {
     return `/api/favicon?host=${encodeURIComponent(host)}&size=32`;
 }
 
-function buildFlagUrl(country: string) {
-    const code = COUNTRY_CODES[normalizeKey(country)];
-    return code ? `https://flagcdn.com/w40/${code}.png` : null;
+/**
+ * The app's own flag (an emoji, as on the site pages' Locations), never a third-party image: client pages must not
+ * send viewers' IPs to a flag CDN (round 7, audit item 21).
+ */
+function flagFor(country: string): string {
+    return flagEmoji(COUNTRY_CODES[normalizeKey(country)]) || flagForName(country);
 }
 
 function IconFrame({
@@ -237,30 +241,17 @@ function FaviconIcon({
 }
 
 export function OverviewCountryFlag({ country }: { country: string }) {
-    const src = useMemo(() => buildFlagUrl(country), [country]);
-    const [failedSrc, setFailedSrc] = useState<string | null>(null);
-    const broken = Boolean(src && failedSrc === src);
-
-    if (!src || broken) {
+    const flag = useMemo(() => flagFor(country), [country]);
+    if (!flag) {
         return (
             <FallbackIcon title={country}>
                 <Globe2 className="h-3 w-3" />
             </FallbackIcon>
         );
     }
-
     return (
         <IconFrame title={country}>
-            <img
-                src={src}
-                alt=""
-                width={16}
-                height={16}
-                className="h-full w-full rounded-[2px] object-cover"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                onError={() => setFailedSrc(src)}
-            />
+            <span aria-hidden className="text-[14px] leading-none">{flag}</span>
         </IconFrame>
     );
 }
