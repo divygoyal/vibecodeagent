@@ -278,7 +278,8 @@ export function compileWidget(rawWidget: WidgetDef, ctx: CompileCtx): CompiledWi
     const filterOrigins = widgetFilters(widget, ctx);
     const filters = filterOrigins.map((f) => f.clause);
     const source: SourceRef = widget.source ?? { type: 'default' };
-    const compareOn = ctx.controls.date.compare.mode !== 'none' && !(widget.ignoreControls ?? []).includes('compare');
+    // A widget with its own comparison (round 9) asks for it whatever the dashboard shows; "none" there turns it off.
+    const compareOn = (widget.dateOverride?.compare ? widget.dateOverride.compare.mode !== 'none' : ctx.controls.date.compare.mode !== 'none') && !(widget.ignoreControls ?? []).includes('compare');
     // Search Console search type (round 8): only for widgets that read Search Console alone; web is the API default.
     const searchType = searchTypeEligible(widget) && isSearchType(widget.searchType) && widget.searchType !== 'web' ? widget.searchType : undefined;
     const base = { source, filters, ...(searchType ? { searchType } : {}) };

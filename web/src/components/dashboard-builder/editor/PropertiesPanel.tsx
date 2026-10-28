@@ -25,6 +25,7 @@ import { GrainControlProps, MetricControlProps, SearchTypeControlProps, SiteCont
 import { VariablesEditor } from './VariablesEditor';
 import { CalcList } from './CalcEditor';
 import { TABLE_TREND_ROWS, TREND_DAILY_MAX_DAYS, trendMetric, trendUnsupported } from '@/lib/builder/trend';
+import { WidgetDatesField } from './WidgetDatesField';
 import { WidgetFilters } from './WidgetFilters';
 
 type Patch = (w: WidgetDef) => WidgetDef;
@@ -91,6 +92,7 @@ function WidgetProps({ widget, doc, sites, defaultLabel }: { widget: WidgetDef; 
                 {tab === 'setup' ? (
                     <>
                         <Setup widget={widget} edit={edit} sites={sites} defaultLabel={defaultLabel} doc={doc} />
+                        {!meta.static ? <div className="border-t border-border-subtle pt-4"><WidgetDatesField widget={widget} edit={edit} /></div> : null}
                         {!meta.static ? <div className="border-t border-border-subtle pt-4"><WidgetFilters widget={widget} doc={doc} edit={edit} /></div> : null}
                     </>
                 ) : <Style widget={widget} edit={edit} />}
