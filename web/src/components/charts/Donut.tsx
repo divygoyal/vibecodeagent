@@ -15,6 +15,8 @@ export interface DonutItem {
     value: number;
     /** Fixed colour (channelColor / deviceColor). Default: categorical slot by rank. */
     color?: string;
+    /** An "(other)" row from the query: never ranked among the slices, always the last one (merged with the folded rest). */
+    other?: boolean;
 }
 
 export interface DonutProps {
@@ -48,11 +50,16 @@ export interface DonutProps {
 export function Donut({ items, centerLabel, centerValue, format = 'count', size = 160, maxSlices = 6, legend = 'right', onItemClick, className }: DonutProps) {
     const [active, setActive] = useState<string | null>(null);
     const slices = useMemo(() => {
-        const sorted = [...items].filter((i) => i.value > 0).sort((a, b) => b.value - a.value);
-        if (sorted.length <= maxSlices) return sorted.map((s, i) => ({ ...s, color: s.color ?? categoricalColor(i) }));
-        const head = sorted.slice(0, maxSlices - 1).map((s, i) => ({ ...s, color: s.color ?? categoricalColor(i) }));
-        const rest = sorted.slice(maxSlices - 1).reduce((a, b) => a + b.value, 0);
-        return [...head, { key: '__other', label: 'Other', value: rest, color: CATEGORICAL_OTHER }];
+        // "Other" is last whatever its size (round 9 review): a query's own "(other)" row joins the folded rest.
+        const live = items.filter((i) => i.value > 0);
+        const sorted = live.filter((i) => !i.other).sort((a, b) => b.value - a.value);
+        const queryOther = live.filter((i) => i.other).reduce((a, b) => a + b.value, 0);
+        const withOther = (head: DonutItem[], rest: number) => [
+            ...head.map((s, i) => ({ ...s, color: s.color ?? categoricalColor(i) })),
+            ...(rest > 0 ? [{ key: '__other', label: 'Other', value: rest, color: CATEGORICAL_OTHER }] : []),
+        ];
+        if (sorted.length + (queryOther > 0 ? 1 : 0) <= maxSlices) return withOther(sorted, queryOther);
+        return withOther(sorted.slice(0, maxSlices - 1), sorted.slice(maxSlices - 1).reduce((a, b) => a + b.value, queryOther));
     }, [items, maxSlices]);
     const total = slices.reduce((a, b) => a + b.value, 0);
 
@@ -94,7 +101,7 @@ export function Donut({ items, centerLabel, centerValue, format = 'count', size 
                     {slices.length ? <RTooltip content={renderTooltip} isAnimationActive={false} /> : null}
                 </PieChart>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className={size < 120 ? 'text-body-sm font-semibold tabular-nums text-fg' : 'text-stat-sm text-fg'}>{format === 'count' ? fmtCompact(centerValue ?? total) : fmtValue(format, centerValue ?? total)}</span>
+                    <span title={centerValue == null ? `${fmtFull(total)}${centerLabel ? ` ${centerLabel.toLowerCase()}` : ''}: the sum of the slices` : undefined} className={cn('pointer-events-auto', size < 120 ? 'text-body-sm font-semibold tabular-nums text-fg' : 'text-stat-sm text-fg')}>{format === 'count' ? fmtCompact(centerValue ?? total) : fmtValue(format, centerValue ?? total)}</span>
                     {centerLabel && size >= 120 ? <span className="text-meta text-fg-muted">{centerLabel}</span> : null}
                 </div>
             </div>
