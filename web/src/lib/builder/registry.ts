@@ -6,7 +6,7 @@
  * Sizes are in grid units: 12 columns, row height 32 px + 16 px margin (one row = 48 px).
  * Saved layouts store only {i,x,y,w,h}; constraints come from here at render time.
  */
-import { getMetric, metricFamily, metricLabel, dimLabel, type Family } from './catalog';
+import { getMetric, metricFamilies, metricFamily, metricLabel, dimLabel, type Family } from './catalog';
 import type {
     MetricRef,
     SourceRef,
@@ -175,10 +175,7 @@ export function widgetMetrics(w: WidgetDef): string[] {
 
 export function widgetFamilies(w: WidgetDef): Family[] {
     const set = new Set<Family>();
-    for (const id of widgetMetrics(w)) {
-        const f = metricFamily(id);
-        if (f) set.add(f);
-    }
+    for (const id of widgetMetrics(w)) for (const f of metricFamilies(id)) set.add(f);
     return [...set];
 }
 

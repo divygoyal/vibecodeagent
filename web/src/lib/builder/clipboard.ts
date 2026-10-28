@@ -7,9 +7,10 @@
  * existing widgets. Sources are kept as they were ('default' follows the target dashboard's
  * site; an explicit site stays that site). Nothing here talks to the network.
  */
+import { parseCalcId, usesMetric } from './calc';
 import { addPage, clampItem, updatePage } from './docOps';
 import { newWidgetId, widgetMeta } from './registry';
-import type { DashboardDocV2, LayoutItem, PageDef, WidgetDef, WidgetType } from './types';
+import type { CalculatedMetric, DashboardDocV2, LayoutItem, PageDef, WidgetDef, WidgetType } from './types';
 
 export const CLIP_WIDGETS = 'trafficclaw/widgets';
 export const CLIP_PAGE = 'trafficclaw/page';
@@ -19,9 +20,15 @@ const MAX_BYTES = 400_000;
 const TYPES: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', 'table', 'geo', 'text', 'image', 'section', 'portfolio-grid'];
 
 export interface ClipItem { widget: WidgetDef; layout: { x: number; y: number; w: number; h: number } }
+/** `calcs` (round 7): names of the calculated metrics the items use, so a paste keeps them. */
 export type Clip =
-    | { tc: typeof CLIP_WIDGETS; v: 1; items: ClipItem[] }
-    | { tc: typeof CLIP_PAGE; v: 1; title: string; items: ClipItem[] };
+    | { tc: typeof CLIP_WIDGETS; v: 1; items: ClipItem[]; calcs?: CalculatedMetric[] }
+    | { tc: typeof CLIP_PAGE; v: 1; title: string; items: ClipItem[]; calcs?: CalculatedMetric[] };
+
+function calcsOf(doc: DashboardDocV2, items: ClipItem[]): CalculatedMetric[] | undefined {
+    const used = (doc.calcs ?? []).filter((c) => usesMetric(items, c.id));
+    return used.length ? used : undefined;
+}
 
 function itemsOf(doc: DashboardDocV2, page: PageDef, ids?: string[]): ClipItem[] {
     const want = ids ? new Set(ids) : null;
@@ -36,14 +43,15 @@ export function copyWidgets(doc: DashboardDocV2, pageId: string, ids: string[]):
     if (!page) return null;
     const items = itemsOf(doc, page, ids);
     if (!items.length) return null;
-    return JSON.stringify({ tc: CLIP_WIDGETS, v: 1, items } satisfies Clip);
+    return JSON.stringify({ tc: CLIP_WIDGETS, v: 1, items, calcs: calcsOf(doc, items) } satisfies Clip);
 }
 
 /** Clipboard text for a whole page. */
 export function copyPage(doc: DashboardDocV2, pageId: string): string | null {
     const page = doc.pages.find((p) => p.id === pageId);
     if (!page) return null;
-    return JSON.stringify({ tc: CLIP_PAGE, v: 1, title: page.title, items: itemsOf(doc, page) } satisfies Clip);
+    const items = itemsOf(doc, page);
+    return JSON.stringify({ tc: CLIP_PAGE, v: 1, title: page.title, items, calcs: calcsOf(doc, items) } satisfies Clip);
 }
 
 function okWidget(w: unknown): w is WidgetDef {
@@ -66,8 +74,13 @@ export function parseClip(text: string | null | undefined): Clip | null {
             items.push({ widget: it.widget as WidgetDef, layout: { x: num(l.x, 0), y: Math.max(0, num(l.y, 0)), w: num(l.w, 4), h: num(l.h, 6) } });
         }
         if (!items.length) return null;
-        if (c.tc === CLIP_PAGE) return { tc: CLIP_PAGE, v: 1, title: typeof c.title === 'string' && c.title.trim() ? c.title.slice(0, 70) : 'Pasted page', items };
-        return { tc: CLIP_WIDGETS, v: 1, items };
+        const calcs = Array.isArray(c.calcs)
+            ? (c.calcs as Array<Record<string, unknown>>).filter((x) => typeof x?.id === 'string' && parseCalcId(x.id) && typeof x.label === 'string' && x.label.trim())
+                .slice(0, 30).map((x) => ({ id: x.id as string, label: (x.label as string).trim().slice(0, 60) }))
+            : [];
+        const extra = calcs.length ? { calcs } : {};
+        if (c.tc === CLIP_PAGE) return { tc: CLIP_PAGE, v: 1, title: typeof c.title === 'string' && c.title.trim() ? c.title.slice(0, 70) : 'Pasted page', items, ...extra };
+        return { tc: CLIP_WIDGETS, v: 1, items, ...extra };
     } catch {
         return null;
     }
@@ -97,7 +110,11 @@ export function pasteWidgets(doc: DashboardDocV2, pageId: string, clip: Clip): {
     let items = clip.items;
     if (imageCount + items.filter((i) => i.widget.type === 'image').length > 20) items = items.filter((i) => i.widget.type !== 'image');
     const { lg, widgets, ids } = place(page, items, doc);
-    const next = updatePage({ ...doc, widgets: { ...doc.widgets, ...widgets } }, page.id, (p) => ({
+    // Calculated metrics travel with the widgets that use them (names the target lacks are added).
+    const have = new Set((doc.calcs ?? []).map((c) => c.id));
+    const newCalcs = (clip.calcs ?? []).filter((c) => !have.has(c.id) && usesMetric(items, c.id));
+    const calcs = newCalcs.length ? { calcs: [...(doc.calcs ?? []), ...newCalcs].slice(0, 30) } : {};
+    const next = updatePage({ ...doc, ...calcs, widgets: { ...doc.widgets, ...widgets } }, page.id, (p) => ({
         ...p,
         // Tablet and phone layouts are derived again from the desktop one.
         layouts: { lg: [...p.layouts.lg, ...lg], md: undefined, sm: undefined },

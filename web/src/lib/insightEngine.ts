@@ -13,6 +13,7 @@
  * and consistency. Move "finding" into JS, leave "explaining" to the LLM.
  */
 import { expectedCTR } from './alertEngine';
+import { isAiSource } from '@/components/site/lib/rules';
 
 export type InsightCategory =
     // ─── Tactical (specific, $-quantifiable SEO fixes) ───
@@ -2266,14 +2267,13 @@ function detectAiChannelEmergent(input: InsightInput): RankedInsight[] {
     const sources: any[] = an.sources || an.topSources || an.channels || [];
     if (!Array.isArray(sources) || sources.length === 0) return [];
 
-    const AI_SOURCE_RE = /(chatgpt\.com|chat\.openai|perplexity\.ai|gemini\.google|claude\.ai|copilot\.microsoft|you\.com|phind\.com)/i;
     const matches = sources
         .map((s: any, idx: number) => ({
             source: String(s.source || s.name || s.channel || ''),
             sessions: toInt(s.sessions ?? s.users ?? 0),
             rank: idx + 1,
         }))
-        .filter(s => AI_SOURCE_RE.test(s.source) && s.sessions >= 50);
+        .filter(s => isAiSource(s.source) && s.sessions >= 50); // the app's one AI definition (site/lib/rules)
     if (matches.length === 0) return [];
 
     const schema = input.schemaCoverage;

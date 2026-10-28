@@ -12,6 +12,7 @@ import { getValidAccessToken, runGSCQuery } from '@/lib/googleApi';
 import { accessForAsset, credentialsForAsset, listLinkedGoogleConnections } from '@/lib/googleAccounts';
 import { checkOwnership, type OwnershipCheck } from '@/lib/leaderboardVerify';
 import { collectAudience } from '@/lib/audienceFetch';
+import { ROLLING_PRESET_DAYS, rollingWindow } from '@/lib/dateRange';
 import { lbAdmin } from './admin';
 import type { OwnershipOutcome } from './types';
 
@@ -19,11 +20,8 @@ const GA_DATA_BASE = 'https://analyticsdata.googleapis.com/v1beta';
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
-const RANGE_DAYS: Array<{ key: '7d' | '28d' | '3m'; days: number }> = [
-    { key: '7d', days: 7 },
-    { key: '28d', days: 28 },
-    { key: '3m', days: 90 },
-];
+/** The board's ranges: the app presets of the same name (lib/dateRange), so "28 days" is the site page's 28 days. */
+const RANGE_DAYS: Array<{ key: '7d' | '28d' | '3m'; days: number }> = (['7d', '28d', '3m'] as const).map((key) => ({ key, days: ROLLING_PRESET_DAYS[key]! }));
 const DAILY_DAYS = 180;
 
 export interface RefreshInput {
@@ -90,11 +88,26 @@ interface RangeNumbers {
     avg_session_duration: number | null;
 }
 
-async function fetchRange(token: string, pid: string, days: number): Promise<RangeNumbers> {
+type Window = ReturnType<typeof rollingWindow>;
+
+/**
+ * Every window one refresh reads, from one "now" (lib/dateRange, the app's one window rule): the board's 7d / 28d /
+ * 3m are complete days through yesterday with the days right before them, the same days as the site page's; the
+ * daily series run to each source's last complete day. Pure (tests: windowRule.test.mjs).
+ */
+export function leaderboardWindows(now: Date = new Date()): { ranges: Record<'7d' | '28d' | '3m', Window>; gaDaily: Window; gscDaily: Window } {
+    return {
+        ranges: Object.fromEntries(RANGE_DAYS.map((r) => [r.key, rollingWindow(r.days, 'ga4', now)])) as Record<'7d' | '28d' | '3m', Window>,
+        gaDaily: rollingWindow(DAILY_DAYS, 'ga4', now),
+        gscDaily: rollingWindow(DAILY_DAYS, 'gsc', now),
+    };
+}
+
+async function fetchRange(token: string, pid: string, w: Window): Promise<RangeNumbers> {
     const report = await ga4Report(token, pid, {
         dateRanges: [
-            { name: 'cur', startDate: `${days - 1}daysAgo`, endDate: 'today' },
-            { name: 'prev', startDate: `${days * 2 - 1}daysAgo`, endDate: `${days}daysAgo` },
+            { name: 'cur', startDate: w.start, endDate: w.end },
+            { name: 'prev', startDate: w.prevStart!, endDate: w.prevEnd! },
         ],
         metrics: [{ name: 'activeUsers' }, { name: 'engagementRate' }, { name: 'bounceRate' }, { name: 'averageSessionDuration' }],
     });
@@ -125,9 +138,9 @@ interface DailyRow {
     impressions?: number | null;
 }
 
-async function fetchGaDaily(token: string, pid: string): Promise<DailyRow[]> {
+async function fetchGaDaily(token: string, pid: string, w: Window): Promise<DailyRow[]> {
     const report = await ga4Report(token, pid, {
-        dateRanges: [{ startDate: `${DAILY_DAYS - 1}daysAgo`, endDate: 'today' }],
+        dateRanges: [{ startDate: w.start, endDate: w.end }],
         dimensions: [{ name: 'date' }],
         metrics: [{ name: 'activeUsers' }, { name: 'sessions' }, { name: 'screenPageViews' }],
         orderBys: [{ dimension: { dimensionName: 'date' } }],
@@ -141,14 +154,8 @@ async function fetchGaDaily(token: string, pid: string): Promise<DailyRow[]> {
     }));
 }
 
-function isoDay(d: Date): string {
-    return d.toISOString().slice(0, 10);
-}
-
-async function fetchGscDaily(token: string, siteUrl: string): Promise<DailyRow[]> {
-    const end = new Date();
-    const start = new Date(end.getTime() - (DAILY_DAYS - 1) * 86_400_000);
-    const data = (await runGSCQuery(token, siteUrl, ['date'], isoDay(start), isoDay(end), 400, AbortSignal.timeout(20_000))) as {
+async function fetchGscDaily(token: string, siteUrl: string, w: Window): Promise<DailyRow[]> {
+    const data = (await runGSCQuery(token, siteUrl, ['date'], w.start, w.end, 400, AbortSignal.timeout(20_000))) as {
         rows?: Array<{ keys?: string[]; clicks?: number; impressions?: number }>;
     };
     return (data.rows || [])
@@ -223,10 +230,11 @@ export async function refreshEntry(rawInput: RefreshInput): Promise<RefreshResul
         if (a.ok) gscToken = a.token;
     }
     try {
+        const win = leaderboardWindows();
         const [ranges, daily, gscDaily] = await Promise.all([
-            Promise.all(RANGE_DAYS.map((r) => fetchRange(token, pid, r.days))),
-            fetchGaDaily(token, pid),
-            gscSiteUrl ? fetchGscDaily(gscToken, gscSiteUrl).catch((err) => { console.warn(`[leaderboard] GSC daily failed for entry ${input.entryId}:`, err); return null; }) : Promise.resolve(null),
+            Promise.all(RANGE_DAYS.map((r) => fetchRange(token, pid, win.ranges[r.key]))),
+            fetchGaDaily(token, pid, win.gaDaily),
+            gscSiteUrl ? fetchGscDaily(gscToken, gscSiteUrl, win.gscDaily).catch((err) => { console.warn(`[leaderboard] GSC daily failed for entry ${input.entryId}:`, err); return null; }) : Promise.resolve(null),
         ]);
         const rangeBody: Record<string, RangeNumbers> = {};
         RANGE_DAYS.forEach((r, i) => { rangeBody[r.key] = ranges[i]; });

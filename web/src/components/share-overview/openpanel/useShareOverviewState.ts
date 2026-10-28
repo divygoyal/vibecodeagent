@@ -10,7 +10,7 @@ import {
 } from '@/lib/shareOverviewFilters';
 
 const historyOptions = { history: 'push' } as const;
-const RANGE_VALUES = ['today', 'yesterday', '7d', '14d', '30d', '60d', '90d', '6m', '12m', 'this_week', 'last_week', 'this_month', 'last_month', 'this_year', 'last_year', 'all', 'custom'] as const;
+const RANGE_VALUES = ['today', 'yesterday', '7d', '14d', '28d', '30d', '60d', '90d', '6m', '12m', 'this_week', 'last_week', 'this_month', 'last_month', 'this_year', 'last_year', 'all', 'custom'] as const;
 const INTERVAL_VALUES = ['hour', 'day', 'week', 'month'] as const;
 const SOURCE_VALUES = ['referrer_name', 'referrer', 'referrer_type', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'] as const;
 const PAGES_VALUES = ['page', 'entry', 'exit'] as const;
@@ -54,7 +54,7 @@ function getDefaultInterval(range: string, startDate?: string | null, endDate?: 
 export function useShareOverviewState() {
     const [range, setRangeState] = useQueryState(
         'range',
-        parseAsStringEnum([...RANGE_VALUES]).withDefault('30d').withOptions(historyOptions),
+        parseAsStringEnum([...RANGE_VALUES]).withDefault('28d').withOptions(historyOptions),
     );
     const [overrideInterval, setOverrideInterval] = useQueryState(
         'overrideInterval',

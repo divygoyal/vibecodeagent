@@ -223,6 +223,9 @@
   --tc-brand:#a8401a; --tc-brand-hover:#8f3513; --tc-brand-fg:#fff; --tc-brand-text:#a33a14; --tc-brand-soft:#fdeee6; --tc-brand-soft-fg:#8a3112; --tc-focus:#b4441c;
   --tc-shadow-card:0 1px 2px rgb(60 40 10 / 0.05), 0 6px 20px -8px rgb(60 40 10 / 0.12);
   --tc-chart-grid:#f3ece0; --tc-chart-axis:#e0d5c1; --tc-chart-tick:#665c50; --tc-chart-cursor:#c9bba3;
+  /* Chart note markers: the rust brand sits next to the amber Google update markers, so notes are teal
+     (6.1:1 on the surface; the pill's surface-coloured number 6.1:1 on it). */
+  --tc-mark-note:#0f6b78;
 }
 [data-dash-theme="sunrise"][data-theme="dark"] {
   --tc-canvas:#17120d; --tc-surface:#201a14; --tc-surface-raised:#28211a; --tc-surface-sunken:#1b1510; --tc-subtle:#28211a; --tc-subtle-strong:#31281f;
@@ -230,6 +233,7 @@
   --tc-fg:#f3ece1; --tc-fg-secondary:#cbbfae; --tc-fg-muted:#a1957f; --tc-fg-faint:#766b59;
   --tc-brand:#f0a47c; --tc-brand-hover:#f4b996; --tc-brand-fg:#2a1306; --tc-brand-text:#f0a47c; --tc-brand-soft:rgb(240 164 124 / 0.12); --tc-brand-soft-fg:#f6c8ac; --tc-focus:#f0a47c;
   --tc-shadow-card:inset 0 1px 0 rgb(255 255 255 / 0.03); --tc-chart-grid:#302820; --tc-chart-axis:#41362a; --tc-chart-tick:#a1957f; --tc-chart-cursor:#5a4c3a;
+  --tc-mark-note:#6fc2c9; /* 8.4:1 on the surface, and for the dark number on the pill */
 }
 
 /* studio (the brand kit overrides --tc-brand* inline; these are the defaults) */

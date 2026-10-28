@@ -136,32 +136,149 @@ export interface ResolvedDateRange {
 }
 
 export interface ResolveOptions {
-    /** Defaults to now. Only the UTC calendar day is used. */
-    now?: Date;
+    /** Defaults to now. Only the UTC calendar day is used ('YYYY-MM-DD' = that day). */
+    now?: Date | string;
     /**
-     * Days of data delay. Search Console ranges end 2 days ago (lagDays: 2);
-     * GA4 ranges end today (0, the default).
+     * Days of data delay (the last day counted is `lagDays` before today). App code does not pass
+     * this: it calls resolveWindow(value, source), which applies SOURCE_LAG_DAYS.
      */
     lagDays?: number;
 }
 
+// ─── The one window rule (round 7) ────────────────────────────────────────
+//
+// Every surface (site pages, portfolio, dashboards, share page, leaderboard, home page, legacy
+// APIs) resolves "last N days" here, so one site and one "28 days" give the same dates and the
+// same numbers everywhere:
+//
+//   - complete days only, UTC calendar days;
+//   - Google Analytics: through yesterday (today is still filling in);
+//   - Search Console: through 2 days ago (its usual delay; final data);
+//   - previous period: the same number of days right before (7d / 28d are whole weeks, so the
+//     comparison lines up by weekday);
+//   - 7d / 28d / 3m are 7 / 28 / 90 days; 6m / 12m / 16m are calendar months;
+//   - today's partial day only where it is explicitly partial: the 24-hour view, Realtime, and
+//     "this month/week/year" on their first day.
+//
+// Surfaces that show both sources label both windows (they differ by one day).
+
+export type DataSource = 'ga4' | 'gsc';
+
+/** Days between today and the last complete day of each source. */
+export const SOURCE_LAG_DAYS: Record<DataSource, number> = { ga4: 1, gsc: 2 };
+
+/** Fixed day counts of the rolling presets (the month presets are calendar months). */
+export const ROLLING_PRESET_DAYS: Partial<Record<RangePreset, number>> = { '7d': 7, '28d': 28, '3m': 90 };
+
+function todayOf(now: Date | string | undefined): Date {
+    if (typeof now === 'string' && ISO_DAY.test(now)) return parseIso(now);
+    return utcDay(now instanceof Date ? now : new Date());
+}
+
+/** Today's UTC calendar day, 'YYYY-MM-DD'. */
+export function utcToday(now: Date | string = new Date()): string {
+    return iso(todayOf(now));
+}
+
+/** The newest complete day of a source: yesterday for GA4, 2 days ago for Search Console. */
+export function lastCompleteDay(source: DataSource, now: Date | string = new Date()): string {
+    return iso(addDays(todayOf(now), -SOURCE_LAG_DAYS[source]));
+}
+
+/** THE window rule: the days a preset covers for one source (see the block comment above). */
+export function resolveWindow(value: DateRangeValue, source: DataSource, opts: { now?: Date | string } = {}): ResolvedDateRange {
+    return resolveDateRange(value, { now: opts.now, lagDays: SOURCE_LAG_DAYS[source] });
+}
+
+/** "Last N days" for a source (N complete days) with the previous N days. For APIs keyed by a day count. */
+export function rollingWindow(days: number, source: DataSource, now: Date | string = new Date()): ResolvedDateRange {
+    const n = Math.max(1, Math.floor(days));
+    const end = addDays(todayOf(now), -SOURCE_LAG_DAYS[source]);
+    const start = addDays(end, -(n - 1));
+    const pe = addDays(start, -1);
+    return { start: iso(start), end: iso(end), days: n, prevStart: iso(addDays(pe, -(n - 1))), prevEnd: iso(pe) };
+}
+
+/**
+ * The Search Console counterpart of a GA4 window: a window that runs to GA4's last complete day
+ * moves back onto Search Console's last complete day, keeping its length (28 days stay 28 days).
+ * Windows that end earlier (custom ranges, last month) are complete for both and stay as they are.
+ */
+export function searchWindowOf(range: { start: string; end: string }, now: Date | string = new Date()): { start: string; end: string } {
+    const last = lastCompleteDay('gsc', now);
+    if (range.end <= last) return { start: range.start, end: range.end };
+    const shift = Math.round((parseIso(range.end).getTime() - parseIso(last).getTime()) / DAY_MS);
+    const start = iso(addDays(parseIso(range.start), -shift));
+    return { start, end: last };
+}
+
+/** Day counts and app presets of the legacy range keys (old APIs, the client share page). */
+const LEGACY_ROLLING_DAYS: Record<string, number> = { '7d': 7, '14d': 14, '30d': 30, '60d': 60, '90d': 90, all: 365 };
+const LEGACY_PRESETS: Record<string, RangePreset> = { '28d': '28d', '3m': '3m', '6m': '6m', '12m': '12m', '16m': '16m' };
+
+/**
+ * The window rule for legacy range keys ('30d', 'this_month', ...): rolling keys are N complete days, 'this_week'
+ * (Sunday first), 'this_month' and 'this_year' run to the last complete day (today on their first day). Keys that
+ * name fixed past days ('last_month', 'yesterday') or a partial day on purpose ('today', '24h') return null: the
+ * caller keeps its own handling. The previous period is the same number of days right before (none for 'this_*').
+ */
+export function resolveLegacyWindow(range: string, source: DataSource, now: Date | string = new Date()): ResolvedDateRange | null {
+    if (range in LEGACY_ROLLING_DAYS) return rollingWindow(LEGACY_ROLLING_DAYS[range], source, now);
+    if (range in LEGACY_PRESETS) return resolveWindow({ preset: LEGACY_PRESETS[range], compare: 'prev' }, source, { now });
+    const today = todayOf(now);
+    let start: Date;
+    switch (range) {
+        case 'this_week':
+            start = addDays(today, -today.getUTCDay());
+            break;
+        case 'this_month':
+            start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+            break;
+        case 'this_year':
+            start = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
+            break;
+        default:
+            return null;
+    }
+    const last = addDays(today, -SOURCE_LAG_DAYS[source]);
+    const end = last < start ? today : last;
+    return { start: iso(start), end: iso(end), days: Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1, prevStart: null, prevEnd: null };
+}
+
+/** True when a window runs into today, whose numbers are still coming in (24 hours, a custom range to today). */
+export function endsToday(end: string, now: Date | string = new Date()): boolean {
+    return end >= utcToday(now);
+}
+
+/** Chart `partialFrom` for a series that ends on `end`: its last point when that is today (drawn dotted), else none. */
+export function partialTailFrom(points: number, end: string, now: Date | string = new Date()): number | undefined {
+    return points > 1 && endsToday(end, now) ? points - 1 : undefined;
+}
+
+/** Weekday-aligned comparison for N-day windows: shifted back by whole weeks (30 days -> 35), so Mondays face Mondays. */
+export function weekdayAlignedPrevious(range: { start: string; end: string }): { start: string; end: string } {
+    const days = Math.round((parseIso(range.end).getTime() - parseIso(range.start).getTime()) / DAY_MS) + 1;
+    const shift = Math.ceil(days / 7) * 7;
+    return { start: iso(addDays(parseIso(range.start), -shift)), end: iso(addDays(parseIso(range.end), -shift)) };
+}
+
 export function resolveDateRange(value: DateRangeValue, opts: ResolveOptions = {}): ResolvedDateRange {
-    const today = utcDay(opts.now ?? new Date());
+    const today = todayOf(opts.now);
     const lastDay = addDays(today, -(opts.lagDays ?? 0));
     let start: Date;
     let end: Date = lastDay;
 
     switch (value.preset) {
         case '24h':
-            start = addDays(lastDay, -1);
+            // Hourly and explicitly partial: yesterday and today so far, whatever the source lag.
+            end = today;
+            start = addDays(today, -1);
             break;
         case '7d':
-            start = addDays(lastDay, -6);
-            break;
         case '28d':
-            start = addDays(lastDay, -27);
-            break;
         case '3m':
+            start = addDays(lastDay, -((ROLLING_PRESET_DAYS[value.preset] ?? 28) - 1));
+            break;
         case '6m':
         case '12m':
         case '16m':
@@ -169,7 +286,8 @@ export function resolveDateRange(value: DateRangeValue, opts: ResolveOptions = {
             break;
         case 'this_month':
             start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-            if (start > end) start = end;
+            // The 1st: no complete day yet this month, so it is today so far (explicitly partial).
+            if (start > end) end = start;
             break;
         case 'last_month':
             start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));

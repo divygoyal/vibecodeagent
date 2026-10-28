@@ -8,7 +8,7 @@ import { ArrowLeft, Copy, FileDown, Globe, LayoutTemplate, Lock, MonitorPlay, Mo
 import { toast } from 'sonner';
 
 import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Skeleton } from '@/components/ui';
-import { DashboardView, useUrlControls } from '@/components/dashboard-builder/DashboardView';
+import { DashboardView, pickedSiteLabel, useUrlControls, viewerSelection } from '@/components/dashboard-builder/DashboardView';
 import { DashboardBrandHeader } from '@/components/dashboard-builder/DashboardBrandHeader';
 import { brandCompanyName } from '@/lib/builder/placeholders';
 import { ShareDialog } from '@/components/dashboard-builder/ShareDialog';
@@ -21,7 +21,9 @@ import { cssToHex, exportReportPdf, hasReportKit } from '@/lib/builder/reportPdf
 import { themeMode } from '@/lib/builder/themes';
 import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
 import { useResolvedTheme } from '@/lib/theme';
-import type { DashboardDocV2, DashboardRecord, FilterControl, ShareState } from '@/lib/builder/types';
+import { selectedSite } from '@/lib/builder/compile';
+import type { DashboardDocV2, DashboardRecord, FilterControl, ShareState, SiteControl } from '@/lib/builder/types';
+import type { SiteOption } from '@/components/dashboard-builder/editor/Fields';
 
 /** One-time note for dashboards made before the new builder (was a permanent header pill). */
 function noteOlderDashboard(rec: DashboardRecord) {
@@ -63,10 +65,10 @@ export default function DashboardViewPage({ params }: { params: Promise<{ id: st
             </div>
         );
     }
-    return <Loaded rec={rec} onRecord={(r) => mutate({ dashboard: r }, { revalidate: false })} openShare={sp.get('share') === '1'} tv={sp.get('tv') === '1'} router={router} />;
+    return <Loaded rec={rec} onRecord={(r) => mutate({ dashboard: r }, { revalidate: false })} openShare={sp.get('share') === '1'} tv={sp.get('tv') === '1'} created={sp.get('created') === '1'} router={router} />;
 }
 
-function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord; onRecord: (r: DashboardRecord) => void; openShare: boolean; tv: boolean; router: ReturnType<typeof useRouter> }) {
+function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: DashboardRecord; onRecord: (r: DashboardRecord) => void; openShare: boolean; tv: boolean; created: boolean; router: ReturnType<typeof useRouter> }) {
     const doc = rec.doc;
     const appMode = useResolvedTheme();
     const ctl = useUrlControls(doc, { date: true, compare: true, filters: true });
@@ -87,7 +89,21 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
         return () => mq.removeEventListener('change', f);
     }, []);
 
-    const siteLabel = doc.defaultSource.type === 'site' ? doc.defaultSource.siteId : 'All sites';
+    // Site switcher (round 7): the owner's allowed sites; the pick lives in the URL (s.<id>) and is never saved.
+    const siteCtl = doc.controls.find((c): c is SiteControl => c.type === 'site');
+    const { data: sitesData } = useSWR<{ sites: SiteOption[] }>(siteCtl ? '/api/dashboards/sites' : null, (u: string) => fetchJson(u), { revalidateOnFocus: false });
+    const siteOptions = useCallback((c: SiteControl) => {
+        const all = sitesData?.sites ?? [];
+        const list = c.options === 'all' ? all : all.filter((x) => (c.options as string[]).includes(x.siteId));
+        return list.map((x) => ({ value: x.siteId, label: x.label }));
+    }, [sitesData]);
+    const defaultSiteLabel = doc.defaultSource.type === 'site' ? (sitesData?.sites.find((x) => x.siteId === (doc.defaultSource as { siteId: string }).siteId)?.label ?? doc.defaultSource.siteId) : 'All sites';
+    const siteLabel = (siteCtl ? pickedSiteLabel(siteCtl, ctl.state, siteOptions(siteCtl)) : undefined) ?? defaultSiteLabel;
+    const pickedSiteId = siteCtl ? selectedSite(siteCtl, ctl.state) : undefined;
+    const filterSiteId = pickedSiteId ?? (doc.defaultSource.type === 'site' ? doc.defaultSource.siteId : undefined);
+    const switches = { onSite: ctl.setSite, onMetric: ctl.setMetric, onGrain: ctl.setGrain, siteOptions };
+    const selection = viewerSelection(doc, ctl.state, siteCtl ? siteOptions : undefined, defaultSiteLabel);
+    const dateLabel = [presetLabel(ctl.state.date.range), selection].filter(Boolean).join(' · ');
     const updatedAt = page.data ? Object.values(page.data.results).map((r) => (r.status === 'ok' ? r.fetchedAt : '')).filter(Boolean).sort()[0] : undefined;
 
     const saveDoc = async (next: DashboardDocV2) => {
@@ -113,7 +129,7 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
             // Client report kit: cover as its own first page, credits in the footer.
             const cs = getComputedStyle(exportRef.current);
             const tok = (name: string, fallback: string) => cssToHex(cs.getPropertyValue(name).trim(), fallback);
-            toast.promise(exportReportPdf(exportRef.current, { name: doc.name, dateLabel: presetLabel(ctl.state.date.range), theme: doc.theme, background: tok('--tc-canvas', '#f6f7f9'), ink: tok('--tc-fg', '#171a20'), muted: tok('--tc-fg-muted', '#636b78') }), { loading: 'Preparing PDF…', success: 'PDF downloaded', error: 'PDF export failed' });
+            toast.promise(exportReportPdf(exportRef.current, { name: doc.name, dateLabel, theme: doc.theme, background: tok('--tc-canvas', '#f6f7f9'), ink: tok('--tc-fg', '#171a20'), muted: tok('--tc-fg-muted', '#636b78') }), { loading: 'Preparing PDF…', success: 'PDF downloaded', error: 'PDF export failed' });
             return;
         }
         const bg = getComputedStyle(document.body).backgroundColor;
@@ -121,8 +137,8 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
             const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(bg);
             return m ? `#${[m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('')}` : '#f6f7f9';
         })();
-        toast.promise(exportDashboardToPDF(exportRef.current, { dashboardName: doc.name, dateRangeLabel: presetLabel(ctl.state.date.range), companyName: brandCompanyName(doc.theme) ?? undefined, backgroundColor: hex }), { loading: 'Preparing PDF…', success: 'PDF downloaded', error: 'PDF export failed' });
-    }, [doc, ctl.state.date.range]);
+        toast.promise(exportDashboardToPDF(exportRef.current, { dashboardName: doc.name, dateRangeLabel: dateLabel, companyName: brandCompanyName(doc.theme) ?? undefined, backgroundColor: hex }), { loading: 'Preparing PDF…', success: 'PDF downloaded', error: 'PDF export failed' });
+    }, [doc, dateLabel]);
     const del = async () => {
         await fetchJson(`/api/dashboards/${rec.id}`, { method: 'DELETE' });
         toast.success('Dashboard deleted');
@@ -164,7 +180,11 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
                     </DropdownMenu>
                 </div>
             </div>
-            {!wide && editNote ? (
+            {created ? (
+                <Banner variant="success" title="Dashboard created" onDismiss={() => router.replace(`/dashboard/dashboards/${rec.id}`, { scroll: false })}>
+                    It shows your live data now, and you can share it from here. To change its widgets and layout, open it on a computer.
+                </Banner>
+            ) : !wide && editNote ? (
                 <Banner variant="neutral" onDismiss={() => setEditNote(false)}>Editing works on larger screens. Open this dashboard on a computer to change its widgets and layout.</Banner>
             ) : null}
         </div>
@@ -177,11 +197,11 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
         const r = dashRootProps(doc.theme, tvMode);
         return (
             <TvFrame doc={doc} pageId={ctl.state.pageId} onPage={ctl.setPage} onExit={() => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); ctl.setTv(false); }}
-                resolved={page.data?.resolved} updatedAt={updatedAt} themeAttrs={r?.attrs ?? { 'data-theme': tvMode }} themeStyle={r?.style} themeClass={r?.className}>
+                resolved={page.data?.resolved} updatedAt={updatedAt} themeAttrs={r?.attrs ?? { 'data-theme': tvMode }} themeStyle={r?.style} themeClass={r?.className} selection={selection}>
                 {(fit) => <DashboardView
-                    fitHeight={fit} doc={doc} mode="view" siteLabel={siteLabel} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter}
+                    fitHeight={fit} doc={doc} mode="view" siteLabel={defaultSiteLabel} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter} switches={switches}
                     allow={{ date: true, compare: true, filters: true }} data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)}
-                    onRetry={() => void page.mutate()} options={{}} shell="inherit" tv
+                    onRetry={() => void page.mutate()} options={{}} shell="inherit" tv notes={{ kind: 'owner', defaultSource: doc.defaultSource, canAdd: false }}
                 />}
             </TvFrame>
         );
@@ -192,7 +212,8 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
             <DashboardView
                 doc={doc}
                 mode="view"
-                siteLabel={siteLabel}
+                siteLabel={defaultSiteLabel}
+                switches={switches}
                 state={ctl.state}
                 onPage={ctl.setPage}
                 onDate={ctl.setDate}
@@ -204,12 +225,13 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
                 loading={!page.data && !page.error}
                 refetching={page.isValidating && Boolean(page.data)}
                 onRetry={() => void page.mutate()}
-                options={{ load: (c: FilterControl, q: string) => fetchJson<{ options: Array<{ value: string; label: string }> }>(`/api/dashboards/options?dimension=${encodeURIComponent(c.dimension)}&q=${encodeURIComponent(q)}${doc.defaultSource.type === 'site' ? `&siteId=${encodeURIComponent(doc.defaultSource.siteId)}` : ''}`).then((r) => r.options) }}
+                options={{ load: (c: FilterControl, q: string) => fetchJson<{ options: Array<{ value: string; label: string }> }>(`/api/dashboards/options?dimension=${encodeURIComponent(c.dimension)}&q=${encodeURIComponent(q)}${filterSiteId ? `&siteId=${encodeURIComponent(filterSiteId)}` : ''}`).then((r) => r.options) }}
                 header={header}
                 exportRef={exportRef}
                 onChooseSource={wide ? () => router.push(`/dashboard/dashboards/${rec.id}/edit`) : undefined}
                 shell="panel"
                 appMode={appMode}
+                notes={{ kind: 'owner', defaultSource: doc.defaultSource, canAdd: true }}
             />
             {page.error ? <Banner variant="danger" className="mt-4">{page.error instanceof Error ? page.error.message : 'Could not load data'}</Banner> : null}
             <ShareDialog

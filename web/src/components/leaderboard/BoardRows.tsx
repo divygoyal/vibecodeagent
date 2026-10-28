@@ -52,11 +52,11 @@ export function BoardRowItem({ row, focus, range, showNew, cols = ALL_COLUMNS }:
                                 {row.name}
                             </Link>
                             <VerifiedMark v={row.verification} className="relative z-10" />
-                            {row.category ? <><span aria-hidden className="text-meta text-fg-faint">·</span><CategoryText name={row.category} /></> : null}
+                            {row.category ? <><span aria-hidden className="text-meta text-fg-muted">·</span><CategoryText name={row.category} /></> : null}
                             {showNew ? <Badge variant="up" className="relative z-10 ml-1">New</Badge> : null}
                         </div>
                         {row.description ? <p className="mt-0.5 line-clamp-2 text-body-sm text-fg-muted @3xl:line-clamp-1">{row.description}</p> : null}
-                        {row.topic_labels.length ? <p className="mt-0.5 truncate text-meta text-fg-faint">{row.topic_labels.join(' · ')}</p> : null}
+                        {row.topic_labels.length ? <p className="mt-0.5 truncate text-meta text-fg-muted">{row.topic_labels.join(' · ')}</p> : null}
                     </div>
                 </div>
             </div>
@@ -190,7 +190,7 @@ export function SponsoredStrip({ cards, openTotal }: { cards: SponsoredCard[]; o
                                 {formatCents(c.slot.price_cents)} {billingPeriodSuffix(c.slot.billing_period)} · {c.slot.quantity_open} open
                             </span>
                         </span>
-                        <Megaphone aria-hidden size={16} className="mt-1 shrink-0 text-fg-faint group-hover:text-fg-muted" />
+                        <Megaphone aria-hidden size={16} className="mt-1 shrink-0 text-fg-muted group-hover:text-fg" />
                     </Link>
                 ))}
             </div>

@@ -105,7 +105,8 @@ export function OpportunitiesTab() {
 
 // ─── Cannibalization ──────────────────────────────────────────────────────
 
-const SEVERITY = { high: { label: 'High', variant: 'warn' as const }, medium: { label: 'Medium', variant: 'info' as const }, low: { label: 'Low', variant: 'neutral' as const } };
+/** The Actions tier, word for word (one rule: lib/actionText cannibalizationImpact), so "High" here is "High impact" there. */
+const SEVERITY = { high: { label: 'High impact', variant: 'warn' as const }, medium: { label: 'Medium impact', variant: 'info' as const }, low: { label: 'Low impact', variant: 'neutral' as const } };
 
 /** Search > Cannibalization: queries where 2+ of your pages split impressions. */
 export function CannibalizationTab() {
@@ -118,10 +119,10 @@ export function CannibalizationTab() {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="max-w-2xl text-body-sm text-fg-muted">Queries where several of your pages show up and none clearly wins. Google splits impressions between them, so each ranks lower than one strong page would.</p>
+                <p className="max-w-2xl text-body-sm text-fg-muted">Queries where several of your pages show up and none clearly wins. Google splits impressions between them, so each ranks lower than one strong page would. Impact is the clicks one clear page could add, against this site&apos;s own traffic, as on Actions.</p>
                 <div className="flex items-center gap-2">
-                    <SegmentedControl ariaLabel="Severity" size="sm" variant="neutral" value={level} onChange={setLevel} options={[{ value: 'all', label: 'All' }, { value: 'high', label: 'High only' }]} />
-                    <Button size="sm" variant="ghost" disabled={!list.length} onClick={() => downloadCsv('cannibalization.csv', ['Query', 'Severity', 'Page', 'Impressions', 'Clicks', 'Position', 'Share'],
+                    <SegmentedControl ariaLabel="Impact" size="sm" variant="neutral" value={level} onChange={setLevel} options={[{ value: 'all', label: 'All' }, { value: 'high', label: 'High impact' }]} />
+                    <Button size="sm" variant="ghost" disabled={!list.length} onClick={() => downloadCsv('cannibalization.csv', ['Query', 'Impact', 'Page', 'Impressions', 'Clicks', 'Position', 'Share'],
                         list.flatMap((c) => c.pages.map((p) => [c.query, c.severity, p.page, p.impressions, p.clicks, p.position.toFixed(1), p.share.toFixed(3)])))}>Export</Button>
                 </div>
             </div>
@@ -136,6 +137,7 @@ export function CannibalizationTab() {
                                     <div className="min-w-0">
                                         <h3 className="text-title-sm text-fg [overflow-wrap:anywhere]">&ldquo;{c.query}&rdquo;</h3>
                                         <p className="mt-0.5 text-meta text-fg-muted">{c.pages.length} pages · {fmtFull(c.totalImpressions)} impressions · {fmtFull(c.totalClicks)} clicks · best position {fmtPosition(c.bestPosition)}</p>
+                                        {c.gain > 0 ? <p className="mt-0.5 text-meta text-fg-secondary tabular-nums">+{fmtFull(c.gain)} clicks a month if one page ranks</p> : null}
                                     </div>
                                     <Badge variant={SEVERITY[c.severity].variant}>{SEVERITY[c.severity].label}</Badge>
                                 </div>

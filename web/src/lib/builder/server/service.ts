@@ -39,6 +39,7 @@ export function evaluateDoc(
         controlDefs: doc.controls,
         controls,
         timezone: doc.settings.timezone,
+        calcs: doc.calcs,
     }, deps);
 }
 

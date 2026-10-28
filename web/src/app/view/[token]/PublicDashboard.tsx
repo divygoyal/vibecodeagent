@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 
 import { cn } from '@/lib/cn';
 import { Button, EmptyState, Skeleton } from '@/components/ui';
-import { DashboardView, useUrlControls } from '@/components/dashboard-builder/DashboardView';
+import { DashboardView, publicSiteOptions, useUrlControls, viewerSelection } from '@/components/dashboard-builder/DashboardView';
 import { DashboardBrandHeader, MadeWithBadge } from '@/components/dashboard-builder/DashboardBrandHeader';
 import { TvFrame, tvRefreshMs } from '@/components/dashboard-builder/TvMode';
 import { interactionToParam } from '@/components/dashboard-builder/Interactions';
@@ -132,10 +132,16 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
         q.set('compare', compareToParam(ctl.state.date.compare));
         for (const [k, v] of Object.entries(ctl.state.filters)) if (v.length) q.set(`f.${k}`, v.join(','));
         if (ctl.state.interaction?.length) q.set('x', interactionToParam(ctl.state.interaction) ?? '');
+        // Round 7 switchers: opaque site keys, metric ids and grains; the server re-checks every one.
+        for (const [k, v] of Object.entries(ctl.state.site ?? {})) q.set(`s.${k}`, v);
+        for (const [k, v] of Object.entries(ctl.state.metric ?? {})) q.set(`m.${k}`, v);
+        for (const [k, v] of Object.entries(ctl.state.grain ?? {})) q.set(`g.${k}`, v);
         return q;
     }, [ctl.state]);
     const page = usePageResults(`pub:${token}:${pub.rev}:${canonicalJson(ctl.state)}:${unlockKey ?? ''}`, publicPageLoader(token, query, unlockKey), tv ? tvRefreshMs(doc) : doc.settings.autoRefreshSec ? doc.settings.autoRefreshSec * 1000 : 300_000);
     const rootRef = useRef<HTMLDivElement>(null);
+    // Round 7: the owner's chart notes, only when they switched them on for share links.
+    const notes = useMemo(() => ({ kind: 'public' as const, token, query: query.toString(), unlockKey, enabled: Boolean(doc.settings.shareNotes) }), [token, query, unlockKey, doc.settings.shareNotes]);
 
     // Embeds report their height so the host page can size the iframe (PostHog-style).
     useEffect(() => {
@@ -150,6 +156,9 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
     }, [embed]);
 
     const siteLabel = doc.defaultSource && 'label' in (doc.defaultSource as object) ? String((doc.defaultSource as unknown as { label: string }).label) : '';
+    // View-only switchers (round 7): picks stay in this viewer's URL and are never saved.
+    const switches = { onSite: ctl.setSite, onMetric: ctl.setMetric, onGrain: ctl.setGrain, siteOptions: publicSiteOptions };
+    const selection = viewerSelection(doc, ctl.state, publicSiteOptions, siteLabel);
     const copy = async () => {
         try {
             const r = await fetchJson<{ id: string }>(`/api/dashboards/public/${token}/copy`, { method: 'POST', body: JSON.stringify({}), headers: unlockKey ? { Authorization: `Bearer ${unlockKey}` } : undefined });
@@ -164,9 +173,9 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
         const updatedAt = page.data ? Object.values(page.data.results).map((r) => (r.status === 'ok' ? r.fetchedAt : '')).filter(Boolean).sort()[0] : undefined;
         return (
             <TvFrame doc={doc} pageId={ctl.state.pageId} onPage={ctl.setPage} onExit={() => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); ctl.setTv(false); }}
-                resolved={page.data?.resolved} updatedAt={updatedAt} themeAttrs={tv.attrs} themeStyle={tv.style} themeClass={tv.className}>
-                {(fit) => <DashboardView fitHeight={fit} doc={doc} mode="public" siteLabel={siteLabel} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter} allow={allow}
-                    data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)} onRetry={() => void page.mutate()} options={{}} shell="inherit" tv />}
+                resolved={page.data?.resolved} updatedAt={updatedAt} themeAttrs={tv.attrs} themeStyle={tv.style} themeClass={tv.className} selection={selection}>
+                {(fit) => <DashboardView fitHeight={fit} doc={doc} mode="public" siteLabel={siteLabel} switches={switches} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter} allow={allow}
+                    data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)} onRetry={() => void page.mutate()} options={{}} shell="inherit" tv notes={notes} />}
             </TvFrame>
         );
     }
@@ -190,6 +199,7 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
                 doc={doc}
                 mode="public"
                 siteLabel={siteLabel}
+                switches={switches}
                 state={ctl.state}
                 onPage={ctl.setPage}
                 onDate={ctl.setDate}
@@ -205,6 +215,7 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
                 header={header}
                 footer={pub.share?.badge ? <div className="flex justify-center pt-2"><MadeWithBadge /></div> : null}
                 shell="inherit"
+                notes={notes}
             />
             {page.error ? <p className="mt-4 text-center text-body-sm text-fg-muted">{page.error instanceof Error ? page.error.message : 'Data is temporarily unavailable.'}</p> : null}
         </div>

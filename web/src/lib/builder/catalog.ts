@@ -15,6 +15,7 @@ import {
     fmtPosition,
     type DeltaResult,
 } from '@/lib/format';
+import { calcAutoLabel, calcDescription, calcInputs, parseCalcId, registeredCalcLabel, type CalcSpec } from './calc';
 import type { DimId, MetricId, NumberFormat } from './types';
 
 export type Family = 'ga4' | 'gsc';
@@ -43,6 +44,8 @@ export interface MetricDef {
     tier: 'core' | 'more';
     /** In the Portfolio snapshot set. */
     snapshot?: boolean;
+    /** Calculated metric (round 7): what it computes from which catalogue metrics. */
+    calc?: CalcSpec;
 }
 
 export interface DimDef {
@@ -161,7 +164,58 @@ const DIM_BY_ID = new Map(DIM_LIST.map((d) => [d.id, d]));
 // ── Lookups ──────────────────────────────────────────────────────────────
 
 export function getMetric(id: MetricId): MetricDef | undefined {
-    return METRIC_BY_ID.get(id);
+    return METRIC_BY_ID.get(id) ?? (id?.startsWith('calc:') ? calcMetric(id) : undefined);
+}
+
+const CALC_FORMAT: Record<CalcSpec['format'], MetricFormatKind> = { num: 'decimal', pct: 'percent', cur: 'currency' };
+const calcDefs = new Map<string, MetricDef>();
+
+/**
+ * A calculated metric as a catalogue entry: label from the dashboard (registerCalcs) or a default
+ * name, format and direction from the id, colour of its first input. Rolled up from its inputs by
+ * the engine (rollup 'none' here: it is never summed itself).
+ */
+function calcMetric(id: MetricId): MetricDef | undefined {
+    const spec = parseCalcId(id);
+    if (!spec) return undefined;
+    const a = METRIC_BY_ID.get(spec.a);
+    const b = spec.b ? METRIC_BY_ID.get(spec.b) : undefined;
+    if (!a || (spec.b && !b)) return undefined;
+    const labelOf = (x: MetricId) => METRIC_BY_ID.get(x)?.label ?? x;
+    const label = registeredCalcLabel(id) ?? calcAutoLabel(spec, labelOf);
+    const hit = calcDefs.get(id);
+    if (hit && hit.label === label) return hit;
+    const def: MetricDef = {
+        id,
+        api: id,
+        family: a.family,
+        label,
+        short: label,
+        description: calcDescription(spec, labelOf),
+        format: CALC_FORMAT[spec.format],
+        better: spec.better === 'flat' ? 'neutral' : spec.better,
+        scope: a.scope,
+        rollup: { kind: 'none' },
+        additive: spec.op === 'diff' && a.additive && Boolean(b?.additive),
+        colorKey: a.colorKey,
+        tier: 'core',
+        calc: spec,
+    };
+    if (calcDefs.size > 2000) calcDefs.clear();
+    calcDefs.set(id, def);
+    return def;
+}
+
+export function isCalcMetric(id: MetricId): boolean {
+    return Boolean(getMetric(id)?.calc);
+}
+
+/** Data families a metric reads: one for catalogue metrics, its inputs' families for a calculation. */
+export function metricFamilies(id: MetricId): Family[] {
+    const spec = parseCalcId(id);
+    if (spec) return [...new Set(calcInputs(spec).map((x) => metricFamily(x)).filter((f): f is Family => Boolean(f)))];
+    const f = metricFamily(id);
+    return f ? [f] : [];
 }
 
 export function getDim(id: DimId): DimDef | undefined {
@@ -175,7 +229,7 @@ export function metricFamily(id: MetricId): Family | null {
 }
 
 export function metricLabel(id: MetricId): string {
-    return getMetric(id)?.label ?? id.replace(/^(ga4|gsc):/, '');
+    return getMetric(id)?.label ?? (id.startsWith('calc:') ? 'Calculated metric' : id.replace(/^(ga4|gsc):/, ''));
 }
 
 export function dimLabel(id: DimId): string {

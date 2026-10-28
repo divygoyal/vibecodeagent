@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { getShareData } from '@/app/api/share/route';
+import { notFound } from 'next/navigation';
+import { lookupShare } from '@/app/api/share/route';
 import SharedOverviewClient from '@/components/share-overview/openpanel/SharedOverviewClient';
 import SharedUmamiClient from '@/components/share-overview/umami/SharedUmamiClient';
 import SharedDashboardClient from './SharedDashboardClient';
@@ -44,11 +45,12 @@ export default async function SharedDashboardPage({
     const watermarkParam = resolvedSearchParams?._b;
     const watermarkSig = Array.isArray(watermarkParam) ? watermarkParam[0] : watermarkParam;
     const hideOwnerLogo = verifyShareWatermarkSignature(token, watermarkSig);
-    const share = await getShareData(token, { incrementView: true });
+    const { share, gone } = await lookupShare(token, { incrementView: true });
 
-    /* ─── Invalid / revoked token ─── */
+    /* ─── Invalid / revoked token: 404 with the not-available card (not-found.tsx); share service down: say so ─── */
     if (!share) {
-        return <ShareNotFound isEmbed={isEmbed} />;
+        if (gone) notFound();
+        return <ShareNotFound isEmbed={isEmbed} temporary />;
     }
 
     // Show the slim conversion bar ONLY on direct viewer-facing share views.

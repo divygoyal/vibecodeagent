@@ -3,9 +3,12 @@
  * absolute 'YYYY-MM-DD' (so cache keys are stable), the default range ends yesterday in the
  * property time zone, and comparison ranges are derived from the resolved range.
  */
+import { resolveLegacyWindow } from '@/lib/dateRange';
 import type { CompareSpec, DatePresetId, DateRangeSpec, Iso } from './types';
 
 const DAY_MS = 86_400_000;
+/** Presets resolved by lib/dateRange (this_week stays here: the builder's weeks start on Monday; 16m keeps GSC's limit). */
+const SHARED_PRESETS = new Set<DatePresetId>(['7d', '14d', '28d', '30d', '90d', '3m', '6m', '12m', 'this_month', 'this_year']);
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const PRESETS: { id: DatePresetId; label: string; short: string }[] = [
@@ -119,6 +122,12 @@ export function resolveRange(spec: DateRangeSpec, today: Iso): { start: Iso; end
         const days = Math.max(1, Math.min(500, Math.floor(spec.days || 28)));
         const end = addDays(yesterday, -Math.max(0, Math.floor(spec.endOffsetDays ?? 0)));
         return { start: addDays(end, -(days - 1)), end };
+    }
+    // The app's one window rule (lib/dateRange): the presets every surface shares resolve there, so a dashboard's
+    // "Last 28 days" is the site page's, the portfolio's and the share page's 28 days.
+    if (!spec.includeToday && SHARED_PRESETS.has(spec.id)) {
+        const w = resolveLegacyWindow(spec.id, 'ga4', today);
+        if (w) return { start: w.start, end: w.end };
     }
     const last = spec.includeToday ? today : yesterday;
     const [ty, tm] = ymd(today);

@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useContext, useMemo, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { heatbarClass } from '@/components/charts/style';
@@ -119,7 +119,7 @@ function TrendLine({ values, labels, metric }: { values: number[]; labels: strin
                     </>
                 ) : null}
             </svg>
-            <div aria-hidden className="relative mt-1 h-4 text-meta text-fg-faint">
+            <div aria-hidden className="relative mt-1 h-4 text-meta text-fg-muted">
                 {width > 0 ? labels.map((l, i) => (i % every === 0 || i === labels.length - 1) && !(i !== labels.length - 1 && labels.length - 1 - i < every) ? (
                     <span key={i} className={cn('absolute top-0 whitespace-nowrap', i === 0 ? '' : i === labels.length - 1 ? '-translate-x-full' : '-translate-x-1/2')} style={{ left: i === labels.length - 1 ? x(i) + padX : i === 0 ? x(i) - padX : x(i) }}>{l}</span>
                 ) : null) : null}
@@ -158,13 +158,61 @@ function TrendStrip({ info }: { info: TableInfo }) {
 }
 
 /**
+ * Where the first column that does not fit starts (px from the scroller's left edge), or null when all fit. The right
+ * fade ends there, so a cut-off column is hidden whole instead of showing "vs befo…" / "▲835…" (round 7, audit 17).
+ */
+function useColumnCut(el: HTMLDivElement | null, more: boolean, scrolled: boolean): number | null {
+    const [cut, setCut] = useState<number | null>(null);
+    useEffect(() => {
+        if (!el || !more) return;
+        const measure = () => {
+            const box = el.getBoundingClientRect();
+            const cells = el.querySelectorAll<HTMLElement>('tr:first-child > th, tr:first-child > td');
+            let at: number | null = null;
+            for (const c of cells) {
+                const r = c.getBoundingClientRect();
+                if (r.right > box.right + 1 && r.left < box.right) {
+                    at = r.left - box.left;
+                    break;
+                }
+            }
+            // A single column wider than the box: a plain edge fade.
+            setCut(at !== null && at >= 48 ? Math.round(at) : null);
+        };
+        measure();
+        el.addEventListener('scroll', measure, { passive: true });
+        const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+        ro?.observe(el);
+        return () => {
+            el.removeEventListener('scroll', measure);
+            ro?.disconnect();
+        };
+    }, [el, more, scrolled]);
+    return more ? cut : null;
+}
+
+/**
  * Tables: thin rules, muted headers, tabular numbers. Each table scrolls sideways in its own box (`relative`, so the
  * screen-reader text inside cells cannot widen the page); on phones the first column stays put while the rest
- * scrolls, and a fade on the right edge says there is more.
+ * scrolls. When columns are left over, the box fades out where the first hidden column starts and a round arrow
+ * scrolls to it, so no word is cut in half (round 7, audit item 17).
  */
 export function AnswerTable({ node, children }: { node?: unknown; children?: ReactNode }) {
     const info = useMemo(() => tableInfo(node as HastNode | undefined), [node]);
-    const [ref, { more, scrolled }] = useScrollEdges();
+    const [edgeRef, { more, scrolled }] = useScrollEdges();
+    const [el, setEl] = useState<HTMLDivElement | null>(null);
+    const ref = useCallback((node: HTMLDivElement | null) => {
+        edgeRef(node);
+        setEl(node);
+    }, [edgeRef]);
+    const cut = useColumnCut(el, more, scrolled);
+    const mask = more ? (cut !== null ? `linear-gradient(to right, #000 ${cut - 16}px, transparent ${cut}px)` : 'linear-gradient(to left, transparent, #000 40px)') : undefined;
+    const next = () => {
+        if (!el) return;
+        const sticky = el.querySelector<HTMLElement>('tr:first-child > :first-child');
+        const stuck = sticky && getComputedStyle(sticky).position === 'sticky' ? sticky.getBoundingClientRect().width : 0;
+        el.scrollBy({ left: Math.max(64, (cut ?? el.clientWidth * 0.6) - stuck), behavior: 'smooth' });
+    };
     return (
         <TableCtx.Provider value={info}>
             <div className="relative my-4 min-w-0 max-w-full overflow-hidden rounded-card border border-border-subtle bg-surface">
@@ -175,11 +223,18 @@ export function AnswerTable({ node, children }: { node?: unknown; children?: Rea
                         data-scrolled={scrolled ? '' : undefined}
                         // Keyboard users can scroll a table that is wider than its box.
                         tabIndex={more || scrolled ? 0 : undefined}
+                        style={mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined}
                         className="group/answer-table relative overflow-x-auto overscroll-x-contain focus-visible:-outline-offset-2"
                     >
                         <table className="w-full border-collapse text-body-sm tabular-nums">{children}</table>
                     </div>
-                    {more ? <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent" /> : null}
+                    {more ? (
+                        // Pointer cue; keyboard users scroll the focusable box itself.
+                        <button type="button" tabIndex={-1} aria-hidden onClick={next}
+                            className="absolute top-1 right-1.5 grid size-7 place-items-center rounded-full border border-border-subtle bg-surface-raised text-fg-muted shadow-sm hover:text-fg">
+                            <ChevronRight size={16} strokeWidth={1.75} />
+                        </button>
+                    ) : null}
                 </div>
             </div>
         </TableCtx.Provider>

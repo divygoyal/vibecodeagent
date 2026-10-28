@@ -13,6 +13,7 @@ import { HomeThemeSync } from '@/components/marketing/home/HomeThemeSync';
 import { WhyFree } from '@/components/marketing/home/HomeSections';
 import { JobStory } from '@/components/marketing/home/JobStory';
 import { LeaderboardPreview } from '@/components/marketing/home/LeaderboardPreview';
+import { boardPreviewRows, isTestServer } from '@/components/marketing/home/proof';
 import { McpSection } from '@/components/marketing/home/McpSection';
 import { ConnectGoogleButton } from '@/components/marketing/site/ConnectGoogleButton';
 import { Faq } from '@/components/marketing/site/Faq';
@@ -20,10 +21,11 @@ import { FinalCta } from '@/components/marketing/site/FinalCta';
 import { BrowserFrame, Section, SectionHeading } from '@/components/marketing/site/Section';
 import { SignInNotice } from '@/components/marketing/site/SignInNotice';
 import { BRAND_NAME, SITE_URL } from '@/lib/brand';
+import { lbAdmin } from '@/lib/leaderboard/admin';
 import { PAID_PLANS } from '@/lib/plans';
 
 // Every product number on this page comes from the demo generator (sample data, never Google); it changes
-// once a UTC day, so the page is rebuilt hourly.
+// once a UTC day, so the page is rebuilt hourly (every 10 minutes while the leaderboard teaser's cache is shorter).
 export const revalidate = 3600;
 
 const TITLE = `${BRAND_NAME}: All your sites. One screen. Free.`;
@@ -56,7 +58,11 @@ const appSchema = {
 const HOME_FAQ_PICK = [0, 1, 2, 3, 5, 7, 8, 9, 11];
 
 export default async function HomePage() {
-    const { byRange, story, tour, boardSample } = buildHomeData();
+    const { byRange, story, tour } = buildHomeData();
+    // "Top sites right now": the public board's own Top 5 for 28 days (same rows, ranks and privacy as /leaderboard),
+    // rendered here so it shows without JavaScript. Cached 10 minutes, so the page refreshes it that often.
+    const board = await lbAdmin('/api/lb/board', { query: { tab: 'top', range: '28d', page: 1, page_size: 5 }, revalidate: 600, timeoutMs: 4_000 });
+    const boardRows = board.ok ? boardPreviewRows(board.data) : [];
     const p28 = byRange['28d'];
     // The product tour's live rows: the app's own report code on the same demo data (no network). A row that cannot
     // be built keeps its static picture.
@@ -152,7 +158,7 @@ export default async function HomePage() {
             <McpSection portfolio={p28} askHref={tour.ask} />
 
             <span id="tour-leaderboard" aria-hidden className="block scroll-mt-20" />
-            <LeaderboardPreview sampleRows={boardSample} />
+            <LeaderboardPreview initialRows={boardRows} testServer={testServerHost()} />
 
             <WhyFree />
 
@@ -197,4 +203,13 @@ function CtaRow({ note, demoHref }: { note: string; demoHref?: string }) {
             <p className="text-body-sm text-fg-muted">{note}</p>
         </div>
     );
+}
+
+/** A dev or test server (the board holds seed listings there), by the app's own URL. */
+function testServerHost(): boolean {
+    try {
+        return isTestServer(new URL(process.env.NEXTAUTH_URL || SITE_URL).hostname);
+    } catch {
+        return false;
+    }
 }

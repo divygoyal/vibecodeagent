@@ -30,7 +30,8 @@ import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ChartColumn, ExternalLi
 
 import { cn } from '@/lib/cn';
 import { eventDisplayName } from '@/lib/eventNames';
-import { fmtAxis, fmtCompact, fmtDuration, fmtFull, fmtPercent, makeDateTickFormatter, type MetricFormat } from '@/lib/format';
+import { endsToday, partialTailFrom } from '@/lib/dateRange';
+import { fmtAxis, fmtCompact, fmtDateRange, fmtDuration, fmtFull, fmtPercent, makeDateTickFormatter, type MetricFormat } from '@/lib/format';
 import { categoricalColor, METRICS as METRIC_DEFS, type MetricKey } from '@/lib/metrics';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -187,6 +188,8 @@ type StatsSeriesPoint = Record<string, number | string>;
 type StatsResponse = {
     metrics: Record<string, number>;
     series: StatsSeriesPoint[];
+    /** The days behind the numbers (complete days, lib/dateRange) and the weekday-aligned previous period. */
+    window?: { start: string; end: string; prevStart: string; prevEnd: string };
 };
 type GenericItem = { prefix?: string; name: string; sessions: number; pageviews: number; revenue?: number };
 type TopGenericResponse = { supported: boolean; label: string; primaryMetric?: 'sessions' | 'pageviews'; items: GenericItem[] };
@@ -529,7 +532,7 @@ function BreakdownTable<T>({ rows, rowKey, labelHeader, label, labelText, column
     };
     const sortIcon = (key: string) => {
         const Icon = sort?.key === key ? (sort.dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
-        return <Icon aria-hidden size={12} className={sort?.key === key ? 'text-fg' : 'text-fg-faint'} />;
+        return <Icon aria-hidden size={12} className={sort?.key === key ? 'text-fg' : 'text-fg-muted'} />;
     };
     const ariaSort = (key: string) => (sort?.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined);
 
@@ -629,12 +632,23 @@ function useBoxWidth<T extends HTMLElement>(): [(el: T | null) => void, number] 
     return [setEl, w];
 }
 
-function OverviewChart({ data, metric, interval, height = 260 }: { data: StatsSeriesPoint[]; metric: OverviewMetric; interval: string; height?: number }) {
+function OverviewChart({ data, metric, interval, partialFrom, height = 260 }: { data: StatsSeriesPoint[]; metric: OverviewMetric; interval: string; partialFrom?: number; height?: number }) {
     const color = METRIC_DEFS[metric.family].color;
     const gradientId = `ov-fill-${metric.key}`;
+    // A point still coming in (the range runs into today) is drawn dotted, as in the app: `head` is the solid line,
+    // `tail` the dotted end; they share the last complete point.
+    const p = typeof partialFrom === 'number' && partialFrom > 0 && partialFrom < data.length ? partialFrom : null;
     const rows = useMemo(
-        () => data.map((p) => ({ date: String(p.date), value: seriesValue(p, metric.key), prev: seriesValue(p, `prev_${metric.key}`) })),
-        [data, metric.key],
+        () => data.map((pt, i) => {
+            const value = seriesValue(pt, metric.key);
+            return {
+                date: String(pt.date), value, prev: seriesValue(pt, `prev_${metric.key}`),
+                head: p === null || i < p ? value : null,
+                tail: p !== null && i >= p - 1 ? value : null,
+                partial: p !== null && i >= p,
+            };
+        }),
+        [data, metric.key, p],
     );
     const yFmt = (v: number) => (metric.format === 'count' ? fmtAxis(v) : metric.format === 'decimal' ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : fmtOverview(metric.format, v, { compact: true }));
     // The app's axis rules (components/charts/axis.ts, round 4 audit #6): round steps (0 / 1K / 2K / 3K)
@@ -652,7 +666,7 @@ function OverviewChart({ data, metric, interval, height = 260 }: { data: StatsSe
 
     const renderTooltip = (props: TooltipContentProps<number, string>) => {
         if (!props.active || !props.payload?.length) return null;
-        const row = props.payload[0]?.payload as { date: string; value: number; prev: number } | undefined;
+        const row = props.payload[0]?.payload as { date: string; value: number; prev: number; partial: boolean } | undefined;
         if (!row) return null;
         const tRows: ChartTooltipRow[] = [
             {
@@ -671,7 +685,7 @@ function OverviewChart({ data, metric, interval, height = 260 }: { data: StatsSe
             },
             { key: 'prev', label: 'Previous period', color, dashed: true, value: fmtOverview(metric.format, row.prev) },
         ];
-        return <ChartTooltipCard title={formatDateLabel(row.date, interval, true)} rows={tRows} />;
+        return <ChartTooltipCard title={formatDateLabel(row.date, interval, true)} rows={tRows} partial={row.partial} />;
     };
 
     return (
@@ -695,7 +709,7 @@ function OverviewChart({ data, metric, interval, height = 260 }: { data: StatsSe
                 <Line dataKey="prev" type="monotone" stroke={color} strokeWidth={1.5} strokeDasharray="4 4" strokeOpacity={0.5} dot={false} activeDot={false} isAnimationActive={false} name="Previous period" />
                 <Area dataKey="value" type="monotone" stroke="none" fill={`url(#${gradientId})`} isAnimationActive={false} activeDot={false} tooltipType="none" />
                 <Line
-                    dataKey="value"
+                    dataKey="head"
                     type="monotone"
                     stroke={color}
                     strokeWidth={2}
@@ -706,6 +720,10 @@ function OverviewChart({ data, metric, interval, height = 260 }: { data: StatsSe
                     isAnimationActive={false}
                     name={metric.label}
                 />
+                {p !== null ? (
+                    <Line dataKey="tail" type="monotone" stroke={color} strokeWidth={2} strokeDasharray="2 4" strokeLinecap="round" dot={false}
+                        activeDot={{ r: 4, fill: color, stroke: 'var(--color-surface)', strokeWidth: 2 }} isAnimationActive={false} tooltipType="none" name={`${metric.label} (still coming in)`} />
+                ) : null}
             </ComposedChart>
         </figure>
     );
@@ -838,6 +856,8 @@ function OverviewMetrics({ liveData, liveVisitors }: { liveData?: LiveOverviewRe
     const selectedIndex = OVERVIEW_METRICS[metric] ? metric : 0;
     const selected = OVERVIEW_METRICS[selectedIndex];
     const data = useMemo(() => statsQuery.data?.series ?? [], [statsQuery.data?.series]);
+    const win = statsQuery.data?.window;
+    const partialFrom = win ? partialTailFrom(data.length, win.end) : undefined;
     const loading = statsQuery.isLoading && !statsQuery.data;
     const refetching = statsQuery.isFetching && !loading;
 
@@ -909,7 +929,9 @@ function OverviewMetrics({ liveData, liveVisitors }: { liveData?: LiveOverviewRe
                     <span className={cn('text-meta', pageScoped ? 'text-warn' : 'text-fg-muted')}>
                         {pageScoped
                             ? 'Page filters are on: some session numbers are limited'
-                            : `${getRangeLabel(range)}, compared with the previous period`}
+                            : win
+                                ? `${getRangeLabel(range)}, ${fmtDateRange(win.start, win.end)} vs ${fmtDateRange(win.prevStart, win.prevEnd)}${endsToday(win.end) ? ' · dotted: today, still coming in' : ''}`
+                                : `${getRangeLabel(range)}, compared with the previous period`}
                     </span>
                 </div>
                 {loading ? (
@@ -920,7 +942,7 @@ function OverviewMetrics({ liveData, liveVisitors }: { liveData?: LiveOverviewRe
                     <EmptyState variant="inline" title="No data in this period" description="Try a longer range." />
                 ) : (
                     <div className={cn('transition-opacity duration-120', refetching && 'opacity-60')}>
-                        <OverviewChart data={data} metric={selected} interval={interval} />
+                        <OverviewChart data={data} metric={selected} interval={interval} partialFrom={partialFrom} />
                     </div>
                 )}
             </div>
@@ -1146,7 +1168,7 @@ function TopPagesWidget() {
                                 rel="noreferrer"
                                 onClick={(event) => event.stopPropagation()}
                                 aria-label={`Open ${r.path}`}
-                                className="shrink-0 text-fg-faint hover:text-fg"
+                                className="shrink-0 text-fg-muted hover:text-fg"
                             >
                                 <ExternalLink aria-hidden size={12} strokeWidth={1.75} />
                             </a>

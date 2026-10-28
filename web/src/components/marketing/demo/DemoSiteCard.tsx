@@ -68,7 +68,7 @@ export function DemoSiteCard({ site, portfolio, view = 'search', sparkHeight = 7
                     aria-hidden={site.starred ? undefined : true}
                     size={16}
                     strokeWidth={1.75}
-                    className={cn('shrink-0', site.starred ? 'fill-star text-star' : 'text-fg-faint')}
+                    className={cn('shrink-0', site.starred ? 'fill-star text-star' : 'text-fg-muted')}
                 />
             </div>
 

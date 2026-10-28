@@ -22,12 +22,16 @@ test('rolling day presets end today (GA4) or after the lag (GSC)', () => {
     assert.equal(gsc.prevStart, null);
 });
 
-test('month presets use calendar months', () => {
+test('3 months is 90 days; 6 / 12 / 16 months are calendar months', () => {
     const r = resolveDateRange({ preset: '3m', compare: 'yoy' }, { now, lagDays: 2 });
-    assert.equal(r.start, '2026-07-25');
+    assert.equal(r.start, '2026-07-27');
     assert.equal(r.end, '2026-10-24');
-    assert.equal(r.prevStart, '2025-07-25');
+    assert.equal(r.days, 90);
+    assert.equal(r.prevStart, '2025-07-27');
     assert.equal(r.prevEnd, '2025-10-24');
+    const m6 = resolveDateRange({ preset: '6m', compare: 'none' }, { now, lagDays: 1 });
+    assert.equal(m6.start, '2026-04-26');
+    assert.equal(m6.end, '2026-10-25');
     const lm = resolveDateRange({ preset: 'last_month', compare: 'prev' }, { now });
     assert.equal(lm.start, '2026-09-01');
     assert.equal(lm.end, '2026-09-30');

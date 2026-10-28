@@ -152,6 +152,11 @@ export const SiteCard = memo(function SiteCard({
             ? { s: [{ metric: 'clicks' as const, values: site.series.clicks ?? [] }, { metric: 'impressions' as const, values: site.series.impressions ?? [] }], d: dates.search }
             : null;
     const window = trafficFirst && hasTraffic ? windows.traffic : hasSearch ? windows.search : windows.traffic;
+    // A paired card shows numbers from both sources, whose windows end on different days (GA4 yesterday, Search
+    // Console 2 days ago): the footer names the leading source's days, the tooltip both (the page subtitle says so too).
+    const windowTitle = hasTraffic && hasSearch && windows.traffic && windows.search && windows.traffic.curEnd !== windows.search.curEnd
+        ? `Traffic ${fmtDateRange(windows.traffic.curStart, windows.traffic.curEnd)} · Search ${fmtDateRange(windows.search.curStart, windows.search.curEnd)}`
+        : undefined;
     const chip = alertChipText(site);
     const critical = site.alerts[0]?.severity === 'critical';
     const sparkHeight = compact ? 56 : 72;
@@ -217,7 +222,7 @@ export const SiteCard = memo(function SiteCard({
                         onClick={() => onToggleStar?.(site)}
                         className={cn(
                             'relative z-[1] -mr-1 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors duration-120 hover:bg-subtle pointer-coarse:size-11',
-                            site.starred ? 'text-star' : 'text-fg-faint hover:text-fg-muted',
+                            site.starred ? 'text-star' : 'text-fg-muted hover:text-fg',
                         )}
                     >
                         <Star aria-hidden size={16} strokeWidth={1.75} className={site.starred ? 'fill-star' : undefined} />
@@ -251,14 +256,14 @@ export const SiteCard = memo(function SiteCard({
                         </span>
                     </Tooltip>
                 ) : window && !loadingData ? (
-                    <span className="min-w-0 truncate text-meta whitespace-nowrap text-fg-muted">
+                    <span className="min-w-0 truncate text-meta whitespace-nowrap text-fg-muted" title={greyed ? undefined : windowTitle}>
                         {greyed && site.lastSyncedAt ? `Last data ${fmtDay(new Date(site.lastSyncedAt * 1000))}` : fmtDateRange(window.curStart, window.curEnd)}
                     </span>
                 ) : null}
                 <span className="flex-1" />
                 {site.ga4 && site.gsc ? (
                     <Tooltip content={`GA4 property ${site.ga4.propertyId} linked${site.pairing === 'manual' ? ' (set by you)' : ''}`}>
-                        <span tabIndex={0} className="relative z-[1] hidden rounded text-fg-faint @[21rem]:inline-flex">
+                        <span tabIndex={0} className="relative z-[1] hidden rounded text-fg-muted @[21rem]:inline-flex">
                             <Link2 aria-label="GA4 linked" size={14} strokeWidth={1.75} />
                         </span>
                     </Tooltip>

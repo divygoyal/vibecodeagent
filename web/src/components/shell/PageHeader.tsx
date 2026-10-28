@@ -76,7 +76,7 @@ export function PageHeader({ title, subtitle, icon, badges, keepBadgesOnPhone, a
                         {badges ? <div className={cn('flex shrink-0 flex-wrap items-center gap-1.5', !keepBadgesOnPhone && 'max-sm:hidden')}>{badges}</div> : null}
                     </div>
                     {subtitle ? <p className="mt-1 text-body-sm text-pretty text-fg-muted">{subtitle}</p> : null}
-                    {note ? <p className="mt-0.5 text-meta text-fg-faint italic">{note}</p> : null}
+                    {note ? <p className="mt-0.5 text-meta text-fg-muted italic">{note}</p> : null}
                 </div>
                 {actions || secondaryActions ? (
                     <div className="flex min-w-0 flex-col gap-2 md:items-end">

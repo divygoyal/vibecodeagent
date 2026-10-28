@@ -16,7 +16,7 @@ import type { MetricKey } from '@/lib/metrics';
 
 /** Rank: a small medal for 1-3, plain number after that (DESIGN 5.18). */
 export function RankMark({ rank, className }: { rank: number | null; className?: string }) {
-    if (rank === null) return <span className={cn('inline-block w-7 text-center text-body-sm text-fg-faint', className)}>–</span>;
+    if (rank === null) return <span className={cn('inline-block w-7 text-center text-body-sm text-fg-muted', className)}>–</span>;
     const medal = rank === 1 ? '#c99a1f' : rank === 2 ? '#8e97a6' : rank === 3 ? '#b3702f' : null;
     if (!medal) {
         return <span className={cn('inline-block w-7 text-center text-body-sm font-medium text-fg-muted tabular-nums', className)}>{rank}</span>;
@@ -114,7 +114,7 @@ export function PctDelta({ pct, size = 'sm', variant = 'text', comparisonLabel }
 /** A shared count: the number, or the band with a tooltip that says it is a range. */
 export function CountValue({ m, className, bold = true }: { m: CountMetric | null | undefined; className?: string; bold?: boolean }) {
     const text = metricText(m);
-    if (!m || !text) return <span className={cn('text-fg-faint', className)}>–</span>;
+    if (!m || !text) return <span className={cn('text-fg-muted', className)}>–</span>;
     if (m.mode === 'range') {
         return (
             <Tooltip content="The owner shares a range, not the exact number.">
@@ -133,7 +133,7 @@ export function CountValue({ m, className, bold = true }: { m: CountMetric | nul
 export function RowSpark({ spark, height = 28, className }: { spark: SparkData | null; height?: number; className?: string }) {
     if (!spark || spark.values.filter((v) => v !== null).length < 2) {
         // Still collecting: one dash, not a sentence repeated on every row. (The board drops the whole column when no row has a trend.)
-        return <span className="text-meta text-fg-faint" title="Not enough daily data yet" aria-label="No trend yet">–</span>;
+        return <span className="text-meta text-fg-muted" title="Not enough daily data yet" aria-label="No trend yet">–</span>;
     }
     const metric: MetricKey = spark.metric === 'clicks' ? 'clicks' : 'users';
     return (

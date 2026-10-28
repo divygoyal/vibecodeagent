@@ -109,6 +109,7 @@ export function DashboardLive({ data }: { data: LiveDashboardRow }) {
                     />
                     <p data-live-range-text="" className="text-meta text-fg-muted tabular-nums">
                         {fmtDateRange(resolved.range.start, resolved.range.end)}
+                        {resolved.search ? ` (Search Console ${fmtDateRange(resolved.search.start, resolved.search.end)})` : ''}
                         {resolved.compare ? ` · vs ${fmtDateRange(resolved.compare.start, resolved.compare.end)}` : ''}
                     </p>
                 </div>

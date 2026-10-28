@@ -50,7 +50,7 @@ const productSchema = PAID_PLANS.map((p) => ({
 
 function CellView({ value }: { value: Cell }) {
     if (value === true) return <Check aria-label="Included" size={16} strokeWidth={2} className="mx-auto text-up" />;
-    if (value === false) return <Minus aria-label="Not applicable" size={16} strokeWidth={1.75} className="mx-auto text-fg-faint" />;
+    if (value === false) return <Minus aria-label="Not applicable" size={16} strokeWidth={1.75} className="mx-auto text-fg-muted" />;
     return <span className="inline-block text-body-sm tabular-nums text-fg sm:text-body">{value}</span>;
 }
 

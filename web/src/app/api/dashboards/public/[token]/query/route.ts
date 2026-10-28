@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { checkUnlockKey, clientIp, rateLimited, unlockKeyFrom } from '@/lib/builder/server/access';
-import { evaluateDoc, jsonError, ownerDeps } from '@/lib/builder/server/service';
+import { checkUnlockKey, clientIp, rateLimited, sitePicksFromKeys, unlockKeyFrom } from '@/lib/builder/server/access';
+import { directoryFor, evaluateDoc, jsonError, ownerDeps } from '@/lib/builder/server/service';
 import { getPublicRow, isShareToken, toRecord } from '@/lib/builder/server/store';
 import { publicControlsFromQuery } from '@/lib/builder/publicDoc';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/dashboards/public/[token]/query?page=&range=&compare=&f.<controlId>=
+ * GET /api/dashboards/public/[token]/query?page=&range=&compare=&f.<controlId>=&s.<id>=&m.<id>=&g.<id>=
  * Evaluates every widget of one page with the owner's Google access, server side and cached.
  * The query string can only move the controls the owner allowed (date, compare, filters);
  * metrics, dimensions, sources and widget ids can never be named. Responses carry no ids.
@@ -22,7 +22,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     if (rec.share.hasPassword && !checkUnlockKey(token, unlockKeyFrom(req, token))) {
         return jsonError(401, 'This dashboard needs a password.', { requiresPassword: true });
     }
-    const controls = publicControlsFromQuery(new URL(req.url).searchParams, rec.doc, rec.share);
+    const sp = new URL(req.url).searchParams;
+    // Site switcher (round 7): s.<id> carries an opaque key; it maps to a site id only when the owner lets
+    // viewers switch and the key is one of the allowed sites in the owner's own directory.
+    const wantsSite = rec.doc.controls.some((c) => c.type === 'site' && c.viewerCanChange && sp.has(`s.${c.id}`));
+    const dir = wantsSite ? await directoryFor(row.ownerIdentifier) : null;
+    const controls = publicControlsFromQuery(sp, rec.doc, rec.share, (picks) => sitePicksFromKeys(rec.doc.controls, picks, dir, token));
     try {
         const res = await evaluateDoc(rec.doc, controls, ownerDeps(row.ownerIdentifier, 'public'), { pageId: controls.pageId });
         return NextResponse.json(res, {

@@ -8,14 +8,16 @@
  */
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { CalendarDays, Check, ChevronDown, Filter, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronDown, Filter, Globe, X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Button, Checkbox, Drawer, Popover, PopoverContent, PopoverTrigger, SearchInput, SegmentedControl } from '@/components/ui';
 import { fmtDateRange } from '@/lib/format';
 import { MENU_PRESETS, PRESETS, QUICK_PRESETS, isIso } from '@/lib/builder/dates';
 import { countryName } from '@/lib/builder/countries';
-import type { CompareSpec, ControlState, DatePresetId, DateRangeSpec, FilterControl, PageDef, ResolvedDates } from '@/lib/builder/types';
+import { metricLabel } from '@/lib/builder/catalog';
+import { selectedGrain, selectedMetric } from '@/lib/builder/compile';
+import type { CompareSpec, ControlDef, ControlState, DatePresetId, DateRangeSpec, FilterControl, Grain, GrainControl, MetricControl, PageDef, ResolvedDates, SiteControl } from '@/lib/builder/types';
 
 // ── Date range ───────────────────────────────────────────────────────────
 
@@ -207,6 +209,127 @@ function SearchFilter({ control, initial, onChange, disabled }: { control: Filte
     );
 }
 
+// ── Viewer switchers (round 7) ───────────────────────────────────────────
+
+export interface SwitchOption { value: string; label: string; hint?: string }
+
+/** Labelled pick-one button with a list (site and metric switchers); a search box from 9 options. */
+function PickOne({ label, value, options, onChange, icon, disabled }: { label: string; value: string; options: SwitchOption[]; onChange: (v: string) => void; icon?: React.ReactNode; disabled?: boolean }) {
+    const [open, setOpen] = useState(false);
+    const [q, setQ] = useState('');
+    const current = options.find((o) => o.value === value) ?? options[0];
+    const s = q.trim().toLowerCase();
+    const list = s ? options.filter((o) => o.label.toLowerCase().includes(s)) : options;
+    return (
+        <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQ(''); }}>
+            <PopoverTrigger asChild>
+                <button type="button" disabled={disabled} aria-label={`${label}: ${current?.label ?? ''}`}
+                    className="inline-flex h-9 max-w-[240px] items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 text-body-sm text-fg transition-colors hover:bg-subtle disabled:opacity-60">
+                    {icon}
+                    <span className="text-fg-muted">{label}:</span>
+                    <span className="truncate font-medium">{current?.label ?? '–'}</span>
+                    <ChevronDown aria-hidden size={14} className="shrink-0 text-fg-muted" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-64 p-1.5" aria-label={label}>
+                {options.length > 8 ? <SearchInput value={q} onValueChange={setQ} placeholder="Search" size="sm" className="mb-1.5" autoFocus /> : null}
+                <div role="listbox" aria-label={label} className="max-h-72 overflow-y-auto">
+                    {list.map((o) => {
+                        const on = o.value === current?.value;
+                        return (
+                            <button key={o.value || '__default'} type="button" role="option" aria-selected={on} onClick={() => { onChange(o.value); setOpen(false); }}
+                                className="flex min-h-8 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-body-sm text-fg hover:bg-subtle">
+                                <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                                {o.hint ? <span className="shrink-0 text-caption text-fg-muted">{o.hint}</span> : null}
+                                {on ? <Check aria-hidden size={14} className="shrink-0 text-brand-text" /> : null}
+                            </button>
+                        );
+                    })}
+                    {!list.length ? <p className="px-2.5 py-3 text-body-sm text-fg-muted">No site matches “{q}”.</p> : null}
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+/**
+ * Site switcher. `options` lists the allowed sites (owner: site ids, public: opaque keys); value '' is the
+ * dashboard's default site, shown first as `defaultLabel`.
+ */
+export function SiteSwitch({ control, value, options, defaultLabel, onChange, disabled }: { control: SiteControl; value: string; options: SwitchOption[]; defaultLabel: string; onChange: (v: string) => void; disabled?: boolean }) {
+    const def = control.default || '';
+    const list: SwitchOption[] = def ? options : [{ value: '', label: defaultLabel, hint: 'Default' }, ...options.filter((o) => o.label !== defaultLabel)];
+    return <PickOne label={control.label || 'Site'} value={value || def} options={list} onChange={onChange} disabled={disabled} icon={<Globe aria-hidden size={15} strokeWidth={1.75} className="shrink-0 text-fg-muted" />} />;
+}
+
+export function MetricSwitch({ control, state, onChange, disabled }: { control: MetricControl; state: ControlState; onChange: (v: string) => void; disabled?: boolean }) {
+    const options = (control.options.includes(control.default) ? control.options : [control.default, ...control.options]).map((id) => ({ value: id, label: metricLabel(id) }));
+    return <PickOne label={control.label || 'Metric'} value={selectedMetric(control, state)} options={options} onChange={onChange} disabled={disabled} />;
+}
+
+const GRAIN_LABEL: Record<'auto' | Grain, string> = { auto: 'Auto', day: 'Day', week: 'Week', month: 'Month' };
+
+export function GrainSwitch({ control, state, onChange, size = 'md' }: { control: GrainControl; state: ControlState; onChange: (v: 'auto' | Grain) => void; size?: 'sm' | 'md' }) {
+    const order: Array<'auto' | Grain> = ['auto', 'day', 'week', 'month'];
+    const opts = order.filter((g) => control.options.includes(g) || g === control.default);
+    return (
+        <SegmentedControl<'auto' | Grain>
+            ariaLabel={control.label || 'Time grain'}
+            size={size}
+            value={selectedGrain(control, state)}
+            onChange={onChange}
+            options={opts.map((g) => ({ value: g, label: GRAIN_LABEL[g] }))}
+        />
+    );
+}
+
+export interface ViewerSwitchHandlers {
+    onSite?: (id: string, value: string | null) => void;
+    onMetric?: (id: string, value: string | null) => void;
+    onGrain?: (id: string, value: string | null) => void;
+    /** Allowed sites of a site control (owner: from /api/dashboards/sites; public: the control's opaque choices). */
+    siteOptions?: (control: SiteControl) => SwitchOption[];
+}
+
+/** The switchers a dashboard has, in control order; a switcher without a handler is not shown. */
+export function ViewerSwitches({ controls, state, handlers, defaultSiteLabel, size = 'md', kinds = ['site', 'metric', 'grain'] }: { controls: ControlDef[]; state: ControlState; handlers: ViewerSwitchHandlers; defaultSiteLabel: string; size?: 'sm' | 'md'; kinds?: Array<'site' | 'metric' | 'grain'> }) {
+    return (
+        <>
+            {controls.filter((c) => (kinds as string[]).includes(c.type)).map((c) => {
+                if (c.type === 'site' && handlers.onSite && handlers.siteOptions) {
+                    const options = handlers.siteOptions(c);
+                    if (!options.length) return null;
+                    return <SiteSwitch key={c.id} control={c} value={state.site?.[c.id] ?? ''} options={options} defaultLabel={defaultSiteLabel} onChange={(v) => handlers.onSite!(c.id, v === (c.default || '') ? null : v)} />;
+                }
+                if (c.type === 'metric' && handlers.onMetric && c.options.length) {
+                    return <MetricSwitch key={c.id} control={c} state={state} onChange={(v) => handlers.onMetric!(c.id, v === c.default ? null : v)} />;
+                }
+                if (c.type === 'grain' && handlers.onGrain) {
+                    return <GrainSwitch key={c.id} control={c} state={state} size={size} onChange={(v) => handlers.onGrain!(c.id, v === c.default ? null : v)} />;
+                }
+                return null;
+            })}
+        </>
+    );
+}
+
+/** The current switcher picks as text ("acme.com · Impressions · Weekly") for the PDF header and TV bar. */
+export function switchSummary(controls: ControlDef[], state: ControlState, siteLabel: (c: SiteControl) => string | undefined): string {
+    const parts: string[] = [];
+    for (const c of controls) {
+        if (c.type === 'site') {
+            const l = siteLabel(c);
+            if (l) parts.push(l);
+        } else if (c.type === 'metric' && c.options.length) {
+            parts.push(metricLabel(selectedMetric(c, state)));
+        } else if (c.type === 'grain') {
+            const g = selectedGrain(c, state);
+            if (g !== 'auto') parts.push(g === 'day' ? 'Daily' : g === 'week' ? 'Weekly' : 'Monthly');
+        }
+    }
+    return parts.join(' · ');
+}
+
 // ── Controls bar ─────────────────────────────────────────────────────────
 
 export interface ControlsBarProps {
@@ -260,7 +383,7 @@ export function PageTabs({ pages, value, onChange, trailing }: { pages: PageDef[
                     <button key={p.id} type="button" role="tab" aria-selected={on} onClick={() => onChange(p.id)}
                         className={cn('relative h-10 shrink-0 px-3 text-body-sm font-medium transition-colors', on ? 'text-fg' : 'text-fg-muted hover:text-fg')}>
                         {p.title}
-                        {p.hidden ? <span className="ml-1 text-caption text-fg-faint">(hidden)</span> : null}
+                        {p.hidden ? <span className="ml-1 text-caption text-fg-muted">(hidden)</span> : null}
                         {on ? <span aria-hidden className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand" /> : null}
                     </button>
                 );

@@ -25,12 +25,19 @@ test('every row builds from the app code on sample data, without the network', a
     const live = await buildHomeLive(home.tour.slug, NOW);
     assert.ok(live.site && live.traffic && live.fixes && live.dashboards, 'all four rows');
 
-    // Site row: the site page's own 28-day window (GA4 up to today, so a little off the hero card's complete days),
-    // with a finding per tile.
+    // Site row: the site page's own 28-day window, which is the hero card's and the dashboard's (round 7, one window
+    // rule in lib/dateRange: GA4 through yesterday, Search Console through 2 days ago), so the numbers are the same.
     const card = home.byRange['28d'].sites.find((s) => s.slug === home.tour.slug)!;
-    const near = (a: number, b: number) => Math.abs(a - b) / b < 0.05;
-    assert.ok(near(live.site.traffic.totals.sessions, card.traffic!.cur.sessions));
-    assert.ok(near(live.site.search.totals.clicks, card.search!.cur.clicks));
+    const windows = home.byRange['28d'].windows;
+    assert.deepEqual(live.site.meta.window, {
+        start: windows.traffic!.curStart, end: windows.traffic!.curEnd, searchStart: windows.search!.curStart, searchEnd: windows.search!.curEnd,
+    });
+    assert.deepEqual(live.site.meta.window, { start: '2026-09-30', end: '2026-10-27', searchStart: '2026-09-29', searchEnd: '2026-10-26' });
+    assert.equal(live.site.traffic.totals.sessions, card.traffic!.cur.sessions);
+    assert.equal(live.site.traffic.previous!.sessions, card.traffic!.prev!.sessions);
+    assert.equal(live.site.traffic.totals.users, card.traffic!.cur.users);
+    assert.equal(live.site.search.totals.clicks, card.search!.cur.clicks);
+    assert.equal(live.site.search.previous!.clicks, card.search!.prev!.clicks);
     assert.ok(live.site.traffic.series.length >= 28 && live.site.traffic.series[0].prev_users !== undefined);
     for (const m of ['users', 'sessions', 'pageviews', 'conversions'] as const) assert.ok(live.site.trafficFindings[m]?.text, m);
     for (const m of ['clicks', 'impressions', 'ctr', 'position'] as const) assert.ok(live.site.searchFindings[m]?.text, m);
@@ -49,8 +56,9 @@ test('every row builds from the app code on sample data, without the network', a
     for (const a of live.fixes.actions) assert.ok(a.summary && a.fix.length && a.askPrompt);
     assert.equal(live.fixes.links.actions, home.tour.fixes);
     // The same list as the app's Actions page and Overview (useSiteActions includeAudit): the 2 homepage-audit tasks
-    // are counted, so on this day the row says "of 18" like the live demo.
-    assert.equal(live.fixes.total, 18);
+    // are counted, so on this day the row says "of 19" like the live demo (round 7: + "Get /blog/cohort-analysis-… back
+    // into Google", the top page the demo's Search Console dropped from its index).
+    assert.equal(live.fixes.total, 19);
 
     // Dashboard row: three quick ranges, every widget answered, ranges really differ.
     const dash = live.dashboards;
@@ -63,6 +71,20 @@ test('every row builds from the app code on sample data, without the network', a
         return res.status === 'ok' ? res.parts.series.rows.length : 0;
     };
     assert.ok(days('7d') === 7 && days('28d') === 28 && days('3m') > 80);
+    // The dashboard's 28 days are the site page's: same GA4 days, Search Console on its own days, same totals.
+    const d28 = dash.byRange['28d'];
+    assert.deepEqual(d28.resolved.range, { start: '2026-09-30', end: '2026-10-27' });
+    assert.deepEqual(d28.resolved.search, { start: '2026-09-29', end: '2026-10-26' });
+    const kpi = d28.results.w_kpis;
+    assert.equal(kpi.status, 'ok');
+    if (kpi.status === 'ok') {
+        const row = kpi.parts.total.rows[0];
+        assert.equal(row['m:ga4:sessions'], live.site.traffic.totals.sessions);
+        assert.equal(row['m:ga4:activeUsers'], live.site.traffic.totals.users);
+        // Search Console: the same days and the same clicks (the demo's one-report total is the sum of its days).
+        assert.equal(row['m:gsc:clicks'], live.site.search.totals.clicks);
+        assert.equal(row['m:gsc:clicks'], card.search!.cur.clicks);
+    }
 
     assert.deepEqual(calls, [], 'no call left the sample scope');
     // Deterministic for the same day.

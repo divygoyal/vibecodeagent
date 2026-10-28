@@ -68,7 +68,7 @@ export const LeftPanel = forwardRef<HTMLInputElement, { doc: DashboardDocV2; onA
                                                 >
                                                     <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-subtle text-fg-secondary group-hover:bg-surface"><WidgetIcon type={t} /></span>
                                                     <span className="min-w-0 flex-1 truncate">{m.label}</span>
-                                                    <Plus aria-hidden size={14} className="text-fg-faint opacity-0 group-hover:opacity-100" />
+                                                    <Plus aria-hidden size={14} className="text-fg-muted opacity-0 group-hover:opacity-100" />
                                                 </button>
                                             </Tooltip>
                                         );
@@ -115,13 +115,13 @@ function Outline({ doc }: { doc: DashboardDocV2 }) {
                                     </button>
                                     <button type="button" aria-label={hidden ? 'Show on phones' : 'Hide on phones'} title={hidden ? 'Hidden on phones' : 'Shown on phones'}
                                         onClick={() => apply((d) => updateWidget(d, { ...w, mobile: { ...(w.mobile ?? {}), hidden: !hidden } }))}
-                                        className={cn('shrink-0 rounded p-0.5 hover:bg-surface', hidden ? 'text-fg-muted' : 'text-fg-faint opacity-0 group-hover:opacity-100')}>
+                                        className={cn('shrink-0 rounded p-0.5 hover:bg-surface', hidden ? 'text-fg-muted' : 'text-fg-muted opacity-0 group-hover:opacity-100')}>
                                         {hidden ? <EyeOff aria-hidden size={14} /> : <Eye aria-hidden size={14} />}
                                     </button>
                                 </li>
                             );
                         })}
-                        {!p.layouts.lg.length ? <li className="px-1.5 py-1 text-meta text-fg-faint">No widgets</li> : null}
+                        {!p.layouts.lg.length ? <li className="px-1.5 py-1 text-meta text-fg-muted">No widgets</li> : null}
                     </ul>
                 </div>
             ))}

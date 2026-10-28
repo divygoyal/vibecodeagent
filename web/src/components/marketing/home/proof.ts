@@ -3,6 +3,7 @@
  * API, shown only above a threshold (owner decision, round 2: no invented stats;
  * small numbers would hurt more than they help). Pure, shared with the tests.
  */
+import { fmtCompact } from '@/lib/format';
 
 /**
  * Below these, a figure is hidden: a count only goes on the home page once it is a real brag (round 3 judge:
@@ -94,3 +95,40 @@ export interface BoardPreviewRow {
     spark: number[] | null;
     verified: boolean;
 }
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function hostOf(url: unknown): string | null {
+    if (typeof url !== 'string' || !url) return null;
+    try {
+        return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, '');
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The home page's "Top sites right now": the first 5 rows of the public board's Top tab for 28 days (the same
+ * query, ranking and window as /leaderboard), shaped for the teaser. Each number is what the board shows: the
+ * exact value only when its owner shows it exactly, else the owner's range label. Pure (tests: marketingHome).
+ */
+export function boardPreviewRows(data: unknown): BoardPreviewRow[] {
+    const d = data as any;
+    if (!Array.isArray(d?.rows)) return [];
+    return d.rows.slice(0, 5).map((r: any, i: number): BoardPreviewRow => {
+        const v = r.visitors;
+        const exact = v?.mode === 'exact' && typeof v.value === 'number';
+        return {
+            key: String(r.id),
+            rank: typeof r.rank === 'number' ? r.rank : i + 1,
+            href: `/leaderboard/${encodeURIComponent(r.slug ?? r.id)}`,
+            name: String(r.name ?? ''),
+            host: hostOf(r.website_url),
+            category: r.category ?? null,
+            visitors: exact ? fmtCompact(v.value) : typeof v?.label === 'string' && v.label ? v.label : null,
+            deltaPct: typeof v?.delta_pct === 'number' ? v.delta_pct : null,
+            spark: Array.isArray(r.spark?.values) ? r.spark.values.map((x: unknown) => (typeof x === 'number' ? x : 0)) : null,
+            verified: Boolean(r.verification?.ranked ?? r.verification?.level === 'owner'),
+        };
+    }).filter((r: BoardPreviewRow) => r.name);
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */

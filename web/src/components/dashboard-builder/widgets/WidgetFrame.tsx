@@ -6,6 +6,7 @@ import { AlertTriangle, Download, Info, Link2, PlugZap, RefreshCw } from 'lucide
 import { cn } from '@/lib/cn';
 import { Button, Skeleton, Tooltip } from '@/components/ui';
 import { fmtDay } from '@/lib/format';
+import { metricLabel } from '@/lib/builder/catalog';
 import { widgetTitle } from '@/lib/builder/registry';
 import type { CompareSpec, ResolvedDates, WidgetDef, WidgetResult, WidgetResultOk } from '@/lib/builder/types';
 
@@ -62,7 +63,8 @@ export function downloadCsv(widget: WidgetDef, r: WidgetResultOk) {
     const frame = r.parts.rows ?? r.parts.series ?? r.parts.sites ?? r.parts.total;
     if (!frame) return;
     const keys = frame.seriesKeys?.length ? [frame.columns[0]?.id, ...frame.seriesKeys].filter(Boolean) as string[] : frame.columns.map((c) => c.id);
-    const labelOf = (k: string) => frame.columns.find((c) => c.id === k)?.label ?? k.replace(/^[dmb]:/, '');
+    // Calculated metrics (round 7): the dashboard's name, which the editor's inline queries do not send.
+    const labelOf = (k: string) => (k.startsWith('m:calc:') ? metricLabel(k.slice(2)) : frame.columns.find((c) => c.id === k)?.label ?? k.replace(/^[dmb]:/, ''));
     const esc = (v: unknown) => {
         const t = v === null || v === undefined ? '' : String(v);
         return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
@@ -98,12 +100,14 @@ export function flagNotes(r: WidgetResultOk | undefined, widget: WidgetDef): str
  * Card chrome shared by chart, table and map widgets: title with optional info tooltip,
  * loading skeleton, refetch dimming with a 2px progress bar, per-widget errors, footnotes.
  */
-export function WidgetFrame({ props, children, actions, bodyClassName, skeleton = 'chart' }: {
+export function WidgetFrame({ props, children, actions, bodyClassName, skeleton = 'chart', footnote }: {
     props: WidgetViewProps;
     children: ReactNode;
     actions?: ReactNode;
     bodyClassName?: string;
     skeleton?: 'chart' | 'table' | 'none';
+    /** Leads the footnote line (round 7: the chart's numbered markers); `text` is its plain form for the tooltip. */
+    footnote?: { node: ReactNode; text: string };
 }) {
     const { widget, result, loading, refetching, onRetry, onChooseSource } = props;
     const ok = okResult(result);
@@ -132,7 +136,7 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                     </h3>
                     {widget.description ? (
                         <Tooltip content={widget.description}>
-                            <button type="button" aria-label="About this widget" className="mt-0.5 shrink-0 text-fg-faint hover:text-fg-muted"><Info aria-hidden size={14} strokeWidth={1.75} /></button>
+                            <button type="button" aria-label="About this widget" className="mt-0.5 shrink-0 text-fg-muted hover:text-fg"><Info aria-hidden size={14} strokeWidth={1.75} /></button>
                         </Tooltip>
                     ) : null}
                     {ok?.sourceLabel && props.mode !== 'public' && widget.source?.type && widget.source.type !== 'default' ? (
@@ -143,7 +147,7 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                             {actions}
                             {ok && props.mode !== 'edit' ? (
                                 <Tooltip content="Download CSV">
-                                    <button type="button" aria-label={`Download ${widgetTitle(widget)} as CSV`} onClick={() => downloadCsv(widget, ok)} className="rounded p-0.5 text-fg-faint opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100">
+                                    <button type="button" aria-label={`Download ${widgetTitle(widget)} as CSV`} onClick={() => downloadCsv(widget, ok)} className="rounded p-0.5 text-fg-muted opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100">
                                         <Download aria-hidden size={14} />
                                     </button>
                                 </Tooltip>
@@ -166,8 +170,10 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                     <WidgetError result={result} onRetry={onRetry} onChooseSource={onChooseSource} />
                 ) : children}
             </div>
-            {notes.length ? (
-                <p className="mt-2 truncate text-caption text-fg-muted" title={notes.join(' · ')}>{notes.join(' · ')}</p>
+            {notes.length || footnote ? (
+                <p className="mt-2 truncate text-caption text-fg-muted" title={[footnote?.text, ...notes].filter(Boolean).join(' · ')}>
+                    {footnote?.node}{footnote && notes.length ? ' · ' : ''}{notes.join(' · ')}
+                </p>
             ) : null}
         </div>
     );

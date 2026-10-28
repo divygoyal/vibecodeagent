@@ -5,13 +5,13 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
-import { ArrowRight, Copy, ExternalLink, LayoutDashboard, MoreHorizontal, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
+import { ArrowRight, Copy, ExternalLink, LayoutDashboard, MoreHorizontal, Pencil, Plus, RotateCw, Share2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Pill, SearchInput, SegmentedControl, Skeleton } from '@/components/ui';
 import { Thumbnail, type ThumbItem } from '@/components/dashboard-builder/Thumbnail';
 import { DashThemeRoot } from '@/components/dashboard-builder/theme/DashTheme';
-import { fetchJson } from '@/components/dashboard-builder/useWidgetData';
+import { fetchJson, QueryHttpError } from '@/components/dashboard-builder/useWidgetData';
 import { buildFromTemplate, defaultTheme, TEMPLATES } from '@/lib/builder/templates';
 import { themePreset } from '@/lib/builder/themes';
 import type { ThemeV2 } from '@/lib/builder/types';
@@ -109,7 +109,7 @@ type Filter = 'all' | 'private' | 'shared' | 'templates';
 export default function DashboardsListPage() {
     const router = useRouter();
     const appMode = useResolvedTheme();
-    const { data, isLoading, mutate } = useSWR<{ dashboards: ListItem[] }>('/api/dashboards', (u: string) => fetchJson(u), { revalidateOnFocus: false });
+    const { data, error, isLoading, isValidating, mutate } = useSWR<{ dashboards: ListItem[] }>('/api/dashboards', (u: string) => fetchJson(u), { revalidateOnFocus: false });
     const [q, setQ] = useState('');
     const [filter, setFilter] = useState<Filter>('all');
     const [toDelete, setToDelete] = useState<ListItem | null>(null);
@@ -152,6 +152,11 @@ export default function DashboardsListPage() {
 
             {isLoading ? (
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />)}</div>
+            ) : error && !data ? (
+                // A failed list is not an empty one (round 7 audit #20: a rate-limited demo said "No dashboards yet").
+                <EmptyState variant="card" title="Couldn't load your dashboards"
+                    description={error instanceof QueryHttpError && error.status === 429 ? 'Too many requests right now. Try again in a minute.' : 'Something went wrong. Try again in a moment.'}
+                    actions={<Button variant="secondary" icon={RotateCw} loading={isValidating} onClick={() => void mutate()}>Try again</Button>} />
             ) : !all.length ? (
                 <EmptyState variant="page" icon={LayoutDashboard} title="No dashboards yet" description={`Start from one of ${TEMPLATES.length} templates: Executive summary, SEO opportunities, AI traffic, Client report and more. Every widget can use any of your sites.`}
                     actions={<><Button asChild variant="primary" icon={Plus}><Link href="/dashboard/dashboards/new">New dashboard</Link></Button><Button asChild variant="secondary"><Link href="/dashboard/dashboards/new?template=site-overview">Start from a template</Link></Button></>} />
@@ -164,11 +169,11 @@ export default function DashboardsListPage() {
                             <Link href={`/dashboard/dashboards/${d.id}`} className="flex flex-col focus-visible:outline-offset-[-2px]">
                                 {d.look?.id ? (
                                     <DashThemeRoot theme={{ ...defaultTheme('light'), ...d.look }} mode={appMode} className="flex aspect-[16/9] items-start justify-center overflow-hidden border-b border-border-subtle p-4">
-                                        {d.preview.length ? <Thumbnail items={d.preview} className="w-full" /> : <span className="m-auto text-body-sm text-fg-faint">Empty dashboard</span>}
+                                        {d.preview.length ? <Thumbnail items={d.preview} className="w-full" /> : <span className="m-auto text-body-sm text-fg-muted">Empty dashboard</span>}
                                     </DashThemeRoot>
                                 ) : (
                                     <div className="flex aspect-[16/9] items-start justify-center overflow-hidden border-b border-border-subtle bg-surface-sunken p-4">
-                                        {d.preview.length ? <Thumbnail items={d.preview} className="w-full" /> : <span className="m-auto text-body-sm text-fg-faint">Empty dashboard</span>}
+                                        {d.preview.length ? <Thumbnail items={d.preview} className="w-full" /> : <span className="m-auto text-body-sm text-fg-muted">Empty dashboard</span>}
                                     </div>
                                 )}
                                 <div className="flex flex-col gap-1 p-4 pb-3">
@@ -179,7 +184,7 @@ export default function DashboardsListPage() {
                             <div className="mt-auto flex items-center gap-2 px-4 pb-4">
                                 {d.isTemplate ? <Pill tone="info">Template</Pill> : d.share.enabled ? <Pill tone="brand" dot>{d.share.embed ? 'Embedded' : 'Public link'}</Pill> : <Pill>Private</Pill>}
                                 {d.share.enabled ? <span className="shrink-0 whitespace-nowrap text-meta text-fg-muted">{d.views} {d.views === 1 ? 'view' : 'views'}</span> : null}
-                                <span className="min-w-0 truncate whitespace-nowrap text-meta text-fg-faint" title={d.look?.id ? `${themePreset(d.look.id).name} theme` : undefined}>{d.widgetCount} widgets{d.pageCount > 1 ? ` · ${d.pageCount} pages` : ''}</span>
+                                <span className="min-w-0 truncate whitespace-nowrap text-meta text-fg-muted" title={d.look?.id ? `${themePreset(d.look.id).name} theme` : undefined}>{d.widgetCount} widgets{d.pageCount > 1 ? ` · ${d.pageCount} pages` : ''}</span>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" iconOnly icon={MoreHorizontal} aria-label={`Actions for ${d.name}`} className="ml-auto" /></DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">

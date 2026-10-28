@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 
 import { Banner, Button, Checkbox, Modal, SegmentedControl, Select, Switch, Tabs } from '@/components/ui';
 import { applyThemePreset, clientReportTheme, themeOptions } from '@/lib/builder/themes';
-import type { DashboardDocV2, ShareState } from '@/lib/builder/types';
+import type { DashboardDocV2, ShareState, SiteControl } from '@/lib/builder/types';
 import { useResolvedTheme } from '@/lib/theme';
 import { BrandColorInput, ThemeGallery } from './theme/AppearanceSettings';
 import { fetchJson } from './useWidgetData';
@@ -52,6 +52,7 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
     const [embedTheme, setEmbedTheme] = useState<'light' | 'dark'>('light');
     const [embedHeight, setEmbedHeight] = useState('800');
     const appMode = useResolvedTheme();
+    const siteCtl = doc.controls.find((c): c is SiteControl => c.type === 'site');
     const [company, setCompany] = useState(doc.theme.header.companyName ?? '');
     const [logo, setLogo] = useState(doc.theme.header.logoUrl ?? '');
     useEffect(() => {
@@ -140,9 +141,12 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
                                     <Checkbox checked={share.viewerControls.date} onCheckedChange={(v) => put({ viewerControls: { date: v } })} label="Date range" />
                                     <Checkbox checked={share.viewerControls.compare} onCheckedChange={(v) => put({ viewerControls: { compare: v } })} label="Comparison" />
                                     <Checkbox checked={share.viewerControls.filters} onCheckedChange={(v) => put({ viewerControls: { filters: v } })} label="Filters" />
+                                    {siteCtl ? <Checkbox checked={Boolean(siteCtl.viewerCanChange)} onCheckedChange={(v) => onDocChange({ ...doc, controls: doc.controls.map((c) => (c.type === 'site' ? { ...c, viewerCanChange: v } : c)) })} label="Site" /> : null}
                                 </div>
+                                {siteCtl?.viewerCanChange ? <p className="text-meta text-fg-muted">Viewers can switch between {siteCtl.options === 'all' ? 'all your sites' : `${siteCtl.options.length} site${siteCtl.options.length === 1 ? '' : 's'}`} and see their names (never their ids). Their picks are not saved.</p> : null}
                             </fieldset>
                             <Switch checked={share.allowCopy} onCheckedChange={(v) => put({ allowCopy: v })} label="Allow viewers to copy this dashboard" description="Signed-in viewers can use it as a template for their own site. Your data is never copied." />
+                            <Switch checked={Boolean(doc.settings.shareNotes)} onCheckedChange={(v) => onDocChange({ ...doc, settings: { ...doc.settings, shareNotes: v || undefined } })} label="Show my chart notes" description="Notes you add to your site charts show on this link’s time series. Off: viewers see Google update markers only." />
                             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-3">
                                 <p className="text-meta text-fg-muted">{views ?? 0} view{views === 1 ? '' : 's'}</p>
                                 <div className="flex gap-2">

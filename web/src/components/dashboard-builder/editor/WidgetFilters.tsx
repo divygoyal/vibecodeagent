@@ -9,7 +9,7 @@
 import { Plus, X } from 'lucide-react';
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Button } from '@/components/ui';
-import { dimLabel, getDim } from '@/lib/builder/catalog';
+import { dimLabel, getDim, metricFamilies } from '@/lib/builder/catalog';
 import { widgetMetrics } from '@/lib/builder/registry';
 import { brandRegex } from '@/lib/builder/templates.round2';
 import { AI_SOURCE_PATTERN } from '@/components/site/lib/rules';
@@ -49,7 +49,7 @@ function segments(doc: DashboardDocV2): Array<{ label: string; hint: string; cla
 function familyNote(dim: string, metrics: string[]): string | null {
     const d = getDim(dim);
     if (!d) return null;
-    const fams = new Set(metrics.map((m) => (m.startsWith('gsc:') ? 'gsc' : 'ga4')));
+    const fams = new Set(metrics.flatMap((m) => metricFamilies(m)));
     if (fams.has('gsc') && fams.has('ga4')) {
         if (!d.gsc) return 'Applies to Analytics numbers only';
         if (!d.ga4) return 'Applies to Search Console numbers only';
@@ -75,7 +75,7 @@ export function WidgetFilters({ widget, doc, edit }: { widget: WidgetDef; doc: D
         if (!multi && Array.isArray(n.value)) n.value = n.value.join(', ');
         return n;
     }), key);
-    const firstDim = metrics.some((m) => m.startsWith('gsc:')) ? 'query' : 'page';
+    const firstDim = metrics.some((m) => metricFamilies(m).includes('gsc')) ? 'query' : 'page';
     const varNames = variableControls(doc.controls).map((v) => `{{var:${v.id}}}`);
     const clickable = widget.type === 'bar' || widget.type === 'table' || widget.type === 'geo';
     return (

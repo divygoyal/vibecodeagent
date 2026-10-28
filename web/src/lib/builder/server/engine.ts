@@ -11,12 +11,16 @@
 import { runGABatch, runGSCSearchAnalytics } from '@/lib/googleApi';
 import { GoogleBreakerOpenError, reportGoogleOutcome, withGoogleSlot } from '@/lib/googleLimiter';
 import { normalizeHost } from '@/lib/sites/pairing';
+import { calcValue, expandCalcs, parseCalcId, registerCalcs, shareTotals, sumOf, withCalcValues, type CalcSpec } from '../calc';
 import { dimInFamily, getDim, getMetric, type Family, type MetricDef } from '../catalog';
-import { canonicalJson, compileWidget } from '../compile';
+import { applyViewerControls, canonicalJson, compileWidget } from '../compile';
 import { alpha2ToGsc, gscToAlpha2 } from '../countries';
-import { addDays, autoGranularity, eachDay, fromDay, monthStart, resolveCompare, resolveRange, todayIn, weekStart } from '../dates';
+import { lastCompleteDay, searchWindowOf } from '@/lib/dateRange';
+import { addDays, autoGranularity, eachDay, fromDay, monthStart, resolveCompare, resolveRange, toDay, todayIn, weekStart } from '../dates';
 import { widgetMeta } from '../registry';
+import { tableTrendQuery } from '../trend';
 import type {
+    CalculatedMetric,
     CellValue,
     ControlDef,
     ControlState,
@@ -74,6 +78,8 @@ export interface EvalInput {
     controlDefs: ControlDef[];
     controls: ControlState;
     timezone?: string;
+    /** Names of the dashboard's calculated metrics (round 7); the maths is in their ids. */
+    calcs?: CalculatedMetric[];
 }
 
 // ── Errors ───────────────────────────────────────────────────────────────
@@ -454,11 +460,22 @@ function withComponents(metrics: string[]): string[] {
 
 // ── Planning per widget ──────────────────────────────────────────────────
 
+/** A GSC leaf's window: the GA4 window moved onto Search Console's last complete day; the comparison moves with it. */
+function searchWindows(range: Range, compare: Range | undefined, today: Iso): { range: Range; compare?: Range } {
+    const r = searchWindowOf(range, today);
+    const shift = toDay(range.end) - toDay(r.end);
+    return { range: r, compare: compare && shift ? { start: addDays(compare.start, -shift), end: addDays(compare.end, -shift) } : compare };
+}
+
 interface Target { site: ResolvedSite; families: Family[] }
 
 interface WidgetPlan {
     widget: WidgetDef;
-    queries: Array<{ q: WidgetQuery; range: Range; compare?: Range; targets: Target[]; leaves: Array<{ leaf: LogicalLeaf; site: ResolvedSite }>; families: Family[]; granularity: 'day' | 'week' | 'month' }>;
+    queries: Array<{
+        q: WidgetQuery; range: Range; compare?: Range; targets: Target[]; leaves: Array<{ leaf: LogicalLeaf; site: ResolvedSite }>; families: Family[]; granularity: 'day' | 'week' | 'month';
+        /** Catalogue metrics fetched for q.metrics: calculated metrics replaced by their inputs (round 7). */
+        base: string[];
+    }>;
     error?: WidgetResultError;
     flags: ResultFlags;
     sourceLabel: string;
@@ -548,11 +565,13 @@ async function fetchGsc(token: string, userId: string, leaf: PhysicalLeaf, stats
 
 export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promise<DashboardQueryResponse> {
     const t0 = Date.now();
+    registerCalcs(input.calcs);
     const now = deps.now ?? new Date();
     const tz = input.timezone || 'UTC';
     const today = todayIn(tz, now);
     const baseRange = resolveRange(input.controls.date.range, today);
     const baseCompare = resolveCompare(baseRange, input.controls.date.compare);
+    const baseSearch = searchWindowOf(baseRange, today);
     const stats: ExecStats = { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 };
     const results: Record<string, WidgetResult> = {};
 
@@ -560,9 +579,11 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     for (const w of input.widgets) {
         if (widgetMeta(w.widget.type).static) results[w.widget.id] = { status: 'ok', fetchedAt: now.toISOString(), cache: 'hit', parts: {}, flags: {} };
     }
+    // The header names Search Console's days only when a widget reads Search Console (a GA4-only dashboard has one window).
+    let readsSearch = false;
     const response = (): DashboardQueryResponse => ({
         results,
-        resolved: { range: baseRange, compare: baseCompare, timezone: tz, today },
+        resolved: { range: baseRange, compare: baseCompare, ...(readsSearch && baseSearch.end !== baseRange.end ? { search: baseSearch } : {}), timezone: tz, today },
         meta: { durationMs: Date.now() - t0, google: { ga4Calls: stats.ga4Calls, gscCalls: stats.gscCalls, ga4Reports: stats.ga4Reports }, cache: { hit: stats.hit, stale: stats.stale, miss: stats.miss } },
     });
     if (!dataWidgets.length) return response();
@@ -595,14 +616,14 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     const defaultSource: SourceRef = input.defaultSource.type === 'default' ? { type: 'portfolio', include: 'all' } : input.defaultSource;
     const defaultLabel = sourceLabel(defaultSource, dir);
 
-    // 1. Plan
-    const plans: WidgetPlan[] = [];
-    for (const { widget, pageId } of dataWidgets) {
+    // 1. Plan (a function: the trend round below plans its extra query the same way).
+    const planWidget = (widget: WidgetDef, pageId: string | undefined, extra?: { queries: WidgetQuery[]; filter: FilterClause }): WidgetPlan => {
         const plan: WidgetPlan = { widget, queries: [], flags: {}, sourceLabel: '' };
-        plans.push(plan);
         const range = widget.dateOverride?.range ? resolveRange(widget.dateOverride.range, today) : baseRange;
         const compare = widget.dateOverride?.compare ? resolveCompare(range, widget.dateOverride.compare) : widget.dateOverride?.range ? resolveCompare(range, input.controls.date.compare) : baseCompare;
-        const { queries, filterOrigins } = compileWidget(widget, { controlDefs: input.controlDefs, controls: input.controls, pageId });
+        const compiled = compileWidget(widget, { controlDefs: input.controlDefs, controls: input.controls, pageId });
+        const queries = extra ? extra.queries : compiled.queries;
+        const filterOrigins = extra ? [...compiled.filterOrigins, { clause: extra.filter }] : compiled.filterOrigins;
         const src = widget.source?.type === 'default' || !widget.source ? defaultSource : widget.source;
         plan.sourceLabel = src === defaultSource ? defaultLabel : sourceLabel(src, dir);
 
@@ -611,18 +632,18 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             sites = resolvePortfolio(src, dir);
             if (!sites.length) {
                 plan.error = errResult('NO_ACCESS', 'No sites to show. Connect Google or pick other sites.');
-                continue;
+                return plan;
             }
         } else if (src.type === 'site') {
             const s = resolveSiteRef(src, dir);
             if (!s) {
                 plan.error = errResult('NO_ACCESS', `You no longer have access to ${plan.sourceLabel}. Choose another site.`);
-                continue;
+                return plan;
             }
             sites = [s];
         } else {
             plan.error = errResult('INVALID');
-            continue;
+            return plan;
         }
         const portfolio = src.type === 'portfolio';
 
@@ -631,12 +652,15 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
                 plan.error = errResult('INCOMPATIBLE', 'Break down by site needs the "All sites" source.');
                 break;
             }
-            const metricDefs = q.metrics.map((id) => getMetric(id)).filter((m): m is MetricDef => Boolean(m));
-            if (metricDefs.length !== q.metrics.length) {
+            // Calculated metrics are fetched as their inputs and computed after the join and roll-up.
+            const base = expandCalcs(q.metrics);
+            const metricDefs = base.map((id) => getMetric(id)).filter((m): m is MetricDef => Boolean(m) && !m!.calc);
+            if (metricDefs.length !== base.length || q.metrics.some((id) => !getMetric(id))) {
                 plan.error = errResult('INVALID', 'This widget uses a metric we do not know.');
                 break;
             }
             const families = [...new Set(metricDefs.map((m) => m.family))];
+            if (families.includes('gsc')) readsSearch = true;
             const canonDims = q.dimensions.filter((d) => d !== 'site');
             // Static compatibility (BUILDER.md 9.4)
             const badDim = canonDims.find((d) => !TIME_DIMS.has(d) && families.some((f) => !dimInFamily(d, f)));
@@ -662,8 +686,14 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             const granularity: 'day' | 'week' | 'month' = q.granularity ?? (timeDim === 'week' ? 'week' : timeDim === 'month' ? 'month' : (timeDim ? autoGranularity(range.start, range.end, 'line') : 'day'));
             const effDims = canonDims.map((d) => (d === 'date' && granularity !== 'day' ? granularity : d));
             const qCompare = q.compare ? compare : undefined;
+            // Search Console reads its own window (lib/dateRange: through 2 days ago), the days the site page and the
+            // portfolio count, except on a date axis it shares with GA4 (its newest day is then marked preliminary).
+            const gscOnly = families.length === 1 && families[0] === 'gsc';
+            const gscWin = timeDim && !gscOnly ? null : searchWindows(range, qCompare, today);
+            const gscRange = gscWin?.range ?? range;
+            const gscCompare = gscWin ? gscWin.compare : qCompare;
 
-            const entry: WidgetPlan['queries'][number] = { q, range, compare: qCompare, targets: [], leaves: [], families, granularity };
+            const entry: WidgetPlan['queries'][number] = { q, range: gscOnly ? gscRange : range, compare: gscOnly ? gscCompare : qCompare, targets: [], leaves: [], families, granularity, base };
             plan.queries.push(entry);
 
             const missing = new Set<Family>();
@@ -684,10 +714,13 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
                     let order: LogicalLeaf['order'];
                     if (effDims.length && !nonTime.length) order = { kind: 'dim', field: apiDims[0], desc: false };
                     else if (nonTime.length && family === 'ga4') {
-                        const sortBy = q.sort?.by;
+                        // A calculated sort metric orders Google's rows by its first input (A).
+                        const sortBy = q.sort?.by ? (parseCalcId(q.sort.by)?.a ?? q.sort.by) : undefined;
                         const sortMetric = sortBy && fMetrics.includes(sortBy) ? sortBy : fMetrics[0];
                         const byChange = widget.type === 'table' && widget.config.sortByChange;
-                        order = { kind: 'metric', field: getMetric(sortMetric)!.api, desc: q.sort && !byChange ? q.sort.dir === 'desc' || sortBy !== sortMetric : true };
+                        // A calculated sort fetches the biggest rows by A (the calc's order is applied to them below).
+                        const calcSort = Boolean(q.sort?.by && parseCalcId(q.sort.by));
+                        order = { kind: 'metric', field: getMetric(sortMetric)!.api, desc: q.sort && !byChange && !calcSort ? q.sort.dir === 'desc' || sortBy !== sortMetric : true };
                     }
                     const leafMetrics = family === 'gsc' ? ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position'] : (portfolio || granularity !== 'day' ? withComponents(fMetrics) : fMetrics);
                     const common = {
@@ -698,8 +731,8 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
                     if (family === 'ga4') {
                         entry.leaves.push({ site, leaf: { ...common, range, compare: qCompare } });
                     } else {
-                        entry.leaves.push({ site, leaf: { ...common, range } });
-                        if (qCompare) entry.leaves.push({ site, leaf: { ...common, range: qCompare, isPrev: true } });
+                        entry.leaves.push({ site, leaf: { ...common, range: gscRange } });
+                        if (gscCompare) entry.leaves.push({ site, leaf: { ...common, range: gscCompare, isPrev: true } });
                     }
                 }
             }
@@ -711,130 +744,160 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             }
             if (missing.size && !portfolio) plan.flags.missingFamilies = [...missing];
         }
-    }
+        return plan;
+    };
+    // Round 7 viewer switchers (site, metric, Day / Week / Month): plan each widget as the viewer sees it.
+    const viewedWidgets = dataWidgets.map(({ widget, pageId }) => ({ widget: applyViewerControls(widget, { controlDefs: input.controlDefs, controls: input.controls, pageId }), pageId }));
+    const plans = viewedWidgets.map(({ widget, pageId }) => planWidget(widget, pageId));
 
-    // 2. Merge leaves into physical calls (identical shape -> one call, GA4 metrics unioned).
-    const physical = new Map<string, PhysicalLeaf & { metricSet: Set<string>; logical: LogicalLeaf }>();
-    const shapeOf = (l: LogicalLeaf) => canonicalJson({ f: l.family, a: l.asset, d: l.apiDims, fl: l.filters, r: l.range, c: l.compare, o: l.order, lim: l.limit });
-    for (const plan of plans) {
-        if (plan.error) continue;
-        for (const e of plan.queries) {
-            for (const { leaf } of e.leaves) {
-                const shape = shapeOf(leaf);
-                let p = physical.get(shape);
-                if (!p) {
-                    p = { shape, key: '', family: leaf.family, asset: leaf.asset, body: {}, metrics: [], apiDims: leaf.apiDims, range: leaf.range, compare: leaf.compare, metricSet: new Set(), logical: leaf };
-                    physical.set(shape, p);
+    /** Steps 2-4 for some plans: merge leaves, fetch (cache first), assemble one result per plan. */
+    const runPlans = async (plans: WidgetPlan[]): Promise<WidgetResult[]> => {
+        // 2. Merge leaves into physical calls (identical shape -> one call, GA4 metrics unioned).
+        const physical = new Map<string, PhysicalLeaf & { metricSet: Set<string>; logical: LogicalLeaf }>();
+        const shapeOf = (l: LogicalLeaf) => canonicalJson({ f: l.family, a: l.asset, d: l.apiDims, fl: l.filters, r: l.range, c: l.compare, o: l.order, lim: l.limit });
+        for (const plan of plans) {
+            if (plan.error) continue;
+            for (const e of plan.queries) {
+                for (const { leaf } of e.leaves) {
+                    const shape = shapeOf(leaf);
+                    let p = physical.get(shape);
+                    if (!p) {
+                        p = { shape, key: '', family: leaf.family, asset: leaf.asset, body: {}, metrics: [], apiDims: leaf.apiDims, range: leaf.range, compare: leaf.compare, metricSet: new Set(), logical: leaf };
+                        physical.set(shape, p);
+                    }
+                    for (const m of leaf.metrics) p.metricSet.add(m);
                 }
-                for (const m of leaf.metrics) p.metricSet.add(m);
             }
         }
-    }
-    // GA4 allows 10 metrics per report: split oversized merges.
-    const calls: Array<PhysicalLeaf & { logical: LogicalLeaf }> = [];
-    const leafToCalls = new Map<string, Array<PhysicalLeaf & { logical: LogicalLeaf }>>();
-    for (const p of physical.values()) {
-        const ms = [...p.metricSet].sort();
-        const chunks: string[][] = [];
-        if (p.family === 'ga4') for (let i = 0; i < ms.length; i += 10) chunks.push(ms.slice(i, i + 10));
-        else chunks.push(ms);
-        const list: Array<PhysicalLeaf & { logical: LogicalLeaf }> = [];
-        for (const chunk of chunks) {
-            const apiMetrics = p.family === 'ga4' ? chunk.map((id) => getMetric(id)!.api) : GSC_METRIC_API;
-            const body = p.family === 'ga4' ? ga4Body(p.logical, apiMetrics) : gscBody(p.logical);
-            const key = leafKey([deps.userId, p.family, p.asset, canonicalJson(body)]);
-            const call = { shape: p.shape, key, family: p.family, asset: p.asset, body, metrics: apiMetrics, apiDims: p.apiDims, range: p.range, compare: p.compare, logical: p.logical };
-            list.push(call);
-            calls.push(call);
+        // GA4 allows 10 metrics per report: split oversized merges.
+        const calls: Array<PhysicalLeaf & { logical: LogicalLeaf }> = [];
+        const leafToCalls = new Map<string, Array<PhysicalLeaf & { logical: LogicalLeaf }>>();
+        for (const p of physical.values()) {
+            const ms = [...p.metricSet].sort();
+            const chunks: string[][] = [];
+            if (p.family === 'ga4') for (let i = 0; i < ms.length; i += 10) chunks.push(ms.slice(i, i + 10));
+            else chunks.push(ms);
+            const list: Array<PhysicalLeaf & { logical: LogicalLeaf }> = [];
+            for (const chunk of chunks) {
+                const apiMetrics = p.family === 'ga4' ? chunk.map((id) => getMetric(id)!.api) : GSC_METRIC_API;
+                const body = p.family === 'ga4' ? ga4Body(p.logical, apiMetrics) : gscBody(p.logical);
+                const key = leafKey([deps.userId, p.family, p.asset, canonicalJson(body)]);
+                const call = { shape: p.shape, key, family: p.family, asset: p.asset, body, metrics: apiMetrics, apiDims: p.apiDims, range: p.range, compare: p.compare, logical: p.logical };
+                list.push(call);
+                calls.push(call);
+            }
+            leafToCalls.set(p.shape, list);
         }
-        leafToCalls.set(p.shape, list);
-    }
 
-    // 3. Cache lookup, then execute misses (GA4 batched per property, GSC one by one).
-    const outcomes = new Map<string, LeafOutcome>();
-    const misses: Array<PhysicalLeaf & { logical: LogicalLeaf }> = [];
-    const seenKeys = new Set<string>();
-    for (const c of calls) {
-        if (seenKeys.has(c.key)) continue;
-        seenKeys.add(c.key);
-        const neg = negativeGet(c.key);
-        const hit = cacheGet(c.key);
-        if (neg && !(deps.fresh && deps.mode === 'owner')) {
-            outcomes.set(c.key, { error: neg as LeafError, staleData: hit ? { data: hit.value as LeafData, fetchedAt: hit.fetchedAt } : undefined });
-            continue;
+        // 3. Cache lookup, then execute misses (GA4 batched per property, GSC one by one).
+        const outcomes = new Map<string, LeafOutcome>();
+        const misses: Array<PhysicalLeaf & { logical: LogicalLeaf }> = [];
+        const seenKeys = new Set<string>();
+        for (const c of calls) {
+            if (seenKeys.has(c.key)) continue;
+            seenKeys.add(c.key);
+            const neg = negativeGet(c.key);
+            const hit = cacheGet(c.key);
+            if (neg && !(deps.fresh && deps.mode === 'owner')) {
+                outcomes.set(c.key, { error: neg as LeafError, staleData: hit ? { data: hit.value as LeafData, fetchedAt: hit.fetchedAt } : undefined });
+                continue;
+            }
+            if (hit && (hit.state === 'fresh' && !(deps.fresh && deps.mode === 'owner'))) {
+                stats.hit++;
+                outcomes.set(c.key, { data: hit.value as LeafData, fetchedAt: hit.fetchedAt, cache: 'hit' });
+                continue;
+            }
+            if (hit && hit.state === 'stale' && !deps.fresh) {
+                stats.stale++;
+                outcomes.set(c.key, { data: hit.value as LeafData, fetchedAt: hit.fetchedAt, cache: 'stale' });
+                // Background refresh (single-flight); errors keep the stale entry.
+                void singleFlight(`refresh:${c.key}`, async () => {
+                    const t = await tokenFor(c.family, c.asset);
+                    const r = c.family === 'ga4'
+                        ? (await fetchGa4Batch(t, deps.userId, c.asset, [c], { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 })).get(c.key)
+                        : await fetchGsc(t, deps.userId, c, { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 });
+                    if (r && !(r instanceof LeafError)) cacheSet(c.key, r, policyFor(c.family, c.range.end, today));
+                }).catch(() => undefined);
+                continue;
+            }
+            misses.push(c);
         }
-        if (hit && (hit.state === 'fresh' && !(deps.fresh && deps.mode === 'owner'))) {
-            stats.hit++;
-            outcomes.set(c.key, { data: hit.value as LeafData, fetchedAt: hit.fetchedAt, cache: 'hit' });
-            continue;
-        }
-        if (hit && hit.state === 'stale' && !deps.fresh) {
-            stats.stale++;
-            outcomes.set(c.key, { data: hit.value as LeafData, fetchedAt: hit.fetchedAt, cache: 'stale' });
-            // Background refresh (single-flight); errors keep the stale entry.
-            void singleFlight(`refresh:${c.key}`, async () => {
-                const t = await tokenFor(c.family, c.asset);
-                const r = c.family === 'ga4'
-                    ? (await fetchGa4Batch(t, deps.userId, c.asset, [c], { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 })).get(c.key)
-                    : await fetchGsc(t, deps.userId, c, { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 });
-                if (r && !(r instanceof LeafError)) cacheSet(c.key, r, policyFor(c.family, c.range.end, today));
-            }).catch(() => undefined);
-            continue;
-        }
-        misses.push(c);
-    }
 
-    if (misses.length && deps.mode === 'public' && !takePublicBudget(deps.userId, misses.length)) {
-        for (const c of misses) outcomes.set(c.key, { error: new LeafError('QUOTA', 'This shared dashboard is busy. Try again later.', 300) });
-        misses.length = 0;
-    }
-
-    stats.miss += misses.length;
-    const ga4ByProp = new Map<string, Array<PhysicalLeaf & { logical: LogicalLeaf }>>();
-    const gscMisses: Array<PhysicalLeaf & { logical: LogicalLeaf }> = [];
-    for (const c of misses) {
-        if (c.family === 'ga4') {
-            const list = ga4ByProp.get(c.asset) ?? [];
-            list.push(c);
-            ga4ByProp.set(c.asset, list);
-        } else gscMisses.push(c);
-    }
-    const settle = (c: PhysicalLeaf, r: LeafData | LeafError | undefined) => {
-        const fetchedAt = Date.now();
-        if (!r || r instanceof LeafError) {
-            const e = r ?? new LeafError('UPSTREAM', ERROR_TEXT.UPSTREAM);
-            const ttl = (NEGATIVE_TTL_MS as Record<string, number>)[e.code];
-            if (ttl) negativeSet(c.key, e, ttl);
-            const old = cacheGet(c.key);
-            outcomes.set(c.key, { error: e, staleData: old ? { data: old.value as LeafData, fetchedAt: old.fetchedAt } : undefined });
-            return;
+        if (misses.length && deps.mode === 'public' && !takePublicBudget(deps.userId, misses.length)) {
+            for (const c of misses) outcomes.set(c.key, { error: new LeafError('QUOTA', 'This shared dashboard is busy. Try again later.', 300) });
+            misses.length = 0;
         }
-        cacheSet(c.key, r, policyFor(c.family, c.range.end, today));
-        outcomes.set(c.key, { data: r, fetchedAt, cache: 'miss' });
+
+        stats.miss += misses.length;
+        const ga4ByProp = new Map<string, Array<PhysicalLeaf & { logical: LogicalLeaf }>>();
+        const gscMisses: Array<PhysicalLeaf & { logical: LogicalLeaf }> = [];
+        for (const c of misses) {
+            if (c.family === 'ga4') {
+                const list = ga4ByProp.get(c.asset) ?? [];
+                list.push(c);
+                ga4ByProp.set(c.asset, list);
+            } else gscMisses.push(c);
+        }
+        const settle = (c: PhysicalLeaf, r: LeafData | LeafError | undefined) => {
+            const fetchedAt = Date.now();
+            if (!r || r instanceof LeafError) {
+                const e = r ?? new LeafError('UPSTREAM', ERROR_TEXT.UPSTREAM);
+                const ttl = (NEGATIVE_TTL_MS as Record<string, number>)[e.code];
+                if (ttl) negativeSet(c.key, e, ttl);
+                const old = cacheGet(c.key);
+                outcomes.set(c.key, { error: e, staleData: old ? { data: old.value as LeafData, fetchedAt: old.fetchedAt } : undefined });
+                return;
+            }
+            cacheSet(c.key, r, policyFor(c.family, c.range.end, today));
+            outcomes.set(c.key, { data: r, fetchedAt, cache: 'miss' });
+        };
+        await Promise.all([
+            ...[...ga4ByProp.entries()].map(async ([prop, list]) => {
+                const t = await tokenFor('ga4', prop);
+                const res = await singleFlight(`ga4batch:${list.map((l) => l.key).join(',')}`, () => fetchGa4Batch(t, deps.userId, prop, list, stats));
+                for (const c of list) settle(c, res.get(c.key));
+            }),
+            ...gscMisses.map(async (c) => {
+                const t = await tokenFor('gsc', c.asset);
+                settle(c, await singleFlight(c.key, () => fetchGsc(t, deps.userId, c, stats)));
+            }),
+        ]);
+
+        // 4. Assemble each widget.
+        return plans.map((plan): WidgetResult => {
+            if (plan.error) return { ...plan.error, sourceLabel: plan.sourceLabel };
+            try {
+                return assemble(plan, leafToCalls, shapeOf, outcomes, today, deps.mode === 'owner');
+            } catch (err) {
+                return errResult('INVALID', err instanceof Error ? err.message.slice(0, 200) : undefined, { sourceLabel: plan.sourceLabel });
+            }
+        });
     };
-    await Promise.all([
-        ...[...ga4ByProp.entries()].map(async ([prop, list]) => {
-            const t = await tokenFor('ga4', prop);
-            const res = await singleFlight(`ga4batch:${list.map((l) => l.key).join(',')}`, () => fetchGa4Batch(t, deps.userId, prop, list, stats));
-            for (const c of list) settle(c, res.get(c.key));
-        }),
-        ...gscMisses.map(async (c) => {
-            const t = await tokenFor('gsc', c.asset);
-            settle(c, await singleFlight(c.key, () => fetchGsc(t, deps.userId, c, stats)));
-        }),
-    ]);
 
-    // 4. Assemble each widget.
+    const first = await runPlans(plans);
+    plans.forEach((plan, i) => { results[plan.widget.id] = first[i]; });
+
+    // 5. Trend column (round 7): tables that show each row's trend need the top rows first, so
+    // their trend query (sort metric by date x row, filtered to those rows) is a second round:
+    // one GA4 report and/or one Search Console call per table, cached like any leaf.
+    const trendPlans: WidgetPlan[] = [];
     for (const plan of plans) {
-        if (plan.error) {
-            results[plan.widget.id] = { ...plan.error, sourceLabel: plan.sourceLabel };
-            continue;
-        }
-        try {
-            results[plan.widget.id] = assemble(plan, leafToCalls, shapeOf, outcomes, today, deps.mode === 'owner');
-        } catch (err) {
-            results[plan.widget.id] = errResult('INVALID', err instanceof Error ? err.message.slice(0, 200) : undefined, { sourceLabel: plan.sourceLabel });
-        }
+        const w = plan.widget;
+        const r = results[w.id];
+        if (w.type !== 'table' || !w.config.trend || plan.error || r?.status !== 'ok' || !r.parts.rows) continue;
+        const entry = plan.queries.find((e) => e.q.part === 'rows');
+        if (!entry) continue;
+        const t = tableTrendQuery(w, entry.q, r.parts.rows, entry.range);
+        if (t) trendPlans.push(planWidget(w, viewedWidgets.find((d) => d.widget === w)?.pageId, { queries: [t.query], filter: t.filter }));
+    }
+    if (trendPlans.length) {
+        const second = await runPlans(trendPlans);
+        trendPlans.forEach((plan, i) => {
+            const r = results[plan.widget.id];
+            const t = second[i];
+            // A failed trend leaves the table as it is (the column shows dashes).
+            if (r?.status === 'ok' && t.status === 'ok' && t.parts.trend) r.parts.trend = t.parts.trend;
+        });
     }
     return response();
 }
@@ -899,8 +962,9 @@ function assemble(
                 if (data.flags.otherRow) flags.otherRow = true;
                 if (data.flags.currency) flags.currency = data.flags.currency;
                 if (leaf.family === 'gsc' && !leaf.isPrev) {
-                    const lag = addDays(today, -2);
-                    const pf = data.flags.firstIncomplete ?? (e.range.end >= lag ? (lag > e.range.start ? lag : e.range.start) : undefined);
+                    // Days after Search Console's last complete day (lib/dateRange) are preliminary.
+                    const lag = addDays(lastCompleteDay('gsc', today), 1);
+                    const pf = data.flags.firstIncomplete ?? (leaf.range.end >= lag ? (lag > leaf.range.start ? lag : leaf.range.start) : undefined);
                     if (pf && (!flags.preliminaryFrom || pf < flags.preliminaryFrom)) flags.preliminaryFrom = pf;
                 }
                 const metricIds = data.metrics.map((api) => (leaf.family === 'gsc' ? `gsc:${api}` : `ga4:${api}`));
@@ -928,7 +992,7 @@ function assemble(
 
         // Combine sites: keep them apart when 'site' is a dimension, else roll up.
         const bySite = q.dimensions.includes('site');
-        const wanted = withComponents(q.metrics);
+        const wanted = withComponents(e.base);
         const cur = new Map<string, CRow>();
         const prev = new Map<string, CRow>();
         for (const which of ['cur', 'prev'] as const) {
@@ -1010,6 +1074,10 @@ function shapeFrame(
         ...outDims.map((d) => ({ id: `d:${d}`, kind: 'dimension' as const, label: getDim(d)?.label ?? d })),
         ...q.metrics.map((id) => ({ id: `m:${id}`, kind: 'metric' as const, label: getMetric(id)?.label ?? id })),
     ];
+    // Round 7: calculated metrics are computed here, per row, from their inputs' values after the
+    // join and the roll-up (weeks, sites); '% of total' divides by the column total of its input.
+    const hasCalc = q.metrics.some((id) => parseCalcId(id));
+    const withCalcs = (v: Vals | undefined, totals: Record<string, number | null>): Vals | undefined => (v && hasCalc ? withCalcValues(q.metrics, v, totals) : v);
     const toRow = (dims: Record<string, string>, c: Vals | undefined, p: Vals | undefined): Record<string, CellValue> => {
         const row: Record<string, CellValue> = {};
         for (const d of q.dimensions) {
@@ -1030,21 +1098,27 @@ function shapeFrame(
         const gscOnly = e.families.length === 1 && e.families[0] === 'gsc';
         const lagStart = flags.preliminaryFrom;
         const siteIds = bySite ? [...new Set([...cur.values()].map((r) => r.dims.site))] : [''];
+        // Zero-fill the fetched metrics (a calculation's inputs), so a day without data computes from zeros.
+        const fillIds = hasCalc ? e.base : q.metrics;
         const rows: Array<Record<string, CellValue>> = [];
         for (const sid of siteIds) {
             const kOf = (b: Iso) => (bySite ? `${sid}\u0002${b}` : b);
             // Last bucket Search Console returned: later lag days stay empty instead of a false dip to zero.
             let lastWithData = '';
             for (const b of buckets) if (cur.get(kOf(b))) lastWithData = b;
+            const curTot = hasCalc ? shareTotals(q.metrics, buckets.map((b) => cur.get(kOf(b))?.cur ?? {})) : {};
+            const prevTot = hasCalc && e.compare ? shareTotals(q.metrics, prevBuckets.map((b) => prev.get(kOf(b))?.cur ?? {})) : {};
             buckets.forEach((b, i) => {
                 const c = cur.get(kOf(b));
                 const p = e.compare ? prev.get(kOf(prevBuckets[i] ?? '')) : undefined;
                 const fill: Vals = {};
                 const missingTail = gscOnly && !c && lagStart && b >= lagStart && b > lastWithData;
-                for (const id of q.metrics) fill[id] = missingTail ? null : zeroFor(id);
+                for (const id of fillIds) fill[id] = missingTail ? null : zeroFor(id);
                 const pfill: Vals = {};
-                for (const id of q.metrics) pfill[id] = zeroFor(id);
-                const row = toRow(bySite ? { site: sid, [timeDim]: b } : { [timeDim]: b }, c ? { ...fill, ...c.cur } : fill, e.compare ? (p ? { ...pfill, ...p.cur } : prevBuckets[i] ? pfill : undefined) : undefined);
+                for (const id of fillIds) pfill[id] = zeroFor(id);
+                const cv = c ? { ...fill, ...c.cur } : fill;
+                const pv = e.compare ? (p ? { ...pfill, ...p.cur } : prevBuckets[i] ? pfill : undefined) : undefined;
+                const row = toRow(bySite ? { site: sid, [timeDim]: b } : { [timeDim]: b }, withCalcs(cv, curTot), withCalcs(pv, prevTot));
                 row[`d:date`] = b;
                 if (e.compare && prevBuckets[i]) row['d:date:prev'] = prevBuckets[i];
                 rows.push(row);
@@ -1053,11 +1127,14 @@ function shapeFrame(
         return { columns, rows, rowCount: rows.length };
     }
 
-    // ── pivot: wide frame (time series breakdown, stacked bars) ──
+    // ── pivot: wide frame (time series breakdown, stacked bars, table trend column) ──
     if (q.pivot) {
         const pd = q.pivot.dimension;
         const primary = keyDims.find((d) => d !== pd) ?? keyDims[0];
         const metric = q.metrics[0];
+        const spec = parseCalcId(metric);
+        const pivotFrame = spec ? pivotCalc(spec, pd, primary, timeDim, q, e, cur) : null;
+        if (pivotFrame) return pivotFrame;
         const totals = new Map<string, number>();
         for (const r of cur.values()) {
             const v = r.cur[metric];
@@ -1100,7 +1177,12 @@ function shapeFrame(
     }
 
     // ── categorical rows ──
-    let rows = [...cur.entries()].map(([k, r]) => ({ k, row: toRow(r.dims, r.cur, prev.get(k)?.cur) }));
+    const curTot = hasCalc ? shareTotals(q.metrics, [...cur.values()].map((r) => r.cur)) : {};
+    const prevTot = hasCalc && e.compare ? shareTotals(q.metrics, [...prev.values()].map((r) => r.cur)) : {};
+    let rows = [...cur.entries()].map(([k, r]) => {
+        const pv = prev.get(k)?.cur;
+        return { k, cv: r.cur, pv, row: toRow(r.dims, withCalcs(r.cur, curTot), withCalcs(pv, prevTot)) };
+    });
     if (q.having?.length) {
         rows = rows.filter(({ row }) => q.having!.every((h) => {
             const v = row[`m:${h.metric}`];
@@ -1134,23 +1216,43 @@ function shapeFrame(
     }
     if (e.families.includes('gsc') && isMetricSort && sortBy !== 'gsc:clicks' && q.limit) flags.sortedWithinTop = q.limit;
 
-    let out = rows.map((r) => r.row);
+    /** Inputs summed over some rows, then the calculation (a ratio of sums, never a mean of ratios). */
+    const calcOver = (list: typeof rows, id: string, which: 'cv' | 'pv'): number | null => {
+        const spec = parseCalcId(id)!;
+        const sums: Vals = {};
+        for (const input of expandCalcs([id])) sums[input] = sumOf(list.map((r) => r[which] ?? {}), input);
+        return calcValue(spec, sums, (which === 'cv' ? curTot : prevTot)[id]);
+    };
     const totals: Record<string, number | null> = {};
     for (const id of q.metrics) {
-        if (getMetric(id)?.additive) {
-            totals[`m:${id}`] = out.reduce((s, r) => s + (typeof r[`m:${id}`] === 'number' ? (r[`m:${id}`] as number) : 0), 0);
-            if (e.compare) totals[`m:${id}:prev`] = out.reduce((s, r) => s + (typeof r[`m:${id}:prev`] === 'number' ? (r[`m:${id}:prev`] as number) : 0), 0);
+        const def = getMetric(id);
+        if (def?.calc && !def.additive) {
+            // Totals of a calculation need summable inputs (never users or rates).
+            if (expandCalcs([id]).every((x) => getMetric(x)?.additive)) {
+                totals[`m:${id}`] = calcOver(rows, id, 'cv');
+                if (e.compare) totals[`m:${id}:prev`] = calcOver(rows, id, 'pv');
+            }
+        } else if (def?.additive) {
+            totals[`m:${id}`] = rows.reduce((s, r) => s + (typeof r.row[`m:${id}`] === 'number' ? (r.row[`m:${id}`] as number) : 0), 0);
+            if (e.compare) totals[`m:${id}:prev`] = rows.reduce((s, r) => s + (typeof r.row[`m:${id}:prev`] === 'number' ? (r.row[`m:${id}:prev`] as number) : 0), 0);
         }
     }
-    const rowCount = out.length;
+    const rowCount = rows.length;
     let truncated = false;
+    let out = rows.map((r) => r.row);
     if (q.top) {
         const shown = out.slice(0, q.top.n);
         if (q.top.other && out.length > q.top.n) {
+            const restRows = rows.slice(q.top.n);
             const rest = out.slice(q.top.n);
             const other: Record<string, CellValue> = {};
             for (const d of q.dimensions) other[`d:${d}`] = '(other)';
             for (const id of q.metrics) {
+                if (parseCalcId(id)) {
+                    other[`m:${id}`] = calcOver(restRows, id, 'cv');
+                    if (e.compare) other[`m:${id}:prev`] = calcOver(restRows, id, 'pv');
+                    continue;
+                }
                 other[`m:${id}`] = rest.reduce((s, r) => s + (Number(r[`m:${id}`]) || 0), 0);
                 if (e.compare) other[`m:${id}:prev`] = rest.reduce((s, r) => s + (Number(r[`m:${id}:prev`]) || 0), 0);
             }
@@ -1166,5 +1268,69 @@ function shapeFrame(
     return { columns, rows: out, totals, rowCount, truncated };
 }
 
+/**
+ * Pivot of a calculated metric: each cell computed from its summed inputs ("Other" included);
+ * values ranked by the total of input A (a ratio would rank one-visit rows first).
+ */
+function pivotCalc(
+    spec: CalcSpec,
+    pd: string,
+    primary: string,
+    timeDim: string | undefined,
+    q: WidgetQuery,
+    e: WidgetPlan['queries'][number],
+    cur: Map<string, CRow>,
+): DataFrame {
+    const inputs = expandCalcs([q.metrics[0]]);
+    const all = [...cur.values()];
+    const shareTot = spec.op === 'share' ? sumOf(all.map((r) => r.cur), spec.a) : null;
+    const add = (acc: Vals, v: Vals) => {
+        for (const id of inputs) {
+            const x = v[id];
+            if (typeof x === 'number') acc[id] = ((acc[id] as number | null | undefined) ?? 0) + x;
+        }
+    };
+    const sizeBy = (key: (r: CRow) => string) => {
+        const m = new Map<string, number>();
+        for (const r of all) {
+            const v = r.cur[spec.a];
+            if (typeof v === 'number') m.set(key(r), (m.get(key(r)) ?? 0) + v);
+        }
+        return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    };
+    const ranked = sizeBy((r) => r.dims[pd]);
+    const top = ranked.slice(0, q.pivot!.top).map(([k]) => k);
+    const topSet = new Set(top);
+    const hasOther = q.pivot!.other && ranked.length > top.length;
+    const seriesKeys = [...top.map((v) => `b:${v}`), ...(hasOther ? ['b:__other'] : [])];
+    const primaryKeys = timeDim ? bucketsFor(e.range, e.granularity) : sizeBy((r) => r.dims[primary]).slice(0, q.top?.n ?? 10).map(([k]) => k);
+    const cells = new Map<string, Map<string, Vals>>();
+    for (const pk of primaryKeys) cells.set(pk, new Map());
+    for (const r of all) {
+        const row = cells.get(r.dims[primary]);
+        if (!row) continue;
+        const col = topSet.has(r.dims[pd]) ? `b:${r.dims[pd]}` : hasOther ? 'b:__other' : null;
+        if (!col) continue;
+        const acc = row.get(col) ?? {};
+        add(acc, r.cur);
+        row.set(col, acc);
+    }
+    // A day with no rows computes from zeros (0 − 0 = 0; 0 ÷ 0 = no value).
+    const zeros: Vals = Object.fromEntries(inputs.map((id) => [id, zeroFor(id)]));
+    const rows = primaryKeys.map((pk) => {
+        const row: Record<string, CellValue> = { [`d:${timeDim ? 'date' : primary}`]: pk };
+        for (const s of seriesKeys) {
+            const v = cells.get(pk)?.get(s);
+            row[s] = v ? calcValue(spec, { ...zeros, ...v }, shareTot) : timeDim ? calcValue(spec, zeros, shareTot) : null;
+        }
+        return row;
+    });
+    const columns = [
+        { id: `d:${timeDim ? 'date' : primary}`, kind: 'dimension' as const, label: getDim(timeDim ? 'date' : primary)?.label ?? primary },
+        ...seriesKeys.map((s) => ({ id: s, kind: 'metric' as const, label: s === 'b:__other' ? 'Other' : s.slice(2) })),
+    ];
+    return { columns, rows, seriesKeys, rowCount: rows.length };
+}
+
 /** Exposed for tests: plan-only helpers. */
-export const __test = { ga4Filter, gscFilters, isoWeekToMonday, rollup, withComponents, bucketsFor, parseGa4, parseGsc, canonValue };
+export const __test = { ga4Filter, gscFilters, isoWeekToMonday, rollup, withComponents, bucketsFor, parseGa4, parseGsc, canonValue, shapeFrame };

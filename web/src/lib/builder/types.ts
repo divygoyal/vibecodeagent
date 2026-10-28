@@ -78,6 +78,11 @@ export interface FilterControl {
     viewerCanChange: boolean;
 }
 
+/**
+ * Site switcher (round 7): widgets whose source is "Default" (the dashboard's site) read the site picked
+ * here. `options` are the owner's site ids ('all' = every site the owner can read, checked server side on
+ * each request); `default` '' = the dashboard's default site.
+ */
 export interface SiteControl {
     id: ControlId;
     type: 'site';
@@ -85,14 +90,40 @@ export interface SiteControl {
     options: string[] | 'all';
     default: string;
     scope: ControlScope;
+    /** Share-link and embed viewers may switch too (missing = no: only the owner switches). */
+    viewerCanChange?: boolean;
+    /**
+     * Public docs only, filled by the server: opaque option keys and their labels. A public doc never
+     * carries site ids, property ids or the hosts of sites the owner did not allow.
+     */
+    choices?: Array<{ key: string; label: string }>;
 }
 
+/**
+ * Metric switcher (round 7): widgets in scope that show `default` show the viewer's pick from `options`
+ * instead (the other metrics of a widget stay).
+ */
 export interface MetricControl {
     id: ControlId;
     type: 'metric';
     label: string;
     options: MetricId[];
     default: MetricId;
+    scope: ControlScope;
+}
+
+export type Grain = 'day' | 'week' | 'month';
+
+/**
+ * Day / Week / Month control (round 7): time series in scope use the picked granularity; 'auto' keeps
+ * each chart's own setting.
+ */
+export interface GrainControl {
+    id: ControlId;
+    type: 'grain';
+    label: string;
+    options: Array<'auto' | Grain>;
+    default: 'auto' | Grain;
     scope: ControlScope;
 }
 
@@ -109,7 +140,7 @@ export interface VariableControl {
     viewerCanChange: boolean;
 }
 
-export type ControlDef = DateControl | FilterControl | SiteControl | MetricControl | VariableControl;
+export type ControlDef = DateControl | FilterControl | SiteControl | MetricControl | GrainControl | VariableControl;
 
 export type FilterOp = 'eq' | 'neq' | 'in' | 'not_in' | 'contains' | 'not_contains' | 'starts' | 'ends' | 'regex' | 'not_regex';
 export interface FilterClause { dimension: DimId; op: FilterOp; value: string | string[] }
@@ -120,8 +151,12 @@ export interface ControlState {
     date: { range: DateRangeSpec; compare: CompareSpec };
     filters: Record<ControlId, string[]>;
     interaction?: FilterClause[];
+    /** Site control picks (URL s.<id>): owner views hold site ids; public URLs hold opaque keys the server maps. */
     site?: Record<ControlId, string>;
+    /** Metric control picks (URL m.<id>). */
     metric?: Record<ControlId, MetricId>;
+    /** Day / Week / Month picks (URL g.<id>). */
+    grain?: Record<ControlId, 'auto' | Grain>;
     pageId?: PageId;
 }
 
@@ -187,6 +222,8 @@ export interface DashboardSettings {
     timezone?: string;
     /** TV mode (round 2): page rotation in seconds (0 = off) and whether filters hide. */
     tv?: { rotateSec: 0 | 15 | 30 | 60 | 120; hideControls: boolean };
+    /** Round 7: show the owner's chart notes on share links and embeds (off unless set). */
+    shareNotes?: boolean;
 }
 
 export interface DashboardDocV2 {
@@ -203,6 +240,18 @@ export interface DashboardDocV2 {
         createdFrom?: string;
         migratedFromV1?: { at: string; propertyId: string; siteUrl?: string };
     };
+    /**
+     * Calculated metrics (round 7): the names of the dashboard's calculations. The id says what to
+     * compute (lib/builder/calc.ts), so widgets use it like any MetricId. Missing = none.
+     */
+    calcs?: CalculatedMetric[];
+}
+
+/** A named calculated metric: id 'calc:<op>_<format>_<better>:<A>[:<B>]:<token>' (calc.ts). */
+export interface CalculatedMetric {
+    id: MetricId;
+    /** Up to 60 characters. */
+    label: string;
 }
 
 // ── Widgets ──────────────────────────────────────────────────────────────
@@ -280,6 +329,35 @@ export interface TimeSeriesConfig {
     legend: 'auto' | 'top' | 'bottom' | 'none';
     yAxis: { min?: 'zero' | 'auto' };
     markPreliminary: boolean;
+    /**
+     * Round 7: dated markers on the chart. 'all' (also when missing) = your chart notes (the site
+     * pages' notes, /api/annotations) and Google ranking updates; 'off' draws none.
+     */
+    annotations?: AnnotationMode;
+    /** Round 7: horizontal goal / reference / average lines (at most 3). */
+    refLines?: RefLine[];
+}
+
+export type AnnotationMode = 'all' | 'notes' | 'google' | 'off';
+
+/**
+ * A horizontal line on a time series (round 7). Values use the metric's units (ratios as
+ * fractions, like ScorecardConfig.target). 'average' is computed from the plotted points.
+ */
+export interface RefLine {
+    kind: 'goal' | 'reference' | 'average';
+    /** goal / reference only. */
+    value?: number;
+    /**
+     * What the value counts (additive metrics only; others are drawn as entered): 'point' = one
+     * point of the chart (default); 'day' / 'week' / 'month' = a rate scaled to the chart's
+     * granularity; 'period' = a total for the whole date range, like a scorecard target.
+     */
+    per?: 'point' | 'day' | 'week' | 'month' | 'period';
+    /** Up to 40 characters; default "Goal", "Reference" or "Average". */
+    label?: string;
+    /** The series it is measured on (default: the first one). */
+    metric?: MetricId;
 }
 export type TimeSeriesWidget = WidgetBase<'timeseries', TimeSeriesConfig>;
 
@@ -355,6 +433,11 @@ export interface TableConfig {
      * so "Declining pages" never lists a page that held steady or grew (round 4 polish).
      */
     changeOnly?: boolean;
+    /**
+     * Trend column (round 7): each row's daily (weekly past 92 days) line of the sort metric, for the
+     * top TABLE_TREND_ROWS rows. Single-dimension tables only. Missing = off.
+     */
+    trend?: boolean;
 }
 export type TableWidget = WidgetBase<'table', TableConfig>;
 
@@ -463,7 +546,14 @@ export interface DashboardQueryRequest {
     fresh?: boolean;
 }
 
-export interface ResolvedDates { range: { start: Iso; end: Iso }; compare?: { start: Iso; end: Iso }; timezone: string; today: Iso }
+export interface ResolvedDates {
+    range: { start: Iso; end: Iso };
+    compare?: { start: Iso; end: Iso };
+    /** Search Console's days when they differ from `range` (it runs a day behind GA4: lib/dateRange). */
+    search?: { start: Iso; end: Iso };
+    timezone: string;
+    today: Iso;
+}
 
 export interface DashboardQueryResponse {
     results: Record<WidgetId, WidgetResult>;

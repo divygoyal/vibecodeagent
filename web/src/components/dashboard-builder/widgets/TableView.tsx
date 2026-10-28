@@ -4,16 +4,19 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ExternalLink, Maximize2 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
+import { Sparkline } from '@/components/charts';
+import { fmtDay } from '@/lib/format';
 import { Button, EmptyState, MetricDelta, Modal, SearchInput, Table, type TableColumn as UiColumn } from '@/components/ui';
 import { dimLabel, fmtMetricValue, metricHeatbar, metricLabel } from '@/lib/builder/catalog';
 import { cellStyle } from '@/lib/builder/cfRules';
+import { rowTrends, TABLE_TREND_ROWS, trendChange, trendMetric, trendUnsupported, type RowTrends } from '@/lib/builder/trend';
 import type { CellValue, TableWidget } from '@/lib/builder/types';
 import { useElementWidth } from '../useElementWidth';
 import { useTvScreen } from '../TvMode';
 import { sortRows } from '@/components/ui/tableSort';
 import { flagNotes, okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { dimText } from './Charts';
-import { dsFormat, metricBetter } from './metricUi';
+import { dsFormat, dsKey, metricBetter } from './metricUi';
 
 type Row = Record<string, CellValue>;
 type Col = TableWidget['config']['columns'][number];
@@ -26,6 +29,11 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
  * and DataFast's breakdown cards).
  */
 export const NARROW_TABLE_PX = 640;
+/** Narrow cards keep the trend column from this width (name, number, change and a 72 px line fit). */
+export const NARROW_TREND_PX = 360;
+
+/** The trend column's data (round 7): the metric it draws and one line per row value. */
+interface TrendData { metric: string; lines: RowTrends }
 
 /**
  * Which columns a table widget shows at this width. `drop` more columns are hidden after a
@@ -72,6 +80,12 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
     });
 
     const footer = c.totalsRow && ok?.parts.totals?.rows[0] ? <TotalsLine cols={cols} totals={ok.parts.totals.rows[0]} currency={ok.flags.currency} /> : undefined;
+    // Trend column (round 7): only when the engine sent the lines; narrow cards keep it while it fits.
+    const trendPart = c.trend ? ok?.parts.trend : undefined;
+    const trendId = c.trend && !trendUnsupported(widget) ? trendMetric(widget) : null;
+    const lines = rowTrends(trendPart);
+    const trend: TrendData | undefined = trendId && lines.byValue.size ? { metric: trendId, lines } : undefined;
+    const cardTrend = trend && (!narrow || boxWidth >= NARROW_TREND_PX) ? trend : undefined;
     // Phones show two-line list rows, 5 a page, and the card grows to fit them (DashboardCanvas
     // growsOnPhone; round 5 audit #28: a fixed box showed 2 rows above a blank half card). Desktop:
     // rows that fit under the title, header, pager and any footnote (round 4: the pager was clipped).
@@ -115,18 +129,52 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                         pagination={tv ? undefined : c.pagination || phone ? { pageSize } : undefined}
                         limit={tv ? tvRows : undefined}
                         footer={footer}
+                        trend={cardTrend}
                     />
                 )}
             </div>
             {canOpen ? (
                 <Modal open={details} onOpenChange={setDetails} size="xl" title={widget.title ?? 'Table'} description={`All ${cols.length} columns, ${frame?.rows.length.toLocaleString('en-US')} rows`}>
                     <div className="-mx-5 -mb-5">
-                        <TableBody props={props} cols={cols} narrow={false} pagination={{ pageSize: 15 }} footer={footer} inDialog />
+                        <TableBody props={props} cols={cols} narrow={false} pagination={{ pageSize: 15 }} footer={footer} inDialog trend={trend} />
                     </div>
                 </Modal>
             ) : null}
         </WidgetFrame>
     );
+}
+
+/** The trend column: a small line per row (top TABLE_TREND_ROWS rows), a dash for the others. */
+function trendColumn(trend: TrendData, dim: string, labels?: Record<string, string>): UiColumn<Row> {
+    const { metric, lines } = trend;
+    const name = metricLabel(metric);
+    const span = lines.dates.length ? `${fmtDay(lines.dates[0])} to ${fmtDay(lines.dates[lines.dates.length - 1])}` : '';
+    const weekly = lines.dates.length > 1 && Date.parse(lines.dates[1]) - Date.parse(lines.dates[0]) > 86_400_000 * 2;
+    return {
+        key: '__trend',
+        header: <span title={`${weekly ? 'Weekly' : 'Daily'} ${name.toLowerCase()}, ${span}. Shown for the top ${TABLE_TREND_ROWS} rows.`}>Trend</span>,
+        mobileLabel: 'Trend',
+        mobile: 'trailing',
+        align: 'right',
+        className: 'w-[88px] min-w-[88px]',
+        cell: (r) => {
+            const raw = String(r[`d:${dim}`] ?? '');
+            const values = lines.byValue.get(raw);
+            const ends = values ? trendChange(values) : null;
+            if (!values || !ends) {
+                return <span className="text-fg-muted" title={r.__other ? undefined : `Trends show for the top ${TABLE_TREND_ROWS} rows`}>–</span>;
+            }
+            const text = dimText(dim, r[`d:${dim}`], labels);
+            const from = fmtMetricValue(metric, ends.first, { compact: true });
+            const to = fmtMetricValue(metric, ends.last, { compact: true });
+            return (
+                <span className="ml-auto block w-14 md:w-[72px]" title={`${text}: ${name.toLowerCase()} from ${from} to ${to} (${span})`}>
+                    <Sparkline series={[{ metric: dsKey(metric), values, label: name }]} dates={lines.dates} height={22} area="none" interactive={false} />
+                    <span className="sr-only">{`${weekly ? 'Weekly' : 'Daily'} ${name.toLowerCase()} from ${from} to ${to}`}</span>
+                </span>
+            );
+        },
+    };
 }
 
 function TotalsLine({ cols, totals, currency }: { cols: Col[]; totals: Row; currency?: string }) {
@@ -144,7 +192,7 @@ function TotalsLine({ cols, totals, currency }: { cols: Col[]; totals: Row; curr
  * The table itself (card and Details dialog). Narrow cards: compact numbers, the change next to
  * the sort metric, and the heat bar on the sort column only.
  */
-function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, inDialog }: {
+function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, inDialog, trend }: {
     props: WidgetViewProps<TableWidget>;
     cols: Col[];
     narrow: boolean;
@@ -154,6 +202,7 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
     limit?: number;
     footer?: React.ReactNode;
     inDialog?: boolean;
+    trend?: TrendData;
 }) {
     const { widget, result } = props;
     const ok = okResult(result);
@@ -197,7 +246,7 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                             {pick ? (
                                 <button type="button" onClick={() => pick(raw)} title={sub ? `Filter the page by ${text} (${sub})` : `Filter the page by ${text}`} className={cn('truncate text-left hover:text-brand-text hover:underline', props.selectedValue === raw && 'font-semibold text-brand-text')}>{text}{subEl}</button>
                             ) : <span className="truncate" title={sub ? `${text} · ${sub}` : text}>{text}{subEl}</span>}
-                            {href && props.mode !== 'edit' ? <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${text}`} className="shrink-0 text-fg-faint hover:text-fg-muted"><ExternalLink aria-hidden size={12} /></a> : null}
+                            {href && props.mode !== 'edit' ? <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${text}`} className="shrink-0 text-fg-muted hover:text-fg"><ExternalLink aria-hidden size={12} /></a> : null}
                         </span>
                     );
                 },
@@ -238,6 +287,12 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
             },
         };
     });
+
+    if (trend) {
+        // Right after the column it draws (else at the end); phones put it at the end of the row's first line.
+        const at = columns.findIndex((col) => col.key === c.sort.by);
+        columns.splice(at >= 0 ? at + 1 : columns.length, 0, trendColumn(trend, d0, frame?.labels));
+    }
 
     const defaultSort = c.sortByChange ? undefined : { key: c.sort.by, dir: c.sort.dir };
     let shownRows = rows;

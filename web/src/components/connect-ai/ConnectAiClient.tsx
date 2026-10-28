@@ -228,7 +228,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                         {/* Collapsed by default: plain names first, the tool name an AI app shows in monospace under it. */}
                         <details className="group border-t border-border-subtle pt-3">
                             <summary className="flex cursor-pointer list-none items-center gap-2 pointer-coarse:min-h-11 text-body-sm font-medium text-fg-secondary hover:text-fg [&::-webkit-details-marker]:hidden">
-                                <Wrench aria-hidden size={14} strokeWidth={1.75} className="text-fg-faint" />
+                                <Wrench aria-hidden size={14} strokeWidth={1.75} className="text-fg-muted" />
                                 <span className="group-open:hidden">What each tool does</span>
                                 <span className="hidden group-open:inline">Hide the tools</span>
                             </summary>
@@ -236,7 +236,7 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                                 {TOOL_SUMMARIES.map((t) => (
                                     <li key={t.name} className="min-w-0">
                                         <span className="text-body-sm font-medium text-fg">{t.label}</span>
-                                        <span className="ml-1.5 font-mono text-[12px] text-fg-faint">{t.name}</span>
+                                        <span className="ml-1.5 font-mono text-[12px] text-fg-muted">{t.name}</span>
                                         <p className="text-body-sm text-fg-muted">{t.summary}</p>
                                     </li>
                                 ))}

@@ -7,7 +7,7 @@ import {
     Banner, Button, EmptyState, SearchInput, SegmentedControl, Select, Tooltip, useDebouncedValue,
 } from '@/components/ui';
 import { cn } from '@/lib/cn';
-import { fmtFull } from '@/lib/format';
+import { fmtDay, fmtFull } from '@/lib/format';
 import { RANGE_LABEL } from '@/lib/portfolio/ranges';
 import type { PortfolioRange, PortfolioResponse, PortfolioSite, SitePatch } from '@/lib/portfolio/types';
 import { filterSites, SORT_OPTIONS, sortSites, type FilterKey, type SortKey } from '@/lib/portfolio/view';
@@ -130,6 +130,10 @@ function Subtitle({ data, range, alerts = 0 }: { data: PortfolioResponse | undef
         parts.push([<span key="find" className="inline-flex items-center gap-1.5"><Loader2 aria-hidden size={12} className="animate-spin" />Finding your sites</span>, true]);
     }
     parts.push([`${RANGE_LABEL[range]} vs previous`, true]);
+    // The two sources' windows end on different days (lib/dateRange: GA4 yesterday, Search Console 2 days ago).
+    const t = data?.windows.traffic;
+    const s = data?.windows.search;
+    if (t && s && t.curEnd !== s.curEnd) parts.push([`traffic to ${fmtDay(t.curEnd)}, search to ${fmtDay(s.curEnd)}`, false]);
     if (alerts > 0) {
         parts.push([
             <a key="alerts" href={`#${ALERTS_ID}`} onClick={scrollToAlerts} className="tap-area font-medium text-down underline-offset-2 hover:underline">
@@ -142,7 +146,7 @@ function Subtitle({ data, range, alerts = 0 }: { data: PortfolioResponse | undef
         <span className="inline-flex flex-wrap items-center gap-x-1.5">
             {parts.map(([p, phone], i) => (
                 <span key={i} className={cn('inline-flex items-center gap-1.5', !phone && 'max-md:hidden')}>
-                    {i > 0 ? <span aria-hidden className="text-fg-faint">·</span> : null}
+                    {i > 0 ? <span aria-hidden className="text-fg-muted">·</span> : null}
                     {p}
                 </span>
             ))}

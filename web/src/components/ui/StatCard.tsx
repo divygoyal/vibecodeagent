@@ -41,7 +41,7 @@ export function StatCard({ metric, value, previous, label, comparisonLabel, info
                 <span className="truncate text-body-sm font-medium text-fg-secondary">{label ?? m.label}</span>
                 {tip ? (
                     <Tooltip content={tip}>
-                        <button type="button" aria-label={`About ${label ?? m.label}`} className="relative ml-auto rounded text-fg-faint hover:text-fg-muted pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5">
+                        <button type="button" aria-label={`About ${label ?? m.label}`} className="relative ml-auto rounded text-fg-muted hover:text-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5">
                             <Info aria-hidden size={14} strokeWidth={1.75} />
                         </button>
                     </Tooltip>

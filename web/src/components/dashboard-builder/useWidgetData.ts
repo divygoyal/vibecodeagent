@@ -109,12 +109,14 @@ function enqueue(widget: WidgetDef, ctx: InlineCtx, ctxKey: string) {
 /** Stable key: what the widget asks Google for, not how it looks. */
 export function widgetDataKey(widget: WidgetDef, ctx: InlineCtx): string {
     const compiled = compileWidget(widget, { controlDefs: ctx.controlDefs, controls: ctx.controls, pageId: ctx.pageId });
-    return canonicalJson({ q: compiled.queries, d: widget.dateOverride ?? null, t: widget.type === 'table' ? (widget.config.sortByChange ?? false) : null });
+    // Tables: the change order and (round 7) the trend column change what the engine returns.
+    const t = widget.type === 'table' ? (widget.config.trend ? [widget.config.sortByChange ?? false, 'trend'] : (widget.config.sortByChange ?? false)) : null;
+    return canonicalJson({ q: compiled.queries, d: widget.dateOverride ?? null, t });
 }
 
 export function useInlineResult(widget: WidgetDef, ctx: InlineCtx, enabled = true) {
     const isStatic = widgetMeta(widget.type).static;
-    const ctxKey = canonicalJson({ s: ctx.defaultSource, c: ctx.controls, p: ctx.pageId ?? null, tz: ctx.timezone ?? null, f: ctx.controlDefs.filter((c) => c.type === 'filter') });
+    const ctxKey = canonicalJson({ s: ctx.defaultSource, c: ctx.controls, p: ctx.pageId ?? null, tz: ctx.timezone ?? null, f: ctx.controlDefs.filter((c) => c.type === 'filter' || c.type === 'site' || c.type === 'metric' || c.type === 'grain') });
     const key = enabled && !isStatic ? ['wq', widget.id, widgetDataKey(widget, ctx), ctxKey] : null;
     return useSWR(key, () => enqueue(widget, ctx, ctxKey), SWR_OPTS);
 }

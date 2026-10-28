@@ -302,7 +302,7 @@ function OptionCard({ href, onClick, icon: Icon, title, subtitle, external }: {
                 {/* Wraps to a second line rather than cutting itself off in the 300px side column. */}
                 <span className="line-clamp-2 block text-body-sm text-fg-muted [overflow-wrap:anywhere]">{subtitle}</span>
             </span>
-            <ArrowRight aria-hidden size={16} className="shrink-0 text-fg-faint transition-transform duration-120 group-hover:translate-x-0.5 group-hover:text-fg-muted" />
+            <ArrowRight aria-hidden size={16} className="shrink-0 text-fg-muted transition-transform duration-120 group-hover:translate-x-0.5 group-hover:text-fg" />
         </Card>
     );
     if (!href) return <button type="button" onClick={onClick} className="block w-full rounded-card text-left focus-visible:outline-2">{inner}</button>;

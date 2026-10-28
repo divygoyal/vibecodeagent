@@ -15,33 +15,39 @@ import { toast } from 'sonner';
 import {
     ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, LayoutTemplate, Loader2, Monitor, MoreHorizontal, Pencil,
     Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson, ClipboardCopy, ClipboardPaste, MonitorPlay, Palette,
+    Globe, ArrowLeftRight, CalendarRange,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Kbd, SegmentedControl, Tooltip } from '@/components/ui';
+import { registerCalcs } from '@/lib/builder/calc';
 import { addPage, addWidget, duplicatePage, duplicateWidget, firstFreeSlot, layoutFor, moveWidgetToPage, movePage, readingOrder, removePage, removeWidget, renamePage, setLayout, updatePage, clampItem } from '@/lib/builder/docOps';
 import { defaultWidget, widgetMeta, widgetTitle, newWidgetId } from '@/lib/builder/registry';
 import { dimLabel } from '@/lib/builder/catalog';
 import { clipLabel, copyPage, copyWidgets, parseClip, pastePage, pasteWidgets, type Clip } from '@/lib/builder/clipboard';
 import { isDefaultLook, type Mode } from '@/lib/builder/themes';
-import type { DashboardDocV2, DashboardRecord, FilterControl, LayoutItem, WidgetDef, WidgetType } from '@/lib/builder/types';
+import type { ControlDef, DashboardDocV2, DashboardRecord, FilterControl, LayoutItem, SiteControl, WidgetDef, WidgetType } from '@/lib/builder/types';
 import { useResolvedTheme } from '@/lib/theme';
 import { useEditorStore, type Viewport } from '@/stores/dashboardEditorStore';
 import { DashboardCanvas, type Bp } from '../DashboardCanvas';
 import { DashboardCover } from '../DashboardCover';
 import { dashRootProps } from '../theme/DashTheme';
-import { DateControl, FilterControlView } from '../Controls';
+import { DateControl, FilterControlView, GrainSwitch, MetricSwitch, SiteSwitch } from '../Controls';
+import { applyViewerControls, selectedSite } from '@/lib/builder/compile';
+import { newGrainControl, newMetricControl, newSiteControl } from './SwitchControlProps';
 import { ShareDialog } from '../ShareDialog';
 import { textVars } from '../DashboardView';
 import { useElementHeight, useElementWidth } from '../useElementWidth';
-import { fetchJson, useInlineResult, QueryHttpError, type InlineCtx } from '../useWidgetData';
+import { fetchJson, useInlineResult, type InlineCtx } from '../useWidgetData';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
+import { ChartNotesProvider } from '../charts/chartNotes';
 import { LeftPanel } from './LeftPanel';
 import { VersionsDialog } from './VersionsDialog';
 import { openAppearance, PropertiesPanel } from './PropertiesPanel';
 import { notifyReadOnly } from '@/components/demo/DemoBar';
 import { useDemoSession } from '@/components/demo/useDemoSession';
 import type { SiteOption } from './Fields';
+import { createAutosave } from './autosave';
 
 const VIEWPORT_W: Record<Viewport, number | null> = { desktop: null, tablet: 768, phone: 390 };
 /** Narrowest desktop canvas: about what the dashboard page gets on a 1280 px screen with the sidebar open. */
@@ -71,9 +77,14 @@ function isTyping(t: EventTarget | null): boolean {
     return Boolean(el.closest('[role="dialog"],[role="listbox"],[role="menu"],[data-radix-popper-content-wrapper]'));
 }
 
-function EditorWidget({ widget, ctx, height, bp, vars }: { widget: WidgetDef; ctx: InlineCtx; height: number; bp: Bp; vars: Record<string, string> }) {
-    const q = useInlineResult(widget, ctx);
+function EditorWidget({ widget: raw, ctx, height, bp, vars }: { widget: WidgetDef; ctx: InlineCtx; height: number; bp: Bp; vars: Record<string, string> }) {
+    // Round 7 switchers: ask for (and draw) the widget as the current picks show it; the stored widget is unchanged.
+    const cctx = { controlDefs: ctx.controlDefs, controls: ctx.controls, pageId: ctx.pageId };
+    const widget = applyViewerControls(raw, cctx, { site: false });
+    const q = useInlineResult(applyViewerControls(raw, cctx), ctx);
     return (
+        // Round 7: time series show your chart notes here too (adding one is on the dashboard page).
+        <ChartNotesProvider value={{ kind: 'owner', defaultSource: ctx.defaultSource, canAdd: false, view: cctx }}>
         <WidgetRenderer
             widget={widget}
             result={q.data?.result ?? (q.error ? { status: 'error', code: 'UPSTREAM', message: q.error instanceof Error ? q.error.message : 'Could not load', retryable: true } : undefined)}
@@ -88,6 +99,7 @@ function EditorWidget({ widget, ctx, height, bp, vars }: { widget: WidgetDef; ct
             onRetry={() => void q.mutate()}
             onChooseSource={() => useEditorStore.getState().select(widget.id)}
         />
+        </ChartNotesProvider>
     );
 }
 
@@ -95,6 +107,8 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const router = useRouter();
     const s = useEditorStore();
     const { doc, pageId, selectedId, preview, viewport, controls, status } = s;
+    // Calculated metric names for the panels, pickers and canvas (idempotent; ids are unique per dashboard).
+    registerCalcs(doc?.calcs);
     const [shareOpen, setShareOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [versionsOpen, setVersionsOpen] = useState(false);
@@ -113,28 +127,19 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
         useEditorStore.getState().load(initial);
     }, [initial]);
 
-    // ── autosave (800 ms after the last change) ──
-    const save = useCallback(async (force?: boolean) => {
-        const st = useEditorStore.getState();
-        if (!st.doc || !st.id) return;
-        const docToSave = st.doc;
-        let rev = st.rev;
-        if (force) {
-            const cur = await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${st.id}`);
-            rev = cur.dashboard.rev;
-        }
-        st.setStatus('saving');
-        try {
-            const r = await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${st.id}`, { method: 'PUT', headers: { 'If-Match': String(rev) }, body: JSON.stringify({ doc: docToSave }) });
-            useEditorStore.getState().markSaved(r.dashboard.rev, docToSave);
-        } catch (e) {
-            if (e instanceof QueryHttpError && e.status === 412) useEditorStore.getState().setStatus('conflict');
-            else {
-                useEditorStore.getState().setStatus('error');
-                toast.error(e instanceof Error ? e.message : 'Could not save');
-            }
-        }
-    }, []);
+    // ── autosave (800 ms after the last change), one PUT at a time with the latest rev (editor/autosave.ts) ──
+    const [save] = useState(() => createAutosave<DashboardDocV2>({
+        get: () => useEditorStore.getState(),
+        put: async (id, doc, rev) => (await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${id}`, { method: 'PUT', headers: { 'If-Match': String(rev) }, body: JSON.stringify({ doc }) })).dashboard.rev,
+        latestRev: async (id) => (await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${id}`)).dashboard.rev,
+        setSaving: () => useEditorStore.getState().setStatus('saving'),
+        markSaved: (rev, doc) => useEditorStore.getState().markSaved(rev, doc),
+        conflict: () => useEditorStore.getState().setStatus('conflict'),
+        failed: (e) => {
+            useEditorStore.getState().setStatus('error');
+            toast.error(e instanceof Error ? e.message : 'Could not save');
+        },
+    }));
     // Public live demo: edits stay in this tab (nothing is saved, no "leave page?" prompt); say so once.
     const { demo } = useDemoSession();
     const demoNoticeShown = useRef(false);
@@ -176,7 +181,12 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const defaultLabel = doc?.defaultSource.type === 'site' ? (defaultSite?.label ?? doc.defaultSource.siteId) : 'All sites';
 
     const ctx: InlineCtx | null = doc && controls ? { defaultSource: doc.defaultSource, controlDefs: doc.controls, controls: { ...controls, pageId: page?.id }, pageId: page?.id, timezone: doc.settings.timezone } : null;
-    const vars = useMemo(() => textVars(defaultLabel, resolvedDates, page?.title ?? ''), [defaultLabel, resolvedDates, page?.title]);
+    // {{site}} and filter values follow the site switcher's pick in the preview (round 7).
+    const siteCtl = doc?.controls.find((c): c is SiteControl => c.type === 'site');
+    const pickedSiteId = siteCtl && controls ? selectedSite(siteCtl, controls) : undefined;
+    const siteVarLabel = pickedSiteId ? (sites.find((x) => x.siteId === pickedSiteId)?.label ?? pickedSiteId) : defaultLabel;
+    const filterSiteId = pickedSiteId ?? (doc?.defaultSource.type === 'site' ? doc.defaultSource.siteId : undefined);
+    const vars = useMemo(() => textVars(siteVarLabel, resolvedDates, page?.title ?? ''), [siteVarLabel, resolvedDates, page?.title]);
 
     // Resolved dates for {{date_range}} in text widgets and the toolbar: one tiny query.
     useEffect(() => {
@@ -321,6 +331,18 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     if (!doc || !page || !controls || !ctx) return <div className="fixed inset-0 z-[45] flex items-center justify-center bg-canvas"><Loader2 className="animate-spin text-fg-muted" aria-label="Loading editor" /></div>;
 
     const filters = doc.controls.filter((c): c is FilterControl => c.type === 'filter');
+    const switchDefs = doc.controls.filter((c) => c.type === 'site' || c.type === 'metric' || c.type === 'grain');
+    /** A switcher pick in the editor preview (never saved; viewers pick their own). */
+    const setPick = (kind: 'site' | 'metric' | 'grain', id: string, value: string | null) => {
+        const cur = { ...(controls[kind] ?? {}) } as Record<string, string>;
+        if (value === null) delete cur[id];
+        else cur[id] = value;
+        s.setControls({ ...controls, [kind]: Object.keys(cur).length ? cur : undefined });
+    };
+    const addSwitch = (c: ControlDef) => {
+        s.apply((d) => ({ ...d, controls: [...d.controls, c] }), { announce: `Added ${c.type === 'site' ? 'site switcher' : c.type === 'metric' ? 'metric switcher' : 'Day, Week, Month control'}` });
+        s.selectControl(c.id);
+    };
     const customPhone = Boolean(page.layouts.sm?.length);
     const customTablet = Boolean(page.layouts.md?.length);
     const dc = doc.controls.find((c) => c.type === 'date');
@@ -343,7 +365,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                 ) : (
                     <button type="button" onClick={() => setNameEdit(true)} className="group flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 hover:bg-subtle" title="Rename">
                         <span className="max-w-[260px] truncate text-title-sm text-fg">{doc.name}</span>
-                        <Pencil aria-hidden size={13} className="text-fg-faint group-hover:text-fg-muted" />
+                        <Pencil aria-hidden size={13} className="text-fg-muted group-hover:text-fg" />
                     </button>
                 )}
                 <span className="hidden truncate rounded-badge bg-subtle px-2 py-0.5 text-meta text-fg-secondary xl:inline">{defaultLabel}</span>
@@ -400,12 +422,12 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                 ) : (
                                     <div key={p.id} className="group relative flex shrink-0 items-center">
                                         <button type="button" role="tab" aria-selected={on} onClick={() => s.setPage(p.id)} onDoubleClick={() => setRenaming(p.id)} className={cn('h-10 px-3 text-body-sm font-medium', on ? 'text-fg' : 'text-fg-muted hover:text-fg')}>
-                                            {p.title}{p.hidden ? <span className="ml-1 text-caption text-fg-faint">(hidden)</span> : null}
+                                            {p.title}{p.hidden ? <span className="ml-1 text-caption text-fg-muted">(hidden)</span> : null}
                                         </button>
                                         {on ? <span aria-hidden className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-brand" /> : null}
                                         {on ? (
                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><button type="button" aria-label={`Page ${p.title} actions`} className="-ml-2 rounded p-0.5 text-fg-faint hover:bg-subtle hover:text-fg"><MoreHorizontal aria-hidden size={14} /></button></DropdownMenuTrigger>
+                                                <DropdownMenuTrigger asChild><button type="button" aria-label={`Page ${p.title} actions`} className="-ml-2 rounded p-0.5 text-fg-muted hover:bg-subtle hover:text-fg"><MoreHorizontal aria-hidden size={14} /></button></DropdownMenuTrigger>
                                                 <DropdownMenuContent>
                                                     <DropdownMenuItem icon={Pencil} onSelect={() => setRenaming(p.id)}>Rename</DropdownMenuItem>
                                                     <DropdownMenuItem icon={Copy} onSelect={() => { let nid = ''; s.apply((d) => { const r = duplicatePage(d, p.id); nid = r.id; return r.doc; }); if (nid) s.setPage(nid); }}>Duplicate</DropdownMenuItem>
@@ -427,18 +449,40 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                             {filters.map((f) => (
                                 <div key={f.id} className={cn('flex items-center rounded-control', s.selectedControlId === f.id && 'outline-2 outline-offset-2 outline-brand')}>
                                     <FilterControlView control={f} value={controls.filters[f.id] ?? []} onChange={(v) => s.setControls({ ...controls, filters: { ...controls.filters, [f.id]: v } })}
-                                        options={{ load: (c, q) => fetchJson<{ options: Array<{ value: string; label: string }> }>(`/api/dashboards/options?dimension=${encodeURIComponent(c.dimension)}&q=${encodeURIComponent(q)}${doc.defaultSource.type === 'site' ? `&siteId=${encodeURIComponent(doc.defaultSource.siteId)}` : ''}`).then((r) => r.options) }} />
-                                    {!preview ? <button type="button" aria-label={`Edit ${f.label} control`} onClick={() => s.selectControl(f.id)} className="ml-0.5 rounded p-1 text-fg-faint hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
+                                        options={{ load: (c, q) => fetchJson<{ options: Array<{ value: string; label: string }> }>(`/api/dashboards/options?dimension=${encodeURIComponent(c.dimension)}&q=${encodeURIComponent(q)}${filterSiteId ? `&siteId=${encodeURIComponent(filterSiteId)}` : ''}`).then((r) => r.options) }} />
+                                    {!preview ? <button type="button" aria-label={`Edit ${f.label} control`} onClick={() => s.selectControl(f.id)} className="ml-0.5 rounded p-1 text-fg-muted hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
+                                </div>
+                            ))}
+                            {switchDefs.map((c) => (
+                                <div key={c.id} className={cn('flex items-center rounded-control', s.selectedControlId === c.id && 'outline-2 outline-offset-2 outline-brand')}>
+                                    {c.type === 'site' ? (
+                                        <SiteSwitch control={c} value={controls.site?.[c.id] ?? ''} defaultLabel={defaultLabel}
+                                            options={(c.options === 'all' ? sites : sites.filter((x) => (c.options as string[]).includes(x.siteId))).map((x) => ({ value: x.siteId, label: x.label }))}
+                                            onChange={(v) => setPick('site', c.id, v === (c.default || '') ? null : v)} />
+                                    ) : c.type === 'metric' ? (
+                                        <MetricSwitch control={c} state={controls} onChange={(v) => setPick('metric', c.id, v === c.default ? null : v)} />
+                                    ) : c.type === 'grain' ? (
+                                        <GrainSwitch control={c} state={controls} size="sm" onChange={(v) => setPick('grain', c.id, v === c.default ? null : v)} />
+                                    ) : null}
+                                    {!preview ? <button type="button" aria-label={`Edit ${c.label} control`} onClick={() => s.selectControl(c.id)} className="ml-0.5 rounded p-1 text-fg-muted hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
                                 </div>
                             ))}
                             {!preview ? (
-                                <Button size="sm" variant="ghost" icon={Filter} onClick={() => {
-                                    const used = new Set(filters.map((f) => f.dimension));
-                                    const dim = ['country', 'device', 'channel', 'page'].find((d) => !used.has(d)) ?? 'country';
-                                    const id = `f_${dim}_${Math.random().toString(36).slice(2, 6)}`;
-                                    s.apply((d) => ({ ...d, controls: [...d.controls, { id, type: 'filter', label: dimLabel(dim), dimension: dim, ui: dim === 'page' ? 'search' : 'multiselect', scope: { mode: 'all' }, viewerCanChange: true }] }));
-                                    s.selectControl(id);
-                                }}>Add filter</Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" icon={Plus}>Add control</Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start">
+                                        <DropdownMenuItem icon={Filter} onSelect={() => {
+                                            const used = new Set(filters.map((f) => f.dimension));
+                                            const dim = ['country', 'device', 'channel', 'page'].find((d) => !used.has(d)) ?? 'country';
+                                            const id = `f_${dim}_${Math.random().toString(36).slice(2, 6)}`;
+                                            s.apply((d) => ({ ...d, controls: [...d.controls, { id, type: 'filter', label: dimLabel(dim), dimension: dim, ui: dim === 'page' ? 'search' : 'multiselect', scope: { mode: 'all' }, viewerCanChange: true }] }));
+                                            s.selectControl(id);
+                                        }}>Filter</DropdownMenuItem>
+                                        <DropdownMenuItem icon={Globe} disabled={doc.controls.some((c) => c.type === 'site')} onSelect={() => addSwitch(newSiteControl())}>Site switcher</DropdownMenuItem>
+                                        <DropdownMenuItem icon={ArrowLeftRight} onSelect={() => addSwitch(newMetricControl(doc))}>Metric switcher</DropdownMenuItem>
+                                        <DropdownMenuItem icon={CalendarRange} disabled={doc.controls.some((c) => c.type === 'grain')} onSelect={() => addSwitch(newGrainControl())}>Day / Week / Month</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             ) : null}
                             {dc && dc.type === 'date' && !dc.viewerCanChange ? <span className="text-meta text-fg-muted">Dates are locked for viewers</span> : null}
                         </div>
