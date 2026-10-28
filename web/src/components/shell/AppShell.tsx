@@ -10,6 +10,7 @@ import { X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { useAppTheme } from '@/lib/theme';
+import { trackSignUpWhenReady } from '@/lib/growth/track';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { DemoBar } from '@/components/demo/DemoBar';
 import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
@@ -79,7 +80,10 @@ function NavDrawer() {
 
 function Welcome() {
     const { isWorkspaceLoaded, welcomeSeen, markWelcomeSeen } = useWorkspace();
-    if (!isWorkspaceLoaded || welcomeSeen) return null;
+    const firstVisit = isWorkspaceLoaded && !welcomeSeen;
+    // The admin's welcome_seen flag is false only until the first welcome: that is the sign-up (GA4 sign_up, with the first touch).
+    useEffect(() => (firstVisit ? trackSignUpWhenReady() : undefined), [firstVisit]);
+    if (!firstVisit) return null;
     return <CreditWelcome credits={5} onDismiss={markWelcomeSeen} />;
 }
 

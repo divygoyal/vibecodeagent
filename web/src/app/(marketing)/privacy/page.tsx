@@ -49,7 +49,9 @@ export default function PrivacyPage() {
                     </li>
                     <li>
                         <strong>Website usage:</strong> we use Google Analytics and Microsoft Clarity on our own website to understand how
-                        it is used.
+                        it is used. If you arrive through one of our links (for example a &ldquo;Made with {BRAND_NAME}&rdquo; footer or
+                        a leaderboard badge), a first-party cookie remembers which link for 90 days, so we know which of our own features
+                        brings people here. It holds no personal data.
                     </li>
                 </ul>
 
