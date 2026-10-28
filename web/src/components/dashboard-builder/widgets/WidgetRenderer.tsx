@@ -6,6 +6,7 @@ import type { WidgetViewProps } from './WidgetFrame';
 import { KpiStripView, ScorecardView } from './Scorecard';
 import { BarView, PieView, TimeSeriesView } from './Charts';
 import { TableView } from './TableView';
+import { ChartWidgetView } from '../charts/ChartWidgets';
 import { GeoView, ImageView, PortfolioGridView, SectionView, TextView } from './Other';
 
 /** One widget, any type. Props carry the result for this widget from the page or inline query. */
@@ -32,7 +33,7 @@ export function WidgetRenderer(raw: WidgetViewProps) {
         case 'section': return <SectionView {...props} widget={w} />;
         case 'image': return <ImageView {...props} widget={w} />;
         case 'portfolio-grid': return <PortfolioGridView {...props} widget={w} />;
-        default: return null;
+        default: return <ChartWidgetView {...props} widget={w} />; // round 9 charts
     }
 }
 

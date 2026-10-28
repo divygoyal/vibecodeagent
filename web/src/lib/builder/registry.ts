@@ -7,6 +7,7 @@
  * Saved layouts store only {i,x,y,w,h}; constraints come from here at render time.
  */
 import { getMetric, metricFamilies, metricFamily, metricLabel, dimLabel, type Family } from './catalog';
+import { CHART_META, CHART_PALETTE_ORDER, CHART_TABLE_ORDER, chartDefaultWidget, chartMetrics, chartTitle, isChartType } from './charts';
 import type {
     MetricRef,
     SourceRef,
@@ -46,10 +47,11 @@ export const WIDGET_META: Record<WidgetType, WidgetMeta> = {
     text: { type: 'text', label: 'Text', description: 'Notes and headings in Markdown', icon: 'Type', group: 'Content', defaultSize: { w: 12, h: 2 }, minSize: { w: 2, h: 1 }, maxSize: { w: 12, h: 10 }, phoneH: 2, static: true, keywords: ['text', 'markdown', 'note', 'heading', 'paragraph'] },
     section: { type: 'section', label: 'Section header', description: 'A title and divider between groups', icon: 'Heading', group: 'Content', defaultSize: { w: 12, h: 2 }, minSize: { w: 12, h: 2 }, maxSize: { w: 12, h: 2 }, phoneH: 2, static: true, keywords: ['section', 'divider', 'header', 'title'] },
     image: { type: 'image', label: 'Image', description: 'A logo or picture from an https URL', icon: 'Image', group: 'Content', defaultSize: { w: 3, h: 5 }, minSize: { w: 1, h: 2 }, maxSize: { w: 12, h: 14 }, phoneH: 4, static: true, keywords: ['image', 'logo', 'picture', 'photo'] },
+    ...CHART_META, // round 9: heatmap, scatter, funnel, treemap, pivot (charts/index.ts)
     'portfolio-grid': { type: 'portfolio-grid', label: 'Portfolio grid', description: 'Every site as a card with deltas', icon: 'LayoutGrid', group: 'Portfolio', defaultSize: { w: 12, h: 9 }, minSize: { w: 4, h: 6 }, maxSize: { w: 12, h: 20 }, phoneH: 12, static: false, keywords: ['portfolio', 'sites', 'all sites', 'cards'] },
 };
 
-export const PALETTE_ORDER: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', 'table', 'geo', 'portfolio-grid', 'section', 'text', 'image'];
+export const PALETTE_ORDER: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', ...CHART_PALETTE_ORDER, 'table', ...CHART_TABLE_ORDER, 'geo', 'portfolio-grid', 'section', 'text', 'image'];
 export const PALETTE_GROUPS: PaletteGroup[] = ['Metrics', 'Charts', 'Tables and maps', 'Portfolio', 'Content'];
 
 export function widgetMeta(type: WidgetType): WidgetMeta {
@@ -104,6 +106,7 @@ export function defaultWidget(type: WidgetType, ctx: DefaultCtx, id: WidgetId = 
     const metric = primaryMetric(ctx);
     const gsc = metricFamily(metric) === 'gsc';
     const base = { id, source };
+    if (isChartType(type)) return chartDefaultWidget(type, ctx, base);
     switch (type) {
         case 'scorecard':
             return { ...base, type, config: { metric: m(metric), comparison: { show: true, display: 'percent' }, sparkline: { show: true, kind: 'area' } } };
@@ -169,7 +172,7 @@ export function widgetMetrics(w: WidgetDef): string[] {
         case 'table': return w.config.columns.filter((c) => c.kind === 'metric' && !c.hidden).map((c) => c.ref);
         case 'geo': return [w.config.metric.id];
         case 'portfolio-grid': return w.config.metrics.map((x) => x.id);
-        default: return [];
+        default: return chartMetrics(w);
     }
 }
 
@@ -194,6 +197,7 @@ export function widgetTitle(w: WidgetDef): string {
         case 'section': return w.config.title;
         case 'image': return w.config.alt || 'Image';
         case 'portfolio-grid': return 'All sites';
+        default: return chartTitle(w);
     }
 }
 

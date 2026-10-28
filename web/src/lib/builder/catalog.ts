@@ -131,6 +131,7 @@ export const DIM_LIST: DimDef[] = [
     dim('date', { label: 'Date', ga4: { api: 'date' }, gsc: { api: 'date' }, scope: 'event', kind: 'time', cardinality: 'medium', joinKey: 'date', tier: 'core' }),
     dim('week', { label: 'Week', ga4: { api: 'isoYearIsoWeek' }, scope: 'event', kind: 'time', cardinality: 'low', tier: 'core' }),
     dim('month', { label: 'Month', ga4: { api: 'yearMonth' }, scope: 'event', kind: 'time', cardinality: 'low', tier: 'core' }),
+    dim('hour', { label: 'Hour of day', description: 'In the Analytics property’s time zone.', ga4: { api: 'hour' }, scope: 'event', kind: 'category', cardinality: 'low', tier: 'more', filterable: false }),
     dim('dayOfWeek', { label: 'Day of week', ga4: { api: 'dayOfWeekName', sortApi: 'dayOfWeek' }, scope: 'event', kind: 'category', cardinality: 'low', tier: 'core', filterable: false }),
     dim('channel', { label: 'Channel', synonyms: ['default channel group'], ga4: { api: 'sessionDefaultChannelGroup' }, scope: 'session', kind: 'category', cardinality: 'low', tier: 'core' }),
     dim('source', { label: 'Source', synonyms: ['referrer'], ga4: { api: 'sessionSource' }, scope: 'session', kind: 'category', cardinality: 'high', tier: 'core' }),

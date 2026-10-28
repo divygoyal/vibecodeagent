@@ -16,10 +16,12 @@ import { searchMetrics } from '@/lib/builder/catalog';
 import type { DashboardDocV2, WidgetType } from '@/lib/builder/types';
 import { useEditorStore } from '@/stores/dashboardEditorStore';
 import { setPaletteDrag } from '../DashboardCanvas';
+import { CHART_ICONS } from '../charts/icons';
 
 const ICONS: Record<WidgetType, LucideIcon> = {
     scorecard: Hash, 'kpi-strip': Rows3, timeseries: LineChart, bar: BarChart3, pie: PieChart, table: Table2,
     geo: Globe2, text: Type, section: Heading, image: ImageIcon, 'portfolio-grid': LayoutGrid,
+    ...CHART_ICONS, // round 9
 };
 
 export function WidgetIcon({ type, size = 16 }: { type: WidgetType; size?: number }) {

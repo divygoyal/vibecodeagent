@@ -6,6 +6,7 @@
 import { expandCalcs, isCalcId, parseCalcId } from './calc';
 import { getMetric, metricLabel } from './catalog';
 import { applyDrill, drillFilters } from './drill';
+import { chartMetrics, compileChart, swapChartMetric } from './charts';
 import { clickDimension } from './interaction';
 import { widgetMetrics } from './registry';
 import { isSearchType, searchTypeEligible } from './searchType';
@@ -130,7 +131,7 @@ export function widgetMetricIds(widget: WidgetDef): MetricId[] {
         case 'geo': return [widget.config.metric.id];
         case 'table': return widget.config.columns.filter((c) => c.kind === 'metric').map((c) => c.ref);
         case 'portfolio-grid': return widget.config.metrics.map((m) => m.id);
-        default: return [];
+        default: return chartMetrics(widget);
     }
 }
 
@@ -230,7 +231,7 @@ function swapMetric(widget: WidgetDef, from: MetricId, to: MetricId): WidgetDef 
                 },
             };
         }
-        default: return widget;
+        default: return swapChartMetric(base, from, to);
     }
 }
 
@@ -369,6 +370,8 @@ export function compileWidget(rawWidget: WidgetDef, ctx: CompileCtx): CompiledWi
             break;
         }
         default:
+            // Round 9 charts (heatmap, scatter, funnel, treemap, pivot): charts/index.ts
+            queries.push(...compileChart(widget, base));
             break;
     }
     return { queries, filterOrigins };

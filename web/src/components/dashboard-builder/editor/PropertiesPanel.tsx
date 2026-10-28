@@ -10,6 +10,7 @@ import { Copy, Lock, Trash2 } from 'lucide-react';
 
 import { Banner, Button, Tabs } from '@/components/ui';
 import { dimLabel, getMetric, metricLabel } from '@/lib/builder/catalog';
+import { isChartWidget } from '@/lib/builder/charts';
 import { tableColumns, widgetMeta, widgetMetrics } from '@/lib/builder/registry';
 import { removeWidget, duplicateWidget, updateWidget } from '@/lib/builder/docOps';
 import { MENU_PRESETS, PRESETS } from '@/lib/builder/dates';
@@ -20,6 +21,7 @@ import { useResolvedTheme } from '@/lib/theme';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { Choice, DimensionPicker, Field, MetricList, MetricPicker, NumberInput, SourcePicker, TextInput, Toggle, type SiteOption } from './Fields';
 import { ChartMarksEditor } from './ChartMarksEditor';
+import { ChartSetup } from './ChartSetup';
 import { RulesEditor } from './RulesEditor';
 import { GrainControlProps, MetricControlProps, SearchTypeControlProps, SiteControlProps } from './SwitchControlProps';
 import { VariablesEditor } from './VariablesEditor';
@@ -113,6 +115,8 @@ function Setup({ widget, edit, sites, defaultLabel, doc }: { widget: WidgetDef; 
             <SourcePicker value={widget.source ?? { type: 'default' }} onChange={(s: SourceRef) => edit((w) => ({ ...w, source: s }) as WidgetDef)} sites={sites} defaultLabel={defaultLabel} portfolioOnly={widget.type === 'portfolio-grid'} />
         </Field>
     );
+    // Round 9 charts (heatmap, scatter, funnel, treemap, pivot): editor/ChartSetup.tsx
+    if (isChartWidget(widget)) return <ChartSetup widget={widget} edit={edit} source={source} portfolio={portfolio} />;
     switch (widget.type) {
         case 'scorecard':
             return (
