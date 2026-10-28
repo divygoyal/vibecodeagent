@@ -231,7 +231,9 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
     const frame = ok?.parts.rows;
     const c = widget.config;
     const metric = c.metrics[0]?.id ?? 'gsc:clicks';
-    const rows = c.sort.by === 'dimension' ? mondayFirst(frame?.rows ?? [], c.dimension) : (frame?.rows ?? []);
+    const rawRows = c.sort.by === 'dimension' ? mondayFirst(frame?.rows ?? [], c.dimension) : (frame?.rows ?? []);
+    // All-zero values are an empty chart, like no rows (round 10).
+    const rows = frame?.seriesKeys?.length || !c.metrics.length || rawRows.some((r) => c.metrics.some((m) => Boolean(r[`m:${m.id}`]) || Boolean(r[`m:${m.id}:prev`]))) ? rawRows : [];
     const compare = props.compare !== 'none' && c.compare === 'inherit' && rows.some((r) => `m:${metric}:prev` in r);
     const h = plotHeight(props.height, widget.showTitle !== false, true, Boolean(props.drill?.depth));
     const useList = c.variant === 'list' && !c.stackBy && c.metrics.length === 1;
@@ -279,7 +281,8 @@ export function PieView(props: WidgetViewProps<PieWidget>) {
     const frame = ok?.parts.rows;
     const c = widget.config;
     const id = c.metric.id;
-    const rows = frame?.rows ?? [];
+    const rawRows = frame?.rows ?? [];
+    const rows = rawRows.some((r) => Boolean(r[`m:${id}`])) ? rawRows : [];
     const h = plotHeight(props.height, widget.showTitle !== false, true, Boolean(props.drill?.depth));
     const bottom = props.bp === 'sm' || c.legend === 'bottom' || (width > 0 && width < 380);
     const { size, maxSlices } = pieLayout(h, width, bottom, rows.length);

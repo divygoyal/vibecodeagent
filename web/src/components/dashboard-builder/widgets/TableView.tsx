@@ -216,7 +216,10 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
     const [q, setQ] = useState('');
     const metricCols = cols.filter((col) => col.kind === 'metric');
     const compare = props.compare !== 'none' && Boolean(frame?.rows.some((r) => metricCols.some((m) => `m:${m.ref}:prev` in r)));
-    const all = (frame?.rows ?? []) as Row[];
+    // Rows that are all zero in every metric say nothing: same empty state as no rows at all (round 10: "No rows" next to seven $0.00 rows).
+    const rawRows = (frame?.rows ?? []) as Row[];
+    const allZero = metricCols.length > 0 && rawRows.length > 0 && rawRows.every((r) => metricCols.every((m) => !r[`m:${m.ref}`]));
+    const all = allZero ? [] : rawRows;
     const needle = q.trim().toLowerCase();
     const d0 = c.dimensions[0];
     const rows = needle ? all.filter((r) => `${dimText(d0, r[`d:${d0}`], frame?.labels)} ${frame?.sublabels?.[String(r[`d:${d0}`])] ?? ''}`.toLowerCase().includes(needle)) : all;
@@ -341,7 +344,7 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                     // Phones grow the card with its rows, so every number can wrap onto its row's second line;
                     // fixed-height cards (a narrow viewport with a wider canvas) keep one faded meta line.
                     mobileList={inDialog || props.bp === 'sm' ? true : 'compact'}
-                    footer={footer}
+                    footer={allZero ? undefined : footer}
                     empty={widget.filters?.length || c.rowFilters?.length
                         ? <EmptyState variant="inline" title="Nothing matches yet" description={widget.filters?.length ? 'No rows match this widget’s filter in this period. Rows appear here as soon as they do.' : 'No rows pass this table’s thresholds in this period.'} />
                         : c.sortByChange && c.changeOnly
