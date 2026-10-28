@@ -97,3 +97,25 @@ test('demo Ask "improve first" answer starts with the Actions list\'s first clic
     assert.ok(answer.startsWith(`Start with **${first.title}**: ${shown} clicks a month`), answer.slice(0, 200));
     assert.match(answer, new RegExp(`\\+${fmtCompact(topClickGain(open)).replace('.', '\\.')} clicks a month`));
 });
+
+test('demo Search Console: a one-report total and the sum of its days agree to the click (site, page, query, filtered)', () => {
+    const range = { startDate: iso(29), endDate: iso(2) };
+    for (const site of demoAllSiteUrls()) {
+        const total = demoSearchAnalytics(site, { ...range }, { now }).rows?.[0] ?? { clicks: 0, impressions: 0 };
+        const days = demoSearchAnalytics(site, { ...range, dimensions: ['date'] }, { now }).rows ?? [];
+        assert.equal(days.reduce((a, r) => a + r.clicks, 0), total.clicks, `${site}: clicks`);
+        assert.equal(days.reduce((a, r) => a + r.impressions, 0), total.impressions, `${site}: impressions`);
+    }
+    const site = demoAllSiteUrls()[0];
+    for (const dim of ['page', 'query', 'device']) {
+        const rows = demoSearchAnalytics(site, { ...range, dimensions: [dim], rowLimit: 5 }, { now }).rows ?? [];
+        const byDay = demoSearchAnalytics(site, { ...range, dimensions: [dim, 'date'], rowLimit: 25_000 }, { now }).rows ?? [];
+        for (const r of rows) {
+            const sum = byDay.filter((x) => x.keys[0] === r.keys[0]).reduce((a, x) => a + x.clicks, 0);
+            assert.equal(sum, r.clicks, `${dim} ${r.keys[0]}`);
+        }
+        // Filtered to one value, by date: the same days.
+        const one = demoSearchAnalytics(site, { ...range, dimensions: ['date'], dimensionFilterGroups: [{ filters: [{ dimension: dim, expression: rows[0].keys[0] }] }] }, { now }).rows ?? [];
+        assert.equal(one.reduce((a, x) => a + x.clicks, 0), rows[0].clicks, `${dim} filtered by date`);
+    }
+});

@@ -11,7 +11,7 @@ import { findSiteBySiteUrl, getDemoSite, getDemoSites, siteOrigin } from './cata
 import { DEMO_HISTORY_DAYS, dayToIso, isoToDay, todayIndex } from './dates';
 import { countryShares, sitePages } from './entities';
 import { DemoApiError } from './ga4';
-import { fastNoise, hashString, normalise, rngFor, unit, zipfWeights } from './rng';
+import { fastNoise, hashString, mix32, normalise, rngFor, unit, zipfWeights } from './rng';
 import { dailySeries } from './series';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -301,9 +301,19 @@ export function demoSearchAnalytics(siteUrl: string, request: GscQueryRequest, o
 
     const passes = (vals: Record<string, string>) => filters.every(f => vals[f.dimension] === undefined || matchGsc(vals[f.dimension], f.operator || 'equals', f.expression));
 
-    interface Acc { keys: string[]; clicks: number; impressions: number; posW: number }
-    const rows = new Map<string, Acc>();
-
+    // Every key (the requested dimensions other than date) gets whole clicks and impressions per day, rounded the
+    // same way in every report shape (round 7): a report over the range is the sum of its days, so a one-report total
+    // and the sum of a by-date report agree to the click, as in Search Console. The rounding is stochastic (seeded by
+    // site, row and day) so long-tail rows keep their expected volume instead of rounding to zero every day.
+    interface KeyAcc { keys: string[]; seed: number; clicks: number; impressions: number; rawImpr: number; posW: number }
+    interface Combo { pair: (typeof pairs)[number]; k: number; share: number; posOff: number; ctrMul: number; last: number }
+    const dated = dims.includes('date');
+    // The rounding seed names the row by every dimension it fixes (requested, or pinned by an equals filter), so
+    // "page X" rounds the same in a by-page report and in a by-date report filtered to page X.
+    const fixedDims = [...new Set([...dims.filter(d => d !== 'date'), ...filters.filter(f => (f.operator || 'equals') === 'equals').map(f => f.dimension)])].sort();
+    const keyIndex = new Map<string, number>();
+    const keyAccs: KeyAcc[] = [];
+    const combos: Combo[] = [];
     // Pages Google dropped (indexState): no rows from the day of the crawl that left them out.
     // The site's daily total stays the designed series: the other pages share what a dropped page no longer gets
     // (dayScale), so a drop moves clicks between pages, not the site's headline numbers.
@@ -326,7 +336,7 @@ export function demoSearchAnalytics(siteUrl: string, request: GscQueryRequest, o
     for (const pair of pairs) {
         // Filters on query/page apply before the day loop.
         if (!passes({ query: pair.query ?? '', page: pair.page })) continue;
-        const lastDayOfPair = Math.min(e, (dropDay.get(pair.page) ?? Infinity) - 1);
+        const last = Math.min(e, (dropDay.get(pair.page) ?? Infinity) - 1);
         for (const dev of devices) {
             if (!passes({ device: dev.name })) continue;
             for (const ctry of countries) {
@@ -334,44 +344,70 @@ export function demoSearchAnalytics(siteUrl: string, request: GscQueryRequest, o
                 for (const app of appearances) {
                     if (useAppearance && !passes({ searchAppearance: app.name })) continue;
                     const keyVals: Record<string, string> = { query: pair.query ?? '', page: pair.page, device: dev.name, country: ctry.code, searchAppearance: app.name };
-                    const share = pair.w * (dev.share / devNorm) * ctry.share * app.share * searchType.impr;
-                    const posOff = dev.off + (dev.name === 'MOBILE' ? pair.mobileGap : 0) + ctry.off;
-                    const ctrMul = pair.ctrMul * dev.ctr * searchType.ctr;
-                    let acc: Acc | undefined;
                     const nonDateKey = dims.filter(d => d !== 'date').map(d => keyVals[d]).join('\u0001');
-                    for (let day = s; day <= lastDayOfPair; day++) {
-                        const target = values[day - seriesStart] * clickScale * (scales.get(day) ?? 1);
-                        if (target <= 0) continue;
-                        const daysAgo = today - day;
-                        const impr = (target / model.expectedCtr) * share * fastNoise(0.3, siteSeed + pair.id, day);
-                        if (impr <= 0) continue;
-                        let pos = pair.pos0 + pair.trend * (daysAgo / 100) + (daysAgo >= pair.shiftAt ? pair.shiftDelta : 0) + posOff;
-                        pos += (fastNoise(1, siteSeed ^ pair.id, day * 31) - 1) * 0.6;
-                        pos = Math.max(1, Math.min(100, pos));
-                        const clicks = impr * Math.min(0.95, ctrForPosition(pos) * ctrMul);
-                        const k = dims.includes('date') ? `${nonDateKey}\u0002${day}` : nonDateKey;
-                        if (!acc || dims.includes('date')) {
-                            acc = rows.get(k);
-                            if (!acc) {
-                                acc = { keys: dims.map(d => (d === 'date' ? dayToIso(day) : keyVals[d])), clicks: 0, impressions: 0, posW: 0 };
-                                rows.set(k, acc);
-                            }
-                        }
-                        acc.clicks += clicks;
-                        acc.impressions += impr;
-                        acc.posW += pos * impr;
+                    let k = keyIndex.get(nonDateKey);
+                    if (k === undefined) {
+                        k = keyAccs.length;
+                        keyIndex.set(nonDateKey, k);
+                        keyAccs.push({ keys: dims.map(d => (d === 'date' ? '' : keyVals[d])), seed: hashString(`${site.key}\u0003${fixedDims.map(d => `${d}=${keyVals[d] ?? ''}`).join('\u0001')}`), clicks: 0, impressions: 0, rawImpr: 0, posW: 0 });
                     }
+                    combos.push({
+                        pair, k, last,
+                        share: pair.w * (dev.share / devNorm) * ctry.share * app.share * searchType.impr,
+                        posOff: dev.off + (dev.name === 'MOBILE' ? pair.mobileGap : 0) + ctry.off,
+                        ctrMul: pair.ctrMul * dev.ctr * searchType.ctr,
+                    });
                 }
             }
         }
     }
 
-    let out = [...rows.values()]
-        .map(r => {
-            const impressions = Math.round(r.impressions);
-            const clicks = Math.min(impressions, Math.round(r.clicks));
-            return { keys: r.keys, clicks, impressions, ctr: impressions > 0 ? clicks / impressions : 0, position: r.impressions > 0 ? r.posW / r.impressions : 0 };
-        })
+    const rows: KeyAcc[] = [];
+    const dayClicks = new Float64Array(keyAccs.length);
+    const dayImpr = new Float64Array(keyAccs.length);
+    const dayPosW = new Float64Array(keyAccs.length);
+    const touched: number[] = [];
+    const whole = (x: number, seed: number, day: number, salt: number) => Math.floor(x + mix32(seed + salt, day) / 4294967296);
+    for (let day = s; day <= e; day++) {
+        const target = values[day - seriesStart] * clickScale * (scales.get(day) ?? 1);
+        if (target <= 0) continue;
+        const daysAgo = today - day;
+        for (const c of combos) {
+            if (day > c.last) continue;
+            const pair = c.pair;
+            const impr = (target / model.expectedCtr) * c.share * fastNoise(0.3, siteSeed + pair.id, day);
+            if (impr <= 0) continue;
+            let pos = pair.pos0 + pair.trend * (daysAgo / 100) + (daysAgo >= pair.shiftAt ? pair.shiftDelta : 0) + c.posOff;
+            pos += (fastNoise(1, siteSeed ^ pair.id, day * 31) - 1) * 0.6;
+            pos = Math.max(1, Math.min(100, pos));
+            const clicks = impr * Math.min(0.95, ctrForPosition(pos) * c.ctrMul);
+            if (dayImpr[c.k] === 0) touched.push(c.k);
+            dayClicks[c.k] += clicks;
+            dayImpr[c.k] += impr;
+            dayPosW[c.k] += pos * impr;
+        }
+        for (const k of touched) {
+            const acc = keyAccs[k];
+            const impressions = whole(dayImpr[k], acc.seed, day, 0);
+            const clicks = Math.min(impressions, whole(dayClicks[k], acc.seed, day, 0x9e3779b9));
+            if (dated) {
+                rows.push({ ...acc, keys: acc.keys.map((v, i) => (dims[i] === 'date' ? dayToIso(day) : v)), clicks, impressions, rawImpr: dayImpr[k], posW: dayPosW[k] });
+            } else {
+                acc.clicks += clicks;
+                acc.impressions += impressions;
+                acc.rawImpr += dayImpr[k];
+                acc.posW += dayPosW[k];
+            }
+            dayClicks[k] = 0;
+            dayImpr[k] = 0;
+            dayPosW[k] = 0;
+        }
+        touched.length = 0;
+    }
+    if (!dated) rows.push(...keyAccs.filter(a => a.rawImpr > 0));
+
+    let out = rows
+        .map(r => ({ keys: r.keys, clicks: r.clicks, impressions: r.impressions, ctr: r.impressions > 0 ? r.clicks / r.impressions : 0, position: r.rawImpr > 0 ? r.posW / r.rawImpr : 0 }))
         .filter(r => r.impressions > 0);
     if (dims.includes('date')) {
         const di = dims.indexOf('date');
