@@ -62,7 +62,7 @@ export const BUILDERS_R9: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                     [heatmap('w_peak', 'Sessions by weekday and hour', 'weekday-hour', 'ga4:sessions'), 6, 8],
                     [heatmap('w_peak_events', 'Key events by weekday and hour', 'weekday-hour', 'ga4:keyEvents'), 6, 8],
                 ],
-                [[heatmap('w_calendar', 'Sessions by day, last 12 months', 'calendar', 'ga4:sessions', { dateOverride: { range: { kind: 'preset', id: '12m' }, compare: { mode: 'none' } } }), 12, 8]],
+                [[heatmap('w_calendar', 'Sessions by day, last 12 months', 'calendar', 'ga4:sessions', { dateOverride: { range: { kind: 'preset', id: '12m' }, compare: { mode: 'none' } } }), 12, 6]],
                 [[text('w_tip', '### How to use this\n- Schedule newsletters and social posts for the busiest weekday and hour.\n- Plan site changes for the quietest cells.\n- Compare key events with sessions: the busiest hour is not always the one that converts.', 'callout'), 12, 4]],
             ], w)],
         };

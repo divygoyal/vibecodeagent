@@ -6,7 +6,7 @@
  * boxes inside nested lists, so screen readers get the groups and values as text and PDF / TV render it
  * like any card. Boxes keep dark text on a light tint of the colour: it works on the light and dark card.
  */
-import { useCallback, useLayoutEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { cn } from '@/lib/cn';
 import { EmptyState } from '@/components/ui';
@@ -16,24 +16,9 @@ import { dimLabel, fmtMetricValue, metricColor, metricLabel } from '@/lib/builde
 import { heatLevel, heatThresholds } from '@/lib/builder/charts/heatmap';
 import { layoutTreemap, shapeTreemap, type TreemapNode } from '@/lib/builder/charts/treemap';
 import type { TreemapWidget } from '@/lib/builder/charts/types';
+import { useBox } from './useBox';
 import { okResult, WidgetFrame, type WidgetViewProps } from '../widgets/WidgetFrame';
 import { dimText } from '../widgets/Charts';
-
-/** Width and height of an element (callback ref + ResizeObserver); 0 until measured. */
-function useBox<T extends HTMLElement>(): [(el: T | null) => void, { w: number; h: number }] {
-    const [el, setEl] = useState<T | null>(null);
-    const [box, setBox] = useState({ w: 0, h: 0 });
-    const ref = useCallback((node: T | null) => setEl(node), []);
-    useLayoutEffect(() => {
-        if (!el) return;
-        const read = () => setBox({ w: Math.floor(el.clientWidth), h: Math.floor(el.clientHeight) });
-        read();
-        const ro = new ResizeObserver(read);
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, [el]);
-    return [ref, box];
-}
 
 const pct = (v: number) => fmtPercent(v, { tile: true });
 const mix = (color: string, p: number) => `color-mix(in oklab, ${color} ${p}%, var(--color-surface))`;

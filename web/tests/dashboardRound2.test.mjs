@@ -20,9 +20,9 @@ const ORIGINAL_8 = ['site-overview', 'search-performance', 'traffic-acquisition'
 
 test('the 8 shipped templates keep their ids and order; 16 new ones are appended', () => {
     assert.deepEqual(TEMPLATES.slice(0, 8).map((t) => t.id), ORIGINAL_8);
-    assert.equal(TEMPLATES.length, 24);
-    assert.deepEqual(TEMPLATES.slice(8).map((t) => t.id), TEMPLATES_R2.map((t) => t.id));
-    assert.equal(new Set(TEMPLATES.map((t) => t.id)).size, 24);
+    assert.ok(TEMPLATES.length >= 24); // later rounds append more after the round 2 ones
+    assert.deepEqual(TEMPLATES.slice(8, 8 + TEMPLATES_R2.length).map((t) => t.id), TEMPLATES_R2.map((t) => t.id));
+    assert.equal(new Set(TEMPLATES.map((t) => t.id)).size, TEMPLATES.length);
 });
 
 test('shipped templates build exactly the same documents as before round 2', () => {

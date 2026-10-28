@@ -27,7 +27,7 @@ export function FunnelView(props: WidgetViewProps<FunnelWidget>) {
     const color = metricColor(c.metric.id);
     const fmt = (v: number) => fmtMetricValue(c.metric.id, v, { currency: ok?.flags.currency });
     // Tight cards drop the line between steps and put the conversion next to the count.
-    const compact = bodyH > 0 && bodyH / Math.max(1, model?.rows.length ?? 1) < 54;
+    const compact = bodyH > 0 && (bodyH - 56) / Math.max(1, model?.rows.length ?? 1) < 58;
     return (
         <WidgetFrame props={props}>
             {!ok || !model ? null : model.needsSteps ? (

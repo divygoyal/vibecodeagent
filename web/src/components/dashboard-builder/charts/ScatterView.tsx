@@ -14,7 +14,7 @@ import { fmtAxis } from '@/lib/format';
 import { dimLabel, fmtMetricValue, getMetric, metricColor, metricLabel } from '@/lib/builder/catalog';
 import { logTicks, lowerLabel, pointRadius, quadrantOf, quadrantText, shapeScatter, type ScatterPoint } from '@/lib/builder/charts/scatter';
 import type { ScatterWidget } from '@/lib/builder/charts/types';
-import { useElementWidth } from '../useElementWidth';
+import { useBox } from './useBox';
 import { okResult, WidgetFrame, type WidgetViewProps } from '../widgets/WidgetFrame';
 import { dimText, plotHeight } from '../widgets/Charts';
 
@@ -40,7 +40,7 @@ export function ScatterView(props: WidgetViewProps<ScatterWidget>) {
     const ok = okResult(result);
     const frame = ok?.parts.rows;
     const c = widget.config;
-    const [box, width] = useElementWidth<HTMLDivElement>();
+    const [box, { w: width, h: boxH }] = useBox<HTMLDivElement>();
     const currency = ok?.flags.currency;
     const model = frame ? shapeScatter(frame.rows, c) : null;
     const xLabel = c.x.label || metricLabel(c.x.id);
@@ -64,7 +64,8 @@ export function ScatterView(props: WidgetViewProps<ScatterWidget>) {
         return { xAxis, yAxis, inQuad: [...inQuad].sort(bySize), named: new Set([...model.points].sort(bySize).slice(0, 8).map((p) => p.key)) };
     })();
 
-    const h = Math.max(120, plotHeight(props.height, widget.showTitle !== false) - 52);
+    // The plot fills the space the legend lines leave; before it is measured, estimate from the card height.
+    const h = Math.max(120, boxH > 0 ? boxH : plotHeight(props.height, widget.showTitle !== false) - 52);
     const tooltip = (p: TooltipContentProps<number, string>) => {
         if (!p.active || !p.payload?.length) return null;
         const pt = p.payload[0]?.payload as ScatterPoint | undefined;
