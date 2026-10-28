@@ -357,6 +357,7 @@ export function DashboardView({
                         width={width}
                         mode={mode}
                         renderWidget={render}
+                        compareMode={state.date.compare.mode}
                         fitHeight={tv && fitHeight ? fitHeight - (showControls ? 52 : 0) : undefined}
                         empty={<EmptyState icon={undefined} title="This page is empty" description={mode === 'view' ? 'Open the editor to add widgets.' : undefined} />}
                     />
