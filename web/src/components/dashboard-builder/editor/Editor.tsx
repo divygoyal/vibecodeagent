@@ -92,6 +92,7 @@ function EditorWidget({ widget: raw, ctx, height, bp, vars }: { widget: WidgetDe
             refetching={q.isValidating && Boolean(q.data)}
             resolved={q.data?.resolved}
             compare={ctx.controls.date.compare.mode}
+            compareSpec={ctx.controls.date.compare}
             height={height}
             bp={bp}
             mode="edit"

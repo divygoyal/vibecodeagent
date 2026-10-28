@@ -5,6 +5,7 @@
  * never come from the query string.
  */
 import { usesMetric } from './calc';
+import { viewerMayCompare } from './compare';
 import { compareFromParam, rangeFromParam } from './dates';
 import { drillFromParams, type DrillResolver } from './drill';
 import { clickableDims, interactionFromParam } from './interaction';
@@ -119,7 +120,7 @@ export function publicControlsFromQuery(
         const r = rangeFromParam(q.get('range'), q.get('from'), q.get('to'));
         if (r && r.kind !== 'rolling') range = r;
     }
-    if (share.viewerControls.compare && dc.viewerCanCompare) {
+    if (viewerMayCompare(share.viewerControls, dc)) {
         const c = compareFromParam(q.get('compare'));
         if (c) compare = c;
     }

@@ -47,9 +47,13 @@ export type DateRangeSpec =
 
 export type CompareSpec =
     | { mode: 'none' }
-    | { mode: 'previous_period' }
+    /** `align: 'weekday'` (round 9): shift back by whole weeks, so weekdays face the same weekdays. */
+    | { mode: 'previous_period'; align?: 'weekday' }
     | { mode: 'previous_year'; align?: 'date' | 'weekday' }
     | { mode: 'custom'; start: Iso; end: Iso };
+
+/** "N units earlier" (widgetDates.ts); amount 1-60. */
+export interface DateShift { unit: 'day' | 'week' | 'month' | 'year'; amount: number }
 
 export type ControlScope =
     | { mode: 'all' }
@@ -306,7 +310,8 @@ export interface WidgetBase<T extends string, C> {
     source: SourceRef;
     config: C;
     style?: WidgetStyle;
-    dateOverride?: { range?: DateRangeSpec; compare?: CompareSpec };
+    /** Own dates (round 9, widgetDates.ts): a fixed range, or the dashboard's range moved back; missing = the dashboard's. */
+    dateOverride?: { range?: DateRangeSpec; compare?: CompareSpec; shift?: DateShift };
     filters?: FilterClause[];
     ignoreControls?: ControlId[];
     interactions?: WidgetInteractions;

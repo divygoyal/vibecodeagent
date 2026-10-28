@@ -33,7 +33,7 @@ export const dateRangeSchema = z.union([
 ]);
 export const compareSchema = z.union([
     z.object({ mode: z.literal('none') }),
-    z.object({ mode: z.literal('previous_period') }),
+    z.object({ mode: z.literal('previous_period'), align: z.literal('weekday').optional() }),
     z.object({ mode: z.literal('previous_year'), align: z.enum(['date', 'weekday']).optional() }),
     z.object({ mode: z.literal('custom'), start: iso, end: iso }),
 ]);
@@ -75,7 +75,7 @@ const base = {
     showTitle: z.boolean().optional(),
     source: sourceRefSchema,
     style: z.looseObject({}).optional(),
-    dateOverride: z.object({ range: dateRangeSchema.optional(), compare: compareSchema.optional() }).optional(),
+    dateOverride: z.object({ range: dateRangeSchema.optional(), compare: compareSchema.optional(), shift: z.object({ unit: z.enum(['day', 'week', 'month', 'year']), amount: z.number().int().min(1).max(60) }).optional() }).optional(),
     filters: z.array(filterClause).max(20).optional(),
     ignoreControls: z.array(z.string().max(64)).max(50).optional(),
     interactions: z.object({ clickToFilter: z.boolean().optional(), drill: z.array(dimId).min(1).max(3).optional() }).optional(),

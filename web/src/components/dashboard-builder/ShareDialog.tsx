@@ -139,10 +139,11 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
                                 <legend className="mb-1 text-body-sm font-medium text-fg">Viewers can change</legend>
                                 <div className="flex flex-wrap gap-4">
                                     <Checkbox checked={share.viewerControls.date} onCheckedChange={(v) => put({ viewerControls: { date: v } })} label="Date range" />
-                                    <Checkbox checked={share.viewerControls.compare} onCheckedChange={(v) => put({ viewerControls: { compare: v } })} label="Comparison" />
+                                    <Checkbox checked={share.viewerControls.compare && share.viewerControls.date} disabled={!share.viewerControls.date} onCheckedChange={(v) => put({ viewerControls: { compare: v } })} label="Comparison" />
                                     <Checkbox checked={share.viewerControls.filters} onCheckedChange={(v) => put({ viewerControls: { filters: v } })} label="Filters and drill down" />
                                     {siteCtl ? <Checkbox checked={Boolean(siteCtl.viewerCanChange)} onCheckedChange={(v) => onDocChange({ ...doc, controls: doc.controls.map((c) => (c.type === 'site' ? { ...c, viewerCanChange: v } : c)) })} label="Site" /> : null}
                                 </div>
+                                {!share.viewerControls.date ? <p className="text-meta text-fg-muted">Comparison is part of the date control: it stays locked while viewers cannot change dates. Views they copy as links keep what you allow here.</p> : null}
                                 {siteCtl?.viewerCanChange ? <p className="text-meta text-fg-muted">Viewers can switch between {siteCtl.options === 'all' ? 'all your sites' : `${siteCtl.options.length} site${siteCtl.options.length === 1 ? '' : 's'}`} and see their names (never their ids). Their picks are not saved.</p> : null}
                             </fieldset>
                             <Switch checked={share.allowCopy} onCheckedChange={(v) => put({ allowCopy: v })} label="Allow viewers to copy this dashboard" description="Signed-in viewers can use it as a template for their own site. Your data is never copied." />

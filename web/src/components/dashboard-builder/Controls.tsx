@@ -14,6 +14,7 @@ import { cn } from '@/lib/cn';
 import { Button, Checkbox, Drawer, Popover, PopoverContent, PopoverTrigger, SearchInput, SegmentedControl } from '@/components/ui';
 import { fmtDateRange } from '@/lib/format';
 import { MENU_PRESETS, PRESETS, QUICK_PRESETS, isIso } from '@/lib/builder/dates';
+import { COMPARE_OPTIONS, compareOptionId, customCompare } from '@/lib/builder/compare';
 import { countryName } from '@/lib/builder/countries';
 import { metricLabel } from '@/lib/builder/catalog';
 import { selectedGrain, selectedMetric, selectedSearchType } from '@/lib/builder/compile';
@@ -81,8 +82,8 @@ export function DateControl({ range, compare, onChange, canChange = true, canCom
                         <ChevronDown aria-hidden size={14} />
                     </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-72 p-1" aria-label="Date range">
-                    <div role="listbox" aria-label="Presets" className="max-h-72 overflow-y-auto">
+                <PopoverContent align="end" className="w-80 p-1" aria-label="Date range">
+                    <div role="listbox" aria-label="Presets" className="max-h-56 overflow-y-auto">
                         {MENU_PRESETS.map((id) => {
                             const active = range.kind === 'preset' && range.id === id;
                             return (
@@ -107,20 +108,54 @@ export function DateControl({ range, compare, onChange, canChange = true, canCom
                     {canCompare ? (
                         <>
                             <div className="my-1 h-px bg-border-subtle" />
-                            <p className="px-2.5 pt-1 text-meta font-medium text-fg-muted">Compare to</p>
-                            <div role="radiogroup" aria-label="Compare to" className="pb-1">
-                                {([['previous_period', 'Previous period'], ['previous_year', 'Same period last year'], ['none', 'No comparison']] as const).map(([mode, text]) => (
-                                    <button key={mode} type="button" role="radio" aria-checked={compare.mode === mode} onClick={() => onChange(range, { mode })}
-                                        className="flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-body-sm text-fg hover:bg-subtle">
-                                        {text}
-                                        {compare.mode === mode ? <Check aria-hidden size={16} className="text-brand-text" /> : null}
-                                    </button>
-                                ))}
-                            </div>
+                            <CompareSection compare={compare} resolved={resolved} today={today} onPick={(c) => { onChange(range, c); if (c.mode !== 'custom') setOpen(false); }} />
                         </>
                     ) : null}
                 </PopoverContent>
             </Popover>
+        </div>
+    );
+}
+
+/** "Compare to" rows of the date popover: previous period, whole weeks back, last year, last year by weekday, custom, none. */
+function CompareSection({ compare, resolved, today, onPick }: { compare: CompareSpec; resolved?: ResolvedDates; today: string; onPick: (c: CompareSpec) => void }) {
+    const current = compareOptionId(compare);
+    const [customOpen, setCustomOpen] = useState(current === 'custom');
+    const [cFrom, setCFrom] = useState(compare.mode === 'custom' ? compare.start : '');
+    const [cTo, setCTo] = useState(compare.mode === 'custom' ? compare.end : '');
+    const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    const applied = resolved?.compare;
+    const custom = customCompare(cFrom, cTo);
+    return (
+        <div>
+            <p className="px-2.5 pt-1 text-meta font-medium text-fg-muted">Compare to</p>
+            <div role="radiogroup" aria-label="Compare to" className="pb-1">
+                {COMPARE_OPTIONS.map((o) => {
+                    const on = current === o.id;
+                    return (
+                        <div key={o.id}>
+                            <button type="button" role="radio" aria-checked={on} onClick={() => { if (o.spec) { setCustomOpen(false); onPick(o.spec); } else setCustomOpen(true); }}
+                                className="flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1 text-left text-body-sm text-fg hover:bg-subtle">
+                                <span className="min-w-0">
+                                    <span className="block">{o.label}</span>
+                                    {on && applied && o.id !== 'none' ? <span className="block text-caption text-fg-muted" data-testid="compare-resolved">{fmtDateRange(applied.start, applied.end)}</span> : o.hint ? <span className="block text-caption text-fg-muted">{o.hint}</span> : null}
+                                </span>
+                                {on ? <Check aria-hidden size={16} className="shrink-0 text-brand-text" /> : null}
+                            </button>
+                            {o.id === 'custom' && customOpen ? (
+                                <form className="space-y-2 px-2.5 pb-2 pt-1" onSubmit={(e) => { e.preventDefault(); if (custom) onPick(custom); }}>
+                                    <div className="flex items-center gap-2">
+                                        <input aria-label="Comparison start date" type="date" value={cFrom} max={yesterday} onChange={(e) => setCFrom(e.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-body-sm text-fg" />
+                                        <span className="text-fg-muted">–</span>
+                                        <input aria-label="Comparison end date" type="date" value={cTo} max={yesterday} onChange={(e) => setCTo(e.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-body-sm text-fg" />
+                                    </div>
+                                    <Button type="submit" size="sm" variant="secondary" disabled={!custom} className="w-full">Apply comparison</Button>
+                                </form>
+                            ) : null}
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }

@@ -11,6 +11,8 @@ import { widgetTitle } from '@/lib/builder/registry';
 import { drillTitleSuffix, ignoredFiltersNote } from '@/lib/builder/levelLabels';
 import { searchTypeLabel, widgetSearchType } from '@/lib/builder/searchType';
 import { DrillCrumbs, type DrillView } from './DrillCrumbs';
+import type { WidgetDates } from '@/lib/builder/widgetDates';
+import { DateChip } from './DateChip';
 import type { CompareSpec, ResolvedDates, WidgetDef, WidgetResult, WidgetResultOk } from '@/lib/builder/types';
 
 export interface WidgetViewProps<W extends WidgetDef = WidgetDef> {
@@ -22,6 +24,10 @@ export interface WidgetViewProps<W extends WidgetDef = WidgetDef> {
     refetching: boolean;
     resolved?: ResolvedDates;
     compare: CompareSpec['mode'];
+    /** The dashboard's comparison rule (round 9); WidgetRenderer derives `dates` from it. */
+    compareSpec?: CompareSpec;
+    /** Round 9: the days this widget reads (own dates or the dashboard's) and its comparison; set by WidgetRenderer. */
+    dates?: WidgetDates;
     /** Pixel height of the grid cell. */
     height: number;
     bp: 'lg' | 'md' | 'sm';
@@ -152,6 +158,7 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                     {widgetSearchType(widget) !== 'web' ? (
                         <span title="Search Console search type" className="mt-0.5 shrink-0 truncate rounded-badge bg-brand-soft px-1.5 text-caption text-brand-soft-fg">{searchTypeLabel(widgetSearchType(widget))}</span>
                     ) : null}
+                    <DateChip widget={widget} dates={props.dates} className="mt-0.5" />
                     {ok?.sourceLabel && props.mode !== 'public' && widget.source?.type && widget.source.type !== 'default' ? (
                         <span className="mt-0.5 truncate rounded-badge bg-subtle px-1.5 text-caption text-fg-muted">{ok.sourceLabel}</span>
                     ) : null}

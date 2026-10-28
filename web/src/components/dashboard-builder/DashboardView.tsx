@@ -15,6 +15,7 @@ import { fmtDateRange } from '@/lib/format';
 import { registerCalcs } from '@/lib/builder/calc';
 import { compareFromParam, compareToParam, rangeFromParam, rangeToParam } from '@/lib/builder/dates';
 import { dateControlOf, defaultControlState, viewerSwitchesFromQuery } from '@/lib/builder/publicDoc';
+import { viewerMayCompare } from '@/lib/builder/compare';
 import { applyViewerControls, selectedSite } from '@/lib/builder/compile';
 import { drillDown, drillFromParams, drillInfo, drillKeyLabel, drillTo, drillToParam, keepDrillKey, resolveDrillValue } from '@/lib/builder/drill';
 import { dimLabel } from '@/lib/builder/catalog';
@@ -42,7 +43,7 @@ export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> &
         const base = defaultControlState(doc);
         const dc = dateControlOf(doc);
         const range = allow.date && dc.viewerCanChange ? rangeFromParam(sp.get('range'), sp.get('from'), sp.get('to')) : null;
-        const compare = allow.compare && dc.viewerCanCompare ? compareFromParam(sp.get('compare')) : null;
+        const compare = viewerMayCompare({ date: allow.date, compare: allow.compare }, dc) ? compareFromParam(sp.get('compare')) : null;
         const filters = { ...base.filters };
         if (allow.filters) {
             for (const c of doc.controls) {
@@ -266,6 +267,7 @@ export function DashboardView({
             refetching={refetching}
             resolved={data?.resolved}
             compare={state.date.compare.mode}
+            compareSpec={state.date.compare}
             height={heightPx}
             bp={b}
             mode={mode}
@@ -298,7 +300,7 @@ export function DashboardView({
                         compare={state.date.compare}
                         onChange={onDate}
                         canChange={allow.date && dc.viewerCanChange}
-                        canCompare={allow.compare && dc.viewerCanCompare}
+                        canCompare={viewerMayCompare(allow, dc)}
                         resolved={data?.resolved}
                         size={bp === 'sm' ? 'sm' : 'md'}
                     />
