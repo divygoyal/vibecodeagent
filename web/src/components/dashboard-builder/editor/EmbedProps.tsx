@@ -60,7 +60,8 @@ export function EmbedSetup({ widget, edit }: { widget: EmbedWidget; edit: (fn: (
                     {!verdict ? `Checking ${embedHost(c.url)}…`
                         : verdict.status === 'ok' ? `${embedHost(c.url)} allows being shown in a frame.`
                             : verdict.status === 'blocked' ? `${embedHost(c.url)} refuses to be framed (${verdict.reason}). Viewers get an "Open in a new tab" button.`
-                                : `Could not check ${embedHost(c.url)}. It is tried when the dashboard opens.`}
+                                : verdict.status === 'unreachable' ? `${verdict.reason} Viewers see "${embedHost(c.url)} cannot be shown here" with an "Open in a new tab" button.`
+                                    : `We could not check ${embedHost(c.url)}, so the page is shown anyway. If it fails to load, viewers get an "Open in a new tab" button.`}
                 </p>
             ) : null}
             <Field label="Frame title" hint="Read aloud by screen readers.">

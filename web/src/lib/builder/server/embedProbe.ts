@@ -51,6 +51,19 @@ const realFetch: HeaderFetch = (url) => new Promise((resolve, reject) => {
     req.end();
 });
 
+/**
+ * A network error that means the browser could not show the page either. Only the sure ones: a host that does not
+ * exist, a refused connection, a certificate the browser rejects. Resets and timeouts can be our probe's own bad luck
+ * (bot protection, a slow site), so they stay "unknown" and the card's own load timer decides.
+ */
+export function networkVerdict(e: unknown): EmbedProbe {
+    const code = String((e as { code?: unknown } | null)?.code ?? '');
+    if (code === 'ENOTFOUND') return { status: 'unreachable', reason: 'No site answers at this address (the host name does not exist).' };
+    if (code === 'ECONNREFUSED') return { status: 'unreachable', reason: 'The site refused the connection.' };
+    if (/CERT_|SELF_SIGNED|UNABLE_TO_VERIFY|ALTNAME|ERR_TLS_CERT|HOSTNAME_MISMATCH/i.test(code)) return { status: 'unreachable', reason: 'The site security certificate is not valid.' };
+    return { status: 'unknown' };
+}
+
 /** Verdict for an address. `appHosts` are the hosts of the page that will frame it. */
 export async function probeEmbeddable(raw: string, appHosts: string[], fetchHeaders: HeaderFetch = realFetch): Promise<EmbedProbe> {
     let url: URL;
@@ -72,8 +85,10 @@ export async function probeEmbeddable(raw: string, appHosts: string[], fetchHead
             const v = frameVerdict(res.headers, appHosts);
             return v.blocked ? { status: 'blocked', reason: v.reason ?? 'The page refuses to be framed' } : { status: 'ok' };
         }
-    } catch {
-        // timeouts, DNS failures, refused private addresses: the iframe is tried anyway
+    } catch (e) {
+        // A host that does not exist, a refused connection or a bad certificate: the browser would show its own error page.
+        // Timeouts and refused private addresses stay unknown: the iframe is tried anyway (its load timer decides).
+        return networkVerdict(e);
     }
     return { status: 'unknown' };
 }
@@ -88,7 +103,7 @@ export function clearEmbedProbeCache(): void {
     inflight.clear();
 }
 
-/** Cached verdict: an hour for an answer, a minute for "unknown" (so a slow site is tried again soon). */
+/** Cached verdict: an hour for an answer, a minute for "unknown" or "unreachable" (so a slow site is tried again soon). */
 export async function probeEmbeddableCached(raw: string, appHosts: string[], fetchHeaders?: HeaderFetch, now: () => number = Date.now): Promise<EmbedProbe> {
     const key = `${raw.trim()}|${appHosts.join(',')}`;
     const hit = cache.get(key);
@@ -96,7 +111,7 @@ export async function probeEmbeddableCached(raw: string, appHosts: string[], fet
     const running = inflight.get(key);
     if (running) return running;
     const p = probeEmbeddable(raw, appHosts, fetchHeaders).then((value) => {
-        cache.set(key, { at: now(), ttl: value.status === 'unknown' ? 60_000 : 3_600_000, value });
+        cache.set(key, { at: now(), ttl: value.status === 'unknown' || value.status === 'unreachable' ? 60_000 : 3_600_000, value });
         if (cache.size > 500) for (const [k, e] of cache) if (now() - e.at >= e.ttl) cache.delete(k);
         return value;
     }).finally(() => { inflight.delete(key); });

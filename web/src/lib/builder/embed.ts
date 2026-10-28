@@ -174,9 +174,46 @@ export function frameVerdict(headers: Record<string, string | undefined>, appHos
     return { blocked: false };
 }
 
-export type EmbedProbe = { status: 'ok' } | { status: 'blocked'; reason: string } | { status: 'unknown' };
+export type EmbedProbe =
+    | { status: 'ok' }
+    | { status: 'blocked'; reason: string }
+    /** The address does not answer at all (no such host, connection refused, invalid certificate): the browser would show its own error page. */
+    | { status: 'unreachable'; reason: string }
+    | { status: 'unknown' };
+
+/** How long a framed page may take to load once it is on screen before the card gives up and says so. */
+export const EMBED_LOAD_TIMEOUT_MS = 20_000;
+
+/** Why a card shows the "cannot be shown here" panel instead of the page. */
+export type EmbedFailure = 'blocked' | 'unreachable' | 'timeout' | 'error';
 
 /** What a viewer can do about it. */
 export function embedBlockedMessage(host: string): string {
     return `${host || 'This site'} does not allow other sites to show its pages. Open it in a new tab instead.`;
+}
+
+/** One plain sentence per way a framed page can fail (the "cannot be shown here" panel). */
+export function embedFailureMessage(host: string, kind: EmbedFailure): string {
+    const site = host || 'This site';
+    switch (kind) {
+        case 'blocked': return embedBlockedMessage(host);
+        case 'unreachable': return `${site} could not be reached from here. Check the address, or open it in a new tab.`;
+        case 'timeout': return `${site} took too long to load. It may be down or slow. Try again, or open it in a new tab.`;
+        default: return `${site} did not load. Try again, or open it in a new tab.`;
+    }
+}
+
+/** The failure a probe answer means, or null when the page may be tried. */
+export function probeFailure(probe: EmbedProbe | undefined): { kind: 'blocked' | 'unreachable'; reason: string } | null {
+    if (probe?.status === 'blocked') return { kind: 'blocked', reason: probe.reason };
+    if (probe?.status === 'unreachable') return { kind: 'unreachable', reason: probe.reason };
+    return null;
+}
+
+/**
+ * The line every framed page carries, so a page on a share link can't pass as ours. Only the host is shortened (by
+ * the view, with an ellipsis); the rest is never cut.
+ */
+export function embedDisclosure(brand: string): string {
+    return `not part of ${brand}`;
 }
