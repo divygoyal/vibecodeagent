@@ -7,9 +7,10 @@ import { andFilters } from '@/components/site/lib/filters';
 import { cleanTitle, titleBrand, usableTitle } from '@/components/site/lib/pagePath';
 import { bucketDates, gaBucketDate, type Interval } from '@/components/site/lib/intervals';
 import { AI_SOURCE_PATTERN } from '@/components/site/lib/rules';
+import { COHORTS, cohortWindows, utcToday } from '@/components/site/lib/cohorts';
 import type {
     Ga4Breakdown, Ga4BreakdownResponse, Ga4Heatmap, Ga4OrganicSeries, Ga4PageTrends, Ga4Row, Ga4SeriesPoint, Ga4Summary, Ga4Totals,
-    RealtimeResponse, RetentionResponse,
+    JourneysResponse, RealtimeResponse, RetentionResponse,
 } from '@/components/site/lib/types';
 import { ga4Realtime, ga4Report, type GaReport } from './google';
 import { addDays, daysBetween, type RangeParams } from './params';
@@ -429,40 +430,64 @@ export async function ga4OrganicSeries(userId: string, token: string, property: 
     return { series: fillDays(r.cur.start, r.cur.end).map((date) => ({ date, sessions: byDate.get(date) ?? 0 })) };
 }
 
-// ─── Retention (cohorts by first visit) ────────────────────────────────────
+// ─── Journeys (channel -> landing page -> next step) ─────────────────────────
 
-const COHORTS = { daily: { count: 14, offset: 14, nth: 'cohortNthDay', gran: 'DAILY' }, weekly: { count: 8, offset: 8, nth: 'cohortNthWeek', gran: 'WEEKLY' }, monthly: { count: 6, offset: 6, nth: 'cohortNthMonth', gran: 'MONTHLY' } } as const;
+const bareHostName = (h: string) => h.trim().toLowerCase().replace(/^www\./, '');
+const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
 
-function utcToday(): Date {
-    const n = new Date();
-    return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()));
-}
-const iso = (d: Date) => d.toISOString().slice(0, 10);
-
-/** Cohort windows GA4 accepts: single days, Sunday–Saturday weeks, calendar months (complete ones only). */
-function cohortWindows(mode: RetentionResponse['mode']): { start: string; end: string }[] {
-    const today = utcToday();
-    const out: { start: string; end: string }[] = [];
-    if (mode === 'daily') {
-        for (let i = COHORTS.daily.count; i >= 1; i--) {
-            const d = new Date(today.getTime() - i * 86_400_000);
-            out.push({ start: iso(d), end: iso(d) });
+/**
+ * Two reports: sessions by channel x landing page (with the share that had a key event), and page views by
+ * landing page x page referrer x page. GA4 has no path report in its API, but on a click inside the site it sets
+ * page_referrer to the previous page, so a view whose referrer is the landing page (same host) is the step after
+ * landing. Everything else (external referrers, deeper steps, reloads) is left out.
+ */
+export async function ga4Journeys(userId: string, token: string, property: string, r: RangeParams): Promise<JourneysResponse> {
+    const dateRanges = [{ startDate: r.cur.start, endDate: r.cur.end }];
+    const [entriesRes, nextRes] = await Promise.all([
+        ga4Report(userId, token, property, {
+            dateRanges,
+            dimensions: [{ name: 'sessionDefaultChannelGroup' }, { name: 'landingPage' }],
+            metrics: [{ name: 'sessions' }, { name: 'sessionKeyEventRate' }],
+            orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+            limit: 2000,
+        }),
+        ga4Report(userId, token, property, {
+            dateRanges,
+            dimensions: [{ name: 'landingPage' }, { name: 'pageReferrer' }, { name: 'hostName' }, { name: 'pagePath' }],
+            metrics: [{ name: 'screenPageViews' }],
+            orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+            limit: 5000,
+        }).catch(() => null),
+    ]);
+    const entries = (entriesRes.rows ?? []).map((row) => {
+        const [channel = '', landing = ''] = (row.dimensionValues ?? []).map((d) => d.value ?? '');
+        const sessions = num(row.metricValues?.[0]?.value);
+        const rate = Math.max(0, Math.min(1, num(row.metricValues?.[1]?.value)));
+        return { channel: channel || 'Unassigned', landing, sessions, keySessions: Math.round(sessions * rate) };
+    }).filter((e) => e.sessions > 0 && e.landing && e.landing !== '(not set)');
+    const nextMap = new Map<string, { landing: string; next: string; views: number }>();
+    for (const row of nextRes?.rows ?? []) {
+        const [landing = '', referrer = '', host = '', path = ''] = (row.dimensionValues ?? []).map((d) => d.value ?? '');
+        if (!landing || landing === '(not set)' || !referrer || !path) continue;
+        let ref: URL;
+        try {
+            ref = new URL(referrer);
+        } catch {
+            continue;
         }
-    } else if (mode === 'weekly') {
-        const lastSat = new Date(today.getTime() - ((today.getUTCDay() + 1) % 7 || 7) * 86_400_000);
-        for (let i = COHORTS.weekly.count - 1; i >= 0; i--) {
-            const end = new Date(lastSat.getTime() - i * 7 * 86_400_000);
-            out.push({ start: iso(new Date(end.getTime() - 6 * 86_400_000)), end: iso(end) });
-        }
-    } else {
-        for (let i = COHORTS.monthly.count; i >= 1; i--) {
-            const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i, 1));
-            const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i + 1, 0));
-            out.push({ start: iso(start), end: iso(end) });
-        }
+        if (bareHostName(ref.hostname) !== bareHostName(host)) continue;
+        const from = trimSlash(ref.pathname || '/');
+        if (from !== trimSlash(landing) || trimSlash(path) === from) continue;
+        const k = `${landing}\u0001${path}`;
+        const cur = nextMap.get(k) ?? { landing, next: path, views: 0 };
+        cur.views += num(row.metricValues?.[0]?.value);
+        nextMap.set(k, cur);
     }
-    return out;
+    const cut = (rep: GaReport | null) => Boolean(rep && (rep.rowCount ?? 0) > (rep.rows?.length ?? 0));
+    return { entries, next: [...nextMap.values()].sort((a, b) => b.views - a.views), truncated: cut(entriesRes) || cut(nextRes) };
 }
+
+// ─── Retention (cohorts by first visit) ────────────────────────────────────
 
 /** Periods a cohort could have reached by today (later cells are null, not 0). */
 function reachable(mode: RetentionResponse['mode'], start: string): number {

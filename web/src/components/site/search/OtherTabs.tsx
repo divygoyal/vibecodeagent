@@ -1,12 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CheckCircle2, ExternalLink, FileSearch, Info, Search as SearchIcon } from 'lucide-react';
+import { CheckCircle2, Info } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { fmtDayYear, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
+import { fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
 import { Badge } from '@/components/ui/Badge';
-import { Banner } from '@/components/ui/Banner';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -18,9 +17,9 @@ import { useDateRange } from '@/components/shell/DateRangeControl';
 import { BreakdownTable } from '../BreakdownTable';
 import { per28 } from '../lib/actionText';
 import { displayPage, emptyMoversLine, expectedCtr, moverGroups, pageRef, STRIKING_TARGET, type MoverKind } from '../lib/rules';
-import type { CannibalizedQuery, GscRow, GscRowsResponse, InspectResponse, OpportunitiesResponse, OpportunityRow, SitemapRow } from '../lib/types';
+import type { CannibalizedQuery, GscRow, GscRowsResponse, OpportunitiesResponse, OpportunityRow } from '../lib/types';
 import { AskButton, LoadError } from '../SiteStates';
-import { downloadCsv, fetchJson, useGsc, useSite, useSiteRange } from '../useSiteData';
+import { downloadCsv, useGsc, useSite, useSiteRange } from '../useSiteData';
 import { useStringParam } from '../useTabParam';
 import { SearchDetailDrawer } from './SearchDetailDrawer';
 
@@ -245,115 +244,6 @@ export function MoversTab() {
                 </p>
             ) : null}
             <SearchDetailDrawer kind={detail?.startsWith('p:') ? 'page' : 'query'} value={detail ? detail.slice(2) : null} onClose={() => void setDetail(null)} />
-        </div>
-    );
-}
-
-// ─── Indexing ─────────────────────────────────────────────────────────────
-
-const VERDICT: Record<string, { label: string; tone: string }> = {
-    PASS: { label: 'Indexed', tone: 'text-up' },
-    PARTIAL: { label: 'Indexed with issues', tone: 'text-warn' },
-    FAIL: { label: 'Not indexed', tone: 'text-down' },
-    NEUTRAL: { label: 'Excluded', tone: 'text-fg-muted' },
-};
-
-/** Search > Indexing: sitemaps and URL inspection (on demand: the API allows 2,000 a day). */
-export function IndexingTab() {
-    const site = useSite();
-    const sitemaps = useGsc<{ sitemaps: SitemapRow[] }>('sitemaps', { noRange: true });
-    const pages = useGsc<GscRowsResponse>('pages');
-    const [url, setUrl] = useState(site.homeUrl ?? '');
-    const [result, setResult] = useState<InspectResponse | null>(null);
-    const [busy, setBusy] = useState(false);
-    const [err, setErr] = useState<string | null>(null);
-    const inspect = async (target: string) => {
-        if (!site.gsc) return;
-        setUrl(target);
-        setBusy(true);
-        setErr(null);
-        try {
-            const r = await fetchJson<InspectResponse>(`/api/site/gsc?${new URLSearchParams({ site: site.gsc, report: 'inspect', url: target })}`);
-            setResult(r);
-        } catch (e) {
-            setErr(e instanceof Error ? e.message : 'Inspection failed');
-            setResult(null);
-        } finally {
-            setBusy(false);
-        }
-    };
-    const v = result ? VERDICT[result.verdict] ?? { label: result.verdict, tone: 'text-fg-muted' } : null;
-    return (
-        <div className="flex flex-col gap-4">
-            <Card>
-                <CardHeader title="Inspect a URL" description="What Google saw the last time it crawled the page. Runs only when you ask (Google allows 2,000 a day)." />
-                <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); if (url.trim()) void inspect(url.trim()); }}>
-                    <label className="sr-only" htmlFor="inspect-url">URL</label>
-                    <input id="inspect-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/page" inputMode="url"
-                        className="h-9 min-w-0 flex-1 rounded-control border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint focus-visible:outline-2 focus-visible:outline-focus" />
-                    <Button type="submit" variant="primary" icon={FileSearch} loading={busy} disabled={!url.trim()}>Inspect</Button>
-                </form>
-                {err ? <Banner variant="danger" className="mt-3">{err}</Banner> : null}
-                {result && v ? (
-                    <div className="mt-4 rounded-card border border-border-subtle p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className={cn('text-title-sm', v.tone)}>{v.label}</p>
-                            {result.link ? <a href={result.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-body-sm text-fg-secondary hover:text-fg">Open in Search Console <ExternalLink aria-hidden size={14} /></a> : null}
-                        </div>
-                        <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-                            {[
-                                ['Coverage', result.coverageState],
-                                ['Last crawl', result.lastCrawlTime ? fmtDayYear(result.lastCrawlTime.slice(0, 10)) : null],
-                                ['Crawled as', result.crawledAs?.replace(/_/g, ' ').toLowerCase()],
-                                ['Indexing allowed', result.indexingState?.replace(/_/g, ' ').toLowerCase()],
-                                ['robots.txt', result.robotsTxtState?.replace(/_/g, ' ').toLowerCase()],
-                                ['Page fetch', result.pageFetchState?.replace(/_/g, ' ').toLowerCase()],
-                                ['Google canonical', result.googleCanonical],
-                                ['Your canonical', result.userCanonical],
-                                ['Rich results', result.richResultTypes.length ? result.richResultTypes.join(', ') : result.richResultsVerdict ? result.richResultsVerdict.toLowerCase() : null],
-                            ].filter(([, val]) => val).map(([k, val]) => (
-                                <div key={k as string} className="flex min-w-0 items-baseline justify-between gap-3 border-b border-dashed border-border-subtle pb-1.5">
-                                    <dt className="shrink-0 text-meta text-fg-muted">{k}</dt>
-                                    <dd className="min-w-0 truncate text-right text-body-sm text-fg" title={String(val)}>{val}</dd>
-                                </div>
-                            ))}
-                        </dl>
-                    </div>
-                ) : null}
-                {pages.data?.rows.length ? (
-                    <div className="mt-4">
-                        <p className="mb-2 text-meta text-fg-muted">Top pages by clicks: inspect one</p>
-                        <div className="flex flex-wrap gap-1.5">
-                            {pages.data.rows.slice(0, 8).map((r) => (
-                                <button key={r.key} type="button" onClick={() => void inspect(r.key)}
-                                    className="inline-flex h-7 max-w-full items-center gap-1 truncate rounded-full border border-border-subtle bg-surface px-3 text-body-sm text-fg-secondary hover:bg-subtle">
-                                    <SearchIcon aria-hidden size={12} className="shrink-0" />
-                                    <span className="truncate">{displayPage(pageRef(r.key), site.siteHost)}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                ) : null}
-            </Card>
-            {sitemaps.state === 'error' ? <LoadError error={sitemaps.error} onRetry={sitemaps.mutate} /> : (
-                <Table<SitemapRow>
-                    caption="Sitemaps"
-                    rows={sitemaps.data?.sitemaps ?? []}
-                    rowKey={(r) => r.path}
-                    loading={sitemaps.state === 'loading'}
-                    toolbar={<div><p className="text-title-sm text-fg">Sitemaps</p><p className="text-meta text-fg-muted">Submitted in Search Console</p></div>}
-                    empty={<EmptyState variant="inline" title="No sitemaps submitted" description="Submit your sitemap in Search Console so Google finds new pages faster." />}
-                    columns={[
-                        { key: 'path', header: 'Sitemap', width: '44%', cell: (r) => <a href={r.path} target="_blank" rel="noreferrer" className="tap-inline hover:underline" title={r.path}>{r.path.replace(/^https?:\/\//, '')}</a> },
-                        { key: 'submitted', header: 'URLs', align: 'right', cell: (r) => fmtFull(r.submitted) },
-                        { key: 'read', header: 'Last read', align: 'right', className: 'max-md:hidden', headerClassName: 'max-md:hidden', cell: (r) => (r.lastDownloaded ? fmtDayYear(r.lastDownloaded.slice(0, 10)) : '–') },
-                        { key: 'status', header: 'Status', align: 'right', cell: (r) => (r.errors ? <span className="text-down">{fmtFull(r.errors)} errors</span> : r.warnings ? <span className="text-warn">{fmtFull(r.warnings)} warnings</span> : r.isPending ? 'Pending' : <span className="text-up">OK</span>) },
-                    ]}
-                />
-            )}
-            <p className="text-meta text-fg-muted">
-                For the full coverage report, open Pages in Search Console. Google doesn&apos;t share it through the API.
-            </p>
         </div>
     );
 }

@@ -4,6 +4,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { SourceIcon } from '@/components/site/SourceIcon';
 import { sourceInfo } from '@/components/site/lib/sources';
+import { browserIconHost, deviceGlyph, osIconHost } from '@/components/site/TechIcon';
 import {
     Activity,
     Globe2,
@@ -14,8 +15,6 @@ import {
     MousePointer2,
     Search,
     ShoppingCart,
-    Smartphone,
-    Tablet,
 } from 'lucide-react';
 
 const COUNTRY_CODES: Record<string, string> = {
@@ -119,28 +118,6 @@ const SITE_ALIASES: Record<string, string> = {
     'x.com': 'x.com',
     'youtube': 'youtube.com',
     'youtube.com': 'youtube.com',
-};
-
-const BROWSER_SITES: Record<string, string> = {
-    'android webview': 'android.com',
-    'brave': 'brave.com',
-    'chrome': 'google.com/chrome',
-    'chrome webview': 'google.com/chrome',
-    'edge': 'microsoft.com/edge',
-    'firefox': 'mozilla.org/firefox',
-    'internet explorer': 'microsoft.com',
-    'opera': 'opera.com',
-    'safari': 'apple.com/safari',
-    'samsung internet': 'samsung.com',
-};
-
-const OS_SITES: Record<string, string> = {
-    'android': 'android.com',
-    'chrome os': 'google.com/chromebook',
-    'ios': 'apple.com/ios',
-    'linux': 'ubuntu.com',
-    'macos': 'apple.com/macos',
-    'windows': 'microsoft.com/windows',
 };
 
 const BRAND_SITES: Record<string, string> = {
@@ -302,10 +279,8 @@ function semanticSourceFallback(value: string, column: string) {
 }
 
 function semanticDeviceFallback(value: string) {
-    const key = normalizeKey(value);
-    if (key.includes('mobile')) return <Smartphone className="h-3 w-3" />;
-    if (key.includes('tablet')) return <Tablet className="h-3 w-3" />;
-    return <Monitor className="h-3 w-3" />;
+    const Icon = deviceGlyph(value);
+    return <Icon className="h-3 w-3" />;
 }
 
 function semanticEventFallback(value: string, column: string) {
@@ -361,12 +336,13 @@ export function OverviewValueIcon({
     }
 
     if (column === 'browser' || column === 'browser_version') {
-        const browserSite = BROWSER_SITES[normalizeKey(value)] || buildFaviconTarget(value);
+        // One map with the app's lists (components/site/TechIcon.tsx): product logos, not company ones.
+        const browserSite = browserIconHost(value) || buildFaviconTarget(value);
         return <FaviconIcon site={browserSite} title={value} fallback={<Globe2 className="h-3 w-3" />} />;
     }
 
     if (column === 'os' || column === 'os_version') {
-        const osSite = OS_SITES[normalizeKey(value)] || buildFaviconTarget(value);
+        const osSite = osIconHost(value) || buildFaviconTarget(value);
         return <FaviconIcon site={osSite} title={value} fallback={<Monitor className="h-3 w-3" />} />;
     }
 

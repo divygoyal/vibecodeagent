@@ -17,6 +17,7 @@ export const TTL = {
     gsc: 15 * 60_000,
     realtime: 30_000,
     slow: 30 * 60_000,
+    day: 24 * 60 * 60_000,
 } as const;
 
 // ─── Concurrency ──────────────────────────────────────────────────────────
@@ -162,6 +163,17 @@ export async function gscInspect(userId: string, token: string, siteUrl: string,
 }
 
 /** Search Console sites this user can read (cached), to validate a siteUrl. */
+/**
+ * URL Inspection for the Indexing table: cached a day per (user, property, URL), so the top pages cost at most
+ * one inspection each per day (Google allows 2,000 a day per property). Returns when Google answered.
+ */
+export async function gscInspectDaily(userId: string, token: string, siteUrl: string, url: string): Promise<{ at: string; data: unknown }> {
+    return cached(`site-gsc-inspect-day:${userId}:${siteUrl}:${url}`, TTL.day, async () => ({
+        at: new Date().toISOString(),
+        data: await googleFetch('https://searchconsole.googleapis.com/v1/urlInspection/index:inspect', token, { siteUrl, inspectionUrl: url, languageCode: 'en-US' }),
+    }));
+}
+
 export async function gscSiteList(userId: string, token: string): Promise<string[]> {
     const data = await cached(`site-gsc-list:${userId}`, TTL.gsc, () => googleFetch(`${GSC_BASE}/sites`, token) as Promise<{ siteEntry?: { siteUrl: string }[] }>);
     return (data.siteEntry ?? []).map((s) => s.siteUrl);

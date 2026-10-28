@@ -9,8 +9,9 @@ import {
 import type {
     CannibalizedQuery, DecayRow, GscDetailResponse, GscDimensionReport, GscMetrics, GscRow, GscRowsResponse,
     GscSeriesPoint, GscSummary, InspectResponse, OpportunitiesResponse, OpportunityRow, SitemapRow,
+    IndexStatusPage, IndexStatusResponse, SearchFlowResponse,
 } from '@/components/site/lib/types';
-import { gscInspect, gscQuery, gscSitemaps, type GscApiRow } from './google';
+import { gscInspect, gscInspectDaily, gscQuery, gscSitemaps, type GscApiRow } from './google';
 import { addDays, daysBetween, type RangeParams, type Window } from './params';
 
 const DIM: Record<GscDimensionReport, string> = {
@@ -102,6 +103,16 @@ export async function gscRows(userId: string, token: string, site: string, repor
 async function queryPages(userId: string, token: string, site: string, w: Window) {
     const rows = await gscQuery(userId, token, site, { dimensions: ['query', 'page'], startDate: w.start, endDate: w.end, rowLimit: 5000 });
     return rows.map((x) => ({ query: x.keys?.[0] ?? '', page: x.keys?.[1] ?? '', ...metrics(x) }));
+}
+
+/**
+ * Query -> page clicks for Traffic › Journeys (round 5): which searches bring people to which entry pages. Same
+ * cached query + page report as Opportunities and Cannibalization, so it costs no extra Search Console call.
+ */
+export async function gscSearchFlow(userId: string, token: string, site: string, w: Window): Promise<SearchFlowResponse> {
+    const qp = await queryPages(userId, token, site, w);
+    const rows = qp.filter((r) => r.clicks > 0).sort((a, b) => b.clicks - a.clicks);
+    return { rows: rows.slice(0, 500).map((r) => ({ query: r.query, page: r.page, clicks: r.clicks })), totalClicks: rows.reduce((a, r) => a + r.clicks, 0) };
 }
 
 /** Top page (most impressions) per query. */
@@ -242,9 +253,8 @@ export async function gscSitemapRows(userId: string, token: string, site: string
     });
 }
 
-export async function gscInspectUrl(userId: string, token: string, site: string, url: string): Promise<InspectResponse> {
-    const data = await gscInspect(userId, token, site, url) as { inspectionResult?: Record<string, unknown> };
-    const r = data.inspectionResult ?? {};
+function parseInspection(url: string, data: unknown): InspectResponse {
+    const r = ((data ?? {}) as { inspectionResult?: Record<string, unknown> }).inspectionResult ?? {};
     const idx = (r.indexStatusResult ?? {}) as Record<string, unknown>;
     const mob = (r.mobileUsabilityResult ?? {}) as Record<string, unknown>;
     const rich = (r.richResultsResult ?? {}) as { verdict?: string; detectedItems?: { richResultType?: string }[] };
@@ -265,4 +275,37 @@ export async function gscInspectUrl(userId: string, token: string, site: string,
         richResultTypes: (rich.detectedItems ?? []).map((d) => d.richResultType ?? '').filter(Boolean),
         link: str(r.inspectionResultLink),
     };
+}
+
+export async function gscInspectUrl(userId: string, token: string, site: string, url: string): Promise<InspectResponse> {
+    return parseInspection(url, await gscInspect(userId, token, site, url));
+}
+
+/** Top pages by clicks that get a daily inspection (Search › Indexing). */
+export const INDEX_CHECK_LIMIT = 20;
+const INSPECT_PARALLEL = 4;
+
+/**
+ * Index status of the site's top pages by clicks in the range (round 5, audit item 29): one URL Inspection per
+ * page, each cached a day, 4 at a time. A quota or rate error stops the batch; the pages not asked yet come back
+ * as 'skipped' and the ones already answered stay.
+ */
+export async function gscIndexStatus(userId: string, token: string, site: string, r: RangeParams): Promise<IndexStatusResponse> {
+    const top = await gscRows(userId, token, site, 'pages', { cur: r.cur, cmp: null });
+    const withClicks = top.rows.filter((x) => x.clicks > 0).sort((a, b) => b.clicks - a.clicks);
+    const pick = withClicks.slice(0, INDEX_CHECK_LIMIT);
+    const pages: IndexStatusPage[] = pick.map((x) => ({ url: x.key, clicks: x.clicks, impressions: x.impressions, status: 'skipped', checkedAt: null }));
+    let stop = false;
+    for (let i = 0; i < pages.length && !stop; i += INSPECT_PARALLEL) {
+        await Promise.all(pages.slice(i, i + INSPECT_PARALLEL).map(async (p) => {
+            try {
+                const res = await gscInspectDaily(userId, token, site, p.url);
+                Object.assign(p, parseInspection(p.url, res.data), { status: 'ok', checkedAt: res.at });
+            } catch (e) {
+                p.status = 'error';
+                if (/Google API error (429|403)/.test(e instanceof Error ? e.message : '')) stop = true;
+            }
+        }));
+    }
+    return { pages, limit: INDEX_CHECK_LIMIT, pagesWithClicks: withClicks.length };
 }

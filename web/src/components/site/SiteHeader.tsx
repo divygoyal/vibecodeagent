@@ -19,19 +19,21 @@ export interface SiteHeaderProps {
     /** Extra actions before the date range control. */
     actions?: ReactNode;
     tabs?: ReactNode;
-    /** Hide the date range (Actions, Audit). */
+    /** Hide the date range (Actions, Audit, Realtime, Retention). */
     noRange?: boolean;
+    /** With noRange: what the page covers instead ("Last 30 minutes · updates every 30 s"). */
+    rangeNote?: ReactNode;
     backHref?: string;
     title?: ReactNode;
 }
 
 /** Site page header: favicon + host, range facts, date range control last (no source badges: the subtitle names the source). */
-export function SiteHeader({ section, source, search, actions, tabs, noRange, backHref, title }: SiteHeaderProps) {
+export function SiteHeader({ section, source, search, actions, tabs, noRange, rangeNote, backHref, title }: SiteHeaderProps) {
     const { site, label, gsc } = useSite();
     const dr = useDateRange();
     const r = search ? dr.resolvedSearch : dr.resolved;
     const range = `${fmtDateRange(r.start, r.end)}${r.prevStart && r.prevEnd ? ` vs ${fmtDateRange(r.prevStart, r.prevEnd)}` : ''}`;
-    const facts = [source, noRange ? null : range].filter(Boolean);
+    const facts = [source, noRange ? rangeNote : range].filter(Boolean);
     return (
         <PageHeader
             backHref={backHref}
