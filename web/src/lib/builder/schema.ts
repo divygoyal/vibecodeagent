@@ -5,6 +5,8 @@
  */
 import { z } from 'zod';
 import { parseCalcId } from './calc';
+import { drillProblem } from './drill';
+import { widgetSearchTypeProblem } from './searchType';
 import type { DashboardDocV2, WidgetDef } from './types';
 
 const id = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
@@ -43,6 +45,7 @@ const scope = z.union([
 ]);
 
 const grainValue = z.enum(['auto', 'day', 'week', 'month']);
+const searchTypeValue = z.enum(['web', 'image', 'video', 'news', 'discover', 'googleNews']);
 
 const filterOp = z.enum(['eq', 'neq', 'in', 'not_in', 'contains', 'not_contains', 'starts', 'ends', 'regex', 'not_regex']);
 const filterClause = z.object({ dimension: dimId, op: filterOp, value: z.union([z.string().max(500), z.array(z.string().max(500)).max(100)]) });
@@ -55,6 +58,8 @@ const controlSchema = z.union([
     z.object({ id, type: z.literal('site'), label: shortText, options: z.union([z.literal('all'), z.array(z.string().max(253)).max(500)]), default: z.string().max(253), scope, viewerCanChange: z.boolean().optional() }),
     z.object({ id, type: z.literal('metric'), label: shortText, options: z.array(metricId).max(30), default: metricId, scope }),
     z.object({ id, type: z.literal('grain'), label: shortText, options: z.array(grainValue).min(1).max(4), default: grainValue, scope }),
+    // Round 8: Search Console search type switcher.
+    z.object({ id, type: z.literal('searchType'), label: shortText, options: z.array(searchTypeValue).min(2).max(6), default: searchTypeValue, scope }),
     z.object({ id: z.string().min(1).max(32).regex(/^[a-z0-9_]+$/), type: z.literal('variable'), label: z.string().min(1).max(60), kind: z.enum(['text', 'regex', 'number']), default: z.string().max(300), viewerCanChange: z.boolean() }),
 ]);
 
@@ -73,7 +78,8 @@ const base = {
     dateOverride: z.object({ range: dateRangeSchema.optional(), compare: compareSchema.optional() }).optional(),
     filters: z.array(filterClause).max(20).optional(),
     ignoreControls: z.array(z.string().max(64)).max(50).optional(),
-    interactions: z.object({ clickToFilter: z.boolean().optional() }).optional(),
+    interactions: z.object({ clickToFilter: z.boolean().optional(), drill: z.array(dimId).min(1).max(3).optional() }).optional(),
+    searchType: searchTypeValue.optional(),
     mobile: z.object({ hidden: z.boolean().optional(), minHeight: z.number().optional() }).optional(),
 };
 
@@ -164,6 +170,8 @@ export const controlStateSchema = z.object({
     site: z.record(z.string().max(64), z.string().max(253)).optional(),
     metric: z.record(z.string().max(64), metricId).optional(),
     grain: z.record(z.string().max(64), grainValue).optional(),
+    searchType: z.record(z.string().max(64), searchTypeValue).optional(),
+    drill: z.record(z.string().max(64), z.array(z.string().min(1).max(200)).max(3)).optional(),
     pageId: z.string().max(64).optional(),
 });
 
@@ -171,6 +179,12 @@ export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: s
 
 function fmtIssues(err: z.ZodError): string {
     return err.issues.slice(0, 5).map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
+}
+
+/** Settings a widget cannot honour as saved (a drill list its metrics cannot show, a search type it cannot read). */
+function widgetProblem(w: WidgetDef): string | null {
+    const p = drillProblem(w) ?? widgetSearchTypeProblem(w);
+    return p ? `widget ${w.id}: ${p}` : null;
 }
 
 export function validateDoc(doc: unknown): ValidationResult<DashboardDocV2> {
@@ -189,6 +203,10 @@ export function validateDoc(doc: unknown): ValidationResult<DashboardDocV2> {
     for (const [k, w] of Object.entries(d.widgets)) {
         if (w.id !== k) return { ok: false, error: `widget key ${k} does not match its id` };
     }
+    for (const w of Object.values(d.widgets)) {
+        const problem = widgetProblem(w);
+        if (problem) return { ok: false, error: problem };
+    }
     const images = Object.values(d.widgets).filter((w) => w.type === 'image').length;
     if (images > 20) return { ok: false, error: 'At most 20 images per dashboard' };
     return { ok: true, value: d };
@@ -197,5 +215,9 @@ export function validateDoc(doc: unknown): ValidationResult<DashboardDocV2> {
 export function validateWidgets(widgets: unknown): ValidationResult<WidgetDef[]> {
     const r = z.array(widgetSchema).max(40).safeParse(widgets);
     if (!r.success) return { ok: false, error: fmtIssues(r.error) };
+    for (const w of r.data as unknown as WidgetDef[]) {
+        const problem = widgetProblem(w);
+        if (problem) return { ok: false, error: problem };
+    }
     return { ok: true, value: r.data as unknown as WidgetDef[] };
 }

@@ -5,6 +5,7 @@
  * `x=<dimension>:<value>|...` so filtered views stay linkable. The widget you clicked keeps
  * showing all its values (it ignores selections on its own dimension).
  */
+import { drillChain } from './drill';
 import type { DashboardDocV2, FilterClause, WidgetDef } from './types';
 
 const MAX = 4;
@@ -26,6 +27,8 @@ export function clickableDims(doc: Pick<DashboardDocV2, 'widgets'>): Set<string>
     for (const w of Object.values(doc.widgets)) {
         const d = clickDimension(w as WidgetDef);
         if (d && d !== 'date' && d !== 'site') out.add(d);
+        // Round 8: on the last drill level a click filters the page by that level's dimension.
+        if (d && w.interactions?.clickToFilter) for (const level of drillChain(w as WidgetDef) ?? []) if (level !== 'date' && level !== 'site') out.add(level);
     }
     return out;
 }

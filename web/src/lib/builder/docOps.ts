@@ -2,7 +2,9 @@
  * Pure operations on a DashboardDocV2 (editor store, routes, tests). Every function returns a
  * new doc and never mutates its input, so undo history can keep references.
  */
+import { drillProblem } from './drill';
 import { newPageId, newWidgetId, widgetMeta } from './registry';
+import { widgetSearchTypeProblem } from './searchType';
 import type { DashboardDocV2, GridLayouts, LayoutItem, PageDef, SourceRef, WidgetDef } from './types';
 
 const COLS = { lg: 12, md: 6, sm: 1 } as const;
@@ -123,8 +125,24 @@ export function removeWidget(doc: DashboardDocV2, widgetId: string): DashboardDo
     };
 }
 
-export function updateWidget(doc: DashboardDocV2, widget: WidgetDef): DashboardDocV2 {
-    if (!doc.widgets[widget.id]) return doc;
+/**
+ * Drops the settings an edit made impossible (round 8): a drill list its metrics or dimension no longer fit, a
+ * search type once the widget reads Analytics, or needs queries or position under Discover.
+ */
+export function repairWidget(w: WidgetDef): WidgetDef {
+    let out = w;
+    if (out.interactions?.drill && drillProblem(out)) {
+        const { drill: _drop, ...rest } = out.interactions;
+        void _drop;
+        out = { ...out, interactions: Object.keys(rest).length ? rest : undefined } as WidgetDef;
+    }
+    if (out.searchType && widgetSearchTypeProblem(out)) out = { ...out, searchType: undefined } as WidgetDef;
+    return out;
+}
+
+export function updateWidget(doc: DashboardDocV2, widgetIn: WidgetDef): DashboardDocV2 {
+    if (!doc.widgets[widgetIn.id]) return doc;
+    const widget = repairWidget(widgetIn);
     let next: DashboardDocV2 = { ...doc, widgets: { ...doc.widgets, [widget.id]: widget } };
     // Keep the layout inside the (possibly new) size constraints.
     const page = pageOf(next, widget.id);

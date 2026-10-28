@@ -6,7 +6,9 @@
  */
 import { usesMetric } from './calc';
 import { compareFromParam, rangeFromParam } from './dates';
+import { drillFromParams, type DrillResolver } from './drill';
 import { clickableDims, interactionFromParam } from './interaction';
+import { isSearchType } from './searchType';
 import { cleanVariable } from './variables';
 import type {
     CompareSpec,
@@ -103,6 +105,11 @@ export function publicControlsFromQuery(
     share: { viewerControls: { date: boolean; compare: boolean; filters: boolean } },
     /** Round 7: maps the opaque site keys of the URL (s.<controlId>) to the owner's site ids (server/access.ts). */
     mapSitePicks?: (picks: Record<string, string>) => Record<string, string>,
+    /**
+     * Round 8: what a drill part of the URL (d.<widgetId>) means. Public requests pass the signed-key check
+     * (server/access.ts drillResolver); without it a public request carries no drill state at all.
+     */
+    resolveDrill?: DrillResolver,
 ): ControlState {
     const base = defaultControlState(doc);
     const dc = dateControlOf(doc);
@@ -138,20 +145,23 @@ export function publicControlsFromQuery(
     const pageParam = q.get('page');
     const pageId = pageParam && doc.pages.some((p) => p.id === pageParam && !p.hidden) ? pageParam : undefined;
     const switches = viewerSwitchesFromQuery(q, doc, mapSitePicks);
-    return { date: { range, compare }, filters, pageId, ...(interaction.length ? { interaction } : {}), ...switches };
+    // Drill down is a viewer filter like click-to-filter: only when the share lets viewers filter.
+    const drill = share.viewerControls.filters && resolveDrill ? drillFromParams(q, doc.widgets, resolveDrill) : undefined;
+    return { date: { range, compare }, filters, pageId, ...(interaction.length ? { interaction } : {}), ...switches, ...(drill ? { drill } : {}) };
 }
 
 /**
  * Round 7 viewer switchers from a query string: m.<id> must be one of the metric control's options,
- * g.<id> one of the Day / Week / Month control's options; s.<id> only passes through `mapSitePicks`
+ * g.<id> one of the Day / Week / Month control's options, t.<id> (round 8) one of the search type control's
+ * options; s.<id> only passes through `mapSitePicks`
  * (owner views: the server checks site ids; public links: opaque keys mapped server side).
  */
 export function viewerSwitchesFromQuery(
     q: URLSearchParams,
     doc: Pick<DashboardDocV2, 'controls'>,
     mapSitePicks?: (picks: Record<string, string>) => Record<string, string>,
-): Pick<ControlState, 'site' | 'metric' | 'grain'> {
-    const out: Pick<ControlState, 'site' | 'metric' | 'grain'> = {};
+): Pick<ControlState, 'site' | 'metric' | 'grain' | 'searchType'> {
+    const out: Pick<ControlState, 'site' | 'metric' | 'grain' | 'searchType'> = {};
     const sitePicks: Record<string, string> = {};
     for (const c of doc.controls) {
         if (c.type === 'metric') {
@@ -160,6 +170,9 @@ export function viewerSwitchesFromQuery(
         } else if (c.type === 'grain') {
             const v = q.get(`g.${c.id}`) as GrainControl['default'] | null;
             if (v && v !== c.default && c.options.includes(v)) (out.grain ??= {})[c.id] = v;
+        } else if (c.type === 'searchType') {
+            const v = q.get(`t.${c.id}`);
+            if (isSearchType(v) && v !== c.default && c.options.includes(v)) (out.searchType ??= {})[c.id] = v;
         } else if (c.type === 'site') {
             const v = q.get(`s.${c.id}`);
             if (v && v.length <= 253) sitePicks[c.id] = v;
