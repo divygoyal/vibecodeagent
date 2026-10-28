@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { ArrowRight, Check, ListChecks, PanelsTopLeft, PanelTop, Sparkles, type LucideIcon } from 'lucide-react';
 
+import type { HomeLive } from './homeLive';
+import { LiveRow } from './live/LiveRow';
 import tourImages from './tourImages.json';
 
 export type FeatureKey = 'site' | 'fixes' | 'traffic' | 'dashboards';
@@ -76,10 +78,24 @@ function Shot({ row }: { row: FeatureRow }) {
 
 /**
  * Every feature visible while scrolling, all rows alike: the copy (label, ≤8-word headline, three bullets, a
- * link to that screen in the live demo) in one band above a full-width crop of the real app. Each row is an
- * anchor (`#tour-<key>`) for links from the footer and other pages.
+ * link to that screen in the live demo) in one band above the product. Each row is an anchor (`#tour-<key>`) for
+ * links from the footer and other pages.
+ *
+ * Round 6: the product is live. Each row with sample data in `live` becomes the app's real components (clickable,
+ * nothing saved) once it scrolls near the screen; until then, and for any row without data, it is the static crop.
  */
-export function FeatureRows({ rows }: { rows: FeatureRow[] }) {
+function Product({ row, live }: { row: FeatureRow; live?: HomeLive }) {
+    const shot = <Shot row={row} />;
+    switch (row.key) {
+        case 'site': return live?.site ? <LiveRow kind="site" data={live.site}>{shot}</LiveRow> : shot;
+        case 'traffic': return live?.traffic ? <LiveRow kind="traffic" data={live.traffic}>{shot}</LiveRow> : shot;
+        case 'fixes': return live?.fixes ? <LiveRow kind="fixes" data={live.fixes}>{shot}</LiveRow> : shot;
+        case 'dashboards': return live?.dashboards ? <LiveRow kind="dashboards" data={live.dashboards}>{shot}</LiveRow> : shot;
+        default: return shot;
+    }
+}
+
+export function FeatureRows({ rows, live }: { rows: FeatureRow[]; live?: HomeLive }) {
     return (
         <div className="mx-auto flex max-w-[1016px] flex-col gap-16 md:gap-24">
             {rows.map((row) => {
@@ -108,12 +124,12 @@ export function FeatureRows({ rows }: { rows: FeatureRow[] }) {
                             </Link>
                         </div>
                         <div className="mt-6">
-                            <Shot row={row} />
+                            <Product row={row} live={live} />
                         </div>
                     </section>
                 );
             })}
-            <p className="text-center text-meta text-fg-secondary">Real app screens · sample data</p>
+            <p className="text-center text-meta text-fg-secondary">Real app screens · sample data · nothing you click here is saved</p>
         </div>
     );
 }

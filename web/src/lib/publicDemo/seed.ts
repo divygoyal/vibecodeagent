@@ -11,7 +11,7 @@
  *
  * Everything goes to the admin API directly (X-API-Key), as the app's own routes do.
  */
-import { DEMO_ACCESS_TOKEN, DEMO_REFRESH_TOKEN, DEMO_USER_ID, DEMO_USER_NAME, DEMO_WORKSPACE } from './config';
+import { DEMO_ACCESS_TOKEN, DEMO_NOTES, DEMO_REFRESH_TOKEN, DEMO_USER_ID, DEMO_USER_NAME, DEMO_WORKSPACE } from './config';
 
 const ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://admin-api:8000';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -99,12 +99,8 @@ async function seedAnnotationsGoalsFunnel(): Promise<void> {
         for (const a of existing) {
             if (a.id !== undefined) await admin('DELETE', `/api/annotations/${encodeURIComponent(String(a.id))}?user_identifier=${uid}`);
         }
-        for (const a of [
-            { date: isoDaysAgo(26), category: 'product', title: 'Launched the new pricing page' },
-            { date: isoDaysAgo(15), category: 'marketing', title: 'Newsletter: retention guide' },
-            { date: isoDaysAgo(6), category: 'algorithm_update', title: 'Google core update rolled out' },
-        ]) {
-            await admin('POST', '/api/annotations', { user_identifier: DEMO_USER_ID, property_id: property, ...a });
+        for (const n of DEMO_NOTES) {
+            await admin('POST', '/api/annotations', { user_identifier: DEMO_USER_ID, property_id: property, date: isoDaysAgo(n.daysAgo), category: n.category, title: n.title });
         }
     }
     const goals = await admin('GET', `/api/analytics/goals/definitions?user_identifier=${uid}&property_id=${encodeURIComponent(property)}`);

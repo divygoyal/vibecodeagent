@@ -5,6 +5,7 @@
  * concurrent requests per property; other features need some headroom).
  */
 import { cachedFetch } from '@/lib/apiCache';
+import { scopedFetch } from '@/lib/demo/sampleScope';
 
 const GA_DATA = 'https://analyticsdata.googleapis.com/v1beta';
 const GSC_BASE = 'https://www.googleapis.com/webmasters/v3';
@@ -50,7 +51,8 @@ async function withSlot<T>(asset: string, fn: () => Promise<T>): Promise<T> {
 }
 
 async function googleFetch(url: string, token: string, body?: unknown, method?: string): Promise<unknown> {
-    const res = await fetch(url, {
+    // scopedFetch: the global fetch, or the demo generator while the home page renders its sample rows.
+    const res = await scopedFetch()(url, {
         method: method ?? (body ? 'POST' : 'GET'),
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: body ? JSON.stringify(body) : undefined,

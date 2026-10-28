@@ -38,12 +38,14 @@ export function ImpactBars({ impact, className }: { impact: ActionImpact; classN
  * Each number shows once; the why, the suggested fix and the buttons open
  * under the row.
  */
-export function ActionRow({ action, site, onStatus, canSave = true, defaultOpen = false }: {
+export function ActionRow({ action, site, onStatus, canSave = true, defaultOpen = false, askLink }: {
     action: SiteActionWithStatus;
     site: { ga4: string | null; gsc: string | null; siteHost?: string | null };
     onStatus?: (status: ActionStatus, undo: ActionStatus) => void;
     canSave?: boolean;
     defaultOpen?: boolean;
+    /** Rewrites the Ask link (the home page's sample rows send it through the live demo). */
+    askLink?: (href: string) => string;
 }) {
     const [open, setOpen] = useState(defaultOpen);
     const [leaving, setLeaving] = useState(false);
@@ -109,7 +111,7 @@ export function ActionRow({ action, site, onStatus, canSave = true, defaultOpen 
                     </ol>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                         <Button asChild size="sm" variant="secondary" icon={Sparkles}>
-                            <Link href={askHref(action.askPrompt, site, 'site:actions')} title="Opens Ask with this question (uses 1 message)">Ask AI about this</Link>
+                            <Link href={(askLink ?? String)(askHref(action.askPrompt, site, 'site:actions'))} title="Opens Ask with this question (uses 1 message)">Ask AI about this</Link>
                         </Button>
                         {canSave && onStatus ? (
                             action.status === 'open' ? (
