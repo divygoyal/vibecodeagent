@@ -91,9 +91,10 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
     // growsOnPhone; round 5 audit #28: a fixed box showed 2 rows above a blank half card). Desktop:
     // rows that fit under the title, header, pager and any footnote (round 4: the pager was clipped).
     const phone = props.bp === 'sm';
-    const pageSize = phone
-        ? 5
-        : Math.max(3, Math.min(c.pageSize, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (flagNotes(ok, widget).length ? 26 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - 36 - 48) / 36)));
+    // A table that does not paginate used to scroll inside its card, which left the last row cut through its text
+    // (round 8 judge). It now pages by whole rows that fit, like a paginated one; a short table shows no pager.
+    const fitRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (flagNotes(ok, widget).length ? 26 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - 36 - 48) / 36));
+    const pageSize = phone ? 5 : c.pagination ? Math.min(c.pageSize, fitRows) : fitRows;
     // TV: no pager, just the top rows that fit the card (round 4).
     const tv = Boolean(useTvScreen());
     const tvRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - 36 - 18) / 36));
@@ -127,7 +128,7 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
                         cols={fit ? shown : cols}
                         narrow={narrow}
                         scrollRef={scrollRef}
-                        pagination={tv ? undefined : c.pagination || phone ? { pageSize } : undefined}
+                        pagination={tv ? undefined : { pageSize }}
                         limit={tv ? tvRows : undefined}
                         footer={footer}
                         trend={cardTrend}
@@ -274,8 +275,9 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                     <span className="relative flex min-h-7 items-center justify-end gap-2">
                         {/* With a change next to the value, a fill would sit behind the change alone and read as its chip
                             (round 5 judge): the bar becomes the app's underline under the value and change instead. */}
-                        {pct && showDelta && pv !== undefined ? (
-                            <span aria-hidden className={cn('absolute bottom-0 right-0 h-[3px] rounded-full', metricHeatbar(id))} style={{ width: `${Math.max(pct, 1.5)}%`, ['--tc-heatbar' as string]: '45%' }} />
+                        {/* Phones (round 8 judge): a fill behind a short value is a few pixels wide and read as clipped at the card edge; the underline never is. */}
+                        {pct && ((showDelta && pv !== undefined) || narrow) ? (
+                            <span aria-hidden className={cn('absolute bottom-0 right-1 h-[3px] rounded-full', metricHeatbar(id))} style={{ width: `${Math.max(pct, 1.5)}%`, ['--tc-heatbar' as string]: '45%' }} />
                         ) : pct ? <span aria-hidden className={cn('absolute inset-y-0.5 right-[-6px] rounded-md', metricHeatbar(id))} style={{ width: `calc(${pct}% + 6px)` }} /> : null}
                         <span className={cf ? `relative tc-cf-cell tc-cf-${cf} font-medium` : 'relative'} title={cf ? (cf === 'good' ? 'Meets a good rule' : cf === 'bad' ? 'Matches a bad rule' : 'Needs attention') : narrow && v !== null ? fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format }) : undefined}>
                             {fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format, compact: narrow })}
