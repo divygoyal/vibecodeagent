@@ -120,6 +120,8 @@ export const DEMO_API_RULES: RouteRule[] = [
     R('/api/dashboards/sites', READ),
     // The builder's widget queries are POSTs but only read (demo generator).
     R('/api/dashboards/query', { POST: 'allow' }),
+    // Round 9: realtime widget (reads the demo generator's realtime report).
+    R('/api/dashboards/realtime', { POST: 'allow' }),
     R('/api/dashboards/[id]', { GET: 'allow', PUT: 'deny', DELETE: 'deny' }),
     R('/api/dashboards/[id]/widget-data', READ),
     R('/api/dashboards/notes', READ),
@@ -131,6 +133,7 @@ export const DEMO_API_RULES: RouteRule[] = [
     R('/api/dashboards/public/[token]/query', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/widget-data', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/notes', PUBLIC_ALL),
+    R('/api/dashboards/public/[token]/realtime', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/unlock', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/copy', PUBLIC_ALL),
 

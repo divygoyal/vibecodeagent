@@ -19,6 +19,7 @@ import { useResolvedTheme } from '@/lib/theme';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { Choice, DimensionPicker, Field, MetricList, MetricPicker, NumberInput, SourcePicker, TextInput, Toggle, type SiteOption } from './Fields';
 import { ChartMarksEditor } from './ChartMarksEditor';
+import { RealtimeSetup } from './RealtimeProps';
 import { RulesEditor } from './RulesEditor';
 import { GrainControlProps, MetricControlProps, SearchTypeControlProps, SiteControlProps } from './SwitchControlProps';
 import { VariablesEditor } from './VariablesEditor';
@@ -230,6 +231,7 @@ function Setup({ widget, edit, sites, defaultLabel, doc }: { widget: WidgetDef; 
                 </>
             );
         }
+        case 'realtime': return <RealtimeSetup widget={widget} edit={edit} source={source} />;
         case 'portfolio-grid': {
             const c = widget.config;
             return (

@@ -23,6 +23,11 @@ export type ChartNotesSource =
 
 const Ctx = createContext<ChartNotesSource>({ kind: 'none' });
 
+/** The dashboard's source context (owner view / editor, share link, or none) for widgets that fetch their own data (round 9). */
+export function useChartSource(): ChartNotesSource {
+    return useContext(Ctx);
+}
+
 export function ChartNotesProvider({ value, children }: { value: ChartNotesSource; children: ReactNode }) {
     return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

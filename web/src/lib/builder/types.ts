@@ -528,9 +528,22 @@ export interface PortfolioGridConfig {
 }
 export type PortfolioGridWidget = WidgetBase<'portfolio-grid', PortfolioGridConfig>;
 
+// ── Round 9: live widgets (lib/builder/realtime.ts) ──
+export type RealtimeBreakdown = 'none' | 'country' | 'city' | 'page' | 'device';
+export interface RealtimeConfig {
+    /** The list under the number. GA4's Realtime API has no source dimension, so no "source" option. */
+    breakdown: RealtimeBreakdown;
+    /** Rows of the list. */
+    top: 3 | 5 | 8;
+    /** Mini bars, one per minute of the last 30. */
+    bars: boolean;
+}
+export type RealtimeWidget = WidgetBase<'realtime', RealtimeConfig>;
+
 export type WidgetDef =
     | ScorecardWidget | KpiStripWidget | TimeSeriesWidget | BarWidget | PieWidget | TableWidget
-    | GeoWidget | TextWidget | ImageWidget | SectionWidget | PortfolioGridWidget;
+    | GeoWidget | TextWidget | ImageWidget | SectionWidget | PortfolioGridWidget
+    | RealtimeWidget;
 
 export type WidgetType = WidgetDef['type'];
 

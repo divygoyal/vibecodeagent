@@ -1454,6 +1454,11 @@ export async function runGABatch(token: string, propertyId: string, requests: Re
     return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:batchRunReports`, token, { requests }, signal);
 }
 
+/** GA4 runRealtimeReport (last 30 minutes) with the full request body; one report per call (no batch exists). */
+export async function runGARealtime(token: string, propertyId: string, body: Record<string, unknown>, signal?: AbortSignal) {
+    return gaFetch(`${GA_DATA_BASE}/${cleanPropertyId(propertyId)}:runRealtimeReport`, token, body, signal);
+}
+
 /** Search Console searchAnalytics.query with the full request body (filters, dataState, paging). */
 export async function runGSCSearchAnalytics(token: string, siteUrl: string, body: Record<string, unknown>, signal?: AbortSignal) {
     return gaFetch(`${GSC_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, token, body, signal);

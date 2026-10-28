@@ -32,6 +32,8 @@ export interface WidgetMeta {
     phoneH: number;
     /** No data query (text, image, section). */
     static: boolean;
+    /** Round 9: not part of the page query either: the widget fetches its own live data (realtime). */
+    selfFetch?: boolean;
     keywords: string[];
 }
 
@@ -46,14 +48,21 @@ export const WIDGET_META: Record<WidgetType, WidgetMeta> = {
     text: { type: 'text', label: 'Text', description: 'Notes and headings in Markdown', icon: 'Type', group: 'Content', defaultSize: { w: 12, h: 2 }, minSize: { w: 2, h: 1 }, maxSize: { w: 12, h: 10 }, phoneH: 2, static: true, keywords: ['text', 'markdown', 'note', 'heading', 'paragraph'] },
     section: { type: 'section', label: 'Section header', description: 'A title and divider between groups', icon: 'Heading', group: 'Content', defaultSize: { w: 12, h: 2 }, minSize: { w: 12, h: 2 }, maxSize: { w: 12, h: 2 }, phoneH: 2, static: true, keywords: ['section', 'divider', 'header', 'title'] },
     image: { type: 'image', label: 'Image', description: 'A logo or picture from an https URL', icon: 'Image', group: 'Content', defaultSize: { w: 3, h: 5 }, minSize: { w: 1, h: 2 }, maxSize: { w: 12, h: 14 }, phoneH: 4, static: true, keywords: ['image', 'logo', 'picture', 'photo'] },
+    realtime: { type: 'realtime', label: 'Realtime', description: 'Who is online now: active users in the last 30 minutes, refreshed every minute', icon: 'Radio', group: 'Metrics', defaultSize: { w: 4, h: 9 }, minSize: { w: 3, h: 4 }, maxSize: { w: 8, h: 12 }, phoneH: 9, static: false, selfFetch: true, keywords: ['realtime', 'real-time', 'live', 'online now', 'active users', 'now'] },
     'portfolio-grid': { type: 'portfolio-grid', label: 'Portfolio grid', description: 'Every site as a card with deltas', icon: 'LayoutGrid', group: 'Portfolio', defaultSize: { w: 12, h: 9 }, minSize: { w: 4, h: 6 }, maxSize: { w: 12, h: 20 }, phoneH: 12, static: false, keywords: ['portfolio', 'sites', 'all sites', 'cards'] },
 };
 
-export const PALETTE_ORDER: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', 'table', 'geo', 'portfolio-grid', 'section', 'text', 'image'];
+export const PALETTE_ORDER: WidgetType[] = ['scorecard', 'kpi-strip', 'realtime', 'timeseries', 'bar', 'pie', 'table', 'geo', 'portfolio-grid', 'section', 'text', 'image'];
 export const PALETTE_GROUPS: PaletteGroup[] = ['Metrics', 'Charts', 'Tables and maps', 'Portfolio', 'Content'];
 
 export function widgetMeta(type: WidgetType): WidgetMeta {
     return WIDGET_META[type] ?? WIDGET_META.text;
+}
+
+/** True when the page query never asks Google for this widget (static content, or a widget that fetches its own live data). */
+export function skipsPageQuery(type: WidgetType): boolean {
+    const m = widgetMeta(type);
+    return m.static || Boolean(m.selfFetch);
 }
 
 // ── ids ──────────────────────────────────────────────────────────────────
@@ -148,6 +157,8 @@ export function defaultWidget(type: WidgetType, ctx: DefaultCtx, id: WidgetId = 
             return { ...base, type, showTitle: false, config: { title: 'Section', divider: true, align: 'left' } };
         case 'image':
             return { ...base, type, showTitle: false, config: { src: '', alt: '', fit: 'contain', radius: 'md' } };
+        case 'realtime':
+            return { ...base, type, title: 'Online now', config: { breakdown: 'country', top: 5, bars: true } };
         case 'portfolio-grid':
             return {
                 ...base, type, title: 'All sites',
@@ -194,6 +205,7 @@ export function widgetTitle(w: WidgetDef): string {
         case 'section': return w.config.title;
         case 'image': return w.config.alt || 'Image';
         case 'portfolio-grid': return 'All sites';
+        case 'realtime': return 'Online now';
     }
 }
 

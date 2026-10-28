@@ -104,6 +104,7 @@ export const widgetSchema = z.discriminatedUnion('type', [
     z.object({ ...base, type: z.literal('text'), config: z.looseObject({ markdown: z.string().max(20_000), role: z.enum(['heading', 'subheading', 'body', 'note', 'callout']) }) }),
     z.object({ ...base, type: z.literal('image'), config: z.looseObject({ src: httpsUrl, alt: z.string().max(300), fit: z.enum(['contain', 'cover']), href: httpsUrl.optional() }) }),
     z.object({ ...base, type: z.literal('section'), config: z.looseObject({ title: z.string().max(200), subtitle: z.string().max(300).optional(), divider: z.boolean() }) }),
+    z.object({ ...base, type: z.literal('realtime'), config: z.looseObject({ breakdown: z.enum(['none', 'country', 'city', 'page', 'device']), top: z.union([z.literal(3), z.literal(5), z.literal(8)]), bars: z.boolean() }) }),
     z.object({ ...base, type: z.literal('portfolio-grid'), config: z.looseObject({ metrics: z.array(metricRef).min(1).max(4), limit: z.number().int().min(1).max(500) }) }),
 ]);
 
