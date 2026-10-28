@@ -141,12 +141,14 @@ function Subtitle({ data, range, alerts = 0 }: { data: PortfolioResponse | undef
             true,
         ]);
     }
+    // Wrap between facts, never inside one; the dot ends the line before (lib/subtitleSegments).
+    const shown = parts.map(([p, phone]) => ({ p, phone }));
     return (
-        <span className="inline-flex flex-wrap items-center gap-x-1.5">
-            {parts.map(([p, phone], i) => (
-                <span key={i} className={cn('inline-flex items-center gap-1.5', !phone && 'max-md:hidden')}>
-                    {i > 0 ? <span aria-hidden className="text-fg-muted">·</span> : null}
-                    {p}
+        <span>
+            {shown.map(({ p, phone }, i) => (
+                <span key={i} className={cn(!phone && 'max-md:hidden')}>
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap max-sm:whitespace-normal">{p}</span>
+                    {i < shown.length - 1 ? <span aria-hidden className={cn('text-fg-muted', !shown.slice(i + 1).some((x) => x.phone) && 'max-md:hidden')}> ·</span> : null}{' '}
                 </span>
             ))}
         </span>

@@ -6,6 +6,8 @@ import { fmtDateRange } from '@/lib/format';
 import { Favicon } from '@/components/ui/Favicon';
 import { DateRangeControl, useDateRange } from '@/components/shell/DateRangeControl';
 import { PageHeader } from '@/components/shell/PageHeader';
+import { SubtitleSegments } from '@/components/shell/SubtitleSegments';
+import { subtitleSegments } from '@/lib/subtitleSegments';
 import { PeriodStepper } from './chart/ChartExtras';
 import { useSite } from './useSiteData';
 
@@ -43,7 +45,7 @@ export function SiteHeader({ section, source, search, both, actions, tabs, noRan
     const range = both && hasGa4 && hasGsc && (r.start !== s.start || r.end !== s.end)
         ? `Traffic ${fmtDateRange(r.start, r.end)} · Search ${fmtDateRange(s.start, s.end)}${dr.compareLabel ? ` · ${dr.compareLabel}` : ''}`
         : `${fmtDateRange(r.start, r.end)}${r.prevStart && r.prevEnd ? ` vs ${fmtDateRange(r.prevStart, r.prevEnd)}` : ''}`;
-    const facts = [source, noRange ? rangeNote : range].filter(Boolean);
+    const facts = subtitleSegments<ReactNode>([source, noRange ? rangeNote : range]);
     return (
         <PageHeader
             backHref={backHref}
@@ -54,7 +56,7 @@ export function SiteHeader({ section, source, search, both, actions, tabs, noRan
                     {section ? <span className="font-normal text-fg-muted"> · {section}</span> : null}
                 </>
             )}
-            subtitle={facts.length ? facts.map((f, i) => <span key={i}>{i > 0 ? ' · ' : ''}{f}</span>) : undefined}
+            subtitle={facts.length ? <SubtitleSegments items={facts} /> : undefined}
             actions={actions || !noRange ? (
                 <>
                     {actions}
