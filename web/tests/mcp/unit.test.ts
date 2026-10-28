@@ -18,7 +18,11 @@ import { outputJsonSchema, type ToolContext } from '@/lib/mcp/toolkit';
 import { gscSearchAnalytics } from '@/lib/mcp/tools/search';
 import { buildSiteRecords, resolveSite, brandTokens, type SiteCatalog } from '@/lib/mcp/siteResolver';
 import { ToolError } from '@/lib/mcp/errors';
-import { hitLimit, chargeUnits } from '@/lib/mcp/rateLimit';
+import { hitLimit, chargeUnits, isAnthropicEgress, perIpLimit } from '@/lib/mcp/rateLimit';
+import { GET as serverCard } from '@/app/.well-known/mcp/server-card.json/route';
+import { GET as registryAuth } from '@/app/.well-known/mcp-registry-auth/route';
+import { GET as glamaClaim } from '@/app/.well-known/glama.json/route';
+import { PROMPTS, serverInfo } from '@/lib/mcp/server';
 
 describe('PKCE', () => {
     test('RFC 7636 appendix B vector', () => {
@@ -296,5 +300,57 @@ describe('structured output', () => {
         assert.deepEqual(JSON.parse(j.text).rows, j.structured.rows, 'JSON text and structuredContent agree');
         assert.equal(j.structured.table, undefined);
         assert.ok(validate(schema, { ...j.structured, warnings: [] }));
+    });
+});
+
+describe('directory listing', () => {
+    test('Anthropic egress addresses get a larger per-IP limit', () => {
+        assert.equal(isAnthropicEgress('160.79.104.7'), true);
+        assert.equal(isAnthropicEgress('160.79.111.255'), true);
+        assert.equal(isAnthropicEgress('160.79.112.1'), false);
+        assert.equal(isAnthropicEgress('203.0.113.9'), false);
+        assert.equal(perIpLimit('160.79.105.1', 120), 3000);
+        assert.equal(perIpLimit('203.0.113.9', 120), 120);
+    });
+
+    test('every tool is read-only with a title (Claude directory rule)', () => {
+        for (const t of TOOLS) {
+            assert.ok(t.title.length > 0 && t.name.length <= 64, t.name);
+            assert.ok(t.description.length > 40, `${t.name} description`);
+        }
+    });
+
+    test('server card lists all tools and prompts with JSON Schema inputs', async () => {
+        const res = serverCard();
+        assert.equal(res.status, 200);
+        const card = await res.json() as { serverInfo: { name: string; icons: unknown[] }; authentication: { schemes: string[] }; tools: { name: string; inputSchema: { type: string }; annotations: { readOnlyHint: boolean } }[]; prompts: { name: string }[] };
+        assert.equal(card.serverInfo.name, 'trafficclaw');
+        assert.ok(card.serverInfo.icons.length >= 1);
+        assert.deepEqual(card.authentication.schemes, ['oauth2']);
+        assert.deepEqual(card.tools.map((t) => t.name), TOOLS.map((t) => t.name));
+        for (const t of card.tools) {
+            assert.equal(t.inputSchema.type, 'object', t.name);
+            assert.equal(t.annotations.readOnlyHint, true);
+        }
+        assert.deepEqual(card.prompts.map((p) => p.name), PROMPTS.map((p) => p.name));
+        assert.equal(serverInfo().websiteUrl.endsWith('/ai'), true);
+    });
+
+    test('registry and Glama proof files are 404 until configured', async () => {
+        delete process.env.MCP_REGISTRY_AUTH;
+        delete process.env.GLAMA_CLAIM_TOKEN;
+        assert.equal(registryAuth().status, 404);
+        assert.equal(glamaClaim().status, 404);
+        process.env.MCP_REGISTRY_AUTH = 'not a record';
+        assert.equal(registryAuth().status, 404);
+        process.env.MCP_REGISTRY_AUTH = 'v=MCPv1; k=ed25519; p=' + 'A'.repeat(43) + '=';
+        const ok = registryAuth();
+        assert.equal(ok.status, 200);
+        assert.equal(ok.headers.get('content-type'), 'text/plain; charset=utf-8');
+        assert.match(await ok.text(), /^v=MCPv1; k=ed25519; p=A{43}=\n$/);
+        process.env.GLAMA_CLAIM_TOKEN = 'glama_claim_abc123';
+        assert.deepEqual(await glamaClaim().json(), { $schema: 'https://glama.ai/mcp/schemas/connector.json', claim: 'glama_claim_abc123' });
+        delete process.env.MCP_REGISTRY_AUTH;
+        delete process.env.GLAMA_CLAIM_TOKEN;
     });
 });
