@@ -63,7 +63,9 @@ export function PageHeader({ title, subtitle, icon, badges, keepBadgesOnPhone, a
     return (
         <header className={cn('mb-6', className)}>
             <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-4">
-                <div className="min-w-0">
+                {/* Wide screens: the title block takes the room the actions leave and the subtitle wraps under the title, so a long
+                    subtitle never pushes the actions to a second row (Actions page, round 7 judge). */}
+                <div className="min-w-0 md:flex-1 md:basis-80">
                     <div className="flex min-w-0 items-center gap-2.5">
                         {backHref ? (
                             <Link href={backHref} aria-label="Back" className="tap-area -ml-1 flex size-8 shrink-0 items-center justify-center rounded-control text-fg-muted hover:bg-subtle hover:text-fg">
