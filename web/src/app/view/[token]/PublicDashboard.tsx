@@ -126,7 +126,8 @@ function PasswordGate({ token, name, onUnlocked }: { token: string; name: string
 
 function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string; pub: PublicDashboard; doc: DashboardDocV2; unlockKey: string | null; embed: boolean; dark?: boolean; tv?: { attrs: Record<string, string>; style?: React.CSSProperties; className?: string } }) {
     const allow = pub.share?.viewerControls ?? { date: false, compare: false, filters: false };
-    const ctl = useUrlControls(doc, allow, { publicKeys: true });
+    const defaultViewQuery = (doc as { defaultViewQuery?: string }).defaultViewQuery;
+    const ctl = useUrlControls(doc, allow, { publicKeys: true, defaultQuery: defaultViewQuery });
     const query = useMemo(() => {
         const q = new URLSearchParams();
         if (ctl.state.pageId) q.set('page', ctl.state.pageId);
@@ -222,6 +223,7 @@ function Loaded({ token, pub, doc, unlockKey, embed, dark, tv }: { token: string
                 footer={pub.share?.badge ? <div className="flex justify-center pt-2"><MadeWithTrafficClaw kind={embed ? 'embed' : 'view'} /></div> : null}
                 shell="inherit"
                 notes={notes}
+                views={embed ? undefined : { onApply: ctl.applyView, onReset: ctl.resetView, hasDefault: Boolean(defaultViewQuery), link: ctl.viewLink }}
             />
             {page.error ? <p className="mt-4 text-center text-body-sm text-fg-muted">{page.error instanceof Error ? page.error.message : 'Data is temporarily unavailable.'}</p> : null}
         </div>

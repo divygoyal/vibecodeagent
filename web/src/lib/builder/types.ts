@@ -272,6 +272,22 @@ export interface DashboardDocV2 {
      * compute (lib/builder/calc.ts), so widgets use it like any MetricId. Missing = none.
      */
     calcs?: CalculatedMetric[];
+    /**
+     * Saved views (round 9, savedViews.ts): named bookmarks of the viewer state (the URL query), kept in the
+     * doc so they need no table. Owner pages only: a share link never receives this list.
+     */
+    views?: SavedView[];
+    /** The view the dashboard opens on when the URL carries no state (id of one of `views`). */
+    defaultViewId?: string;
+}
+
+/** A named bookmark of the viewer's state: the query string a link to that view would carry (savedViews.ts). */
+export interface SavedView {
+    id: string;
+    /** 1-60 characters. */
+    name: string;
+    /** URL query without the leading '?': range, compare, page, f.*, x, s.*, m.*, g.*, t.*, d.*. */
+    query: string;
 }
 
 /** A named calculated metric: id 'calc:<op>_<format>_<better>:<A>[:<B>]:<token>' (calc.ts). */
@@ -576,7 +592,9 @@ export interface PublicDashboard {
     share?: Pick<ShareState, 'allowCopy' | 'badge' | 'viewerControls'>;
     rev?: number;
 }
-export type PublicDashboardDoc = Omit<DashboardDocV2, 'defaultSource' | 'widgets' | 'meta'> & {
+export type PublicDashboardDoc = Omit<DashboardDocV2, 'defaultSource' | 'widgets' | 'meta' | 'views' | 'defaultViewId'> & {
+    /** The owner's default view as a query the share allows (savedViews.ts publicDefaultQuery); missing = none. */
+    defaultViewQuery?: string;
     defaultSource: PublicSourceRef;
     widgets: Record<WidgetId, Omit<WidgetDef, 'source'> & { source: PublicSourceRef | { type: 'default' } }>;
     meta: Record<string, never>;

@@ -16,6 +16,7 @@ import { registerCalcs } from '@/lib/builder/calc';
 import { compareFromParam, compareToParam, rangeFromParam, rangeToParam } from '@/lib/builder/dates';
 import { dateControlOf, defaultControlState, viewerSwitchesFromQuery } from '@/lib/builder/publicDoc';
 import { viewerMayCompare } from '@/lib/builder/compare';
+import { effectiveParams, isStateKey, NO_DEFAULT_KEY, viewLink } from '@/lib/builder/savedViews';
 import { applyViewerControls, selectedSite } from '@/lib/builder/compile';
 import { drillDown, drillFromParams, drillInfo, drillKeyLabel, drillTo, drillToParam, keepDrillKey, resolveDrillValue } from '@/lib/builder/drill';
 import { dimLabel } from '@/lib/builder/catalog';
@@ -26,6 +27,7 @@ import type { ControlState, DashboardDocV2, DashboardQueryResponse, FilterContro
 import { DashboardCanvas, bpForWidth, type Bp } from './DashboardCanvas';
 import { ControlsBar, DateControl, PageTabs, switchSummary, ViewerSwitches, type OptionsSource, type ViewerSwitchHandlers } from './Controls';
 import { DashboardCover } from './DashboardCover';
+import { ViewsMenu, type ViewsHandlers } from './ViewsMenu';
 import { ChartNotesProvider, type ChartNotesSource } from './charts/chartNotes';
 import type { DrillView } from './widgets/DrillCrumbs';
 import { dimText } from './widgets/Charts';
@@ -34,9 +36,12 @@ import { dashRootProps } from './theme/DashTheme';
 import { WidgetRenderer } from './widgets/WidgetRenderer';
 
 /** Viewer state <-> URL. Only keys the viewer may change are read. */
-export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> & { widgets?: DashboardDocV2['widgets'] }, allow: { date: boolean; compare: boolean; filters: boolean }, opts: { publicKeys?: boolean } = {}) {
+export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> & { widgets?: DashboardDocV2['widgets'] }, allow: { date: boolean; compare: boolean; filters: boolean }, opts: { publicKeys?: boolean; defaultQuery?: string } = {}) {
     const publicKeys = Boolean(opts.publicKeys);
-    const sp = useSearchParams();
+    const rawSp = useSearchParams();
+    // Round 9: the default view's state stands in when the URL carries none (and moves into the URL on the first change).
+    const defaultQuery = opts.defaultQuery;
+    const sp = useMemo(() => effectiveParams(new URLSearchParams(rawSp.toString()), defaultQuery), [rawSp, defaultQuery]);
     const router = useRouter();
     const pathname = usePathname();
     const state = useMemo<ControlState>(() => {
@@ -87,8 +92,27 @@ export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> &
             if (v === null || v === '') next.delete(k);
             else next.set(k, v);
         }
+        // A viewer who cleared the default view's state keeps it cleared.
+        if (defaultQuery) {
+            const real = [...next.keys()].some((k) => k !== 'page' && k !== NO_DEFAULT_KEY && isStateKey(k));
+            if (real) next.delete(NO_DEFAULT_KEY);
+            else next.set(NO_DEFAULT_KEY, '0');
+        }
         router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-    }, [sp, router, pathname]);
+    }, [sp, router, pathname, defaultQuery]);
+    /** Opens a saved view: its state replaces the state keys of the URL (tv, embed and theme stay). */
+    const applyView = useCallback((query: string) => {
+        const next = new URLSearchParams(rawSp.toString());
+        for (const k of [...next.keys()]) if (isStateKey(k) && k !== 'page') next.delete(k);
+        for (const [k, v] of new URLSearchParams(query)) next.set(k, v);
+        router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+    }, [rawSp, router, pathname]);
+    /** Back to what the dashboard opens with: no state keys (the default view, when there is one, applies again). */
+    const resetView = useCallback(() => {
+        const next = new URLSearchParams(rawSp.toString());
+        for (const k of [...next.keys()]) if (isStateKey(k) && k !== 'page') next.delete(k);
+        router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+    }, [rawSp, router, pathname]);
 
     return {
         state,
@@ -108,6 +132,10 @@ export function useUrlControls(doc: Pick<DashboardDocV2, 'controls' | 'pages'> &
         setSearchType: (id: string, value: string | null) => set({ [`t.${id}`]: value }),
         /** Drill down (round 8): the values clicked so far on one widget (empty = back to its own dimension). */
         setDrill: (widgetId: string, path: string[]) => set({ [`d.${widgetId}`]: drillToParam(path) }),
+        applyView,
+        resetView,
+        /** The link to the viewer's current view (state keys only). */
+        viewLink: () => viewLink(window.location.origin, pathname, sp),
         query: sp,
     };
 }
@@ -180,10 +208,12 @@ export interface DashboardViewProps {
     switches?: ViewerSwitchHandlers;
     /** Round 7: where time series read chart notes (default: no markers). */
     notes?: ChartNotesSource;
+    /** Round 9: the Views menu (owner: save, apply, default; share viewers: copy a link to their view). */
+    views?: ViewsHandlers;
 }
 
 export function DashboardView({
-    doc, mode, siteLabel: defaultSiteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv, fitHeight, onVariable, onInteraction, onDrill, switches, notes,
+    doc, mode, siteLabel: defaultSiteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv, fitHeight, onVariable, onInteraction, onDrill, switches, notes, views,
 }: DashboardViewProps) {
     // Names of the dashboard's calculated metrics, before any widget or the cover renders (round 7).
     registerCalcs(doc.calcs);
@@ -304,6 +334,7 @@ export function DashboardView({
                         resolved={data?.resolved}
                         size={bp === 'sm' ? 'sm' : 'md'}
                     />
+                    {views ? <ViewsMenu handlers={views} size={bp === 'sm' ? 'sm' : 'md'} /> : null}
                     {switches ? <ViewerSwitches controls={doc.controls} state={state} handlers={switches} defaultSiteLabel={defaultSiteLabel} size={bp === 'sm' ? 'sm' : 'md'} kinds={['metric', 'grain', 'searchType']} /> : null}
                     {editableVars.map((v) => <VariableInput key={v.id} control={v} value={variableValues([v], state)[v.id]} onChange={(val) => onVariable!(v.id, val)} />)}
                 </ControlsBar>

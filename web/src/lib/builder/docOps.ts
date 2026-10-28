@@ -18,7 +18,11 @@ export function resetSources(doc: DashboardDocV2, defaultSource: DashboardDocV2[
     // Site switchers (round 7) list the old owner's site ids: a copy starts on "all my sites", owner-only.
     const controls = doc.controls.map((c) => (c.type === 'filter' && c.source ? { ...c, source: undefined }
         : c.type === 'site' ? { id: c.id, type: 'site' as const, label: c.label, options: 'all' as const, default: '', scope: c.scope, viewerCanChange: false } : c));
-    return { ...doc, defaultSource, widgets, controls, meta: { createdFrom: doc.meta.createdFrom } };
+    // Saved views (round 9) hold the old owner's site ids and drilled values: a copy starts without them.
+    const { views: _views, defaultViewId: _default, ...rest } = doc;
+    void _views;
+    void _default;
+    return { ...rest, defaultSource, widgets, controls, meta: { createdFrom: doc.meta.createdFrom } };
 }
 
 export function pageOf(doc: DashboardDocV2, widgetId: string): PageDef | undefined {
