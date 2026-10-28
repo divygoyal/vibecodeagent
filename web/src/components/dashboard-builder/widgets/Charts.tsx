@@ -96,7 +96,9 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
     }) : [];
     // Plain text, so it ellipsises on phones (numbers match the glyphs on the chart; the tooltip has the details).
     const footnoteText = marks.map((m) => `${m.n} ${m.label}`).join(' · ');
-    const footnote = marks.length ? {
+    // An empty (all-zero) chart draws no markers, so it lists none either.
+    const emptySeries = !breakdown && rows.length > 0 && rows.every((r) => !r[`m:${c.series[0]?.metric.id}`]);
+    const footnote = marks.length && !emptySeries ? {
         text: `${hidden ? `${hidden} earlier marker${hidden === 1 ? '' : 's'} not shown · ` : ''}${marks.map((m) => `${m.n} ${m.label} (${fmtDay(m.date)})`).join(' · ')}`,
         node: footnoteText,
     } : undefined;
