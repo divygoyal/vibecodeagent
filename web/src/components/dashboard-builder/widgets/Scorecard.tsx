@@ -38,7 +38,7 @@ function Tile({ m, total, spark, showDelta, showSpark, sparkHeight, big, cmp, cu
     const dates = spark?.rows.map((r) => String(r['d:date'] ?? '')) ?? [];
     const label = m.label || metricLabel(m.id);
     return (
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="@container/tile flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex min-w-0 items-center gap-2">
                 <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: metricColor(m.id) }} />
                 <span className="truncate text-body-sm font-medium text-fg-secondary">{label}</span>
@@ -114,7 +114,7 @@ export function ScorecardView(props: WidgetViewProps<ScorecardWidget>) {
                         m={{ ...c.metric, label: c.metric.label || (widget.showTitle !== false ? widget.title : undefined) }}
                         total={ok?.parts.total} spark={ok?.parts.spark}
                         showDelta={c.comparison.show && props.compare !== 'none'}
-                        chip={<DateChip widget={widget} dates={props.dates} />}
+                        chip={<DateChip widget={widget} dates={props.dates} tile />}
                         sparkHeight={Math.max(28, Math.min(72, height - (target ? 176 : 120)))} showSpark={c.sparkline.show && (!target || height >= 200)} big={height >= 220} cmp={cmpOf(props)} currency={ok?.flags.currency} missing={missing}
                     />
                     {target ? <TargetBar metricId={c.metric.id} value={typeof totalRaw === 'number' ? totalRaw : null} target={target.value} label={target.label} currency={ok?.flags.currency} /> : null}
@@ -158,7 +158,7 @@ export function KpiStripView(props: WidgetViewProps<KpiStripWidget>) {
                                 <Tile
                                     m={m} total={ok?.parts.total} spark={ok?.parts.spark}
                                     // Without a title the chip sits on the first tile (it speaks for the whole strip).
-                                    chip={i === 0 && !(widget.showTitle && widget.title) ? <DateChip widget={widget} dates={props.dates} /> : undefined}
+                                    chip={i === 0 && !(widget.showTitle && widget.title) ? <DateChip widget={widget} dates={props.dates} tile /> : undefined}
                                     showDelta={c.comparison.show && props.compare !== 'none'} showSpark={c.sparkline.show && (phone ? false : height >= 170)} wrapCompare={phone}
                                     compareLine={phone || !(widget.showTitle && widget.title) || height >= 150}
                                     sparkHeight={28} cmp={cmpOf(props)} currency={ok?.flags.currency}
