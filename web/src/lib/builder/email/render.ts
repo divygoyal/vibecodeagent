@@ -61,7 +61,7 @@ export function renderReportHtml(m: DigestModel, o: ReportRenderOptions): string
 <tr><td style="padding:18px 24px 4px 24px;">
 ${m.pages.length > 1 ? `<div style="font:600 15px/20px ${FONT};color:${INK};margin:0 0 6px 0;">${esc(p.title)}</div>` : ''}
 ${kpiGrid(p.kpis)}
-${p.charts.map((c) => `<div style="margin:12px 0 0 0;"><img src="${esc(c.imageUrl)}" width="${Math.min(c.width, 552)}" alt="${esc(c.alt)}" style="display:block;width:100%;max-width:552px;height:auto;border:1px solid ${LINE};border-radius:10px;"></div>`).join('')}
+${p.charts.map((c) => `<div style="margin:12px 0 0 0;"><img src="${esc(c.imageUrl)}" width="${Math.min(c.width, 552)}" alt="${esc(c.alt)}" style="display:block;box-sizing:border-box;width:100%;max-width:552px;height:auto;border:1px solid ${LINE};border-radius:10px;"></div>`).join('')}
 </td></tr>`).join('');
     const preheader = m.pages.flatMap((p) => p.kpis).slice(0, 3).map((k) => `${k.label} ${k.value}${k.delta ? ` (${k.delta.dir === 'down' ? '-' : k.delta.dir === 'up' ? '+' : ''}${k.delta.text.replace(/^[-+]/, '')})` : ''}`).join(' · ');
 

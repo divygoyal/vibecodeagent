@@ -55,13 +55,14 @@ export interface Classified {
     blocked: string[];
 }
 
-export function classifyRecipients(recipients: string[], ownerEmail: string | null | undefined, state: ScheduleState): Classified {
+export function classifyRecipients(recipients: string[], ownerEmail: string | null | undefined, state: ScheduleState, declinedByOwner: ReadonlySet<string> = new Set()): Classified {
     const owner = ownerEmail?.trim().toLowerCase();
     const out: Classified = { eligible: [], ask: [], waiting: [], blocked: [] };
     for (const r of recipients) {
         const e = r.toLowerCase();
         const st: RecipientState | undefined = state.recipients?.[e];
         if (st?.status === 'unsubscribed' || st?.status === 'declined') out.blocked.push(e);
+        else if (declinedByOwner.has(e) && e !== owner && st?.status !== 'confirmed') out.blocked.push(e);
         else if (owner && e === owner) out.eligible.push(e);
         else if (st?.status === 'confirmed') out.eligible.push(e);
         else if (st?.status === 'pending') out.waiting.push(e);
@@ -75,6 +76,19 @@ export const allowedByCap = (want: number, alreadyToday: number, cap: number): n
 
 const sentOn = (rows: ScheduleRow[], ownerUserId: number, day: string) =>
     rows.filter((r) => r.ownerUserId === ownerUserId).reduce((n, r) => n + (r.schedule.state.sent?.[day] ?? 0), 0);
+
+/**
+ * Addresses that answered "No" on any of this owner's dashboards: the owner is never allowed to ask them again,
+ * on any dashboard (a stranger who said "I do not know this person" is not asked by the next dashboard).
+ */
+export function declinedByOwner(rows: ScheduleRow[], ownerUserId: number): Set<string> {
+    const out = new Set<string>();
+    for (const r of rows) {
+        if (r.ownerUserId !== ownerUserId) continue;
+        for (const [e, st] of Object.entries(r.schedule.state.recipients ?? {})) if (st.status === 'declined') out.add(e);
+    }
+    return out;
+}
 
 const confirmsOn = (rows: ScheduleRow[], ownerUserId: number, day: string) =>
     rows.filter((r) => r.ownerUserId === ownerUserId).reduce((n, r) => n + Object.values(r.schedule.state.recipients ?? {}).filter((x) => x.confirmSentAt?.startsWith(day)).length, 0);
@@ -107,7 +121,7 @@ export async function sendConfirmation(deps: RunnerDeps, row: ScheduleRow, confi
 export async function confirmNewRecipients(deps: RunnerDeps, row: ScheduleRow, config: EmailScheduleConfig): Promise<Record<string, ConfirmOutcome | 'waiting' | 'blocked'>> {
     const all = await deps.store.listScheduled(row.ownerIdentifier ?? row.ownerEmail ?? undefined);
     const fresh = all.find((r) => r.dashboardId === row.dashboardId) ?? row;
-    const cls = classifyRecipients(config.recipients, row.ownerEmail, fresh.schedule.state);
+    const cls = classifyRecipients(config.recipients, row.ownerEmail, fresh.schedule.state, declinedByOwner(all, row.ownerUserId));
     const today = utcDay(deps.now);
     let confirmed = confirmsOn(all, row.ownerUserId, today);
     const out: Record<string, ConfirmOutcome | 'waiting' | 'blocked'> = {};
@@ -161,7 +175,7 @@ export async function runDueSchedules(deps: RunnerDeps): Promise<RunSummary> {
             item.window = due.windowKey;
             summary.due++;
 
-            const cls = classifyRecipients(config.recipients, row.ownerEmail, row.schedule.state);
+            const cls = classifyRecipients(config.recipients, row.ownerEmail, row.schedule.state, declinedByOwner(rows, row.ownerUserId));
             item.skipped.push(...cls.blocked.map((e) => `${e}: unsubscribed or declined`), ...cls.waiting.map((e) => `${e}: waiting for confirmation`));
 
             // Claim first: from here two runs cannot both send this window.

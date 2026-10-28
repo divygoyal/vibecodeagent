@@ -203,6 +203,18 @@ test('a declined or unsubscribed address is never asked again or mailed', async 
     assert.ok(r.items[0].skipped.some((s) => s.startsWith('no@example.com')));
 });
 
+test('a "No" on one dashboard stops every dashboard of that owner from asking the same address again', async () => {
+    const a = row('d1', config({ recipients: ['owner@example.com', 'stranger@example.com'] }), {}, { recipients: { 'stranger@example.com': { status: 'declined' } } });
+    const b = row('d2', config({ recipients: ['owner@example.com', 'stranger@example.com'] }));
+    const other = row('d3', config({ recipients: ['stranger@example.com'] }), { ownerUserId: 2, ownerIdentifier: 'gh-2', ownerEmail: 'someone@example.com' });
+    const { deps, transport } = setup([a, b, other]);
+    await runDueSchedules(deps);
+    const toStranger = transport.sent.filter((m) => m.to === 'stranger@example.com');
+    assert.deepEqual(toStranger.map((m) => `${m.dashboardId}:${m.kind}`), ['d3:confirm'], 'only another owner may still ask');
+    const out = await confirmNewRecipients(deps, b, config({ recipients: ['stranger@example.com'] }));
+    assert.equal(out['stranger@example.com'], 'blocked');
+});
+
 test('forged, expired or wrong-secret links do nothing', async () => {
     const { store, deps } = setup([row('d1', config({ recipients: ['owner@example.com', 'x@example.com'] }), {}, { recipients: { 'x@example.com': { status: 'pending' } } })]);
     const { linkToken } = await import('@/lib/builder/email/tokens');

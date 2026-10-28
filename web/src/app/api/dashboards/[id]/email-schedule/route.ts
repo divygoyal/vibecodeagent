@@ -3,7 +3,7 @@ import { clientIp, rateLimited, sessionUserId } from '@/lib/builder/server/acces
 import { jsonError } from '@/lib/builder/server/service';
 import { getDashboard, StoreError, toRecord } from '@/lib/builder/server/store';
 import { emailOrigin } from '@/lib/builder/email/digest';
-import { classifyRecipients, confirmNewRecipients, type ConfirmOutcome } from '@/lib/builder/email/runner';
+import { classifyRecipients, confirmNewRecipients, declinedByOwner, type ConfirmOutcome } from '@/lib/builder/email/runner';
 import { nextOccurrence, readConfig, validateSchedule } from '@/lib/builder/email/schedule';
 import { AdminScheduleStore } from '@/lib/builder/email/store';
 import { chooseTransport } from '@/lib/builder/email/transport';
@@ -15,14 +15,14 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export type RecipientView = 'owner' | 'confirmed' | 'pending' | 'declined' | 'unsubscribed' | 'not_asked';
 
-function viewOf(recipients: string[], ownerEmail: string | null, state: ScheduleState): Record<string, RecipientView> {
+function viewOf(recipients: string[], ownerEmail: string | null, state: ScheduleState, declined: ReadonlySet<string> = new Set()): Record<string, RecipientView> {
     const owner = ownerEmail?.toLowerCase();
-    const cls = classifyRecipients(recipients, ownerEmail, state);
+    const cls = classifyRecipients(recipients, ownerEmail, state, declined);
     const out: Record<string, RecipientView> = {};
     for (const e of cls.eligible) out[e] = e === owner ? 'owner' : 'confirmed';
     for (const e of cls.waiting) out[e] = 'pending';
     for (const e of cls.ask) out[e] = 'not_asked';
-    for (const e of cls.blocked) out[e] = state.recipients?.[e]?.status === 'declined' ? 'declined' : 'unsubscribed';
+    for (const e of cls.blocked) out[e] = state.recipients?.[e]?.status === 'unsubscribed' ? 'unsubscribed' : 'declined';
     return out;
 }
 
@@ -32,14 +32,16 @@ export async function GET(_req: Request, { params }: Ctx) {
     if (!userId) return jsonError(401, 'Unauthorized');
     const { id } = await params;
     try {
-        const info = await new AdminScheduleStore().get(userId, id);
+        const store = new AdminScheduleStore();
+        const info = await store.get(userId, id);
         if (!info) return jsonError(404, 'Dashboard not found');
         const config = info.schedule ? readConfig(info.schedule.config) : null;
         const state = info.schedule?.state ?? {};
+        const declined = config ? declinedByOwner(await store.listScheduled(userId), info.ownerUserId) : new Set<string>();
         return NextResponse.json({
             config,
             ownerEmail: info.ownerEmail,
-            recipients: config ? viewOf(config.recipients, info.ownerEmail, state) : {},
+            recipients: config ? viewOf(config.recipients, info.ownerEmail, state, declined) : {},
             last: state.last ?? null,
             next: config?.enabled ? nextOccurrence(config, Date.now())?.windowKey ?? null : null,
             shared: Boolean(info.shareToken),
@@ -88,9 +90,10 @@ export async function PUT(req: Request, { params }: Ctx) {
             confirmations = await confirmNewRecipients({ now: Date.now(), store, transport: chooseTransport(), origin: emailOrigin(), buildDigest: async () => { throw new Error('not used'); } }, row, v.value);
         }
         const after = (await store.get(userId, id))?.schedule?.state ?? state;
+        const declined = declinedByOwner(await store.listScheduled(userId), info.ownerUserId);
         return NextResponse.json({
             config: v.value,
-            recipients: viewOf(v.value.recipients, info.ownerEmail, after),
+            recipients: viewOf(v.value.recipients, info.ownerEmail, after, declined),
             confirmations,
             next: v.value.enabled ? nextOccurrence(v.value, Date.now())?.windowKey ?? null : null,
         });
