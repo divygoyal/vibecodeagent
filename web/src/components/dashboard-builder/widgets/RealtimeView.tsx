@@ -8,13 +8,13 @@ import { EmptyState } from '@/components/ui';
 import { metricColor } from '@/lib/builder/catalog';
 import { countryName } from '@/lib/builder/countries';
 import {
-    ageLabel, normalizeRealtimeConfig, REALTIME_MINUTES, realtimeBreakdownLabel, realtimeFrameResult, realtimeRows,
-    type RealtimeSnapshot,
+    ageLabel, normalizeRealtimeConfig, REALTIME_MINUTES, realtimeBreakdownLabel, realtimeFailureView, realtimeFrameResult, realtimeRows,
+    type RealtimeResponse, type RealtimeSnapshot,
 } from '@/lib/builder/realtime';
 import type { RealtimeWidget, WidgetResult } from '@/lib/builder/types';
 import { useChartSource } from '../charts/chartNotes';
 import { useRealtime } from '../useRealtime';
-import { WidgetFrame, type WidgetViewProps } from './WidgetFrame';
+import { WidgetError, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { dsKey } from './metricUi';
 
 const USERS = 'ga4:activeUsers';
@@ -72,6 +72,31 @@ function LiveBadge({ stale }: { stale: boolean }) {
     );
 }
 
+/**
+ * The card's error state: one plain sentence (and Try again). The technical line is for the owner only, behind a
+ * "Details" toggle; a public link never carries it.
+ */
+export function RealtimeError({ failure, owner, onRetry }: { failure: Extract<RealtimeResponse, { status: 'error' }>; owner: boolean; onRetry?: () => void }) {
+    const [open, setOpen] = useState(false);
+    const result = realtimeFrameResult(failure);
+    const detail = owner ? failure.detail : undefined;
+    return (
+        <div className="flex h-full min-h-0 flex-col" data-testid="rt-error">
+            <div className="min-h-0 flex-1">
+                {result.status === 'error' ? <WidgetError result={result} onRetry={onRetry} compact /> : null}
+            </div>
+            {detail ? (
+                <div className="shrink-0 pb-1 text-center">
+                    <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="rounded-md px-1.5 py-0.5 text-meta font-medium text-fg-muted hover:bg-subtle hover:text-fg" data-testid="rt-details-toggle" data-pdf-ignore="true">
+                        {open ? 'Hide details' : 'Details'}
+                    </button>
+                    {open ? <p className="mx-auto mt-1 max-w-full break-words rounded-control bg-surface-sunken px-2 py-1 text-left font-mono text-caption text-fg-muted" data-testid="rt-detail">{detail}</p> : null}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 export function RealtimeView(props: WidgetViewProps<RealtimeWidget>) {
     const { widget, height } = props;
     const cfg = normalizeRealtimeConfig(widget.config);
@@ -87,12 +112,11 @@ export function RealtimeView(props: WidgetViewProps<RealtimeWidget>) {
     }, [onScreen]);
 
     const response = rt.data;
+    const owner = src.kind === 'owner';
     const snap: RealtimeSnapshot | undefined = response?.status === 'ok' ? response.snapshot : undefined;
-    const result: WidgetResult | undefined = useMemo(() => {
-        if (response) return realtimeFrameResult(response);
-        if (rt.error) return { status: 'error', code: 'UPSTREAM', message: rt.error.message || 'Could not load who is online.', retryable: true };
-        return undefined;
-    }, [response, rt.error]);
+    // Never the raw error string: the server's error answers are plain already, and a failed request is turned into one.
+    const failure = useMemo(() => (snap && !rt.error ? undefined : realtimeFailureView(response, rt.error, { owner })), [response, rt.error, owner, snap]);
+    const result: WidgetResult | undefined = useMemo(() => (response?.status === 'ok' ? realtimeFrameResult(response) : undefined), [response]);
     // A failed refresh keeps the last numbers on screen and says so.
     const refreshFailed = Boolean(snap && rt.error);
 
@@ -115,6 +139,8 @@ export function RealtimeView(props: WidgetViewProps<RealtimeWidget>) {
             <div ref={watch} className="flex h-full min-h-0 flex-col gap-3" data-realtime={snap ? 'ready' : 'loading'}>
                 {!rt.enabled ? (
                     <EmptyState variant="inline" title="Live data shows on your dashboards" description={src.kind === 'none' ? 'Open this dashboard to see who is online.' : undefined} />
+                ) : failure && !snap ? (
+                    <RealtimeError failure={failure} owner={owner} onRetry={failure.retryable ? rt.retry : undefined} />
                 ) : snap ? (
                     <>
                         <div className="flex items-end gap-3">

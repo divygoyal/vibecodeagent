@@ -17,7 +17,7 @@ import { GoogleBreakerOpenError, reportGoogleOutcome, withGoogleSlot } from '@/l
 import { applyViewerControls, canonicalJson, widgetFilters } from '../compile';
 import {
     mergeRaw, normalizeRealtimeConfig, parsePerMinute, parseRows, parseTotal, publicResultKey, REALTIME_BREAKDOWNS,
-    REALTIME_MAX_SITES, REALTIME_MINUTES, REALTIME_OWNER_TTL_MS, REALTIME_PUBLIC_TTL_MS, snapshotKey, splitRealtimeFilters,
+    REALTIME_MAX_SITES, REALTIME_MINUTES, REALTIME_OWNER_TTL_MS, REALTIME_PUBLIC_TTL_MS, REALTIME_QUOTA_TEXT, REALTIME_UPSTREAM_TEXT, snapshotKey, splitRealtimeFilters,
     type RawSnapshot, type RealtimeResponse,
 } from '../realtime';
 import type { ControlDef, ControlState, DashboardDocV2, RealtimeWidget, SourceRef, WidgetErrorCode } from '../types';
@@ -69,8 +69,8 @@ const TEXT: Partial<Record<WidgetErrorCode, string>> = {
     NOT_CONNECTED: 'Connect Google to see this data.',
     NO_ACCESS: 'You no longer have access to this site. Choose another site.',
     NO_GA4_SOURCE: 'Link a Google Analytics property to this site to see who is online.',
-    QUOTA: 'Google is rate limiting this property. Try again in a minute.',
-    UPSTREAM: 'Google did not answer. Try again.',
+    QUOTA: REALTIME_QUOTA_TEXT,
+    UPSTREAM: REALTIME_UPSTREAM_TEXT,
     INVALID: 'This widget is not set up correctly.',
     UNSUPPORTED_FOR_PORTFOLIO: `Choose up to ${REALTIME_MAX_SITES} sites to see who is online across them.`,
 };
@@ -86,14 +86,19 @@ function statusOf(err: unknown): number {
     return Number(/Google API error (\d{3})/.exec(msg)?.[1] ?? 0);
 }
 
-function classify(err: unknown): Fail {
-    if (err instanceof GoogleBreakerOpenError) return fail('QUOTA', undefined, { retryAfterSec: err.retryAfterSec });
+/**
+ * Plain answer for a Google failure. The technical line (Google's status and message) goes in `detail`, and only for the
+ * owner's own views: public answers never carry it (they are shared by every viewer of the link).
+ */
+function classify(err: unknown, mode: 'owner' | 'public' = 'public'): Fail {
     const msg = err instanceof Error ? err.message : String(err);
     const status = statusOf(err);
-    if (status === 429 || /RESOURCE_EXHAUSTED/.test(msg)) return fail('QUOTA', undefined, { retryAfterSec: 60 });
-    if (status === 401) return fail('NOT_CONNECTED', 'Google sign-in expired. Reconnect Google.');
-    if (status === 403) return fail('NO_ACCESS');
-    return fail('UPSTREAM');
+    const detail = mode === 'owner' ? { detail: `${status ? `Google answered ${status}` : 'Google call failed'}: ${msg.replace(/\s+/g, ' ').slice(0, 160)}` } : {};
+    if (err instanceof GoogleBreakerOpenError) return fail('QUOTA', undefined, { retryAfterSec: err.retryAfterSec, ...detail });
+    if (status === 429 || /RESOURCE_EXHAUSTED/.test(msg)) return fail('QUOTA', undefined, { retryAfterSec: 60, ...detail });
+    if (status === 401) return fail('NOT_CONNECTED', 'Google sign-in expired. Reconnect Google.', detail);
+    if (status === 403) return fail('NO_ACCESS', undefined, detail);
+    return fail('UPSTREAM', undefined, detail);
 }
 
 /** Error answers live shorter than data; the number is 5 s for the owner and 15 s on public links. */
@@ -203,7 +208,7 @@ export async function evaluateRealtime(
     try {
         dir = deps.loadDirectory ? await deps.loadDirectory(token) : await loadSiteDirectory(deps.userId, token);
     } catch (err) {
-        return classify(err);
+        return classify(err, deps.mode);
     }
     const defaultSource: SourceRef = input.defaultSource.type === 'default' ? { type: 'portfolio', include: 'all' } : input.defaultSource;
     const src = !widget.source || widget.source.type === 'default' ? defaultSource : widget.source;
@@ -253,7 +258,7 @@ export async function evaluateRealtime(
             },
         };
     } catch (err) {
-        return { ...classify(err), sourceLabel: resolved.label };
+        return { ...classify(err, deps.mode), sourceLabel: resolved.label };
     }
 }
 

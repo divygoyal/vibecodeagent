@@ -25,8 +25,12 @@ import {
 } from '@/lib/builder/server/realtime';
 import {
     mergeRaw, normalizeRealtimeConfig, parsePerMinute, parseRows, parseTotal, publicRealtimeQuery, publicResultKey, realtimeFrameResult, realtimeRows,
-    snapshotKey, splitRealtimeFilters, REALTIME_MINUTES, REALTIME_PUBLIC_TTL_MS,
+    realtimeFailureView, realtimeHttpError, snapshotKey, splitRealtimeFilters, REALTIME_MINUTES, REALTIME_PUBLIC_TTL_MS, REALTIME_QUOTA_TEXT, REALTIME_UPSTREAM_TEXT,
 } from '@/lib/builder/realtime';
+import { QueryHttpError } from '@/components/dashboard-builder/useWidgetData';
+import { RealtimeError } from '@/components/dashboard-builder/widgets/RealtimeView';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import type { ControlDef, ControlState, DashboardDocV2, RealtimeWidget, SiteControl, WidgetDef } from '@/lib/builder/types';
 
 const calls: Array<{ url: string; body: any }> = [];
@@ -195,6 +199,81 @@ test('realtime: the page query makes no Google call for it', async () => {
     const res = await evaluateWidgets({ widgets: [{ widget: w as WidgetDef }], defaultSource: { type: 'site', siteId: ACME }, controlDefs: [], controls: state() }, { userId: 'u1', getToken: async () => TOKEN, mode: 'owner' });
     assert.equal(res.results.w_only.status, 'ok');
     assert.equal(calls.length, 0);
+});
+
+// ── errors in plain words ──
+
+test('realtime errors: a failed request reads as one plain sentence, never the raw text; the detail is the owner\'s only', () => {
+    const boom = new QueryHttpError(500, 'boom');
+    const o = realtimeHttpError(boom, { owner: true });
+    assert.equal(o.message, REALTIME_UPSTREAM_TEXT);
+    assert.equal(o.message, "Couldn't load live data from Google Analytics. Retrying…");
+    assert.equal(o.retryable, true);
+    assert.equal(o.detail, 'HTTP 500: boom');
+    const p = realtimeHttpError(boom, { owner: false });
+    assert.equal(p.message, REALTIME_UPSTREAM_TEXT);
+    assert.equal(p.detail, undefined);
+    assert.doesNotMatch(JSON.stringify(p), /boom|500/);
+    // a network failure
+    const net = realtimeHttpError(new TypeError('Failed to fetch'), { owner: true });
+    assert.equal(net.message, REALTIME_UPSTREAM_TEXT);
+    assert.match(net.detail ?? '', /Network error.*Failed to fetch/);
+    assert.doesNotMatch(realtimeHttpError(new TypeError('Failed to fetch'), { owner: false }).message, /fetch/i);
+    // the statuses that will not fix themselves do not say "Retrying"
+    for (const [status, code] of [[401, 'NOT_CONNECTED'], [403, 'NO_ACCESS'], [404, 'UPSTREAM']] as const) {
+        const e = realtimeHttpError(new QueryHttpError(status, 'raw server words'), { owner: false });
+        assert.equal(e.code, code);
+        assert.equal(e.retryable, false);
+        assert.doesNotMatch(e.message, /Retrying|raw server words/);
+    }
+    const limited = realtimeHttpError(new QueryHttpError(429, 'Too many requests. Slow down a little.'), { owner: false });
+    assert.equal(limited.code, 'QUOTA');
+    assert.equal(limited.retryAfterSec, 60);
+    assert.doesNotMatch(limited.message, /Slow down a little/);
+    assert.equal(realtimeFailureView(undefined, undefined, { owner: true }), undefined);
+    // the server's own error answers pass through, minus the detail for everyone but the owner
+    const answer = { status: 'error' as const, code: 'UPSTREAM' as const, message: REALTIME_UPSTREAM_TEXT, retryable: true, detail: 'Google answered 500: x' };
+    assert.equal(realtimeFailureView(answer, undefined, { owner: true })?.detail, 'Google answered 500: x');
+    assert.equal(realtimeFailureView(answer, undefined, { owner: false })?.detail, undefined);
+});
+
+test('realtime errors: the card shows the plain message and a Details toggle only to the owner', () => {
+    const f = { status: 'error' as const, code: 'UPSTREAM' as const, message: REALTIME_UPSTREAM_TEXT, retryable: true, detail: 'HTTP 500: boom' };
+    const ownerHtml = renderToStaticMarkup(createElement(RealtimeError, { failure: f, owner: true, onRetry: () => undefined }));
+    assert.match(ownerHtml, /Couldn&#x27;t load live data from Google Analytics\. Retrying…/);
+    assert.match(ownerHtml, /data-testid="rt-details-toggle"/);
+    assert.doesNotMatch(ownerHtml, /boom/, 'the detail stays closed until the owner opens it');
+    const publicHtml = renderToStaticMarkup(createElement(RealtimeError, { failure: f, owner: false, onRetry: () => undefined }));
+    assert.match(publicHtml, /Retrying/);
+    assert.doesNotMatch(publicHtml, /Details|boom|rt-detail/);
+});
+
+test('realtime errors: Google failures answer plainly; the technical line is added for the owner, never for a public link', async () => {
+    reset();
+    const failing = (status: number) => async () => { throw new Error(`Google API error ${status}: backend said no (properties/12345)`); };
+    for (const [status, text] of [[500, REALTIME_UPSTREAM_TEXT], [429, REALTIME_QUOTA_TEXT]] as const) {
+        reset();
+        const o = await evaluateRealtime(ctx(rt()), { ...owner('u1'), report: failing(status) });
+        assert.equal(o.status, 'error');
+        if (o.status === 'error') {
+            assert.equal(o.message, text);
+            assert.match(o.detail ?? '', new RegExp(`Google answered ${status}`));
+        }
+        reset();
+        const p = await evaluateRealtime(ctx(rt()), { ...owner('u1'), mode: 'public', report: failing(status) });
+        assert.equal(p.status, 'error');
+        if (p.status === 'error') {
+            assert.equal(p.message, text);
+            assert.equal(p.detail, undefined);
+        }
+        assert.doesNotMatch(JSON.stringify(p), /backend said no|properties\/12345/);
+    }
+    reset();
+    const doc = sharedDoc();
+    const controls = publicControlsFromQuery(new URLSearchParams(''), doc, { viewerControls: { date: false, compare: false, filters: false } });
+    const pub = await evaluatePublicRealtime({ shareToken: SHARE, ownerId: 'owner1', widget: doc.widgets.w_pub as RealtimeWidget, defaultSource: doc.defaultSource, controlDefs: doc.controls, controls }, { ...owner('owner1'), report: failing(500) });
+    assert.equal(pub.status, 'error');
+    assert.doesNotMatch(JSON.stringify(pub), /detail|backend said no|12345/);
 });
 
 // ── owner reads ──
