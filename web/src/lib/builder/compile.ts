@@ -117,7 +117,7 @@ export function widgetMetricIds(widget: WidgetDef): MetricId[] {
     }
 }
 
-/** True when a metric control changes this widget (in scope and the widget shows the control's default metric). */
+/** True when a metric control can change this widget (in scope and the widget shows the control's default metric). */
 export function followsMetricControl(control: MetricControl, widget: WidgetDef, ctx: Pick<CompileCtx, 'controlDefs' | 'pageId'>): boolean {
     if ((widget.ignoreControls ?? []).includes(control.id) || !inScope(control, widget, ctx.pageId)) return false;
     return widgetMetricIds(widget).includes(control.default);
@@ -170,12 +170,11 @@ function swapMetric(widget: WidgetDef, from: MetricId, to: MetricId): WidgetDef 
         case 'portfolio-grid': return { ...base, config: { ...base.config, metrics: swapRefs(base.config.metrics, from, to), sort: { ...base.config.sort, by: sortRef(base.config.sort.by) as typeof base.config.sort.by } } };
         case 'table': {
             const c = base.config;
-            const has = c.columns.some((col) => col.kind === 'metric' && col.ref === to);
             const swapped = new Set<string>();
-            const columns = c.columns.flatMap((col) => {
-                if (col.kind !== 'metric' || col.ref !== from) return [col];
+            const columns = c.columns.map((col) => {
+                if (col.kind !== 'metric' || col.ref !== from) return col;
                 swapped.add(col.id);
-                return has ? [] : [{ ...col, ref: to, label: undefined, format: undefined }];
+                return { ...col, ref: to, label: undefined, format: undefined };
             });
             const sortBy = c.sort.by === from ? to : c.sort.by === `m:${from}` ? `m:${to}` : c.sort.by;
             return {
@@ -209,7 +208,9 @@ export function applyViewerControls(widget: WidgetDef, ctx: CompileCtx, opts: { 
     }
     for (const mc of controlsFor('metric', w, ctx)) {
         const to = selectedMetric(mc, ctx.controls);
-        if (to !== mc.default && widgetMetricIds(w).includes(mc.default)) w = swapMetric(w, mc.default, to);
+        const ids = widgetMetricIds(w);
+        // A widget that already shows the pick (a KPI strip with clicks and impressions) stays as it is.
+        if (to !== mc.default && ids.includes(mc.default) && !ids.includes(to)) w = swapMetric(w, mc.default, to);
     }
     if (w.type === 'timeseries') {
         const gc = controlsFor('grain', w, ctx)[0];

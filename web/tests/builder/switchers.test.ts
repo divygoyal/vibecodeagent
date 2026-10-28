@@ -102,7 +102,7 @@ test('metric switcher swaps the bound metric only (titles follow, targets and ru
     assert.equal(followsMetricControl(metricCtl(), other, { controlDefs }), false);
 });
 
-test('metric switcher: a pick outside the options (or unknown) keeps the default; swaps are idempotent; duplicates merge', () => {
+test('metric switcher: a pick outside the options (or unknown) keeps the default; swaps are idempotent; widgets showing the pick stay', () => {
     const controlDefs: ControlDef[] = [metricCtl()];
     const chart = ts('w_ts', ['gsc:clicks']);
     for (const pick of ['ga4:totalRevenue', 'gsc:nonsense', '']) {
@@ -112,8 +112,9 @@ test('metric switcher: a pick outside the options (or unknown) keeps the default
     const ctx = { controlDefs, controls: base({ metric: { m1: 'gsc:impressions' } }) };
     const once = applyViewerControls(chart, ctx);
     assert.deepEqual(applyViewerControls(once, ctx), once);
+    // A widget that already shows the pick is left alone (no duplicate series, no lost series).
     const both = ts('w_both', ['gsc:clicks', 'gsc:impressions']);
-    assert.deepEqual((applyViewerControls(both, ctx) as typeof both).config.series.map((s) => s.metric.id), ['gsc:impressions']);
+    assert.equal(applyViewerControls(both, ctx), both);
 });
 
 test('Day / Week / Month replaces the granularity of time series in scope; Auto keeps each chart\'s own', () => {

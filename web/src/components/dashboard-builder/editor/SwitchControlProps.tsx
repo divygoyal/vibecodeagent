@@ -120,7 +120,7 @@ export function MetricControlProps({ control, doc }: { control: MetricControl; d
     return (
         <Shell title="Metric switcher" onRemove={remove}>
             <Field label="Label"><TextInput value={control.label} onChange={(v) => set({ label: v.slice(0, 60) }, 'label')} /></Field>
-            <Field label="Widgets showing" hint="Widgets in scope that show this metric follow the switcher; their other metrics stay.">
+            <Field label="Widgets showing" hint="Widgets in scope that show this metric follow the switcher; their other metrics stay. A widget that already shows the pick does not change.">
                 <MetricPicker value={control.default} ariaLabel="Default metric" onChange={(id) => set({ default: id, options: [id, ...options.filter((o) => o !== id && o !== control.default)] })} />
             </Field>
             <Field label="Viewers can pick" hint={`${options.length} metrics, up to 8.`}>
