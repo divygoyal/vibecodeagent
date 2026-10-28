@@ -7,6 +7,7 @@ import { fmtCurrency } from '@/lib/format';
 import { METRICS, type MetricKey } from '@/lib/metrics';
 import { rateFinding, trendFinding, updateImpactFinding, type Driver, type Finding } from '../lib/findings';
 import { googleUpdatesIn } from '../lib/googleUpdates';
+import { sentencePage } from '../lib/pagePath';
 import { displayPage, isAiSource, pageRef } from '../lib/rules';
 import { sourceLabel } from '../lib/sources';
 import type { Ga4BreakdownResponse, Ga4Summary, GscRowsResponse, GscSummary } from '../lib/types';
@@ -42,7 +43,7 @@ export function trafficFindingOf(metric: MetricKey, summary: Ga4Summary | undefi
     const rows = drivers?.rows ?? [];
     if (metric === 'pageviews') {
         unit = 'views';
-        list = rows.map((r) => ({ label: displayPage(pageRef(r.dims.pagePath, r.dims.hostName || siteHost), siteHost), cur: r.cur.screenPageViews ?? 0, prev: r.prev?.screenPageViews ?? 0 }));
+        list = rows.map((r) => ({ label: sentencePage(displayPage(pageRef(r.dims.pagePath, r.dims.hostName || siteHost), siteHost)), cur: r.cur.screenPageViews ?? 0, prev: r.prev?.screenPageViews ?? 0 }));
     } else if (metric === 'ai') {
         list = rows.filter((r) => isAiSource(r.dims.sessionSource)).map((r) => ({ label: sourceLabel(r.dims.sessionSource), cur: r.cur.sessions ?? 0, prev: r.prev?.sessions ?? 0 }));
     } else if (metric === 'conversions') {
@@ -91,7 +92,7 @@ export function searchFindingOf(metric: MetricKey, summary: GscSummary | undefin
     const rows = drivers?.rows ?? [];
     const lost = drivers?.lost ?? [];
     const list: Driver[] = [...rows, ...lost].filter((r) => r.prev !== undefined && r.prev !== null).map((r) => ({
-        label: metric === 'clicks' ? displayPage(pageRef(r.key), siteHost) : `“${r.key}”`,
+        label: metric === 'clicks' ? sentencePage(displayPage(pageRef(r.key), siteHost)) : `“${r.key}”`,
         cur: metric === 'clicks' ? r.clicks : r.impressions,
         prev: metric === 'clicks' ? r.prev!.clicks : r.prev!.impressions,
     }));
