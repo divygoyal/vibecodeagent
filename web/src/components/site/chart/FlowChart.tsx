@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { cn } from '@/lib/cn';
 import { useElementWidth } from '@/components/charts/useElementWidth';
+import { clipLabel } from '../lib/clipLabel';
 
 /**
  * A small column flow chart (Sankey) drawn as plain SVG (round 5, Traffic › Journeys). Columns are fixed
@@ -35,15 +36,7 @@ const NODE_W = 10;
 const GAP = 10;
 const CHAR_W = 6.6;
 
-/** Shorten to `max` characters: paths keep their start and end ("/blog/…market-fit"), other text its start. */
-export function clipLabel(s: string, max: number): string {
-    if (s.length <= max) return s;
-    if (s.startsWith('/') && max >= 12) {
-        const head = s.indexOf('/', 1) > 0 && s.indexOf('/', 1) < max / 2 ? s.indexOf('/', 1) + 1 : Math.floor(max / 3);
-        return `${s.slice(0, head)}…${s.slice(s.length - (max - head - 1))}`;
-    }
-    return `${s.slice(0, Math.max(1, max - 1))}…`;
-}
+export { clipLabel };
 
 export function FlowChart({ nodes, links, columns, height = 380, format, unit, ariaLabel, className }: {
     nodes: FlowChartNode[];
@@ -162,20 +155,24 @@ export function FlowChart({ nodes, links, columns, height = 380, format, unit, a
                         const dim = related && !related.has(n.id);
                         const first = n.col === 0;
                         const last = n.col === cols - 1;
-                        const room = first || last ? layout.side - 12 : Math.max(60, (layout.xOf(n.col + 1) - layout.xOf(n.col)) * 0.6);
+                        // Middle labels sit on the bands: most of the gap to the next column, on a surface-coloured box.
+                        const room = first || last ? layout.side - 12 : Math.max(60, (layout.xOf(n.col + 1) - layout.xOf(n.col)) * 0.78);
                         const value = format(n.value);
                         const maxChars = Math.max(6, Math.floor((room - value.length * CHAR_W - 8) / CHAR_W));
                         const tx = first ? n.x - 6 : n.x + NODE_W + 6;
                         const cy = n.y + n.h / 2;
+                        const text = clipLabel(n.label, maxChars);
+                        const boxW = (text.length + value.length) * CHAR_W + 14;
                         return (
                             <g key={n.id} opacity={dim ? 0.35 : 1} onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)} style={{ transition: 'opacity 120ms' }}>
                                 <title>{`${n.title ?? n.label}: ${format(n.value)} ${unit}`}</title>
                                 <rect x={n.x} y={n.y} width={NODE_W} height={n.h} rx={2} fill={n.color} />
+                                {(n.h >= 9 || first || last) && !first && !last ? (
+                                    <rect aria-hidden x={tx - 4} y={cy - 9} width={boxW} height={18} rx={4} fill="var(--color-surface)" fillOpacity={0.92} />
+                                ) : null}
                                 {n.h >= 9 || first || last ? (
-                                    <text x={tx} y={cy} dy="0.35em" textAnchor={first ? 'end' : 'start'}
-                                        className="text-[12px]"
-                                        style={!first && !last ? { paintOrder: 'stroke', stroke: 'var(--color-surface)', strokeWidth: 3, strokeLinejoin: 'round' } : undefined}>
-                                        <tspan className="fill-fg">{clipLabel(n.label, maxChars)}</tspan>
+                                    <text x={tx} y={cy} dy="0.35em" textAnchor={first ? 'end' : 'start'} className="text-[12px]">
+                                        <tspan className="fill-fg">{text}</tspan>
                                         <tspan className="fill-fg-muted tabular-nums" dx={6}>{value}</tspan>
                                     </text>
                                 ) : null}

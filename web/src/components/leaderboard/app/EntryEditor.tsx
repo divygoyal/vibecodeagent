@@ -25,7 +25,8 @@ import { useIsMobile } from '@/lib/useIsMobile';
 import { PrivacyForm } from './PrivacyForm';
 import { SlotsEditor } from './SlotsEditor';
 
-const Dot = () => <span aria-hidden className="text-fg-faint">·</span>;
+// Separators only where the status fits on one line: on phones it wraps and a line ended on a stray "·" (round 5 judge).
+const Dot = () => <span aria-hidden className="text-fg-faint max-md:hidden">·</span>;
 
 const FIELD = 'tc-control w-full rounded-control border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint transition-[border-color,box-shadow] duration-120 hover:border-border-strong focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none';
 
@@ -174,7 +175,7 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
             {/* Status: one row (round 5). Listed · #5 of 13 · Verified owner, checked 4 min ago · Re-check. The
                 verification details sit in the tooltip; a separate card only appears when something needs doing. */}
             <Card padding="sm" className="flex flex-wrap items-center gap-x-4 gap-y-3">
-                <div className="flex min-w-0 flex-1 basis-72 flex-wrap items-center gap-x-2 gap-y-1.5 text-body-sm">
+                <div className="flex min-w-0 flex-1 basis-72 flex-wrap items-center gap-x-2 gap-y-1.5 text-body-sm max-md:gap-x-3">
                     <Pill tone={status.tone} dot>{status.label}</Pill>
                     {live && entry.rank.rank ? <><Dot /><span className="font-medium text-fg tabular-nums">#{entry.rank.rank} <span className="font-normal text-fg-muted">of {entry.rank.total}</span></span></> : null}
                     <Dot />
@@ -261,7 +262,7 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                                     </label>
                                     <label className="sm:col-span-2">
                                         <span className="mb-1 flex justify-between text-body-sm font-medium text-fg-secondary">Tagline <span className="font-normal text-fg-faint tabular-nums">{draft.description.length}/200</span></span>
-                                        <textarea className={cn(FIELD, 'py-2')} rows={2} maxLength={200} value={draft.description} placeholder="One line on what the site is and who it is for" onChange={(e) => set('description', e.target.value)} />
+                                        <textarea className={cn(FIELD, 'h-auto min-h-[5.25rem] py-2')} rows={3} maxLength={200} value={draft.description} placeholder="One line on what the site is and who it is for" onChange={(e) => set('description', e.target.value)} />
                                     </label>
                                     <div>
                                         <span className="mb-1 block text-body-sm font-medium text-fg-secondary">Category</span>
@@ -308,7 +309,9 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                                 <CardHeader title="Danger zone" />
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <p className="max-w-[460px] text-body-sm text-fg-muted">Deleting removes this profile, its history, offers and ad slots for good. To hide it for a while, pause the listing instead.</p>
-                                    <Button variant="danger" icon={Trash2} onClick={() => setConfirmDelete(true)}>Delete profile</Button>
+                                    {/* Outlined in red, not filled: it was the loudest thing on the page in dark mode (round 5 judge). The
+                                        confirm dialog keeps the filled danger button. */}
+                                    <Button variant="secondary" icon={Trash2} className="text-down hover:border-down hover:text-down" onClick={() => setConfirmDelete(true)}>Delete profile</Button>
                                 </div>
                             </Card>
                         </>

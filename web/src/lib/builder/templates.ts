@@ -169,7 +169,7 @@ const BUILDERS_V1: Record<string, () => Built> = {
                 [[ts('w_trend', 'Clicks and impressions', ['gsc:clicks', 'gsc:impressions']), 12, 7]],
                 [[table('w_queries', 'Top queries', ['query'], SEARCH_COLS, { bars: ['gsc:clicks'] }), 6, 9], [table('w_pages', 'Top pages', ['page'], SEARCH_COLS, { bars: ['gsc:clicks'] }), 6, 9]],
                 [[barList('w_countries', 'Countries', 'country', 'gsc:clicks'), 4, 8], [pie('w_devices', 'Devices', 'device', 'gsc:clicks'), 4, 8],
-                    [text('w_note', '### Quick wins\nQueries where you rank **8 to 20** already get impressions. A better title, a clearer answer near the top of the page, or a few internal links can move them onto page one.\n\nThe table below lists them by impressions for {{date_range}}.', 'callout'), 4, 8]],
+                    [text('w_note', '### Quick wins\nQueries where you rank **8 to 20** already get impressions. A better title, a clearer answer near the top of the page, or a few internal links can move them up: from page two onto page one, and from the bottom of page one into the top 5.\n\nThe table below lists them by impressions for {{date_range}}.', 'callout'), 4, 8]],
                 [[table('w_quickwins', 'Quick wins: position 8 to 20', ['query'], ['gsc:impressions', 'gsc:clicks', 'gsc:ctr', 'gsc:position'], { bars: ['gsc:impressions'], rowFilters: [{ metric: 'gsc:position', op: 'between', value: [8, 20] }], maxRows: 5000, sort: { by: 'm:gsc:impressions', dir: 'desc' } }), 12, 8]],
             ], w)],
         };

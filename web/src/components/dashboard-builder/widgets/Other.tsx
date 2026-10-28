@@ -91,7 +91,7 @@ export function geoLayout({ width, height, topList, bp, legend }: { width: numbe
     const side = (listW: number) => {
         const mapW = Math.max(120, width - listW - 16);
         // A world map is about twice as wide as tall: no taller box than that (keeps it top aligned with the list).
-        return { kind: 'side' as const, listW, listRows, mapW, mapH: Math.min(height, Math.round(mapW * 0.56) + (legend ? 22 : 0)) };
+        return { kind: 'side' as const, listW, listRows, mapW, mapH: Math.min(height, Math.round(mapW * 0.56) + (legend ? 30 : 0)) }; // 30 = MAP_LEGEND_H (the map module loads lazily)
     };
     if (bp === 'lg' && width > 520) return side(Math.min(240, Math.floor(width * 0.34)));
     const belowH = height - Math.min(topList, 5) * LIST_ROW_H - 12;
@@ -249,8 +249,8 @@ export function PortfolioGridView(props: WidgetViewProps<PortfolioGridWidget>) {
                                         <Favicon host={site.replace(/--\d+$/, '')} size={16} />
                                         <span className="truncate text-title-sm text-fg" title={sites.sublabels?.[site] ? `${sites.labels?.[site] ?? site} · ${sites.sublabels[site]}` : undefined}>
                                             {sites.labels?.[site] ?? site}
-                                            {/* Host first, the GA4 property name after it in muted text (round 5 audit #14). */}
-                                            {sites.sublabels?.[site] ? <span className="ml-1.5 text-body-sm font-normal text-fg-muted">{sites.sublabels[site]}</span> : null}
+                                            {/* Host first, the GA4 property name after it in muted text (round 5 audit #14); phones: host only. */}
+                                            {sites.sublabels?.[site] ? <span className="ml-1.5 text-body-sm font-normal text-fg-muted max-md:hidden">{sites.sublabels[site]}</span> : null}
                                         </span>
                                         {alert ? <span className="ml-auto shrink-0 rounded-badge bg-down-soft px-1.5 text-caption text-down">Drop</span> : null}
                                     </div>

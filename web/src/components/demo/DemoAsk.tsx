@@ -46,7 +46,7 @@ export function DemoAsk() {
         <div className="flex min-h-[calc(100dvh-8.5rem)] flex-col md:min-h-[calc(100dvh-10rem)]">
             <PageHeader title="Ask" subtitle="Ask about your traffic in plain English" />
 
-            <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col">
+            <div className="mx-auto flex w-full min-w-0 max-w-[760px] flex-1 flex-col">
                 {asked.length === 0 ? (
                     <div className="flex flex-col items-center py-8 text-center">
                         <span className="mb-4 flex size-10 items-center justify-center rounded-xl bg-subtle text-fg-muted">
@@ -58,7 +58,7 @@ export function DemoAsk() {
                         </p>
                     </div>
                 ) : (
-                    <div role="log" aria-label="Conversation" aria-live="polite" className="flex-1 pt-2 pb-6">
+                    <div role="log" aria-label="Conversation" aria-live="polite" className="min-w-0 flex-1 pt-2 pb-6">
                         {asked.map((id, i) => {
                             const s = samples.find((x) => x.id === id);
                             if (!s) return null;
