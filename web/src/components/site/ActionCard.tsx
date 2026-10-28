@@ -1,105 +1,125 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Check, ChevronDown, RotateCcw, Sparkles, X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { fmtDay } from '@/lib/format';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { ACTION_TYPE_LABEL } from './lib/actionText';
-import type { ActionStatus } from './lib/types';
+import { ACTION_TYPE_LABEL, shortImpact } from './lib/actionText';
+import { displayPage, pageRef } from './lib/rules';
+import type { ActionImpact, ActionStatus } from './lib/types';
 import { askHref } from './SiteStates';
 import type { SiteActionWithStatus } from './useSiteActions';
 
-const IMPACT = {
-    high: { label: 'High impact', variant: 'warn' as const },
-    medium: { label: 'Medium impact', variant: 'info' as const },
-    low: { label: 'Low impact', variant: 'neutral' as const },
+const IMPACT: Record<ActionImpact, { label: string; bars: number; tone: string }> = {
+    high: { label: 'High impact', bars: 3, tone: 'bg-warn' },
+    medium: { label: 'Medium impact', bars: 2, tone: 'bg-info' },
+    low: { label: 'Low impact', bars: 1, tone: 'bg-fg-faint' },
 };
 
-export function ImpactBadge({ impact }: { impact: keyof typeof IMPACT }) {
-    return <Badge variant={IMPACT[impact].variant}>{IMPACT[impact].label}</Badge>;
+/** Priority as signal bars (Linear-style), not a badge: 3 bars high, 2 medium, 1 low. */
+export function ImpactBars({ impact, className }: { impact: ActionImpact; className?: string }) {
+    const d = IMPACT[impact];
+    return (
+        <span className={cn('inline-flex h-3 shrink-0 items-end gap-[2px]', className)} title={d.label}>
+            {[5, 8, 11].map((h, i) => (
+                <span key={h} aria-hidden className={cn('w-[3px] rounded-[1px]', i < d.bars ? d.tone : 'bg-border')} style={{ height: h }} />
+            ))}
+            <span className="sr-only">{d.label}</span>
+        </span>
+    );
 }
 
-/** One "what to fix next" task (DESIGN 5.8): badges, title, evidence, impact, fix, actions. */
-export function ActionCard({ action, site, onStatus, compact, canSave = true, className }: {
+/**
+ * One "what to fix next" task as a compact row (round 4, audit item 4): impact
+ * bars, title, the page it is about and the monthly gain, about 56 px tall.
+ * Each number shows once; the why, the suggested fix and the buttons open
+ * under the row.
+ */
+export function ActionRow({ action, site, onStatus, canSave = true, defaultOpen = false }: {
     action: SiteActionWithStatus;
-    site: { ga4: string | null; gsc: string | null };
+    site: { ga4: string | null; gsc: string | null; siteHost?: string | null };
     onStatus?: (status: ActionStatus, undo: ActionStatus) => void;
-    compact?: boolean;
     canSave?: boolean;
-    className?: string;
+    defaultOpen?: boolean;
 }) {
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(defaultOpen);
     const [leaving, setLeaving] = useState(false);
+    const panelId = useId();
     const change = (status: ActionStatus) => {
         setLeaving(true);
         window.setTimeout(() => onStatus?.(status, action.status), 180);
     };
+    const gain = shortImpact(action.expectedImpact);
+    const page = action.page ? displayPage(pageRef(action.page), site.siteHost ?? null) : null;
+    // The page the task is about (once: not when the title already names it); audit tasks say which check and page.
+    const where = action.type === 'audit'
+        ? `${ACTION_TYPE_LABEL.audit}${page ? ` · ${page === '/' ? 'homepage' : page}` : ''}`
+        : page && !action.title.includes(page) ? page : ACTION_TYPE_LABEL[action.type];
+    const stamp = action.status !== 'open' && action.updatedAt ? `${action.status === 'done' ? 'Done' : 'Dismissed'} ${fmtDay(action.updatedAt.slice(0, 10))}` : null;
     return (
-        <Card
-            padding="none"
-            as="article"
-            className={cn('overflow-hidden transition-[opacity,transform] duration-180 ease-standard motion-reduce:transition-none', leaving && 'translate-x-2 opacity-0', className)}
+        <li
+            data-action-row
+            className={cn('list-none transition-[opacity,transform] duration-180 ease-standard motion-reduce:transition-none', leaving && 'translate-x-2 opacity-0')}
         >
-            <div className="p-4 md:p-5">
-                <div className="flex flex-wrap items-center gap-1.5">
-                    <ImpactBadge impact={action.impact} />
-                    <Badge>{action.area}</Badge>
-                    <span className="text-meta text-fg-muted">{ACTION_TYPE_LABEL[action.type]}</span>
-                    {action.status !== 'open' && action.updatedAt ? (
-                        <span className="ml-auto text-meta text-fg-muted">{action.status === 'done' ? 'Done' : 'Dismissed'} {fmtDay(action.updatedAt.slice(0, 10))}</span>
-                    ) : null}
-                </div>
-                <h3 className="mt-2 text-title-sm text-fg [overflow-wrap:anywhere]">{action.title}</h3>
-                <p className="mt-1 text-body-sm text-fg-secondary [overflow-wrap:anywhere]">{action.summary}</p>
-                <p className="mt-2 text-body-sm font-medium text-fg">{action.expectedImpact}</p>
-                {!compact ? (
-                    <>
-                        <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
-                            {action.evidence.map((e) => (
-                                <div key={`${e.label}-${e.value}`} className="flex min-w-0 items-baseline justify-between gap-3 border-b border-dashed border-border-subtle pb-1.5">
-                                    <dt className="shrink-0 text-meta text-fg-muted">{e.label}</dt>
-                                    <dd className="min-w-0 truncate text-right text-body-sm text-fg tabular-nums" title={e.value}>{e.value}</dd>
-                                </div>
-                            ))}
-                        </dl>
-                        <button
-                            type="button"
-                            onClick={() => setOpen((v) => !v)}
-                            aria-expanded={open}
-                            className="relative mt-3 inline-flex items-center gap-1 rounded text-body-sm font-medium text-fg-secondary hover:text-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-x-1 pointer-coarse:after:-inset-y-2"
-                        >
-                            Suggested fix
-                            <ChevronDown aria-hidden size={14} className={cn('transition-transform duration-120', open && 'rotate-180')} />
-                        </button>
-                        {open ? (
-                            <ol className="mt-2 list-decimal space-y-1 pl-5 text-body-sm text-fg-secondary">
-                                {action.fix.map((f) => <li key={f}>{f}</li>)}
-                            </ol>
+            <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={panelId}
+                onClick={() => setOpen((v) => !v)}
+                className={cn(
+                    'group flex w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left transition-colors duration-120 hover:bg-subtle/60 focus-visible:-outline-offset-2 md:px-5',
+                    open && 'bg-subtle/60',
+                )}
+            >
+                <ImpactBars impact={action.impact} />
+                <span className="min-w-0 flex-1">
+                    <span className="block text-body-sm font-medium text-fg max-md:line-clamp-2 md:truncate [overflow-wrap:anywhere]">{action.title}</span>
+                    <span className="mt-0.5 block truncate text-meta text-fg-muted">
+                        {where}
+                        {stamp ? <span> · {stamp}</span> : null}
+                    </span>
+                </span>
+                {gain ? (
+                    <span className="shrink-0 text-right leading-tight">
+                        <span className="block text-body-sm font-semibold text-fg tabular-nums">{gain.value}</span>
+                        <span className="block text-meta text-fg-muted">{gain.unit}</span>
+                    </span>
+                ) : null}
+                <ChevronDown aria-hidden size={16} className={cn('shrink-0 text-fg-muted transition-transform duration-120 group-hover:text-fg', open && 'rotate-180')} />
+            </button>
+            {open ? (
+                <div id={panelId} className="border-t border-dashed border-border-subtle bg-surface-sunken/40 px-4 pb-3 pt-2.5 md:pl-[46px] md:pr-5">
+                    <p className="text-body-sm text-fg-secondary [overflow-wrap:anywhere]">{action.summary}</p>
+                    {!gain ? <p className="mt-1 text-body-sm font-medium text-fg">{action.expectedImpact}</p> : null}
+                    <p className="mt-2.5 text-meta font-medium text-fg-muted">Suggested fix</p>
+                    <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-body-sm text-fg-secondary">
+                        {action.fix.map((f) => <li key={f}>{f}</li>)}
+                    </ol>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Button asChild size="sm" variant="secondary" icon={Sparkles}>
+                            <Link href={askHref(action.askPrompt, site, 'site:actions')} title="Opens Ask with this question (uses 1 message)">Ask AI about this</Link>
+                        </Button>
+                        {canSave && onStatus ? (
+                            action.status === 'open' ? (
+                                <>
+                                    <Button size="sm" variant="ghost" icon={Check} onClick={() => change('done')}>Mark done</Button>
+                                    <Button size="sm" variant="ghost" icon={X} onClick={() => change('dismissed')}>Dismiss</Button>
+                                </>
+                            ) : (
+                                <Button size="sm" variant="ghost" icon={RotateCcw} onClick={() => change('open')}>Reopen</Button>
+                            )
                         ) : null}
-                    </>
-                ) : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle bg-surface-sunken/60 px-4 py-2.5 md:px-5">
-                <Button asChild size="sm" variant="secondary" icon={Sparkles}>
-                    <Link href={askHref(action.askPrompt, site, 'site:actions')} title="Opens Ask with this question (uses 1 message)">Ask AI about this</Link>
-                </Button>
-                {canSave && onStatus ? (
-                    action.status === 'open' ? (
-                        <>
-                            <Button size="sm" variant="ghost" icon={Check} onClick={() => change('done')}>Mark done</Button>
-                            {!compact ? <Button size="sm" variant="ghost" icon={X} onClick={() => change('dismissed')}>Dismiss</Button> : null}
-                        </>
-                    ) : (
-                        <Button size="sm" variant="ghost" icon={RotateCcw} onClick={() => change('open')}>Reopen</Button>
-                    )
-                ) : null}
-                <span className="ml-auto hidden text-meta text-fg-faint sm:inline">Ask uses 1 message</span>
-            </div>
-        </Card>
+                    </div>
+                </div>
+            ) : null}
+        </li>
     );
+}
+
+/** A list of task rows in one card-like frame (divider between rows). */
+export function ActionList({ children, className }: { children: React.ReactNode; className?: string }) {
+    return <ul className={cn('m-0 divide-y divide-border-subtle p-0', className)}>{children}</ul>;
 }

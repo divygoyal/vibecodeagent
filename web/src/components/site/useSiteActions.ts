@@ -5,7 +5,7 @@ import useSWR from 'swr';
 
 import type { AuditReport } from '@/lib/siteAudit';
 import { toast } from '@/components/ui/Toaster';
-import { actionId } from './lib/actionText';
+import { actionId, rankByImpact } from './lib/actionText';
 import type { ActionsResponse, ActionStateRow, ActionStatus, SiteAction } from './lib/types';
 import { fetchJson, useJson, useSite, useSiteRange } from './useSiteData';
 
@@ -43,6 +43,8 @@ export function auditActions(report: AuditReport | undefined, label: string): Si
 /**
  * Ranked tasks for the current site and range, with the user's done/dismissed
  * state (admin store) and, optionally, the cached homepage audit's issues.
+ * The Overview and Actions both pass includeAudit so their open counts agree
+ * (round 4: the Overview said 16 because it left out the 2 audit tasks).
  */
 export function useSiteActions({ includeAudit = false, enabled = true }: { includeAudit?: boolean; enabled?: boolean } = {}) {
     const site = useSite();
@@ -71,6 +73,11 @@ export function useSiteActions({ includeAudit = false, enabled = true }: { inclu
             return { ...a, status: s?.status ?? 'open', updatedAt: s?.updatedAt ?? null };
         });
     }, [actions.data, audit.data, states.data, site.siteHost, site.label]);
+
+    /** Open tasks in the one shared order (Overview top 3 = the first 3 rows of Actions). */
+    const open = useMemo(() => rankByImpact(list.filter((a) => a.status === 'open')), [list]);
+    /** Counts are final: the tasks and (when asked for) the audit have answered, so both pages show the same number. */
+    const settled = Boolean(actions.data) && audit.state !== 'loading' && (!stateKey || states.data !== undefined || states.error !== undefined);
 
     const { mutate: mutateStates } = states;
     const host = site.host;
@@ -107,6 +114,8 @@ export function useSiteActions({ includeAudit = false, enabled = true }: { inclu
 
     return {
         list,
+        open,
+        settled,
         actions,
         states,
         audit,
