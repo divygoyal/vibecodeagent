@@ -12,7 +12,7 @@ import { boardColumns, hasOffer, hasTrend as hasTrendRow, type BoardColumns } fr
 import { profilePath, RANGE_NAMES } from '@/lib/leaderboard/constants';
 import { fmtFull } from '@/lib/format';
 import type { BoardResponse, BoardRow, SponsoredCard } from '@/lib/leaderboard/types';
-import { CategoryBadge, CountValue, Ga4Badge, OpenToChips, PctDelta, RankMark, RowSpark, VerificationBadge } from './shared';
+import { CategoryText, CountValue, OpenToText, PctDelta, RankMark, RowSpark, VerifiedMark } from './shared';
 
 // Rows lay out by the width of the list (container query), not the viewport, so the same row
 // works in the public board and in the narrow "Public preview" column of /dashboard/leaderboard.
@@ -46,16 +46,14 @@ export function BoardRowItem({ row, focus, range, showNew, cols = ALL_COLUMNS }:
                 <div className="flex min-w-0 flex-1 items-start gap-3">
                     <Favicon host={host || row.name} size={32} className="mt-0.5" />
                     <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {/* Round 5: the name with a verified mark, the category as muted text; no row of pills. */}
+                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                             <Link href={profilePath(row)} className="truncate text-body font-semibold text-fg after:absolute after:inset-0 hover:underline focus-visible:outline-offset-[-2px]">
                                 {row.name}
                             </Link>
-                            <span className="relative z-10 flex flex-wrap items-center gap-1.5">
-                                <VerificationBadge v={row.verification} compact />
-                                {row.verification.level === 'owner' && row.verification.ga4_connected ? <Ga4Badge /> : null}
-                                <CategoryBadge name={row.category} />
-                                {showNew ? <Badge variant="up">New</Badge> : null}
-                            </span>
+                            <VerifiedMark v={row.verification} className="relative z-10" />
+                            {row.category ? <><span aria-hidden className="text-meta text-fg-faint">·</span><CategoryText name={row.category} /></> : null}
+                            {showNew ? <Badge variant="up" className="relative z-10 ml-1">New</Badge> : null}
                         </div>
                         {row.description ? <p className="mt-0.5 line-clamp-2 text-body-sm text-fg-muted @3xl:line-clamp-1">{row.description}</p> : null}
                         {row.topic_labels.length ? <p className="mt-0.5 truncate text-meta text-fg-faint">{row.topic_labels.join(' · ')}</p> : null}
@@ -78,7 +76,7 @@ export function BoardRowItem({ row, focus, range, showNew, cols = ALL_COLUMNS }:
 
             {cols.openTo ? (
                 <div className={cn('relative z-10 flex flex-wrap items-center gap-x-2 gap-y-1 @3xl:mt-0 @3xl:flex-col @3xl:items-start', hasOffer(row) ? 'mt-2' : '@max-3xl:hidden')}>
-                    <OpenToChips items={row.open_to} limit={2} />
+                    <OpenToText items={row.open_to} limit={2} labelClassName="@3xl:hidden" />
                     {row.min_slot_price_cents !== null && row.ad_slot_count > 0 ? (
                         <span className="text-meta text-fg-muted">Ads from {formatCents(row.min_slot_price_cents)}</span>
                     ) : null}

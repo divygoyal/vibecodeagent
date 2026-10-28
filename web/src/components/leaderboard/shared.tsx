@@ -61,6 +61,40 @@ export function VerificationBadge({ v, compact, className }: { v: VerificationPu
     );
 }
 
+/**
+ * Verification as a mark after the name (round 5): a shield for a verified owner, the GA4 match and the
+ * check date in its tooltip. Replaces the "Verified owner" + "GA4" pills in rows and headers; a pending
+ * listing still says so in words.
+ */
+export function VerifiedMark({ v, size = 16, className }: { v: VerificationPublic; size?: number; className?: string }) {
+    if (v.level === 'owner') {
+        const tip = `Verified owner in Google Search Console${v.ga4_connected ? '. The Google Analytics data stream matches this domain too' : ''}. Checked daily.`;
+        return (
+            <Tooltip content={tip}>
+                <span tabIndex={0} role="img" aria-label={v.ga4_connected ? 'Verified owner, GA4 matches' : 'Verified owner'} className={cn('inline-flex shrink-0 items-center text-brand-text', className)}>
+                    <ShieldCheck aria-hidden size={size} strokeWidth={1.75} />
+                </span>
+            </Tooltip>
+        );
+    }
+    if (v.level === 'ga4') {
+        return (
+            <Tooltip content="The Google Analytics property matches this domain. Ownership in Search Console is not confirmed.">
+                <span tabIndex={0} role="img" aria-label="GA4 connected" className={cn('inline-flex shrink-0 items-center text-info', className)}>
+                    <Activity aria-hidden size={size} strokeWidth={1.75} />
+                </span>
+            </Tooltip>
+        );
+    }
+    return <VerificationBadge v={v} compact className={className} />;
+}
+
+/** The category as plain muted text (round 5: not a chip). */
+export function CategoryText({ name, className }: { name: string | null; className?: string }) {
+    if (!name) return null;
+    return <span className={cn('text-meta text-fg-muted', className)}>{CATEGORY_LABELS[name] ?? name}</span>;
+}
+
 /** Second signal next to the owner badge. */
 export function Ga4Badge({ className }: { className?: string }) {
     return (
@@ -115,6 +149,29 @@ export function CategoryBadge({ name }: { name: string | null }) {
 }
 
 const OPEN_LABEL: Record<OpenTo, string> = { sponsorships: 'Sponsorships', acquisition: 'Acquisition', partnerships: 'Partnerships' };
+
+/** "sponsorships, acquisition and partnerships" */
+function openList(items: OpenTo[]): string {
+    const words = items.map((o) => OPEN_LABEL[o].toLowerCase());
+    return words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}` : words[0] ?? '';
+}
+
+/**
+ * "Open to" as text, not chips (round 5). `labelClassName` can hide the "Open to" lead where a column header says it.
+ * With `limit`, the rest is "+1" and the full list is in the title.
+ */
+export function OpenToText({ items, limit, labelClassName, className }: { items: OpenTo[]; limit?: number; labelClassName?: string; className?: string }) {
+    if (items.length === 0) return null;
+    const shown = limit ? items.slice(0, limit) : items;
+    const more = limit && items.length > limit ? items.length - limit : 0;
+    const text = more ? `${shown.map((o) => OPEN_LABEL[o].toLowerCase()).join(', ')} +${more}` : openList(shown);
+    return (
+        <span className={cn('text-body-sm text-fg-secondary', className)} title={`Open to ${openList(items)}`}>
+            <span className={cn('text-fg-muted', labelClassName)}>Open to </span>
+            {text}
+        </span>
+    );
+}
 
 export function OpenToChips({ items, className, limit }: { items: OpenTo[]; className?: string; limit?: number }) {
     if (items.length === 0) return null;

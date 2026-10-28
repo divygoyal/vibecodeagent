@@ -1,18 +1,20 @@
 'use client';
 
-import { KeyRound, Plug, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { KeyRound, Plug, Plus, RefreshCw, Trash2, Wrench } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import useSWR from 'swr';
 import {
-    Badge, Banner, Button, Card, CardHeader, Checkbox, ConfirmModal, EmptyState, Modal, Pill, Select, Skeleton, Switch, Table, VerifiedBadge,
+    Badge, Banner, Button, Card, CardHeader, Checkbox, ConfirmModal, EmptyState, Modal, Pill, Select, Skeleton, Switch, Table, Tooltip, VerifiedBadge,
     type TableColumn,
 } from '@/components/ui';
 import { PageHeader } from '@/components/shell/PageHeader';
 import { CodeBlock, CopyButton } from './CopyButton';
 import { SetupTabs } from './SetupTabs';
-import { EXAMPLE_PROMPTS } from './setupClients';
+import type { PortfolioResponse } from '@/lib/portfolio/types';
+import { McpTranscript, topClickMovers } from './McpTranscript';
+import { PROMPT_GROUPS } from './setupClients';
 import { TOOL_SUMMARIES } from './toolSummaries';
 
 interface Grant {
@@ -112,6 +114,17 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
     const [keyHideQueries, setKeyHideQueries] = useState(false);
     const [secret, setSecret] = useState<{ key: string; name: string } | null>(null);
     const url = data?.endpoint ?? endpoint;
+    // "What you get" (round 5): the home page's Claude transcript, answered from the user's own sites
+    // (the portfolio store, no Google call); the public demo portfolio when they have no search data yet.
+    const { data: own, error: ownError } = useSWR<PortfolioResponse>(enabled ? '/api/portfolio?range=28d' : null, fetcher, {
+        revalidateOnFocus: false,
+        // A first sync fills the store in the background: poll until it is done, like the portfolio page.
+        refreshInterval: (d) => (d?.syncing ? 3000 : 0),
+    });
+    const ownMovers = own ? topClickMovers(own.sites, ['lost', 'gained']) : null;
+    const needSample = Boolean(own || ownError) && !ownMovers;
+    const { data: sample } = useSWR<PortfolioResponse>(needSample ? '/api/portfolio?demo=1&range=28d' : null, fetcher, { revalidateOnFocus: false });
+    const sampleMovers = sample ? topClickMovers(sample.sites, ['lost']) : null;
 
     const act = useCallback(async (id: string, fn: () => Promise<unknown>, ok: string) => {
         setBusy(id);
@@ -186,20 +199,78 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                 </div>
             </Card>
 
+            <section aria-labelledby="get-title" className="space-y-3">
+                <div>
+                    <h2 id="get-title" className="text-title text-fg">What you get</h2>
+                    <p className="mt-0.5 text-body-sm text-fg-muted">Your AI app answers from your Analytics and Search Console numbers, with the tools below.</p>
+                </div>
+                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+                    <div className="flex min-w-0 flex-col gap-6">
+                        {ownMovers ? (
+                            <McpTranscript movers={ownMovers} caption={`Example answer from your own sites, last 28 days · ${TOOL_SUMMARIES.length} read-only tools`} />
+                        ) : sampleMovers ? (
+                            <McpTranscript movers={sampleMovers} caption={`Example answer from sample data · ${TOOL_SUMMARIES.length} read-only tools`} />
+                        ) : (
+                            <Skeleton className="h-[380px] w-full" rounded="card" />
+                        )}
+                    <Card>
+                        <CardHeader
+                            as="h3"
+                            title={`${TOOL_SUMMARIES.length} read-only tools`}
+                            description="Your AI app picks the tool for each question. None can change your data."
+                        />
+                        <ul aria-label="Tools" className="flex flex-wrap gap-2">
+                            {TOOL_SUMMARIES.map((t) => (
+                                <li key={t.name}>
+                                    <Tooltip content={t.summary}>
+                                        <span tabIndex={0} className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border-subtle bg-surface-sunken px-2.5 font-mono text-[12px] text-fg-secondary outline-none focus-visible:ring-2 focus-visible:ring-focus/40">
+                                            <Wrench aria-hidden size={12} strokeWidth={1.75} className="text-fg-faint" />
+                                            {t.name}
+                                        </span>
+                                    </Tooltip>
+                                </li>
+                            ))}
+                        </ul>
+                        <details className="group mt-4 border-t border-border-subtle pt-3">
+                            <summary className="flex cursor-pointer list-none items-center gap-2 pointer-coarse:min-h-11 text-body-sm font-medium text-fg-secondary hover:text-fg [&::-webkit-details-marker]:hidden">
+                                <span className="group-open:hidden">What each tool does</span>
+                                <span className="hidden group-open:inline">Hide the details</span>
+                            </summary>
+                            <ul className="mt-3 grid gap-x-6 gap-y-3 grid-cols-1 sm:grid-cols-2">
+                                {TOOL_SUMMARIES.map((t) => (
+                                    <li key={t.name} className="min-w-0">
+                                        <span className="font-mono text-[12px] text-fg">{t.name}</span>
+                                        <p className="text-body-sm text-fg-muted">{t.summary}</p>
+                                    </li>
+                                ))}
+                            </ul>
+                        </details>
+                    </Card>
+                    </div>
+                    <Card>
+                        <CardHeader as="h3" title="Try asking" description="Copy a question into ChatGPT or Claude once TrafficClaw is connected." />
+                        <div className="space-y-4">
+                            {PROMPT_GROUPS.map((g) => (
+                                <div key={g.job}>
+                                    <h4 className="text-caption uppercase tracking-[0.04em] text-fg-muted">{g.job}</h4>
+                                    <ul className="mt-1 divide-y divide-border-subtle">
+                                        {g.prompts.map((p) => (
+                                            <li key={p} className="flex items-center gap-3 py-2">
+                                                <span className="min-w-0 flex-1 text-body text-fg">{p}</span>
+                                                <CopyButton text={p} className="shrink-0" />
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+                </div>
+            </section>
+
             <Card>
                 <CardHeader as="h2" title="Set up your app" />
                 <SetupTabs url={url} urlShown />
-                <div className="mt-5 border-t border-border-subtle pt-4">
-                    <h3 className="mb-2 text-meta font-medium text-fg-muted">Try asking</h3>
-                    <ul className="space-y-1.5">
-                        {EXAMPLE_PROMPTS.slice(0, 3).map((p) => (
-                            <li key={p} className="flex items-center gap-2">
-                                <span className="min-w-0 flex-1 text-body text-fg">&ldquo;{p}&rdquo;</span>
-                                <CopyButton text={p} />
-                            </li>
-                        ))}
-                    </ul>
-                </div>
             </Card>
 
             {/* items-start: Usage is short, it must not stretch into an empty box next to the apps list. */}
@@ -291,27 +362,6 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                 ) : (
                     <Table card={false} density="compact" caption="API keys" columns={keyColumns} rows={keys} rowKey={(k) => String(k.id)} />
                 )}
-            </Card>
-
-            <Card>
-                <details className="group">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
-                        <span>
-                            <span className="block text-title-sm text-fg">Tools your AI app can use</span>
-                            <span className="text-body-sm text-fg-muted">13 read-only tools. None can change your data.</span>
-                        </span>
-                        <span className="text-body-sm text-fg-muted group-open:hidden">Show</span>
-                        <span className="hidden text-body-sm text-fg-muted group-open:inline">Hide</span>
-                    </summary>
-                    <ul className="mt-4 grid gap-x-6 gap-y-3 border-t border-border-subtle pt-4 grid-cols-1 sm:grid-cols-2">
-                        {TOOL_SUMMARIES.map((t) => (
-                            <li key={t.name} className="min-w-0">
-                                <span className="font-mono text-[12px] text-fg">{t.name}</span>
-                                <p className="text-body-sm text-fg-muted">{t.summary}</p>
-                            </li>
-                        ))}
-                    </ul>
-                </details>
             </Card>
 
             <Modal

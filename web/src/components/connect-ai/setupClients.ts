@@ -112,3 +112,33 @@ export const EXAMPLE_PROMPTS = [
     'How many people are on my site right now?',
     'What should I fix first?',
 ];
+
+/** "Try asking", grouped by the job (round 5, audit item 30). Each prompt maps onto one or two of the tools. */
+export const PROMPT_GROUPS: { job: string; hint: string; prompts: string[] }[] = [
+    {
+        job: 'Traffic',
+        hint: 'Visitors, sources and pages from Google Analytics',
+        prompts: [
+            'Compare all my sites over the last 28 days and tell me which one needs attention.',
+            'Where do visitors from ChatGPT land on my site?',
+            'How many people are on my site right now?',
+        ],
+    },
+    {
+        job: 'Search',
+        hint: 'Clicks, queries and indexing from Search Console',
+        prompts: [
+            'Which of my sites lost the most clicks this week, and why?',
+            'Which queries for my main site are on page two of Google and worth improving?',
+            'Is my newest blog post indexed?',
+        ],
+    },
+    {
+        job: 'Weekly digest',
+        hint: 'One message to start your week',
+        prompts: [
+            'Write my weekly digest: what went up, what went down and what to fix first, for every site.',
+            'Compare this week with last week for each site in one short table.',
+        ],
+    },
+];

@@ -3,6 +3,9 @@
 import type { ReactNode } from 'react';
 import { Children, isValidElement, cloneElement } from 'react';
 
+import { betterDownFor, parseDelta } from '@/lib/chat/answerFormat';
+import { AnswerDelta } from './AnswerDelta';
+
 /**
  * B5-full — heuristic inline number highlighting.
  *
@@ -13,7 +16,8 @@ import { Children, isValidElement, cloneElement } from 'react';
  *
  * Patterns matched:
  *   • Numbers with thousand separators       (12,847 / 1,200,000)
- *   • Percentages with optional sign          (-12.5% / +23% / 89%)
+ *   • Signed changes                          (+23% / −7%) -> AnswerDelta (▲▼, app colours)
+ *   • Percentages                             (89%)
  *   • Dollar values                           ($6,688 / $50/mo / $2.4k)
  *   • Position prefixes                       (pos 7 / Pos 3-10 / position 8)
  *
@@ -27,12 +31,14 @@ import { Children, isValidElement, cloneElement } from 'react';
 
 // Order matters — longer / more-specific patterns first.
 const PATTERNS = [
+    // +882% / −7% / -4.5%: a change, drawn like the app's deltas (round 5). Not after a digit or letter ("3-10%").
+    { type: 'delta' as const, re: /(?<![\w.,%])[+\-\u2212]\d+(?:\.\d+)?%/g },
     // $1,234,567 / $50/mo / $2.4k
     { type: 'currency' as const, re: /\$\d{1,3}(?:,\d{3})*(?:\.\d+)?(?:\/[a-z]+)?(?:[a-z])?/g },
     // -23.5% / +12% / 89% (signed percentages first so they don't get sub-matched)
     { type: 'percent' as const, re: /[-+]?\d+(?:\.\d+)?%/g },
     // pos 7 / Pos 3-10 / position 8
-    { type: 'position' as const, re: /\b[Pp](?:os|osition)?\s\d+(?:-\d+)?\b/g },
+    { type: 'position' as const, re: /\b[Pp](?:os|osition)?\s\d+(?:\.\d+)?(?:-\d+)?\b/g },
     // 12,847 / 1,200,000 (must have at least one comma to qualify)
     { type: 'thousand' as const, re: /\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b/g },
     // bare integers ≥ 100 — last so it doesn't gobble parts of currency / percent matches
@@ -45,6 +51,7 @@ const PATTERNS = [
 // and let the bold weight do the work.
 const NUMBER_TOKEN_CLASS = 'text-fg font-semibold tabular-nums';
 const TONE: Record<string, string> = {
+    delta: NUMBER_TOKEN_CLASS,
     currency: NUMBER_TOKEN_CLASS,
     percent: NUMBER_TOKEN_CLASS,
     position: NUMBER_TOKEN_CLASS,
@@ -83,8 +90,13 @@ function findMatches(s: string): Match[] {
     return filtered;
 }
 
+export interface HighlightOptions {
+    /** Lower is better for the numbers here (a position column): a fall is good news. */
+    betterDown?: boolean;
+}
+
 /** Wrap matched substrings in styled spans within a single string. */
-function highlightString(s: string, keyPrefix: string): ReactNode {
+function highlightString(s: string, keyPrefix: string, opts: HighlightOptions = {}): ReactNode {
     if (!s) return s;
     const matches = findMatches(s);
     if (matches.length === 0) return s;
@@ -92,6 +104,16 @@ function highlightString(s: string, keyPrefix: string): ReactNode {
     let cursor = 0;
     matches.forEach((m, i) => {
         if (m.start > cursor) parts.push(s.slice(cursor, m.start));
+        if (m.type === 'delta') {
+            // Polarity from the words around it: "position −2.1%" or "bounce rate +4%" read the other way.
+            const around = `${s.slice(Math.max(0, m.start - 32), m.start)} ${s.slice(m.end, m.end + 32)}`;
+            const d = parseDelta(m.text, { betterDown: opts.betterDown ?? betterDownFor(around) });
+            if (d) {
+                parts.push(<AnswerDelta key={`${keyPrefix}-${i}`} delta={d} />);
+                cursor = m.end;
+                return;
+            }
+        }
         parts.push(
             <span key={`${keyPrefix}-${i}`} className={TONE[m.type]} title="data point">
                 {m.text}
@@ -106,14 +128,14 @@ function highlightString(s: string, keyPrefix: string): ReactNode {
 /** Recursively walk ReactMarkdown children — strings get highlighted,
  *  elements pass through (we don't recurse into elements to keep the
  *  scope narrow and avoid double-highlighting inside <code> spans). */
-export function highlightNumbersInChildren(children: ReactNode, keyPrefix = 'hn'): ReactNode {
+export function highlightNumbersInChildren(children: ReactNode, keyPrefix = 'hn', opts: HighlightOptions = {}): ReactNode {
     if (typeof children === 'string') {
-        return highlightString(children, keyPrefix);
+        return highlightString(children, keyPrefix, opts);
     }
     if (Array.isArray(children)) {
         return Children.map(children, (child, i) => {
             if (typeof child === 'string') {
-                return highlightString(child, `${keyPrefix}-${i}`);
+                return highlightString(child, `${keyPrefix}-${i}`, opts);
             }
             // Pass elements through — don't recurse into <code> / <a> etc.
             // Specifically skip code blocks (numbers in code shouldn't be styled).
