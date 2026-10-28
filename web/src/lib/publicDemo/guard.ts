@@ -127,6 +127,12 @@ export const DEMO_API_RULES: RouteRule[] = [
     R('/api/dashboards/[id]/duplicate', DENY_ALL),
     R('/api/dashboards/[id]/share', DENY_ALL),
     R('/api/dashboards/[id]/share/rotate', DENY_ALL),
+    // Scheduled email (round 9): never for the shared demo user (it sends mail). The picture and the confirm/unsubscribe
+    // page are opened from inside an email by people with no session, so they pass through untouched.
+    R('/api/dashboards/[id]/email-schedule', DENY_ALL),
+    R('/api/dashboards/[id]/email-schedule/test', DENY_ALL),
+    R('/api/email/chart', PUBLIC_ALL),
+    R('/api/email-schedule/respond', PUBLIC_ALL),
     R('/api/dashboards/public/[token]', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/query', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/widget-data', PUBLIC_ALL),
@@ -217,6 +223,7 @@ export const DEMO_API_RULES: RouteRule[] = [
     R('/api/superadmin', DENY_ALL),
     R('/api/superadmin/announce-ad-slots', DENY_ALL),
     R('/api/cron/daily-alerts', DENY_ALL),
+    R('/api/cron/dashboard-email', DENY_ALL),
     R('/api/cron/leaderboard-refresh', DENY_ALL),
     R('/api/cron/portfolio-sync', DENY_ALL),
     R('/api/cron/weekly-digest', DENY_ALL),
