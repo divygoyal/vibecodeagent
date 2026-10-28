@@ -5,7 +5,7 @@ import { Eye, Link2Off } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { BRAND_NAME } from '@/lib/brand';
 import { fmtCompact } from '@/lib/format';
-import { buttonClasses } from '@/components/ui/Button';
+import { buttonClasses } from '@/components/ui/buttonStyles';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Favicon } from '@/components/ui/Favicon';
