@@ -168,7 +168,7 @@ function PivotSetup({ widget, edit, source, portfolio }: Props<PivotWidget>) {
             <Field label="Rows shown" hint="The biggest rows by the metric."><NumberInput value={c.topRows} min={3} max={25} onChange={(n) => set({ topRows: n }, 'topRows')} /></Field>
             <Field label="Columns shown"><NumberInput value={c.topColumns} min={2} max={8} onChange={(n) => set({ topColumns: n }, 'topColumns')} /></Field>
             <Toggle label="Group the other columns" description={counts ? 'One Other column holds the rest.' : 'Not for ratios: they cannot be added up.'} disabled={!counts} checked={c.other && counts} onChange={(v) => set({ other: v })} />
-            <Toggle label="Totals" description={counts ? 'A total column and a total row, adding up the cells shown.' : 'Totals need a count: a ratio of totals is not the sum of its cells.'} disabled={!counts} checked={c.totals !== false && counts} onChange={(v) => set({ totals: v })} />
+            <Toggle label="Totals" description={counts ? 'A total column and a total row for all the data; rows beyond the biggest ones are added up as Other.' : 'Totals need a count: a ratio of totals is not the sum of its cells.'} disabled={!counts} checked={c.totals !== false && counts} onChange={(v) => set({ totals: v })} />
             <Field label="Heat colour"><Choice ariaLabel="Heat colour" value={c.heat ?? 'cell'} onChange={(v) => set({ heat: v })} options={[{ value: 'none', label: 'None' }, { value: 'cell', label: 'Against all cells' }, { value: 'row', label: 'Within each row' }, { value: 'column', label: 'Within each column' }]} /></Field>
         </>
     );

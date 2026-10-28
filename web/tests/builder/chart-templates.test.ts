@@ -32,6 +32,20 @@ const ok = (res: DashboardQueryResponse, id: string): WidgetResultOk => {
     return r as WidgetResultOk;
 };
 
+test('template copy agrees with the charts: no contradictory advice, the shaded scatter corner is where the text says', () => {
+    const visitors = doc('when-visitors-come');
+    const intro = (visitors.widgets.w_intro as { content?: string; text?: string }).content ?? (visitors.widgets.w_intro as { text?: string }).text ?? '';
+    assert.doesNotMatch(intro, /quiet or when people are there/);
+    const opp = doc('content-opportunities');
+    const pages = opp.widgets.w_pages as { config: { highlight: string; y: { id: string } } };
+    const queries = opp.widgets.w_queries as { config: { highlight: string; y: { id: string } } };
+    // Pages: high impressions, low CTR = bottom right. Queries: high impressions, worse position; position runs 1 at the top, so bottom right too.
+    assert.deepEqual([pages.config.highlight, pages.config.y.id], ['br', 'gsc:ctr']);
+    assert.deepEqual([queries.config.highlight, queries.config.y.id], ['tr', 'gsc:position']);
+    const how = JSON.stringify(opp.widgets.w_how);
+    assert.match(how, /position 1 is at the top/);
+});
+
 test('the three templates are in the gallery, marked new, and validate', () => {
     for (const id of NEW_IDS) {
         const m = templateMeta(id);
