@@ -330,9 +330,10 @@ function CopyField({ label, value }: { label: string; value: string }) {
 type BadgeVariantChoice = 'traffic' | 'minimal' | 'stats' | 'live';
 const BADGE_HEIGHT: Record<BadgeVariantChoice, number> = { traffic: 32, minimal: 48, stats: 76, live: 76 };
 
-export function EmbedCard({ origin, slug, id, name, liveEnabled }: { origin: string; slug: string; id: number; name: string; liveEnabled: boolean }) {
+export function EmbedCard({ origin, slug, id, name, liveEnabled, trafficBadge = true }: { origin: string; slug: string; id: number; name: string; liveEnabled: boolean; trafficBadge?: boolean }) {
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [variant, setVariant] = useState<BadgeVariantChoice>('traffic');
+    // The verified-traffic badge only exists for profiles verified in Search Console and ranked (badgeEligible).
+    const [variant, setVariant] = useState<BadgeVariantChoice>(trafficBadge ? 'traffic' : 'minimal');
     // Snippets use the absolute public origin (they are pasted on other sites); the preview
     // loads the same image from this page's own origin so it renders wherever the page is served.
     const imgPath = variant === 'traffic' ? `/badge/${slug}.svg?theme=${theme}` : `/api/badges/${id}?variant=${variant}&theme=${theme}`;
@@ -354,7 +355,7 @@ export function EmbedCard({ origin, slug, id, name, liveEnabled }: { origin: str
                     variant="neutral"
                     value={variant}
                     onChange={setVariant}
-                    options={[{ value: 'traffic', label: 'Verified traffic' }, { value: 'minimal', label: 'Minimal' }, { value: 'stats', label: 'Stats' }, ...(liveEnabled ? [{ value: 'live' as const, label: 'Live' }] : [])]}
+                    options={[...(trafficBadge ? [{ value: 'traffic' as const, label: 'Verified traffic' }] : []), { value: 'minimal' as const, label: 'Minimal' }, { value: 'stats', label: 'Stats' }, ...(liveEnabled ? [{ value: 'live' as const, label: 'Live' }] : [])]}
                 />
             </div>
             <div className={cn('mb-4 flex min-h-24 items-center justify-center rounded-control border border-border-subtle p-4', theme === 'dark' ? 'bg-[#0e1014]' : 'bg-[#f6f7f9]')}>

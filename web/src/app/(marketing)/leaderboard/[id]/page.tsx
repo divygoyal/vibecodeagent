@@ -18,6 +18,7 @@ import { freshness, metricText } from '@/lib/leaderboard/format';
 import { getProfile, parseRange } from '@/lib/leaderboard/server';
 import { jsonLdString } from '@/lib/leaderboard/jsonld';
 import { canonicalRedirect } from '@/lib/leaderboard/canonical';
+import { badgeEligible } from '@/lib/leaderboard/trafficBadge';
 
 // Server rendered per request; the data fetch is cached 60 s.
 export const dynamic = 'force-dynamic';
@@ -170,7 +171,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
                         <SlotsCard p={p} />
                         <OfferSection idOrSlug={slug} siteName={p.name} openTo={p.open_to} slots={p.ad_slots} initialSlotId={Number(Array.isArray(sp.slot) ? sp.slot[0] : sp.slot) || null} />
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                            <EmbedCard origin={SITE_ORIGIN} slug={slug} id={p.id} name={p.name} liveEnabled={p.live.enabled} />
+                            <EmbedCard origin={SITE_ORIGIN} slug={slug} id={p.id} name={p.name} liveEnabled={p.live.enabled} trafficBadge={badgeEligible(p)} />
                             <SimilarCard p={p} />
                         </div>
                     </div>
