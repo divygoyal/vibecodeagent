@@ -66,15 +66,17 @@ function useFrameState(key: string, href: string | null) {
         const t = setTimeout(() => setSt({ key, state: 'timeout' }), EMBED_LOAD_TIMEOUT_MS);
         return () => clearTimeout(t);
     }, [state, onScreen, key]);
+    // Independent of the load event on purpose: a frame fires load for the browser's own error page, often before this request
+    // has failed, so a finished load must not cancel the check.
     useEffect(() => {
-        if (state !== 'loading' || !onScreen || !href || typeof fetch === 'undefined') return;
+        if (!onScreen || !href || typeof fetch === 'undefined') return;
         const ctl = new AbortController();
         // GET (some servers reset a HEAD), dropped as soon as the headers are in: the frame loads the body.
         fetch(href, { method: 'GET', mode: 'no-cors', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', signal: ctl.signal })
             .then(() => ctl.abort())
             .catch((e: unknown) => { if (!ctl.signal.aborted && (e as { name?: string } | null)?.name !== 'AbortError') setSt({ key, state: 'unreachable' }); });
         return () => ctl.abort();
-    }, [state, onScreen, key, href]);
+    }, [onScreen, key, href]);
     return { state, setBox, loaded: () => setSt({ key, state: 'loaded' }), failed: () => setSt({ key, state: 'error' }) } as const;
 }
 

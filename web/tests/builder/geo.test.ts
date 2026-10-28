@@ -270,7 +270,10 @@ test('region list: "Show all" reveals every region; layout gives the map the roo
     assert.equal(wide.kind, 'side');
     assert.equal(wide.mapH, 340, 'the map fills the card height');
     assert.ok(wide.mapW >= 220 && wide.mapW <= 400 && wide.mapW + 16 + wide.listW === 700);
-    assert.ok(wide.fit >= 2 && wide.fit <= 5);
+    assert.equal(wide.fit, 9, 'spare height shows every region (up to 10): no empty card bottom, no control');
+    const tight = regionLayout({ width: 700, height: 220, map: true, want: 5, count: 9 });
+    assert.ok(tight.fit >= 2 && tight.fit < 9, `a short card keeps room for the Show all control (${tight.fit})`);
+    assert.equal(regionLayout({ width: 700, height: 900, map: true, want: 5, count: 40 }).fit, 10, 'never more than 10 rows before Show all');
     const narrow = regionLayout({ width: 320, height: 420, map: true, want: 5, count: 9 });
     assert.equal(narrow.kind, 'stacked');
     assert.ok(narrow.mapH > 100 && narrow.mapH + 12 + narrow.listH === 420);

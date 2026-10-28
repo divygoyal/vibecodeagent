@@ -46,9 +46,10 @@ export function regionLayout({ width, height, map, want, count }: { width: numbe
     const listW = side ? width - mapW - 16 : width;
     const listH = side ? height : stacked ? height - mapH - 12 : height;
     const rows = Math.max(1, Math.floor((listH - HEAD_H) / ROW_H));
-    const all = Math.min(want, rows);
+    // The setting (Top 5 / Top 10) is the least that shows; spare card height shows more, up to 10, so the card does not end in empty space.
+    const all = Math.min(rows, Math.max(want, 10));
     // Everything fits: no control. Otherwise leave room for it.
-    const fit = count <= all ? count : Math.max(2, Math.min(want, Math.floor((listH - HEAD_H - CONTROL_H) / ROW_H)));
+    const fit = count <= all ? count : Math.max(2, Math.min(Math.max(want, 10), Math.floor((listH - HEAD_H - CONTROL_H) / ROW_H)));
     return { kind: side ? 'side' : stacked ? 'stacked' : 'list', mapW, mapH, listW, listH, fit };
 }
 
@@ -151,7 +152,9 @@ export function GeoCityView(props: WidgetViewProps<GeoWidget>) {
     const topList = c.topList === 10 ? 10 : 5;
     const layout = geoLayout({ width, height: h, topList, bp: props.bp, legend: false });
     const [listOnlyMap, setListOnlyMap] = useState(false);
-    const top = sorted.slice(0, topList);
+    // Beside the map the list uses the card height it has (the Top 5 / Top 10 setting is the least it shows, up to 10 rows).
+    const listRows = layout.kind === 'side' ? Math.min(10, Math.max(topList, Math.floor((h + 4) / ROW_H))) : topList;
+    const top = sorted.slice(0, listRows);
     const fmt = (v: number) => fmtMetricValue(id, v, { compact: true, currency: ok?.flags.currency });
     const showMap = layout.kind !== 'list' || listOnlyMap;
     const showList = top.length > 0 && (layout.kind === 'side' || layout.kind === 'below' || (layout.kind === 'list' && !listOnlyMap));
@@ -187,7 +190,7 @@ export function GeoCityView(props: WidgetViewProps<GeoWidget>) {
                                 <BarList
                                     items={top.map((r) => ({ key: `${r.country}|${r.place}`, label: r.place, text: `${r.place}, ${countryName(r.country)}`, value: r.value }))}
                                     metric={dsKey(id)}
-                                    limit={layout.kind === 'side' ? Math.min(top.length, layout.listRows) : Math.min(top.length, 5)}
+                                    limit={layout.kind === 'side' ? Math.min(top.length, listRows) : Math.min(top.length, 5)}
                                     formatValue={(v) => fmtMetricValue(id, v, { currency: ok?.flags.currency, compact: layout.kind === 'side' && layout.listW < 200 })}
                                     labelHeader="City"
                                 />

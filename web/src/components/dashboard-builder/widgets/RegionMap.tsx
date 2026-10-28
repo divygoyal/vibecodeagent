@@ -100,11 +100,20 @@ export function RegionMap({ code, shapes, values, color, width, height, format, 
     const legendH = showLegend ? REGION_LEGEND_H : 0;
     const mapH = height - legendH;
 
-    const paths = useMemo(() => {
-        if (mapH < 72 || width < 100) return [];
-        const proj = regionProjection(code, shapes, width, mapH);
-        const path = geoPath(proj);
-        return shapes.map((s) => path({ type: 'MultiPolygon', coordinates: s.coordinates } as MultiPolygon) ?? '');
+    // The map is as tall as the country is (a wide country in a tall box would float in empty space): fit once, measure,
+    // fit again to the measured height.
+    const { paths, boxH } = useMemo(() => {
+        if (mapH < 72 || width < 100) return { paths: [] as string[], boxH: 0 };
+        const geom = (s: RegionShape) => ({ type: 'MultiPolygon', coordinates: s.coordinates }) as MultiPolygon;
+        const first = geoPath(regionProjection(code, shapes, width, mapH));
+        // The Albers USA insets (Alaska, Hawaii) are part of the picture; for other countries only the main land is measured
+        // (an overseas island far outside the box must not stretch it).
+        const target = code === 'US' ? ({ type: 'MultiPolygon', coordinates: shapes.flatMap((s) => s.coordinates) } as GeoPermissibleObjects) : mainLand(shapes);
+        const [[, top], [, bottom]] = first.bounds(target);
+        const used = Number.isFinite(top) && Number.isFinite(bottom) && bottom > top ? Math.max(96, Math.ceil(bottom - top) + 8) : mapH;
+        const h = Math.min(mapH, used);
+        const path = geoPath(regionProjection(code, shapes, width, h));
+        return { paths: shapes.map((s) => path(geom(s)) ?? ''), boxH: h };
     }, [code, shapes, width, mapH]);
 
     const { thresholds, max } = useMemo(() => scaleThresholds(values.values(), REGION_STEPS), [values]);
@@ -117,8 +126,8 @@ export function RegionMap({ code, shapes, values, color, width, height, format, 
     const hv = hover ? values.get(hover.i) : undefined;
     const lit = hover?.i ?? active ?? null;
     return (
-        <div className="relative shrink-0" style={{ width, height }} data-geo-regions={code}>
-            <svg ref={ref} width={width} height={mapH} className="block overflow-hidden" role="img" aria-label={`${label} by region, ${countryName(code)}. ${values.size} regions with data.`} onMouseLeave={() => { setHover(null); onHover?.(null); }}>
+        <div className="relative shrink-0" style={{ width, height: boxH + legendH }} data-geo-regions={code}>
+            <svg ref={ref} width={width} height={boxH} className="block overflow-hidden" role="img" aria-label={`${label} by region, ${countryName(code)}. ${values.size} regions with data.`} onMouseLeave={() => { setHover(null); onHover?.(null); }}>
                 {paths.map((d, i) => d ? (
                     <path
                         key={i}
