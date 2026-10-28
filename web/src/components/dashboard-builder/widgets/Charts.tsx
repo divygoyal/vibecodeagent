@@ -14,6 +14,7 @@ import { fmtAxis, fmtDay } from '@/lib/format';
 import { channelColor, deviceColor, CATEGORICAL, CATEGORICAL_OTHER } from '@/lib/metrics';
 import { fmtMetricValue, getMetric, metricColor, metricLabel, dimLabel } from '@/lib/builder/catalog';
 import { AXIS_LABEL_GAP, AXIS_LAST_TICK_PAD, categoryAxisWidth, fitLabel } from '@/lib/builder/axisLabels';
+import { pieLayout } from '@/lib/builder/pieLayout';
 import { countryName } from '@/lib/builder/countries';
 import { friendlyDimValue } from '@/lib/builder/levelLabels';
 import { autoGranularity, toDay } from '@/lib/builder/dates';
@@ -267,10 +268,7 @@ export function PieView(props: WidgetViewProps<PieWidget>) {
     const rows = frame?.rows ?? [];
     const h = plotHeight(props.height, widget.showTitle !== false, true, Boolean(props.drill?.depth));
     const bottom = props.bp === 'sm' || c.legend === 'bottom' || (width > 0 && width < 380);
-    // Legend below (phones, narrow cells): the donut, a 20px gap and legend rows (28px + 4px gap) must fit
-    // the cell, or the centred content was cut at both ends. Keep room for 3 rows; fold the rest into "Other".
-    const size = bottom ? Math.max(72, Math.min(160, h - 20 - 3 * 32, width - 16)) : Math.max(96, Math.min(180, h - 8, width - 230));
-    const maxSlices = bottom ? Math.min(6, Math.max(2, Math.floor((h - size - 20 + 4) / 32))) : 6;
+    const { size, maxSlices } = pieLayout(h, width, bottom, rows.length);
     return (
         <WidgetFrame props={props}>
             {!frame ? null : !rows.length ? (

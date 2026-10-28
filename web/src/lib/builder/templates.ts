@@ -182,7 +182,7 @@ const BUILDERS_V1: Record<string, () => Built> = {
             controls: [DATE, filter('channel'), filter('country'), filter('device')],
             pages: [page('p_main', 'Traffic', [
                 [[kpi('w_kpis', ['ga4:activeUsers', 'ga4:sessions', 'ga4:engagementRate', 'ga4:averageSessionDuration', 'ga4:keyEvents']), 12, 3]],
-                [[breakdownTs('w_bychannel', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 8], [pie('w_channels', 'Channels', 'channel', 'ga4:sessions'), 4, 8]],
+                [[breakdownTs('w_bychannel', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 10], [pie('w_channels', 'Channels', 'channel', 'ga4:sessions'), 4, 10]],
                 [[table('w_sources', 'Source / medium', ['sourceMedium'], ['ga4:sessions', 'ga4:activeUsers', 'ga4:engagementRate', 'ga4:keyEvents']), 6, 9],
                     [table('w_campaigns', 'Campaigns', ['campaign'], ['ga4:sessions', 'ga4:keyEvents', 'ga4:sessionKeyEventRate']), 6, 9]],
                 [[table('w_landing', 'Landing pages', ['landingPage'], ['ga4:sessions', 'ga4:engagementRate', 'ga4:bounceRate', 'ga4:keyEvents']), 12, 9]],
@@ -241,7 +241,7 @@ const BUILDERS_V1: Record<string, () => Built> = {
                     [[pie('w_s_devices', 'Devices', 'device', 'gsc:clicks'), 4, 7], [barList('w_s_countries', 'Countries', 'country', 'gsc:clicks'), 8, 7]],
                 ], w),
                 page('p_traffic', 'Traffic', [
-                    [[breakdownTs('w_t_channel', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 8], [pie('w_t_channels', 'Channels', 'channel', 'ga4:sessions'), 4, 8]],
+                    [[breakdownTs('w_t_channel', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 10], [pie('w_t_channels', 'Channels', 'channel', 'ga4:sessions'), 4, 10]],
                     [[table('w_t_sources', 'Source / medium', ['sourceMedium'], ['ga4:sessions', 'ga4:activeUsers', 'ga4:engagementRate', 'ga4:keyEvents']), 6, 9],
                         [table('w_t_landing', 'Landing pages', ['landingPage'], ['ga4:sessions', 'ga4:engagementRate', 'ga4:keyEvents']), 6, 9]],
                 ], w),
