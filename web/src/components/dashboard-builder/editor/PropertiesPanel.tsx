@@ -20,6 +20,7 @@ import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { Choice, DimensionPicker, Field, MetricList, MetricPicker, NumberInput, SourcePicker, TextInput, Toggle, type SiteOption } from './Fields';
 import { ChartMarksEditor } from './ChartMarksEditor';
 import { EmbedSetup } from './EmbedProps';
+import { GeoSetup } from './GeoProps';
 import { RealtimeSetup } from './RealtimeProps';
 import { RulesEditor } from './RulesEditor';
 import { GrainControlProps, MetricControlProps, SearchTypeControlProps, SiteControlProps } from './SwitchControlProps';
@@ -184,18 +185,7 @@ function Setup({ widget, edit, sites, defaultLabel, doc }: { widget: WidgetDef; 
             );
         }
         case 'table': return <TableSetup widget={widget} edit={edit} source={source} portfolio={portfolio} />;
-        case 'geo': {
-            const c = widget.config;
-            return (
-                <>
-                    {source}
-                    <Field label="Metric"><MetricPicker value={c.metric.id} onChange={(id) => edit((w) => cfg(w as typeof widget, { metric: { id } }))} /></Field>
-                    <Field label="Ranked list"><Choice ariaLabel="Ranked list" value={String(c.topList) as '0' | '5' | '10'} onChange={(v) => edit((w) => cfg(w as typeof widget, { topList: Number(v) as 0 | 5 | 10 }))} options={[{ value: '0', label: 'Hide' }, { value: '5', label: 'Top 5' }, { value: '10', label: 'Top 10' }]} /></Field>
-                    <Field label="Projection"><Choice ariaLabel="Projection" value={c.projection} onChange={(v) => edit((w) => cfg(w as typeof widget, { projection: v }))} options={[{ value: 'naturalEarth', label: 'Natural Earth' }, { value: 'mercator', label: 'Mercator' }]} /></Field>
-                    <Toggle label="Legend" checked={c.showLegend} onChange={(v) => edit((w) => cfg(w as typeof widget, { showLegend: v }))} />
-                </>
-            );
-        }
+        case 'geo': return <GeoSetup widget={widget} edit={edit} source={source} />;
         case 'text': {
             const c = widget.config;
             return (

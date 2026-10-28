@@ -486,7 +486,14 @@ export interface TableConfig {
 export type TableWidget = WidgetBase<'table', TableConfig>;
 
 export interface GeoConfig {
-    level: 'country';
+    /**
+     * 'country' = shaded world map (the original). Round 9: 'region' = the regions of one country (a list with bars
+     * beside that country's outline: GA4 gives no region shapes), 'city' = bubbles on the map at each city's place
+     * (a small public-domain lookup, lib/builder/geo.ts) with the ranked list under it for cities it does not know.
+     */
+    level: 'country' | 'region' | 'city';
+    /** Region view: the country shown (ISO 3166-1 alpha-2); missing = the country with the most of the metric. */
+    country?: string;
     metric: MetricRef;
     scale: { kind: 'sequential'; bins: 'quantile' | 'linear' | 'log'; steps: 5 | 7 };
     projection: 'naturalEarth' | 'mercator';

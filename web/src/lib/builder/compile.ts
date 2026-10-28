@@ -356,7 +356,10 @@ export function compileWidget(rawWidget: WidgetDef, ctx: CompileCtx): CompiledWi
             break;
         }
         case 'geo': {
-            queries.push({ ...base, part: 'rows', metrics: [widget.config.metric.id], dimensions: ['country'], sort: { by: widget.config.metric.id, dir: 'desc' }, limit: 300, compare: compareOn });
+            // Round 9: region and city views read country + region / city rows (the country picks the region list).
+            const level = widget.config.level;
+            const dimensions = level === 'region' ? ['country', 'region'] : level === 'city' ? ['country', 'city'] : ['country'];
+            queries.push({ ...base, part: 'rows', metrics: [widget.config.metric.id], dimensions, sort: { by: widget.config.metric.id, dir: 'desc' }, limit: level === 'country' || !level ? 300 : 1000, compare: compareOn && (level === 'country' || !level) });
             break;
         }
         case 'portfolio-grid': {

@@ -103,7 +103,7 @@ export const widgetSchema = z.discriminatedUnion('type', [
     z.object({ ...base, type: z.literal('bar'), config: z.looseObject({ dimension: dimId, metrics: z.array(metricRef).min(1).max(3), stackBy: dimId.optional(), top: z.number().int().min(1).max(25) }) }),
     z.object({ ...base, type: z.literal('pie'), config: z.looseObject({ dimension: dimId, metric: metricRef, top: z.number().int().min(1).max(5) }) }),
     z.object({ ...base, type: z.literal('table'), config: z.looseObject({ dimensions: z.array(dimId).min(1).max(3), columns: z.array(tableColumn).min(1).max(14), maxRows: z.number().int().min(1).max(5000), rowFilters: z.array(metricClause).max(10).optional() }) }),
-    z.object({ ...base, type: z.literal('geo'), config: z.looseObject({ level: z.literal('country'), metric: metricRef }) }),
+    z.object({ ...base, type: z.literal('geo'), config: z.looseObject({ level: z.enum(['country', 'region', 'city']), country: z.string().regex(/^[A-Z]{2}$/).optional(), metric: metricRef }) }),
     z.object({ ...base, type: z.literal('text'), config: z.looseObject({ markdown: z.string().max(20_000), role: z.enum(['heading', 'subheading', 'body', 'note', 'callout']) }) }),
     z.object({ ...base, type: z.literal('image'), config: z.looseObject({ src: httpsUrl, alt: z.string().max(300), fit: z.enum(['contain', 'cover']), href: httpsUrl.optional() }) }),
     z.object({ ...base, type: z.literal('section'), config: z.looseObject({ title: z.string().max(200), subtitle: z.string().max(300).optional(), divider: z.boolean() }) }),

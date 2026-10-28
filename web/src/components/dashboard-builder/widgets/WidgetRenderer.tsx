@@ -6,6 +6,7 @@ import { KpiStripView, ScorecardView } from './Scorecard';
 import { BarView, PieView, TimeSeriesView } from './Charts';
 import { TableView } from './TableView';
 import { EmbedView } from './EmbedView';
+import { GeoCityView, GeoRegionView } from './GeoRegions';
 import { RealtimeView } from './RealtimeView';
 import { GeoView, ImageView, PortfolioGridView, SectionView, TextView } from './Other';
 
@@ -19,7 +20,7 @@ export function WidgetRenderer(props: WidgetViewProps) {
         case 'bar': return <BarView {...props} widget={w} />;
         case 'pie': return <PieView {...props} widget={w} />;
         case 'table': return <TableView {...props} widget={w} />;
-        case 'geo': return <GeoView {...props} widget={w} />;
+        case 'geo': return w.config.level === 'region' ? <GeoRegionView {...props} widget={w} /> : w.config.level === 'city' ? <GeoCityView {...props} widget={w} /> : <GeoView {...props} widget={w} />;
         case 'text': return <TextView {...props} widget={w} />;
         case 'section': return <SectionView {...props} widget={w} />;
         case 'image': return <ImageView {...props} widget={w} />;
