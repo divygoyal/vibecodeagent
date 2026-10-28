@@ -26,13 +26,15 @@ export interface ChartTooltipCardProps {
     rows: ChartTooltipRow[];
     partial?: boolean;
     className?: string;
+    /** Extra lines under the rows (dashboard chart markers on that date). */
+    footer?: ReactNode;
 }
 
 /**
  * Chart tooltip card (DESIGN 6.6): card style, not inverse. Values are full
  * numbers. Use it directly for custom charts, or through TimeSeriesChart.
  */
-export function ChartTooltipCard({ title, subtitle, rows, partial, className }: ChartTooltipCardProps) {
+export function ChartTooltipCard({ title, subtitle, rows, partial, className, footer }: ChartTooltipCardProps) {
     return (
         <div className={cn('pointer-events-none min-w-[180px] rounded-popover border border-border-subtle bg-surface-raised p-3 shadow-popover', className)}>
             {title || partial ? (
@@ -56,6 +58,7 @@ export function ChartTooltipCard({ title, subtitle, rows, partial, className }: 
                     </div>
                 ))}
             </div>
+            {footer ? <div className="mt-2 border-t border-border-subtle pt-2">{footer}</div> : null}
         </div>
     );
 }

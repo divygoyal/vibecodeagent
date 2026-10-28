@@ -1,19 +1,23 @@
 'use client';
 
 import { useMemo } from 'react';
+import { StickyNote } from 'lucide-react';
 import { useElementWidth } from '../useElementWidth';
 import { useReducedMotion } from 'framer-motion';
 import { Bar, BarChart, CartesianGrid, Tooltip as RTooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts';
 
 import { AXIS_LINE, AXIS_TICK, BarList, ChartTooltipCard, Donut, GRID_STROKE, niceAxis, type ChartTooltipRow } from '@/components/charts';
-import { EmptyState } from '@/components/ui';
-import { fmtAxis } from '@/lib/format';
+import { Button, EmptyState } from '@/components/ui';
+import { NotesPopover } from '@/components/site/chart/ChartExtras';
+import { buildChartMarks, resolveRefLines } from '@/lib/builder/chartMarks';
+import { fmtAxis, fmtDay } from '@/lib/format';
 import { channelColor, deviceColor, CATEGORICAL, CATEGORICAL_OTHER } from '@/lib/metrics';
 import { fmtMetricValue, getMetric, metricColor, metricLabel, dimLabel } from '@/lib/builder/catalog';
 import { countryName } from '@/lib/builder/countries';
 import { autoGranularity, toDay } from '@/lib/builder/dates';
 import type { BarWidget, CellValue, PieWidget, TimeSeriesWidget } from '@/lib/builder/types';
-import { BuilderTimeSeries, breakdownColor, breakdownLabel } from '../charts/BuilderTimeSeries';
+import { BuilderTimeSeries, MarkBadge, breakdownColor, breakdownLabel } from '../charts/BuilderTimeSeries';
+import { useWidgetNotes } from '../charts/chartNotes';
 import { okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { dsFormat, dsKey } from './metricUi';
 
@@ -61,8 +65,53 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
     const breakdown = c.breakdown && frame?.seriesKeys ? { metric: c.series[0].metric.id, dimension: c.breakdown.dimension, keys: frame.seriesKeys, stacked: c.stacked !== false, labels: frame.labels } : undefined;
     const compare = props.compare !== 'none' && c.compare === 'inherit' && !breakdown && rows.some((r) => `m:${c.series[0]?.metric.id}:prev` in r);
     const h = plotHeight(props.height, widget.showTitle !== false);
+
+    // Round 7: markers (your notes, Google updates) and goal / reference / average lines.
+    const notes = useWidgetNotes(widget, resolved);
+    const range = notes.range;
+    const rowDates = rows.map((r) => String(r['d:date'] ?? ''));
+    const { marks, hidden } = notes.markers && range ? buildChartMarks({ rowDates, range, mode: c.annotations, notes: notes.notes }) : { marks: [], hidden: 0 };
+    const currency = ok?.flags.currency;
+    const refLines = range ? resolveRefLines(c.refLines, {
+        rows,
+        metrics: breakdown ? [breakdown.metric] : c.series.map((s) => s.metric.id),
+        breakdown,
+        granularity,
+        range,
+        partialFrom,
+        fmt: (id, v) => fmtMetricValue(id, v, { compact: true, currency }),
+    }) : [];
+    const footnote = marks.length ? {
+        text: `${hidden ? `${hidden} earlier marker${hidden === 1 ? '' : 's'} not shown · ` : ''}${marks.map((m) => `${m.n} ${m.label} (${fmtDay(m.date)})`).join(' · ')}`,
+        node: (
+            <>
+                {marks.map((m, i) => (
+                    <span key={m.key} className="inline-flex items-center gap-1 align-middle">
+                        {i ? <span aria-hidden className="mx-1">·</span> : null}
+                        <MarkBadge mark={m} />
+                        <span>{m.label}</span>
+                    </span>
+                ))}
+            </>
+        ),
+    } : undefined;
+    const addNote = notes.canAdd && props.mode === 'view' && range ? (
+        <NotesPopover
+            start={range.start}
+            end={range.end}
+            scope={notes.scope}
+            notes={marks.filter((m) => m.kind === 'note')}
+            failed={notes.failed}
+            onChanged={notes.refresh}
+            hint={notes.scope ? 'A launch, a campaign, a site change. It shows on this site’s charts and dashboards.' : 'A launch, a campaign, a site change. It shows on the charts of all your sites.'}
+            trigger={(
+                <Button size="sm" variant="ghost" iconOnly icon={StickyNote} aria-label="Add a note to this chart" title="Add a note"
+                    className="size-6 text-fg-faint opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100" />
+            )}
+        />
+    ) : null;
     return (
-        <WidgetFrame props={props}>
+        <WidgetFrame props={props} footnote={footnote} actions={addNote ?? undefined}>
             {frame && rows.length ? (
                 <BuilderTimeSeries
                     rows={rows}
@@ -72,8 +121,10 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
                     granularity={granularity}
                     partialFrom={partialFrom}
                     height={h}
-                    currency={ok?.flags.currency}
+                    currency={currency}
                     showLegend={c.legend !== 'none'}
+                    marks={marks}
+                    refLines={refLines}
                 />
             ) : ok ? <EmptyState variant="inline" title="No data in this period" /> : null}
         </WidgetFrame>

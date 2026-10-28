@@ -6,7 +6,7 @@
  * stored by /api/annotations).
  */
 import { parseAsString, useQueryState } from 'nuqs';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Diamond, Plus, StickyNote, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -200,8 +200,16 @@ export function ChartMarkers({ markers, start, end, notesKey, scope, onChanged, 
     );
 }
 
-function NotesPopover({ start, end, scope, notes, onChanged, failed }: {
-    start: string; end: string; notesKey: string | null; scope: string | null; notes: ChartMarker[]; onChanged: () => void; failed?: boolean;
+/**
+ * "Add note" popover: add a note on a date, list and delete this period's notes. Also used by
+ * dashboard time series (round 7) with their own trigger and wording.
+ */
+export function NotesPopover({ start, end, scope, notes, onChanged, failed, trigger, hint }: {
+    start: string; end: string; notesKey?: string | null; scope: string | null; notes: Array<Pick<ChartMarker, 'key' | 'date' | 'label' | 'noteId'>>; onChanged: () => void; failed?: boolean;
+    /** Replaces the "Add note" button (must accept a ref, e.g. a Button). */
+    trigger?: ReactNode;
+    /** Replaces the line under the heading. */
+    hint?: string;
 }) {
     const [open, setOpen] = useState(false);
     const [date, setDate] = useState(end);
@@ -241,11 +249,11 @@ function NotesPopover({ start, end, scope, notes, onChanged, failed }: {
     return (
         <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setDate(end); }}>
             <PopoverTrigger asChild>
-                <Button size="sm" variant="ghost" icon={Plus} className="h-6 px-2 pointer-coarse:h-8">Add note</Button>
+                {trigger ?? <Button size="sm" variant="ghost" icon={Plus} className="h-6 px-2 pointer-coarse:h-8">Add note</Button>}
             </PopoverTrigger>
             <PopoverContent align="start" className="w-80 p-4" aria-label="Chart notes">
                 <p className="text-body-sm font-medium text-fg">Add a note to your charts</p>
-                <p className="mt-0.5 text-meta text-fg-muted">A launch, a campaign, a site change. It shows on the Traffic and Search charts of this site.</p>
+                <p className="mt-0.5 text-meta text-fg-muted">{hint ?? 'A launch, a campaign, a site change. It shows on the Traffic and Search charts of this site.'}</p>
                 <form className="mt-3 flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); void save(); }}>
                     <label className="text-meta text-fg-secondary" htmlFor="note-date">Date</label>
                     <input id="note-date" type="date" className={field} value={date} min={start} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} />

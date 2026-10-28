@@ -143,6 +143,7 @@ export function ShareDialog({ open, onOpenChange, dashboardId, doc, share, views
                                 </div>
                             </fieldset>
                             <Switch checked={share.allowCopy} onCheckedChange={(v) => put({ allowCopy: v })} label="Allow viewers to copy this dashboard" description="Signed-in viewers can use it as a template for their own site. Your data is never copied." />
+                            <Switch checked={Boolean(doc.settings.shareNotes)} onCheckedChange={(v) => onDocChange({ ...doc, settings: { ...doc.settings, shareNotes: v || undefined } })} label="Show my chart notes" description="Notes you add to your site charts show on this link’s time series. Off: viewers see Google update markers only." />
                             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-3">
                                 <p className="text-meta text-fg-muted">{views ?? 0} view{views === 1 ? '' : 's'}</p>
                                 <div className="flex gap-2">

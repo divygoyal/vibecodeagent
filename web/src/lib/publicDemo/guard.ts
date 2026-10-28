@@ -122,6 +122,7 @@ export const DEMO_API_RULES: RouteRule[] = [
     R('/api/dashboards/query', { POST: 'allow' }),
     R('/api/dashboards/[id]', { GET: 'allow', PUT: 'deny', DELETE: 'deny' }),
     R('/api/dashboards/[id]/widget-data', READ),
+    R('/api/dashboards/notes', READ),
     R('/api/dashboards/[id]/versions', READ),
     R('/api/dashboards/[id]/duplicate', DENY_ALL),
     R('/api/dashboards/[id]/share', DENY_ALL),
@@ -129,6 +130,7 @@ export const DEMO_API_RULES: RouteRule[] = [
     R('/api/dashboards/public/[token]', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/query', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/widget-data', PUBLIC_ALL),
+    R('/api/dashboards/public/[token]/notes', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/unlock', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/copy', PUBLIC_ALL),
 

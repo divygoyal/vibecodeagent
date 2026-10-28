@@ -181,7 +181,7 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
                 {(fit) => <DashboardView
                     fitHeight={fit} doc={doc} mode="view" siteLabel={siteLabel} state={ctl.state} onPage={ctl.setPage} onDate={ctl.setDate} onFilter={ctl.setFilter}
                     allow={{ date: true, compare: true, filters: true }} data={page.data} loading={!page.data && !page.error} refetching={page.isValidating && Boolean(page.data)}
-                    onRetry={() => void page.mutate()} options={{}} shell="inherit" tv
+                    onRetry={() => void page.mutate()} options={{}} shell="inherit" tv notes={{ kind: 'owner', defaultSource: doc.defaultSource, canAdd: false }}
                 />}
             </TvFrame>
         );
@@ -210,6 +210,7 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
                 onChooseSource={wide ? () => router.push(`/dashboard/dashboards/${rec.id}/edit`) : undefined}
                 shell="panel"
                 appMode={appMode}
+                notes={{ kind: 'owner', defaultSource: doc.defaultSource, canAdd: true }}
             />
             {page.error ? <Banner variant="danger" className="mt-4">{page.error instanceof Error ? page.error.message : 'Could not load data'}</Banner> : null}
             <ShareDialog

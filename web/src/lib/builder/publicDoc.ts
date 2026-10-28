@@ -60,7 +60,7 @@ export function publicDoc(doc: DashboardDocV2, labelOf: (s: SourceRef) => string
         pages,
         widgets,
         theme,
-        settings: { widthMode: doc.settings.widthMode, autoRefreshSec: doc.settings.autoRefreshSec, ...(doc.settings.tv ? { tv: doc.settings.tv } : {}) },
+        settings: { widthMode: doc.settings.widthMode, autoRefreshSec: doc.settings.autoRefreshSec, ...(doc.settings.tv ? { tv: doc.settings.tv } : {}), ...(doc.settings.shareNotes ? { shareNotes: true } : {}) },
         meta: {},
     };
 }
