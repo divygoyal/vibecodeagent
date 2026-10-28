@@ -7,6 +7,7 @@ import { PLACEHOLDER_COMPANY, PLACEHOLDER_TEXTS } from './placeholders';
 import { tableColumns } from './registry';
 import { applyThemePreset, isThemeId, type ThemeId } from './themes';
 import { BUILDERS_R2, TEMPLATES_R2, type BuildCtx, type BuiltR2 } from './templates.round2';
+import { BUILDERS_R9, TEMPLATES_R9 } from './templates.charts';
 import type {
     BarWidget,
     ControlDef,
@@ -289,9 +290,11 @@ export const TEMPLATES: TemplateMeta[] = [
     { id: 'key-events-revenue', name: 'Key events and revenue', description: 'Key events and ecommerce by channel and product.', category: 'Traffic', needs: ['ga4'] },
     // Round 2: sixteen new templates, appended (the eight above keep their ids and order).
     ...TEMPLATES_R2.map((t): TemplateMeta => ({ ...t, isNew: true })),
+    // Round 9: templates built around the new charts (heatmap, scatter, funnel, treemap, pivot).
+    ...TEMPLATES_R9.map((t): TemplateMeta => ({ ...t, isNew: true })),
 ];
 
-const BUILDERS: Record<string, Builder> = { ...BUILDERS_V1, ...BUILDERS_R2 };
+const BUILDERS: Record<string, Builder> = { ...BUILDERS_V1, ...BUILDERS_R2, ...BUILDERS_R9 };
 
 export const BLANK_TEMPLATE: TemplateMeta = { id: 'blank', name: 'Blank', description: 'Start from an empty page.', category: 'Overview', needs: [] };
 
