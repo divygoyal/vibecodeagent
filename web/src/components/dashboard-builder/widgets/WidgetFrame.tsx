@@ -8,6 +8,7 @@ import { Button, Skeleton, Tooltip } from '@/components/ui';
 import { fmtDay } from '@/lib/format';
 import { metricLabel } from '@/lib/builder/catalog';
 import { widgetTitle } from '@/lib/builder/registry';
+import { drillTitleSuffix, ignoredFiltersNote } from '@/lib/builder/levelLabels';
 import { searchTypeLabel, widgetSearchType } from '@/lib/builder/searchType';
 import { DrillCrumbs, type DrillView } from './DrillCrumbs';
 import type { CompareSpec, ResolvedDates, WidgetDef, WidgetResult, WidgetResultOk } from '@/lib/builder/types';
@@ -44,7 +45,8 @@ export function okResult(r?: WidgetResult): WidgetResultOk | undefined {
     return r.stale;
 }
 
-const ERROR_ICON = { NOT_CONNECTED: PlugZap, NO_ACCESS: Link2, NO_GA4_SOURCE: Link2, NO_GSC_SOURCE: Link2 } as const;
+// INCOMPATIBLE is an expected state (a search type or source that cannot answer this widget), so it gets the info icon, not a warning triangle.
+const ERROR_ICON = { INCOMPATIBLE: Info, NOT_CONNECTED: PlugZap, NO_ACCESS: Link2, NO_GA4_SOURCE: Link2, NO_GSC_SOURCE: Link2 } as const;
 
 export function WidgetError({ result, onRetry, onChooseSource, compact }: { result: Extract<WidgetResult, { status: 'error' }>; onRetry?: () => void; onChooseSource?: () => void; compact?: boolean }) {
     const Icon = (ERROR_ICON as Record<string, typeof AlertTriangle>)[result.code] ?? AlertTriangle;
@@ -94,7 +96,8 @@ export function flagNotes(r: WidgetResultOk | undefined, widget: WidgetDef): str
     if (f.thresholded) out.push('Google hides small groups (privacy thresholds)');
     if (f.otherRow) out.push('Some values are grouped as (other)');
     if (f.preliminaryFrom && (widget.type === 'timeseries' || widget.type === 'scorecard' || widget.type === 'kpi-strip')) out.push(`Search Console data after ${fmtDay(f.preliminaryFrom)} is still being processed`);
-    if (f.filtersIgnored?.length) out.push(`${f.filtersIgnored.length === 1 ? 'A filter does' : 'Some filters do'} not apply to this widget`);
+    const ignored = ignoredFiltersNote(f.filtersIgnoredDims, f.filtersIgnored?.length ?? 0);
+    if (ignored) out.push(ignored);
     if (f.usersSummed) out.push('Users are summed across sites');
     if (f.sitesFailed?.length) out.push(`${f.sitesFailed.length} site${f.sitesFailed.length === 1 ? '' : 's'} could not load`);
     if (f.missingFamilies?.length) out.push(f.missingFamilies.includes('ga4') ? 'No Analytics property linked: those numbers show –' : 'No Search Console site linked: those numbers show –');
@@ -139,6 +142,7 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                 <div className={cn('mb-3 flex min-w-0 items-start gap-2', widget.style?.titleAlign === 'center' && 'justify-center text-center')}>
                     <h3 className={cn('min-w-0 truncate text-fg', widget.style?.titleSize === 'lg' ? 'text-title' : widget.style?.titleSize === 'sm' ? 'text-body-sm font-medium' : 'text-title-sm')}>
                         {widgetTitle(widget)}
+                        {drillTitleSuffix(widget) ? <span className="font-normal text-fg-muted"> › {drillTitleSuffix(widget)}</span> : null}
                     </h3>
                     {widget.description ? (
                         <Tooltip content={widget.description}>

@@ -16,6 +16,7 @@
  */
 import { dimInFamily, getDim, metricFamilies } from './catalog';
 import { widgetMetrics } from './registry';
+import { searchTypeProblem, widgetSearchType } from './searchType';
 import type { ControlState, DimId, FilterClause, WidgetDef } from './types';
 
 export const MAX_DRILL_LEVELS = 3;
@@ -64,14 +65,21 @@ export function drillProblem(w: WidgetDef, levels: DimId[] | undefined = w.inter
     return null;
 }
 
-/** The chain a widget drills through ([own dimension, ...levels]), or null when it has no usable drill list. */
+/**
+ * The chain a widget drills through ([own dimension, ...levels]), or null when it has no usable drill list.
+ * Levels its search type cannot answer are left out; a chain with nothing below its own dimension drills nowhere.
+ */
 export function drillChain(w: WidgetDef): DimId[] | null {
     const runtime = w.interactions?.drillChain;
     if (runtime?.length) return runtime;
     const levels = w.interactions?.drill;
     if (!levels?.length || drillProblem(w, levels)) return null;
     const base = baseDimension(w);
-    return base ? [base, ...levels] : null;
+    if (!base) return null;
+    // A level the widget's search type cannot answer is not offered (Discover and Google News have no queries).
+    const type = widgetSearchType(w);
+    const offered = levels.filter((d) => !searchTypeProblem(type, { dimensions: [d], metrics: [] }));
+    return offered.length ? [base, ...offered] : null;
 }
 
 /**

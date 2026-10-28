@@ -642,6 +642,8 @@ export interface ResultFlags {
     otherRow?: boolean;
     preliminaryFrom?: Iso;
     filtersIgnored?: ControlId[];
+    /** Which filters were left out and for which Google product (the footnote names them). */
+    filtersIgnoredDims?: Array<{ dimension: DimId; family: 'ga4' | 'gsc' }>;
     sitesFailed?: string[];
     usersSummed?: boolean;
     /** Families the source lacks for some of the widget's metrics (those show '–'). */

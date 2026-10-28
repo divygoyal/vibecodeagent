@@ -717,6 +717,8 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
                     for (const fo of filterOrigins) {
                         if (!dimInFamily(fo.clause.dimension, family) && fo.controlId) {
                             plan.flags.filtersIgnored = [...new Set([...(plan.flags.filtersIgnored ?? []), fo.controlId])];
+                            const seen = plan.flags.filtersIgnoredDims ?? [];
+                            if (!seen.some((x) => x.dimension === fo.clause.dimension && x.family === family)) plan.flags.filtersIgnoredDims = [...seen, { dimension: fo.clause.dimension, family }];
                         }
                     }
                     const apiDims = effDims.map((d) => (family === 'ga4' ? ga4ApiDim(d) : gscApiDim(d)));

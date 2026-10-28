@@ -17,6 +17,8 @@ import {
     keepDrillKey, resolveDrillValue, sanitizeDrill,
 } from '@/lib/builder/drill';
 import { clickableDims } from '@/lib/builder/interaction';
+import { drillTitleSuffix, friendlyDimValue, ignoredFiltersNote } from '@/lib/builder/levelLabels';
+import type { SearchTypeControl } from '@/lib/builder/types';
 import { repairWidget, updateWidget } from '@/lib/builder/docOps';
 import { defaultWidget } from '@/lib/builder/registry';
 import { controlStateSchema, validateDoc, validateWidgets } from '@/lib/builder/schema';
@@ -438,4 +440,58 @@ test('engine: a forged state cannot reach a dimension or a widget it does not co
     assert.equal(r.status, 'ok');
     assert.ok(r.parts.rows.columns.some((c: any) => c.id === 'd:channel'), 'still channel');
     assert.ok(!JSON.stringify(calls.map((c) => c.body)).includes('Organic Search'), 'the value was never sent to Google');
+});
+
+// ── Round 8 judge fixes ──────────────────────────────────────────────────
+
+const typeCtl: SearchTypeControl = { id: 't1', type: 'searchType', label: 'Search type', options: ['web', 'image', 'video', 'news', 'discover', 'googleNews'], default: 'web', scope: { mode: 'all' } };
+
+test('offered levels: Discover and Google News drop the query level; country or device stay; web keeps it', () => {
+    const pageToQuery = table('w1', ['page'], ['gsc:clicks'], ['query']);
+    assert.deepEqual(drillChain(pageToQuery), ['page', 'query']);
+    assert.deepEqual(drillChain({ ...pageToQuery, searchType: 'discover' } as Table), null, 'nothing below Page is offered in Discover');
+    assert.deepEqual(drillChain({ ...pageToQuery, searchType: 'googleNews' } as Table), null);
+    assert.deepEqual(drillChain({ ...pageToQuery, searchType: 'image' } as Table), ['page', 'query']);
+    // Other configured levels stay offered while the query level is skipped.
+    const mixed = { ...table('w2', ['page'], ['gsc:clicks'], ['query', 'country']), searchType: 'discover' } as Table;
+    assert.deepEqual(drillChain(mixed), ['page', 'country']);
+
+    // Through the viewer switcher: the page-level control makes the widget a Discover one and the level goes away.
+    const picked = base({ searchType: { t1: 'discover' } });
+    const applied = applyViewerControls(pageToQuery, ctxOf(picked, [typeCtl]));
+    assert.equal(drillInfo(applied, picked.drill), null);
+    assert.deepEqual(drillInfo(applyViewerControls(mixed, ctxOf(picked, [typeCtl])), undefined)?.chain, ['page', 'country']);
+    // A stale path that went into queries is dropped, not sent to Google as a query filter.
+    const stale = base({ searchType: { t1: 'discover' }, drill: { w1: ['/pricing'] } });
+    const q = compileWidget(pageToQuery, ctxOf(stale, [typeCtl])).queries[0];
+    assert.deepEqual(q.dimensions, ['page']);
+    assert.equal(q.searchType, 'discover');
+    // The same widget on web still drills (a widget on Analytics metrics is never affected).
+    const web = compileWidget(pageToQuery, ctxOf(base({ drill: { w1: ['/pricing'] } }), [typeCtl])).queries[0];
+    assert.deepEqual(web.dimensions, ['query']);
+    assert.deepEqual(drillChain(bar('g', 'channel', 'ga4:sessions', ['sourceMedium', 'campaign'])), ['channel', 'sourceMedium', 'campaign']);
+});
+
+test('labels: title follows the drilled level; placeholder values and the homepage read as words', () => {
+    const w = bar('w1', 'channel', 'ga4:sessions', ['sourceMedium', 'campaign'], { title: 'Sessions by channel' });
+    assert.equal(drillTitleSuffix(w), null, 'top level: the title as written');
+    const deep = applyDrill(w, { w1: ['Organic Search', 'google / organic'] });
+    assert.equal(drillTitleSuffix(deep), 'Campaign');
+    assert.equal(drillTitleSuffix(applyDrill(w, { w1: ['Organic Search'] })), 'Source / medium');
+    const countries = table('c', ['country'], ['ga4:sessions'], ['region', 'city']);
+    assert.equal(drillTitleSuffix(applyDrill({ ...countries, title: 'Countries' } as Table, { c: ['US', 'Texas'] })), 'City');
+    assert.equal(drillTitleSuffix(applyDrill({ ...countries, title: undefined } as Table, { c: ['US', 'Texas'] })), null, 'an automatic title is built from the level already');
+
+    assert.equal(friendlyDimValue('campaign', '(organic)'), 'No campaign (organic)');
+    assert.equal(friendlyDimValue('campaign', '(not set)'), 'No campaign (not set)');
+    assert.equal(friendlyDimValue('campaign', 'spring-sale'), null);
+    assert.equal(friendlyDimValue('sourceMedium', '(direct) / (none)'), 'Direct (no source)');
+    assert.equal(friendlyDimValue('page', '/'), '/ (home)');
+    assert.equal(friendlyDimValue('page', '/pricing'), null);
+    assert.equal(friendlyDimValue('channel', '(organic)'), null, 'only the dimensions that have these placeholders');
+
+    assert.equal(ignoredFiltersNote(undefined, 0), null);
+    assert.equal(ignoredFiltersNote([{ dimension: 'campaign', family: 'gsc' }]), 'Campaign filter not applied (Search Console has no campaign data)');
+    assert.match(ignoredFiltersNote([{ dimension: 'campaign', family: 'gsc' }, { dimension: 'channel', family: 'gsc' }]) ?? '', /^Campaign and Channel filters not applied \(Search Console has no data for them\)$/);
+    assert.match(ignoredFiltersNote(undefined, 2) ?? '', /Some filters were not applied/);
 });

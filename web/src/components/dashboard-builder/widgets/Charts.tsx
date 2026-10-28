@@ -14,6 +14,7 @@ import { fmtAxis, fmtDay } from '@/lib/format';
 import { channelColor, deviceColor, CATEGORICAL, CATEGORICAL_OTHER } from '@/lib/metrics';
 import { fmtMetricValue, getMetric, metricColor, metricLabel, dimLabel } from '@/lib/builder/catalog';
 import { countryName } from '@/lib/builder/countries';
+import { friendlyDimValue } from '@/lib/builder/levelLabels';
 import { autoGranularity, toDay } from '@/lib/builder/dates';
 import type { BarWidget, CellValue, PieWidget, TimeSeriesWidget } from '@/lib/builder/types';
 import { BuilderTimeSeries, breakdownColor, breakdownLabel } from '../charts/BuilderTimeSeries';
@@ -27,6 +28,8 @@ export function dimText(dim: string, v: CellValue, labels?: Record<string, strin
     if (v === null || v === undefined || v === '') return '(not set)';
     const s = String(v);
     if (labels?.[s]) return labels[s];
+    const friendly = friendlyDimValue(dim, s);
+    if (friendly) return friendly;
     if (dim === 'country') return s === '(other)' ? 'Other' : countryName(s);
     if (dim === 'device') return s.charAt(0).toUpperCase() + s.slice(1);
     if (s === '(other)') return 'Other';
