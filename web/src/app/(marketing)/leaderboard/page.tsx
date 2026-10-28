@@ -33,10 +33,10 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
     return {
         title: { absolute: title },
         description,
-        alternates: { canonical: `${SITE_ORIGIN}/leaderboard` },
+        alternates: { canonical: '/leaderboard' },
         // Filtered and search views are for people; the plain board is for search engines.
         robots: filtered ? { index: false, follow: true } : { index: true, follow: true },
-        openGraph: { title, description, url: `${SITE_ORIGIN}/leaderboard`, siteName: BRAND_NAME, type: 'website' },
+        openGraph: { title, description, url: '/leaderboard', siteName: BRAND_NAME, type: 'website' },
         twitter: { card: 'summary_large_image', title, description },
     };
 }

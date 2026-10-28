@@ -107,8 +107,9 @@ const nextConfig: NextConfig = {
       ? [{ source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] }]
       : []),
     {
-      // Cache static assets (videos, images, fonts) for 1 year
-      source: '/:path*.(mp4|webm|jpg|jpeg|png|gif|svg|ico|woff|woff2)',
+      // Cache static assets (videos, images, fonts) for 1 year. Not /badge/<slug>.svg: that is generated per request
+      // from live numbers and sets its own 1-hour cache (app/badge/[file]/route.ts).
+      source: '/:path((?!badge/).*).(mp4|webm|jpg|jpeg|png|gif|svg|ico|woff|woff2)',
       headers: [
         { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
       ],
