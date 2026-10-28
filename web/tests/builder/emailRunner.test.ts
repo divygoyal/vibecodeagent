@@ -18,7 +18,7 @@ import { MockTransport } from '@/lib/builder/email/transport';
 import { verifyToken } from '@/lib/builder/email/tokens';
 import type { DigestModel, ScheduleRow } from '@/lib/builder/email/types';
 import { buildFromTemplate } from '@/lib/builder/templates';
-import type { DashboardDocV2, DashboardQueryResponse, DataFrame, WidgetResult } from '@/lib/builder/types';
+import type { CompareSpec, DashboardDocV2, DashboardQueryResponse, DataFrame, WidgetResult } from '@/lib/builder/types';
 
 const SECRET = 'test-secret';
 const ORIGIN = 'https://app.example.test';
@@ -282,7 +282,7 @@ test('the email: KPI tiles and signed chart pictures from widget results, view l
     const doc = buildFromTemplate('site-overview', { name: 'Acme <b>report</b>', defaultSource: { type: 'site', siteId: 'acme.test' } });
     const page = doc.pages[0];
     const res = cannedResults(doc);
-    const base = { doc, pages: [{ page, res }], config: config({ range: '7d' }), origin: ORIGIN, dashboardId: 'dash-1', siteLabel: 'acme.test', compareMode: 'previous_period' as const, secret: SECRET };
+    const base = { doc, pages: [{ page, res }], config: config({ range: '7d' }), origin: ORIGIN, dashboardId: 'dash-1', siteLabel: 'acme.test', compare: { mode: 'previous_period' } as CompareSpec, secret: SECRET };
     const m = buildDigestModel({ ...base, shareToken: null });
     assert.ok(m.pages.length === 1 && m.pages[0].kpis.length > 0, 'has KPI tiles');
     assert.equal(m.rangeLabel.startsWith('Last 7 days'), true);
@@ -309,6 +309,32 @@ test('the email: KPI tiles and signed chart pictures from widget results, view l
     assert.ok(html.includes('Unsubscribe from these emails'));
     assert.ok(html.includes('&amp;x=1'));
     assert.ok(!/<script/i.test(html));
+});
+
+test('the email names the comparison the dashboard really uses (same weekdays, custom days) and follows a widget with its own comparison', () => {
+    const doc = buildFromTemplate('site-overview', { name: 'Acme', defaultSource: { type: 'site', siteId: 'acme.test' } });
+    const page = doc.pages[0];
+    const res = cannedResults(doc);
+    const input = { doc, pages: [{ page, res }], config: config({ range: '7d' }), origin: ORIGIN, dashboardId: 'dash-1', siteLabel: 'acme.test', shareToken: null, secret: SECRET };
+    const cmps = (m: DigestModel) => m.pages[0].kpis.map((k) => k.compare);
+    const weekday = buildDigestModel({ ...input, compare: { mode: 'previous_period', align: 'weekday' } });
+    assert.ok(weekday.pages[0].kpis.length > 0 && cmps(weekday).every((c) => c === 'vs previous period (same weekdays)'));
+    const yoyw = buildDigestModel({ ...input, compare: { mode: 'previous_year', align: 'weekday' } });
+    assert.ok(cmps(yoyw).every((c) => c === 'vs last year (same weekdays)'));
+    // a custom comparison keeps its deltas (it used to drop them)
+    const custom = buildDigestModel({ ...input, compare: { mode: 'custom', start: '2026-08-01', end: '2026-08-31' } });
+    assert.ok(custom.pages[0].kpis.every((k) => k.delta && k.compare === 'vs custom period'));
+    // no comparison: no deltas
+    const none = buildDigestModel({ ...input, compare: { mode: 'none' } });
+    assert.ok(none.pages[0].kpis.every((k) => !k.delta));
+    // a KPI widget with its own comparison says its own words, and "none" removes the delta
+    const strip = Object.values(doc.widgets).find((w) => w.type === 'kpi-strip')!;
+    strip.dateOverride = { compare: { mode: 'previous_year' } };
+    const own = buildDigestModel({ ...input, compare: { mode: 'previous_period' } });
+    assert.ok(cmps(own).includes('vs same period last year'));
+    strip.dateOverride = { compare: { mode: 'none' } };
+    const off = buildDigestModel({ ...input, compare: { mode: 'previous_period' } });
+    assert.ok(off.pages[0].kpis.some((k) => !k.delta));
 });
 
 test('a message from the owner is shown as plain text; the confirmation email names the owner and has both links', () => {

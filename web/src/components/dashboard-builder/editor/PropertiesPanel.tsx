@@ -97,7 +97,7 @@ function WidgetProps({ widget, doc, sites, defaultLabel }: { widget: WidgetDef; 
                 {tab === 'setup' ? (
                     <>
                         <Setup widget={widget} edit={edit} sites={sites} defaultLabel={defaultLabel} doc={doc} />
-                        {!meta.static ? <div className="border-t border-border-subtle pt-4"><WidgetDatesField widget={widget} edit={edit} /></div> : null}
+                        {!meta.static && !meta.selfFetch ? <div className="border-t border-border-subtle pt-4"><WidgetDatesField widget={widget} edit={edit} /></div> : null}
                         {!meta.static ? <div className="border-t border-border-subtle pt-4"><WidgetFilters widget={widget} doc={doc} edit={edit} /></div> : null}
                     </>
                 ) : <Style widget={widget} edit={edit} />}

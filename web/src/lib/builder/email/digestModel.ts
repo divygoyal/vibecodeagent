@@ -8,7 +8,8 @@ import { countryName } from '@/lib/builder/countries';
 import { compareLabel, presetLabel } from '@/lib/builder/dates';
 import { friendlyDimValue } from '@/lib/builder/levelLabels';
 import { brandCompanyName } from '@/lib/builder/placeholders';
-import type { CellValue, DashboardDocV2, DateControl, NumberFormat, DashboardQueryResponse, DataFrame, PageDef, WidgetDef, WidgetResultOk } from '@/lib/builder/types';
+import type { CellValue, CompareSpec, DashboardDocV2, DateControl, NumberFormat, DashboardQueryResponse, DataFrame, PageDef, WidgetDef, WidgetResultOk } from '@/lib/builder/types';
+import { resolveWidgetDates } from '@/lib/builder/widgetDates';
 import { barSize, chartUrl, downsample, LINE_SIZE, type ChartSpec } from './chartSpec';
 import { describeSchedule, lowerFirst, type EmailScheduleConfig } from './schedule';
 import type { DigestChart, DigestKpi, DigestModel, DigestPage } from './types';
@@ -116,7 +117,8 @@ export interface ModelInput {
     shareToken: string | null;
     dashboardId: string;
     siteLabel: string;
-    compareMode: 'previous_period' | 'previous_year' | 'none';
+    /** The dashboard's comparison rule (round 9: includes same-weekday and custom days). A widget with its own comparison overrides it. */
+    compare: CompareSpec;
     secret?: string | null;
 }
 
@@ -128,7 +130,6 @@ export function buildDigestModel(input: ModelInput): DigestModel {
     const { doc, config, origin } = input;
     const pages: DigestPage[] = [];
     let rangeLabel = '';
-    const cmpText = input.compareMode === 'none' ? '' : compareLabel({ mode: input.compareMode });
 
     for (const { page, res } of input.pages) {
         if (res.resolved && !rangeLabel) {
@@ -144,22 +145,26 @@ export function buildDigestModel(input: ModelInput): DigestModel {
             if (!w || w.type === undefined) continue;
             const ok = okOf(res.results[id]);
             if (!ok) continue;
+            // The rule this widget compares by: its own (own dates, round 9) or the dashboard's.
+            const spec = resolveWidgetDates(w.dateOverride, { range: res.resolved.range, compare: res.resolved.compare, compareSpec: input.compare, today: res.resolved.today }).compareSpec;
+            const compareOn = spec.mode !== 'none';
+            const cmpText = compareOn ? compareLabel(spec) : '';
             if (w.type === 'scorecard') {
-                const k = kpiOf(w.config.metric.id, w.config.metric.label || (w.showTitle !== false ? w.title : undefined), ok.parts.total, ok, w.config.comparison.show && input.compareMode !== 'none', cmpText, w.config.metric.format);
+                const k = kpiOf(w.config.metric.id, w.config.metric.label || (w.showTitle !== false ? w.title : undefined), ok.parts.total, ok, w.config.comparison.show && compareOn, cmpText, w.config.metric.format);
                 if (k && kpis.length < MAX_KPIS_PER_PAGE) kpis.push(k);
             } else if (w.type === 'kpi-strip') {
                 for (const m of w.config.metrics) {
-                    const k = kpiOf(m.id, m.label, ok.parts.total, ok, w.config.comparison.show && input.compareMode !== 'none', cmpText, m.format);
+                    const k = kpiOf(m.id, m.label, ok.parts.total, ok, w.config.comparison.show && compareOn, cmpText, m.format);
                     if (k && kpis.length < MAX_KPIS_PER_PAGE) kpis.push(k);
                 }
             } else if (charts.length < MAX_CHARTS_PER_PAGE && (w.type === 'timeseries' || w.type === 'bar' || w.type === 'pie')) {
-                const spec = w.type === 'timeseries' ? lineChart(w, ok, input.compareMode !== 'none') : barChart(w, ok);
-                if (!spec) continue;
-                const size = spec.g === 'line' ? LINE_SIZE : barSize(spec.v.length);
+                const chart = w.type === 'timeseries' ? lineChart(w, ok, compareOn) : barChart(w, ok);
+                if (!chart) continue;
+                const size = chart.g === 'line' ? LINE_SIZE : barSize(chart.v.length);
                 charts.push({
-                    title: spec.t,
-                    imageUrl: chartUrl(origin, spec, input.secret),
-                    alt: spec.g === 'line' ? `${spec.t}: ${spec.f[1]} now, high ${spec.f[0]}, ${spec.l.join(' to ')}` : `${spec.t}: ${spec.l.slice(0, 3).map((l, i) => `${l} ${spec.f[i]}`).join(', ')}`,
+                    title: chart.t,
+                    imageUrl: chartUrl(origin, chart, input.secret),
+                    alt: chart.g === 'line' ? `${chart.t}: ${chart.f[1]} now, high ${chart.f[0]}, ${chart.l.join(' to ')}` : `${chart.t}: ${chart.l.slice(0, 3).map((l, i) => `${l} ${chart.f[i]}`).join(', ')}`,
                     ...size,
                 });
             }

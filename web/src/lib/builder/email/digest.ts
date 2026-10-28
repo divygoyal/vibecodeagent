@@ -52,7 +52,7 @@ export async function loadDigest(row: ScheduleRow, config: EmailScheduleConfig, 
         shareToken: shared && rec.share.token ? rec.share.token : null,
         dashboardId: row.dashboardId,
         siteLabel: src.type === 'site' ? src.siteId : 'All sites',
-        compareMode: controls.date.compare.mode === 'custom' ? 'none' : controls.date.compare.mode,
+        compare: controls.date.compare,
         secret: opts.secret,
     });
     // Never mail an empty report: if Google could not be read, no widget produced a tile or a chart.
