@@ -147,7 +147,7 @@ function TreemapSetup({ widget, edit, source, portfolio }: Props<TreemapWidget>)
             {source}
             <Field label="Size by" hint="Counts only: the boxes of a group add up to the group."><MetricPicker value={c.metric.id} exclude={NOT_ADDITIVE} calcs={false} noShare onChange={(id) => set({ metric: { id } })} /></Field>
             <Field label="One box per"><DimensionPicker value={c.dimension} metrics={[c.metric.id]} allowSite={portfolio} onChange={(d) => d && set({ dimension: d, parent: d === c.parent ? undefined : c.parent })} /></Field>
-            <Field label="Group under" hint="For example Channel above Source."><DimensionPicker value={c.parent} metrics={[c.metric.id]} allowNone ariaLabel="Group under" onChange={(d) => set({ parent: d && d !== c.dimension ? d : undefined })} /></Field>
+            <Field label="Group under" hint="For example Channel above Source."><DimensionPicker value={c.parent} metrics={[c.metric.id]} allowNone ariaLabel="Group under" onChange={(d) => { const parent = d && d !== c.dimension ? d : undefined; set(parent && !c.parent ? { parent, colorBy: 'group' } : { parent }); }} /></Field>
             <Field label="Boxes" hint="The biggest ones are drawn."><NumberInput value={c.top} min={5} max={60} onChange={(n) => set({ top: n }, 'top')} /></Field>
             <Field label="Colour"><Choice ariaLabel="Colour" value={c.colorBy ?? 'group'} onChange={(v) => set({ colorBy: v })} options={[{ value: 'group', label: c.parent ? 'One colour per group' : 'One colour per box' }, { value: 'value', label: 'Darker for bigger' }]} /></Field>
             <Toggle label="Show values in boxes" checked={c.showValues !== false} onChange={(v) => set({ showValues: v })} />

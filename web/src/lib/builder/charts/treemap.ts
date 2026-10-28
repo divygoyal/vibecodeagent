@@ -204,3 +204,48 @@ export function layoutTreemap(model: TreemapModel, width: number, height: number
         return { key: g.key, parent: g.parent, amount: g.amount, share: model.total > 0 ? g.amount / model.total : 0, index: f.index, header, x: f.x, y: f.y, w: f.w, h: f.h, leaves };
     });
 }
+
+// ── labels ───────────────────────────────────────────────────────────────
+
+/** Width of one character of the box text (caption size, medium weight) and the room a box keeps around it. */
+export const TILE_CHAR_W = 6.3;
+const TILE_PAD_X = 12;
+const TILE_PAD_Y = 8;
+const TILE_LINE_H = 14;
+/** A name is cut only when at least this many characters survive; below that the box carries no text (its tooltip does). */
+export const TILE_MIN_CHARS = 12;
+
+export interface TileLabel {
+    /** The name to draw, cut with an ellipsis when it must be; null = no text in this box. */
+    name: string | null;
+    /** "$12,742 · 21%", or just the value when the share does not fit; null = no second line. */
+    detail: string | null;
+}
+
+const cut = (text: string, chars: number) => (text.length <= chars ? text : `${text.slice(0, Math.max(1, chars - 1)).trimEnd()}…`);
+
+/**
+ * What a box of w x h px says. The share goes first when room is short, then the value, and only then is the
+ * name cut; a name that would lose more than it keeps (fewer than 12 characters left) is not drawn at all and
+ * the box leaves it to its tooltip. Text never wraps, so a line either fits or is dropped.
+ */
+export function tileLabel(w: number, h: number, name: string, value: string, share: string, showValues: boolean): TileLabel {
+    const inner = w - 2 - TILE_PAD_X;
+    const lines = Math.floor((h - 2 - TILE_PAD_Y) / TILE_LINE_H);
+    if (lines < 1 || inner <= 0) return { name: null, detail: null };
+    const chars = Math.floor(inner / TILE_CHAR_W);
+    if (name.length > chars && chars < Math.min(TILE_MIN_CHARS, name.length)) return { name: null, detail: null };
+    let detail: string | null = null;
+    if (showValues && lines >= 2) {
+        const full = `${value} · ${share}`;
+        detail = full.length <= chars ? full : value.length <= chars ? value : null;
+    }
+    return { name: cut(name, chars), detail };
+}
+
+/** A group's title strip: name and share while both fit, else the name alone (cut only if it must be). */
+export function groupLabel(w: number, name: string, share: string): string {
+    const chars = Math.floor((w - TILE_PAD_X) / TILE_CHAR_W);
+    const full = `${name} · ${share}`;
+    return full.length <= chars ? full : cut(name, Math.max(1, chars));
+}

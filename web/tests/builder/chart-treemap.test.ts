@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { applyViewerControls, compileWidget } from '@/lib/builder/compile';
-import { GROUP_HEADER, layoutTreemap, shapeTreemap, squarify, type Rect } from '@/lib/builder/charts/treemap';
+import { GROUP_HEADER, groupLabel, layoutTreemap, shapeTreemap, squarify, tileLabel, type Rect } from '@/lib/builder/charts/treemap';
 import type { TreemapWidget } from '@/lib/builder/charts/types';
 import { defaultWidget, widgetMetrics, widgetTitle } from '@/lib/builder/registry';
 import { validateWidgets } from '@/lib/builder/schema';
@@ -151,6 +151,29 @@ test('treemap layout: groups tile the box, boxes tile their group, shares add up
     assert.ok(Math.abs(flat[0].leaves.reduce((s, n) => s + n.w * n.h, 0) - 300 * 200) < 1e-6);
     // A tiny box gets no title strip.
     assert.equal(layoutTreemap(m, 60, 40)[0].header, 0);
+});
+
+test('treemap labels: the share goes first, then the value, a name is cut only when enough of it survives, else the box is silent', () => {
+    // A roomy box says everything.
+    assert.deepEqual(tileLabel(220, 80, 'google', '$12,742', '21%', true), { name: 'google', detail: '$12,742 · 21%' });
+    // Narrower: the share is dropped before the name is touched.
+    const mid = tileLabel(80, 50, 'newsletter', '$5,586', '9.2%', true);
+    assert.equal(mid.name, 'newsletter');
+    assert.equal(mid.detail, '$5,586');
+    // Values switched off, or no room for a second line: the name alone.
+    assert.deepEqual(tileLabel(220, 80, 'google', '1,000', '5%', false), { name: 'google', detail: null });
+    assert.equal(tileLabel(220, 24, 'google', '1,000', '5%', true).detail, null);
+    // A long path is cut with an ellipsis when most of it still shows, and left out when only a stub would.
+    const cutName = tileLabel(130, 40, '/blog/product-analytics-tools-compared', '2,577', '11%', true);
+    assert.match(cutName.name ?? '', /^\/blog\/product.*…$/);
+    assert.deepEqual(tileLabel(60, 40, '/blog/product-analytics-tools-compared', '2,577', '11%', true), { name: null, detail: null });
+    // A short name still fits a small box whole; a tiny box says nothing.
+    assert.equal(tileLabel(60, 30, 'bing', '1', '1%', true).name, 'bing');
+    assert.deepEqual(tileLabel(20, 12, 'bing', '1', '1%', true), { name: null, detail: null });
+    // Group titles: name and share while both fit, else the name (cut only if it must be).
+    assert.equal(groupLabel(200, 'Organic Social', '8.1%'), 'Organic Social · 8.1%');
+    assert.equal(groupLabel(120, 'Organic Social', '8.1%'), 'Organic Social');
+    assert.equal(groupLabel(60, 'Organic Social', '8.1%'), 'Organi…');
 });
 
 test('treemap engine: channel and source from one Analytics report, the boxes add up to the group', async () => {
