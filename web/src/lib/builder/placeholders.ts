@@ -38,6 +38,7 @@ export function hiddenForViewers(w: WidgetDef | undefined): boolean {
     if (!w) return false;
     if (w.type === 'text') return !w.config.markdown.trim() || isPlaceholderMarkdown(w.config.markdown);
     if (w.type === 'image') return !/^https:\/\//i.test(w.config.src ?? '');
+    if (w.type === 'embed') return !w.config.url?.trim();
     return false;
 }
 

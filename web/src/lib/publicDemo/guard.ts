@@ -122,6 +122,8 @@ export const DEMO_API_RULES: RouteRule[] = [
     R('/api/dashboards/query', { POST: 'allow' }),
     // Round 9: realtime widget (reads the demo generator's realtime report).
     R('/api/dashboards/realtime', { POST: 'allow' }),
+    // Web embed probe: fetches a page the visitor typed, so the demo answers "unknown" instead of making the server fetch it.
+    R('/api/dashboards/embed-check', { GET: 'noop' }, { status: 'unknown' }),
     R('/api/dashboards/[id]', { GET: 'allow', PUT: 'deny', DELETE: 'deny' }),
     R('/api/dashboards/[id]/widget-data', READ),
     R('/api/dashboards/notes', READ),
@@ -134,6 +136,7 @@ export const DEMO_API_RULES: RouteRule[] = [
     R('/api/dashboards/public/[token]/widget-data', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/notes', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/realtime', PUBLIC_ALL),
+    R('/api/dashboards/public/[token]/embed-check', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/unlock', PUBLIC_ALL),
     R('/api/dashboards/public/[token]/copy', PUBLIC_ALL),
 

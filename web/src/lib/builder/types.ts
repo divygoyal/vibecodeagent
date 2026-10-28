@@ -540,10 +540,25 @@ export interface RealtimeConfig {
 }
 export type RealtimeWidget = WidgetBase<'realtime', RealtimeConfig>;
 
+/** A web page in a sandboxed iframe (lib/builder/embed.ts). */
+export interface EmbedConfig {
+    /** https only; '' while the widget is new. */
+    url: string;
+    /** Accessible title of the frame. */
+    title: string;
+    /** Height of the page inside the card in pixels (120-2000); missing = fill the card. Setting it also resizes the card. */
+    heightPx?: number;
+    /** Let the page scroll inside the card (default on). */
+    scroll: boolean;
+    /** Share links and embeds show this widget only when the owner turns this on (missing = off). */
+    showOnPublic?: boolean;
+}
+export type EmbedWidget = WidgetBase<'embed', EmbedConfig>;
+
 export type WidgetDef =
     | ScorecardWidget | KpiStripWidget | TimeSeriesWidget | BarWidget | PieWidget | TableWidget
     | GeoWidget | TextWidget | ImageWidget | SectionWidget | PortfolioGridWidget
-    | RealtimeWidget;
+    | RealtimeWidget | EmbedWidget;
 
 export type WidgetType = WidgetDef['type'];
 

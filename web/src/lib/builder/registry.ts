@@ -49,10 +49,11 @@ export const WIDGET_META: Record<WidgetType, WidgetMeta> = {
     section: { type: 'section', label: 'Section header', description: 'A title and divider between groups', icon: 'Heading', group: 'Content', defaultSize: { w: 12, h: 2 }, minSize: { w: 12, h: 2 }, maxSize: { w: 12, h: 2 }, phoneH: 2, static: true, keywords: ['section', 'divider', 'header', 'title'] },
     image: { type: 'image', label: 'Image', description: 'A logo or picture from an https URL', icon: 'Image', group: 'Content', defaultSize: { w: 3, h: 5 }, minSize: { w: 1, h: 2 }, maxSize: { w: 12, h: 14 }, phoneH: 4, static: true, keywords: ['image', 'logo', 'picture', 'photo'] },
     realtime: { type: 'realtime', label: 'Realtime', description: 'Who is online now: active users in the last 30 minutes, refreshed every minute', icon: 'Radio', group: 'Metrics', defaultSize: { w: 4, h: 9 }, minSize: { w: 3, h: 4 }, maxSize: { w: 8, h: 12 }, phoneH: 9, static: false, selfFetch: true, keywords: ['realtime', 'real-time', 'live', 'online now', 'active users', 'now'] },
+    embed: { type: 'embed', label: 'Web embed', description: 'Any https page in a sandboxed frame: a status page, a Looker Studio report, a video', icon: 'AppWindow', group: 'Content', defaultSize: { w: 6, h: 9 }, minSize: { w: 2, h: 3 }, maxSize: { w: 12, h: 40 }, phoneH: 9, static: true, keywords: ['embed', 'iframe', 'web page', 'website', 'url', 'frame', 'video', 'report'] },
     'portfolio-grid': { type: 'portfolio-grid', label: 'Portfolio grid', description: 'Every site as a card with deltas', icon: 'LayoutGrid', group: 'Portfolio', defaultSize: { w: 12, h: 9 }, minSize: { w: 4, h: 6 }, maxSize: { w: 12, h: 20 }, phoneH: 12, static: false, keywords: ['portfolio', 'sites', 'all sites', 'cards'] },
 };
 
-export const PALETTE_ORDER: WidgetType[] = ['scorecard', 'kpi-strip', 'realtime', 'timeseries', 'bar', 'pie', 'table', 'geo', 'portfolio-grid', 'section', 'text', 'image'];
+export const PALETTE_ORDER: WidgetType[] = ['scorecard', 'kpi-strip', 'realtime', 'timeseries', 'bar', 'pie', 'table', 'geo', 'portfolio-grid', 'section', 'text', 'image', 'embed'];
 export const PALETTE_GROUPS: PaletteGroup[] = ['Metrics', 'Charts', 'Tables and maps', 'Portfolio', 'Content'];
 
 export function widgetMeta(type: WidgetType): WidgetMeta {
@@ -157,6 +158,8 @@ export function defaultWidget(type: WidgetType, ctx: DefaultCtx, id: WidgetId = 
             return { ...base, type, showTitle: false, config: { title: 'Section', divider: true, align: 'left' } };
         case 'image':
             return { ...base, type, showTitle: false, config: { src: '', alt: '', fit: 'contain', radius: 'md' } };
+        case 'embed':
+            return { ...base, type, title: 'Web page', showTitle: false, style: { padding: 'none' }, config: { url: '', title: 'Embedded page', scroll: true } };
         case 'realtime':
             return { ...base, type, title: 'Online now', config: { breakdown: 'country', top: 5, bars: true } };
         case 'portfolio-grid':
@@ -206,6 +209,7 @@ export function widgetTitle(w: WidgetDef): string {
         case 'image': return w.config.alt || 'Image';
         case 'portfolio-grid': return 'All sites';
         case 'realtime': return 'Online now';
+        case 'embed': return w.config.title || 'Web page';
     }
 }
 
