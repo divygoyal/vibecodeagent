@@ -4,50 +4,50 @@
       "width": 1016,
       "height": 342,
       "light": {
-        "x1": "/marketing/site-desktop-light@1x.3885c3a5.webp",
-        "x2": "/marketing/site-desktop-light@2x.9113c2f8.webp"
+        "x1": "/marketing/site-desktop-light@1x.22b05989.webp",
+        "x2": "/marketing/site-desktop-light@2x.857b6df6.webp"
       },
       "dark": {
-        "x1": "/marketing/site-desktop-dark@1x.fabfa45c.webp",
-        "x2": "/marketing/site-desktop-dark@2x.c98975d9.webp"
+        "x1": "/marketing/site-desktop-dark@1x.63490bca.webp",
+        "x2": "/marketing/site-desktop-dark@2x.b7e74338.webp"
       }
     },
     "mobile": {
       "width": 382,
       "height": 342,
       "light": {
-        "x1": "/marketing/site-mobile-light@1x.2a70a287.webp",
-        "x2": "/marketing/site-mobile-light@2x.ab6b1615.webp"
+        "x1": "/marketing/site-mobile-light@1x.37499eb7.webp",
+        "x2": "/marketing/site-mobile-light@2x.64cedbbe.webp"
       },
       "dark": {
-        "x1": "/marketing/site-mobile-dark@1x.d785da5e.webp",
-        "x2": "/marketing/site-mobile-dark@2x.3a95d9b5.webp"
+        "x1": "/marketing/site-mobile-dark@1x.b6315d9a.webp",
+        "x2": "/marketing/site-mobile-dark@2x.b4584268.webp"
       }
     }
   },
   "fixes": {
     "desktop": {
       "width": 1016,
-      "height": 373,
+      "height": 482,
       "light": {
-        "x1": "/marketing/fixes-desktop-light@1x.6be8d0ba.webp",
-        "x2": "/marketing/fixes-desktop-light@2x.daf3fb40.webp"
+        "x1": "/marketing/fixes-desktop-light@1x.f47c553f.webp",
+        "x2": "/marketing/fixes-desktop-light@2x.5c7db7bc.webp"
       },
       "dark": {
-        "x1": "/marketing/fixes-desktop-dark@1x.564b023a.webp",
-        "x2": "/marketing/fixes-desktop-dark@2x.b04f66b9.webp"
+        "x1": "/marketing/fixes-desktop-dark@1x.407f8e90.webp",
+        "x2": "/marketing/fixes-desktop-dark@2x.30aa294e.webp"
       }
     },
     "mobile": {
       "width": 382,
-      "height": 433,
+      "height": 641,
       "light": {
-        "x1": "/marketing/fixes-mobile-light@1x.fee50937.webp",
-        "x2": "/marketing/fixes-mobile-light@2x.ccc85e3c.webp"
+        "x1": "/marketing/fixes-mobile-light@1x.13b38f34.webp",
+        "x2": "/marketing/fixes-mobile-light@2x.198661bb.webp"
       },
       "dark": {
-        "x1": "/marketing/fixes-mobile-dark@1x.1d85af33.webp",
-        "x2": "/marketing/fixes-mobile-dark@2x.e31c9773.webp"
+        "x1": "/marketing/fixes-mobile-dark@1x.fe2547a2.webp",
+        "x2": "/marketing/fixes-mobile-dark@2x.4eba95a5.webp"
       }
     }
   },
@@ -56,24 +56,24 @@
       "width": 1016,
       "height": 489,
       "light": {
-        "x1": "/marketing/traffic-desktop-light@1x.4ee05d3b.webp",
-        "x2": "/marketing/traffic-desktop-light@2x.f8cafd71.webp"
+        "x1": "/marketing/traffic-desktop-light@1x.bbd3581a.webp",
+        "x2": "/marketing/traffic-desktop-light@2x.7ad2dbb1.webp"
       },
       "dark": {
-        "x1": "/marketing/traffic-desktop-dark@1x.3885a518.webp",
-        "x2": "/marketing/traffic-desktop-dark@2x.86463e80.webp"
+        "x1": "/marketing/traffic-desktop-dark@1x.dcc2a186.webp",
+        "x2": "/marketing/traffic-desktop-dark@2x.055e3626.webp"
       }
     },
     "mobile": {
       "width": 382,
       "height": 543,
       "light": {
-        "x1": "/marketing/traffic-mobile-light@1x.0bfbe352.webp",
-        "x2": "/marketing/traffic-mobile-light@2x.9e40f23d.webp"
+        "x1": "/marketing/traffic-mobile-light@1x.0c891ec3.webp",
+        "x2": "/marketing/traffic-mobile-light@2x.bdc36bc8.webp"
       },
       "dark": {
-        "x1": "/marketing/traffic-mobile-dark@1x.ee78153d.webp",
-        "x2": "/marketing/traffic-mobile-dark@2x.7d79c33b.webp"
+        "x1": "/marketing/traffic-mobile-dark@1x.57892f32.webp",
+        "x2": "/marketing/traffic-mobile-dark@2x.8ed6cbca.webp"
       }
     }
   },
@@ -82,24 +82,24 @@
       "width": 1016,
       "height": 640,
       "light": {
-        "x1": "/marketing/dashboards-desktop-light@1x.650d9b8a.webp",
-        "x2": "/marketing/dashboards-desktop-light@2x.3c2280d4.webp"
+        "x1": "/marketing/dashboards-desktop-light@1x.b8ef7a22.webp",
+        "x2": "/marketing/dashboards-desktop-light@2x.27d7d3c5.webp"
       },
       "dark": {
-        "x1": "/marketing/dashboards-desktop-dark@1x.e251e3ca.webp",
-        "x2": "/marketing/dashboards-desktop-dark@2x.e1fbed09.webp"
+        "x1": "/marketing/dashboards-desktop-dark@1x.2489ea2b.webp",
+        "x2": "/marketing/dashboards-desktop-dark@2x.a271a89f.webp"
       }
     },
     "mobile": {
       "width": 382,
-      "height": 624,
+      "height": 548,
       "light": {
-        "x1": "/marketing/dashboards-mobile-light@1x.887f6700.webp",
-        "x2": "/marketing/dashboards-mobile-light@2x.d03fdc15.webp"
+        "x1": "/marketing/dashboards-mobile-light@1x.4c2800c9.webp",
+        "x2": "/marketing/dashboards-mobile-light@2x.8732725c.webp"
       },
       "dark": {
-        "x1": "/marketing/dashboards-mobile-dark@1x.29100e78.webp",
-        "x2": "/marketing/dashboards-mobile-dark@2x.d56a5ef5.webp"
+        "x1": "/marketing/dashboards-mobile-dark@1x.ee945bd2.webp",
+        "x2": "/marketing/dashboards-mobile-dark@2x.105789a6.webp"
       }
     }
   }

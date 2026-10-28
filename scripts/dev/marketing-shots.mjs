@@ -90,12 +90,23 @@ const SHOTS = [
         name: 'fixes',
         path: `/dashboard/s/${SITE}/actions`,
         prepare: async (page, mobile) => {
-            // Desktop: the first task with its suggested fix open; phones: the task card as it opens.
-            const btn = page.getByRole('button', { name: 'Suggested fix' }).first();
-            if (!mobile && (await btn.count())) await btn.click();
+            // The compact fix list (round 4): the first task opened to its why and fix, then the next few rows. Rows
+            // past that are hidden so the crop ends on the list card's own bottom edge.
+            const first = page.locator('li[data-action-row] > button').first();
+            if (await first.count()) {
+                await first.click();
+                await page.waitForTimeout(400);
+            }
+            await page.evaluate((keep) => {
+                const rows = [...document.querySelectorAll('li[data-action-row]')];
+                rows.slice(keep).forEach((r) => { r.style.display = 'none'; });
+                let card = rows[0]?.parentElement ?? null;
+                while (card && !(parseFloat(getComputedStyle(card).borderBottomLeftRadius) > 0 && parseFloat(getComputedStyle(card).borderBottomWidth) > 0)) card = card.parentElement;
+                card?.setAttribute('data-shot-fixes', '');
+            }, mobile ? 4 : 5);
+            await page.waitForTimeout(300);
         },
-        // Desktop: exactly the first task card; phones too.
-        crop: { from: 'card:High impact', offset: -6, whole: { desktop: true, mobile: true }, height: { desktop: 700, mobile: 900 } },
+        crop: { from: '[data-shot-fixes]', offset: -6, whole: { desktop: true, mobile: true }, height: { desktop: 700, mobile: 900 } },
     },
     {
         name: 'traffic',
