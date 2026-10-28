@@ -1,0 +1,17 @@
+admin1/<ISO2>.json: first-level regions (states, provinces) per country, cut from Natural Earth
+"ne_10m_admin_1_states_provinces" (https://www.naturalearthdata.com, https://github.com/nvkelso/natural-earth-vector),
+2026-10-28, simplified (Douglas-Peucker, about 0.004 degrees, more for the very large countries so a file stays
+under 150 KB) by scripts/geo/build-admin1.mjs. Run it again with the source GeoJSON to rebuild.
+
+Licence: public domain. From https://www.naturalearthdata.com/about/terms-of-use/ :
+
+  All versions of Natural Earth raster + vector map data found on this website are in the public domain. You may
+  use the maps in any manner, including modifying the content and design, electronic dissemination, and offset
+  printing. The primary authors, Tom Patterson and Nathaniel Vaughn Kelso, and all other contributors renounce
+  all financial claim to the maps and invites you to use them for personal, educational, and commercial purposes.
+  No permission is needed to use Natural Earth. Crediting the authors is unnecessary.
+
+We credit it anyway in the region map footnote ("Region shapes: Natural Earth (public domain)").
+Differences from Natural Earth: Great Britain is merged into England, Scotland, Wales and Northern Ireland, and
+France, Spain and Italy into their regions, because that is the level Google Analytics reports. Region names in
+other languages are left out; the English name and a few alternative spellings are kept so Google's names match.

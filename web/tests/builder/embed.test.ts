@@ -6,9 +6,13 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
+import { BRAND_NAME } from '@/lib/brand';
+import { EmbedSource } from '@/components/dashboard-builder/widgets/EmbedView';
 import {
-    EMBED_REFERRER_POLICY, EMBED_SANDBOX, embedBlockedMessage, embedHost, embedUrlProblem, fitEmbedHeight, frameVerdict, normalizeEmbedConfig, normalizeEmbedUrl,
+    EMBED_LOAD_TIMEOUT_MS, EMBED_REFERRER_POLICY, EMBED_SANDBOX, embedBlockedMessage, embedDisclosure, embedFailureMessage, embedHost, probeFailure, embedUrlProblem, fitEmbedHeight, frameVerdict, normalizeEmbedConfig, normalizeEmbedUrl,
     publicEmbedWidget, rowsForPixels, selfHosts,
 } from '@/lib/builder/embed';
 import { hiddenForViewers } from '@/lib/builder/placeholders';
@@ -16,7 +20,7 @@ import { publicDoc } from '@/lib/builder/publicDoc';
 import { defaultWidget, skipsPageQuery, widgetMeta } from '@/lib/builder/registry';
 import { validateDoc, validateWidgets } from '@/lib/builder/schema';
 import { buildFromTemplate } from '@/lib/builder/templates';
-import { clearEmbedProbeCache, probeEmbeddable, probeEmbeddableCached, type HeaderFetch } from '@/lib/builder/server/embedProbe';
+import { clearEmbedProbeCache, networkVerdict, probeEmbeddable, probeEmbeddableCached, type HeaderFetch } from '@/lib/builder/server/embedProbe';
 import type { DashboardDocV2, EmbedWidget } from '@/lib/builder/types';
 
 const ACME = 'acmeanalytics.example';
@@ -174,6 +178,41 @@ test('embed frame verdict: X-Frame-Options and CSP frame-ancestors', () => {
     assert.match(embedBlockedMessage('status.example.com'), /status\.example\.com.*new tab/);
 });
 
+// ── the card: disclosure and load failures ──
+
+test('embed disclosure: only the host is shortened; "not part of" the brand is never cut and may wrap', () => {
+    const html = renderToStaticMarkup(createElement(EmbedSource, { host: 'a-very-long-subdomain.of-a-very-long-company-name-for-testing.example.com' }));
+    assert.match(html, /data-embed-disclosure/);
+    assert.ok(html.includes(`not part of ${BRAND_NAME}`));
+    assert.equal(embedDisclosure('TrafficClaw'), 'not part of TrafficClaw');
+    const host = /<span[^>]*data-embed-host[^>]*>/.exec(html)![0];
+    assert.match(host, /truncate/, 'the host gets the ellipsis');
+    assert.match(host, /title="a-very-long/, 'and its full name as a tooltip');
+    const disc = /<span[^>]*data-embed-disclosure[^>]*>/.exec(html)![0];
+    assert.doesNotMatch(disc, /truncate|overflow/, 'the disclosure is never ellipsized');
+    assert.match(disc, /whitespace-nowrap/);
+    const wrapper = /<p[^>]*data-embed-source[^>]*>/.exec(html)![0];
+    assert.match(wrapper, /flex-wrap/, 'a narrow card wraps the disclosure onto its own line');
+    assert.doesNotMatch(wrapper, /truncate|overflow-hidden/);
+});
+
+test('embed failures: each way a page can fail has its own plain sentence, probe answers map to a failure', () => {
+    for (const kind of ['blocked', 'unreachable', 'timeout', 'error'] as const) {
+        const m = embedFailureMessage('status.example.com', kind);
+        assert.match(m, /status\.example\.com/);
+        assert.match(m, /new tab/);
+        assert.ok(!/[A-Z][a-z]+-[A-Z]/.test(m), 'no header names in the plain sentence');
+    }
+    assert.notEqual(embedFailureMessage('x.com', 'timeout'), embedFailureMessage('x.com', 'unreachable'));
+    assert.match(embedFailureMessage('', 'blocked'), /^This site/);
+    assert.deepEqual(probeFailure({ status: 'blocked', reason: 'X-Frame-Options: DENY' }), { kind: 'blocked', reason: 'X-Frame-Options: DENY' });
+    assert.deepEqual(probeFailure({ status: 'unreachable', reason: 'No site answers' }), { kind: 'unreachable', reason: 'No site answers' });
+    assert.equal(probeFailure({ status: 'ok' }), null);
+    assert.equal(probeFailure({ status: 'unknown' }), null);
+    assert.equal(probeFailure(undefined), null);
+    assert.ok(EMBED_LOAD_TIMEOUT_MS >= 10_000 && EMBED_LOAD_TIMEOUT_MS <= 30_000);
+});
+
 // ── the probe (SSRF guarded) ──
 
 const hdr = (headers: Record<string, string>, status = 200, location?: string): ReturnType<HeaderFetch> => Promise.resolve({ status, headers, location });
@@ -183,6 +222,22 @@ test('embed probe: ok, blocked, and unknown on a network error', async () => {
     const b = await probeEmbeddable('https://a.example.com/', ['app.trafficclaw.com'], () => hdr({ 'x-frame-options': 'DENY' }));
     assert.equal(b.status, 'blocked');
     assert.deepEqual(await probeEmbeddable('https://a.example.com/', [], () => Promise.reject(new Error('ECONNRESET'))), { status: 'unknown' });
+});
+
+test('embed probe: a host that does not exist, a refused connection and a bad certificate are "unreachable"; slow or reset stays unknown', async () => {
+    const fail = (code: string): HeaderFetch => () => Promise.reject(Object.assign(new Error(code), { code }));
+    for (const code of ['ENOTFOUND', 'ECONNREFUSED', 'CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'ERR_TLS_CERT_ALTNAME_INVALID', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE']) {
+        const r = await probeEmbeddable('https://gone.example.com/', [], fail(code));
+        assert.equal(r.status, 'unreachable', code);
+        assert.ok('reason' in r && r.reason.length > 10);
+    }
+    for (const code of ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN']) assert.deepEqual(await probeEmbeddable('https://slow.example.com/', [], fail(code)), { status: 'unknown' }, code);
+    assert.deepEqual(await probeEmbeddable('https://slow.example.com/', [], () => Promise.reject(new Error('timeout'))), { status: 'unknown' });
+    assert.deepEqual(networkVerdict(new Error('private address')), { status: 'unknown' }, 'a refused private address says nothing');
+    assert.deepEqual(networkVerdict(null), { status: 'unknown' });
+    // The reason is for the owner: it never carries the address or a header.
+    const r = await probeEmbeddable('https://gone.example.com/secret?x=1', [], fail('ENOTFOUND'));
+    assert.doesNotMatch(JSON.stringify(r), /gone\.example|secret/);
 });
 
 test('embed probe: never fetches an address the validator refuses, nor follows a redirect to one', async () => {

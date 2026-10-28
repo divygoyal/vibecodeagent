@@ -71,7 +71,38 @@ export interface RealtimeSnapshot {
 
 export type RealtimeResponse =
     | { status: 'ok'; snapshot: RealtimeSnapshot }
-    | { status: 'error'; code: WidgetErrorCode; message: string; retryable: boolean; retryAfterSec?: number; sourceLabel?: string };
+    | { status: 'error'; code: WidgetErrorCode; message: string; retryable: boolean; retryAfterSec?: number; sourceLabel?: string; detail?: string };
+
+// ── Errors in plain words ────────────────────────────────────────────────
+
+/** What a viewer reads when Google's live report cannot be loaded. The widget keeps trying (every 30 s), so it says so. */
+export const REALTIME_UPSTREAM_TEXT = "Couldn't load live data from Google Analytics. Retrying…";
+export const REALTIME_QUOTA_TEXT = 'Google Analytics is limiting live data for a moment. Retrying…';
+
+type RealtimeFail = Extract<RealtimeResponse, { status: 'error' }>;
+
+/**
+ * An error of the request itself (HTTP status from our route, or the network) as a plain answer. The viewer never reads
+ * a raw string: not the server's error text, not "Failed to fetch". The technical detail is only for the owner
+ * (`owner` true), who can open it behind a "Details" toggle; public links get none.
+ */
+export function realtimeHttpError(err: unknown, opts: { owner: boolean }): RealtimeFail {
+    const status = typeof (err as { status?: unknown } | null)?.status === 'number' ? (err as { status: number }).status : 0;
+    const raw = err instanceof Error ? (err.name && err.name !== 'Error' ? `${err.name}: ${err.message}` : err.message) : typeof err === 'string' ? err : '';
+    const detail = opts.owner ? `${status ? `HTTP ${status}` : 'Network error'}${raw ? `: ${raw}` : ''}`.slice(0, 240) : undefined;
+    const base = (code: WidgetErrorCode, message: string, retryable: boolean, extra: Partial<RealtimeFail> = {}): RealtimeFail => ({ status: 'error', code, message, retryable, ...(detail ? { detail } : {}), ...extra });
+    if (status === 401) return base('NOT_CONNECTED', opts.owner ? 'You are signed out. Sign in again to see live data.' : 'This dashboard needs a password to show live data.', false);
+    if (status === 403) return base('NO_ACCESS', 'You do not have access to this live data.', false);
+    if (status === 404) return base('UPSTREAM', 'Live data is not available on this dashboard any more.', false);
+    if (status === 429) return base('QUOTA', 'Too many refreshes. Live data will update again in a minute.', true, { retryAfterSec: 60 });
+    return base('UPSTREAM', REALTIME_UPSTREAM_TEXT, true);
+}
+
+/** The answer a card shows: the server's own error answer, with the owner-only detail dropped for everyone else. */
+export function realtimeFailureView(response: RealtimeResponse | undefined, err: unknown, opts: { owner: boolean }): RealtimeFail | undefined {
+    if (response?.status === 'error') return opts.owner ? response : { ...response, detail: undefined };
+    return err ? realtimeHttpError(err, opts) : undefined;
+}
 
 // ── Filters ──────────────────────────────────────────────────────────────
 

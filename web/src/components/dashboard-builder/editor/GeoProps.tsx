@@ -17,7 +17,7 @@ export function GeoSetup({ widget, edit, source }: { widget: GeoWidget; edit: (f
     return (
         <>
             {source}
-            <Field label="Show" hint={level === 'country' ? undefined : 'Region and city views use Google Analytics, which names regions and cities but gives no shapes: regions are a ranked list, cities are bubbles.'}>
+            <Field label="Show" hint={level === 'country' ? undefined : 'Region and city views use Google Analytics, which names regions and cities but gives no coordinates: regions are shaded on a map of the country (a ranked list where we have no shapes), cities are bubbles.'}>
                 <Choice
                     ariaLabel="Geo view"
                     value={level}
