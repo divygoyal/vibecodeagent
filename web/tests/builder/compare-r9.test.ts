@@ -11,7 +11,7 @@ import test from 'node:test';
 import { demoAccessToken } from '@/lib/demo';
 import { createDemoGoogleFetch } from '@/lib/sites/fetchInventory';
 import { compareFromParam, compareToParam, resolveCompare, resolveRange } from '@/lib/builder/dates';
-import { COMPARE_OPTIONS, compareOptionId, compareTail, compareText, customCompare, viewerMayCompare } from '@/lib/builder/compare';
+import { COMPARE_OPTIONS, compareLengthNote, compareOptionId, compareTail, compareText, customCompare, viewerMayCompare } from '@/lib/builder/compare';
 import { defaultWidget } from '@/lib/builder/registry';
 import { buildFromTemplate } from '@/lib/builder/templates';
 import { publicControlsFromQuery } from '@/lib/builder/publicDoc';
@@ -203,3 +203,13 @@ test('public link: viewers change the comparison only when the share lets them c
     assert.deepEqual(publicControlsFromQuery(new URLSearchParams('compare=custom&cfrom=x'), d, { viewerControls: { date: true, compare: true, filters: false } }).date.compare, def);
 });
 
+
+test('compare: a custom comparison of another length warns, the same length does not', () => {
+    const range = { start: '2026-09-30', end: '2026-10-27' }; // 28 days
+    assert.equal(compareLengthNote(range, { start: '2026-09-02', end: '2026-09-29' }), null);
+    assert.equal(
+        compareLengthNote(range, { start: '2026-08-01', end: '2026-08-31' }),
+        'Your range is 28 days but this comparison is 31 days. Totals will not be like for like; pick 28 days to compare fairly.',
+    );
+    assert.match(compareLengthNote({ start: '2026-10-27', end: '2026-10-27' }, { start: '2026-10-01', end: '2026-10-02' })!, /Your range is 1 day but this comparison is 2 days/);
+});

@@ -3,7 +3,7 @@
  * tooltips use ("vs Sep 2 – Sep 29", "vs last year") and the share-link permission. Pure and isomorphic.
  */
 import { fmtDateRange } from '@/lib/format';
-import { isIso } from './dates';
+import { daysBetween, isIso } from './dates';
 import type { CompareSpec, DateControl, Iso } from './types';
 
 export interface CompareOption {
@@ -77,4 +77,16 @@ export function viewerMayCompare(share: { date: boolean; compare: boolean }, dc:
 export function customCompare(start: string, end: string): CompareSpec | null {
     if (!isIso(start) || !isIso(end)) return null;
     return start <= end ? { mode: 'custom', start, end } : { mode: 'custom', start: end, end: start };
+}
+
+/**
+ * A custom comparison of another length than the range compares unlike totals (28 days against 31). The words for the
+ * date popover, or null when the lengths match. Both ranges are inclusive.
+ */
+export function compareLengthNote(range: { start: Iso; end: Iso }, cmp: { start: Iso; end: Iso }): string | null {
+    const a = daysBetween(range.start, range.end);
+    const b = daysBetween(cmp.start, cmp.end);
+    if (a === b) return null;
+    const d = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+    return `Your range is ${d(a)} but this comparison is ${d(b)}. Totals will not be like for like; pick ${d(a)} to compare fairly.`;
 }

@@ -8,13 +8,13 @@
  */
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { CalendarDays, Check, ChevronDown, Filter, Globe, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Check, ChevronDown, Filter, Globe, X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { Button, Checkbox, Drawer, Popover, PopoverContent, PopoverTrigger, SearchInput, SegmentedControl } from '@/components/ui';
+import { Button, Checkbox, DateField, Drawer, Popover, PopoverContent, PopoverTrigger, SearchInput, SegmentedControl } from '@/components/ui';
 import { fmtDateRange } from '@/lib/format';
 import { MENU_PRESETS, PRESETS, QUICK_PRESETS, isIso } from '@/lib/builder/dates';
-import { COMPARE_OPTIONS, compareOptionId, customCompare } from '@/lib/builder/compare';
+import { COMPARE_OPTIONS, compareLengthNote, compareOptionId, customCompare } from '@/lib/builder/compare';
 import { countryName } from '@/lib/builder/countries';
 import { metricLabel } from '@/lib/builder/catalog';
 import { selectedGrain, selectedMetric, selectedSearchType } from '@/lib/builder/compile';
@@ -99,9 +99,9 @@ export function DateControl({ range, compare, onChange, canChange = true, canCom
                     <form className="space-y-2 px-2.5 py-2" onSubmit={(e) => { e.preventDefault(); if (isIso(from) && isIso(to)) { onChange({ kind: 'custom', start: from <= to ? from : to, end: from <= to ? to : from }, compare); setOpen(false); } }}>
                         <p className="text-meta font-medium text-fg-muted">Custom range</p>
                         <div className="flex items-center gap-2">
-                            <input aria-label="Start date" type="date" value={from} max={today} onChange={(e) => setFrom(e.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-body-sm text-fg" />
+                            <DateField ariaLabel="Start date" value={from} max={today} onChange={setFrom} />
                             <span className="text-fg-muted">–</span>
-                            <input aria-label="End date" type="date" value={to} max={today} onChange={(e) => setTo(e.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-body-sm text-fg" />
+                            <DateField ariaLabel="End date" value={to} max={today} onChange={setTo} />
                         </div>
                         <Button type="submit" size="sm" variant="secondary" disabled={!isIso(from) || !isIso(to)} className="w-full">Apply dates</Button>
                     </form>
@@ -126,6 +126,9 @@ function CompareSection({ compare, resolved, today, onPick }: { compare: Compare
     const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
     const applied = resolved?.compare;
     const custom = customCompare(cFrom, cTo);
+    // A custom window of another length than the range makes totals unlike: say so before it is applied (and while it is active).
+    const range = resolved?.range;
+    const lengthNote = range && custom && custom.mode === 'custom' ? compareLengthNote(range, custom) : null;
     return (
         <div>
             <p className="px-2.5 pt-1 text-meta font-medium text-fg-muted">Compare to</p>
@@ -145,10 +148,11 @@ function CompareSection({ compare, resolved, today, onPick }: { compare: Compare
                             {o.id === 'custom' && customOpen ? (
                                 <form className="space-y-2 px-2.5 pb-2 pt-1" onSubmit={(e) => { e.preventDefault(); if (custom) onPick(custom); }}>
                                     <div className="flex items-center gap-2">
-                                        <input aria-label="Comparison start date" type="date" value={cFrom} max={yesterday} onChange={(e) => setCFrom(e.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-body-sm text-fg" />
+                                        <DateField ariaLabel="Comparison start date" value={cFrom} max={yesterday} onChange={setCFrom} />
                                         <span className="text-fg-muted">–</span>
-                                        <input aria-label="Comparison end date" type="date" value={cTo} max={yesterday} onChange={(e) => setCTo(e.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-body-sm text-fg" />
+                                        <DateField ariaLabel="Comparison end date" value={cTo} max={yesterday} onChange={setCTo} />
                                     </div>
+                                    {lengthNote ? <p role="status" data-testid="compare-length-note" className="flex items-start gap-1.5 rounded-md bg-warn-soft px-2 py-1.5 text-meta text-fg-secondary"><AlertTriangle aria-hidden size={14} className="mt-px shrink-0 text-warn" />{lengthNote}</p> : null}
                                     <Button type="submit" size="sm" variant="secondary" disabled={!custom} className="w-full">Apply comparison</Button>
                                 </form>
                             ) : null}
