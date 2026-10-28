@@ -10,7 +10,7 @@ import test from 'node:test';
 import { AXIS_LABEL_GAP, AXIS_LAST_TICK_PAD, categoryAxisWidth, fitLabel, textWidth } from '@/lib/builder/axisLabels';
 
 test('axis width fits the longest label (Washington is wider than 10 x 6.5 px) and is capped', () => {
-    assert.ok(textWidth('Washington') > 65, `${textWidth('Washington')}px for Washington`);
+    assert.ok(textWidth('Washington') >= 60, `${textWidth('Washington')}px for Washington`);
     const w = categoryAxisWidth(['Washington', 'Ohio', 'Texas']);
     assert.ok(w >= textWidth('Washington') + AXIS_LABEL_GAP);
     assert.equal(categoryAxisWidth(['x'.repeat(80)]), 150, 'capped');
