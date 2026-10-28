@@ -49,6 +49,8 @@ export interface BuilderTimeSeriesProps {
     /** Breakdown frame: series keys 'b:<value>' (one metric). */
     breakdown?: { metric: string; dimension: string; keys: string[]; stacked: boolean; labels?: Record<string, string> };
     compare: boolean;
+    /** Round 9: what the dashed line is called in tooltips and legends ("Last year"); default "Previous period". */
+    compareName?: string;
     granularity: 'day' | 'week' | 'month';
     /** Rows from this index are partial (Search Console lag): dotted. */
     partialFrom?: number;
@@ -240,7 +242,7 @@ export function BuilderTimeSeries(props: BuilderTimeSeriesProps) {
     return <Plot {...props} />;
 }
 
-function Plot({ rows, series, breakdown, compare, granularity, partialFrom, height, currency, showLegend, className, marks, refLines }: BuilderTimeSeriesProps) {
+function Plot({ rows, series, breakdown, compare, compareName = 'Previous period', granularity, partialFrom, height, currency, showLegend, className, marks, refLines }: BuilderTimeSeriesProps) {
     const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
     const reduce = useReducedMotion();
     // TV screens keep the y axis down to a 120 px plot (round 4): numbers read from across the room.
@@ -291,7 +293,7 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     value: fmtMetricValue(s.metric, typeof v === 'number' ? v : null, { currency }),
                     delta: pv !== undefined ? <MetricDelta current={typeof v === 'number' ? v : null} previous={typeof pv === 'number' ? pv : null} format={dsFormat(s.metric)} better={metricBetter(s.metric)} /> : undefined,
                 });
-                if (pv !== undefined) out.push({ key: `${s.metric}-prev`, label: 'Previous period', color: metricColor(s.metric), dashed: true, value: fmtMetricValue(s.metric, typeof pv === 'number' ? pv : null, { currency }) });
+                if (pv !== undefined) out.push({ key: `${s.metric}-prev`, label: compareName, color: metricColor(s.metric), dashed: true, value: fmtMetricValue(s.metric, typeof pv === 'number' ? pv : null, { currency }) });
             }
         }
         const pd = row['d:date:prev'];
@@ -438,7 +440,7 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     : null}
 
                 {!breakdown && compare ? series.slice(0, 2).map((s) => (
-                    <Line key={`${s.metric}-prev`} yAxisId={s.metric} dataKey={`m:${s.metric}:prev`} type="monotone" stroke={metricColor(s.metric)} strokeWidth={1.5} strokeDasharray="4 4" strokeOpacity={0.5} dot={false} activeDot={false} connectNulls={false} isAnimationActive={anim} animationDuration={400} name="Previous period" />
+                    <Line key={`${s.metric}-prev`} yAxisId={s.metric} dataKey={`m:${s.metric}:prev`} type="monotone" stroke={metricColor(s.metric)} strokeWidth={1.5} strokeDasharray="4 4" strokeOpacity={0.5} dot={false} activeDot={false} connectNulls={false} isAnimationActive={anim} animationDuration={400} name={compareName} />
                 )) : null}
 
                 {!breakdown && first && first.kind !== 'bar' && (first.kind === 'area' || series.length === 1) ? (

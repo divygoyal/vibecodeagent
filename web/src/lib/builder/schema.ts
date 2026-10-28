@@ -6,6 +6,7 @@
 import { z } from 'zod';
 import { parseCalcId } from './calc';
 import { drillProblem } from './drill';
+import { MAX_VIEW_NAME, MAX_VIEW_QUERY, MAX_VIEWS, savedViewProblem } from './savedViews';
 import { widgetSearchTypeProblem } from './searchType';
 import type { DashboardDocV2, WidgetDef } from './types';
 
@@ -33,7 +34,7 @@ export const dateRangeSchema = z.union([
 ]);
 export const compareSchema = z.union([
     z.object({ mode: z.literal('none') }),
-    z.object({ mode: z.literal('previous_period') }),
+    z.object({ mode: z.literal('previous_period'), align: z.literal('weekday').optional() }),
     z.object({ mode: z.literal('previous_year'), align: z.enum(['date', 'weekday']).optional() }),
     z.object({ mode: z.literal('custom'), start: iso, end: iso }),
 ]);
@@ -75,7 +76,7 @@ const base = {
     showTitle: z.boolean().optional(),
     source: sourceRefSchema,
     style: z.looseObject({}).optional(),
-    dateOverride: z.object({ range: dateRangeSchema.optional(), compare: compareSchema.optional() }).optional(),
+    dateOverride: z.object({ range: dateRangeSchema.optional(), compare: compareSchema.optional(), shift: z.object({ unit: z.enum(['day', 'week', 'month', 'year']), amount: z.number().int().min(1).max(60) }).optional() }).optional(),
     filters: z.array(filterClause).max(20).optional(),
     ignoreControls: z.array(z.string().max(64)).max(50).optional(),
     interactions: z.object({ clickToFilter: z.boolean().optional(), drill: z.array(dimId).min(1).max(3).optional() }).optional(),
@@ -115,6 +116,9 @@ const page = z.object({
     hidden: z.boolean().optional(),
     layouts: z.object({ lg: z.array(layoutItem).max(200), md: z.array(layoutItem).max(200).optional(), sm: z.array(layoutItem).max(200).optional() }),
 });
+
+/** Round 9: a saved view is a name and the URL query of the state (savedViews.ts checks the query keys). */
+export const savedViewSchema = z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/), name: z.string().trim().min(1).max(MAX_VIEW_NAME), query: z.string().min(1).max(MAX_VIEW_QUERY) });
 
 export const docSchema = z.object({
     schemaVersion: z.literal(2),
@@ -161,6 +165,9 @@ export const docSchema = z.object({
     }),
     meta: z.object({ createdFrom: z.string().max(64).optional(), migratedFromV1: z.object({ at: z.string(), propertyId: z.string(), siteUrl: z.string().optional() }).optional() }),
     calcs: z.array(calculatedMetric).max(30).optional(),
+    // Round 9: saved views (validated further by validateDoc: unique ids, a known default).
+    views: z.array(savedViewSchema).max(MAX_VIEWS).optional(),
+    defaultViewId: z.string().max(64).optional(),
 });
 
 export const controlStateSchema = z.object({
@@ -207,6 +214,8 @@ export function validateDoc(doc: unknown): ValidationResult<DashboardDocV2> {
         const problem = widgetProblem(w);
         if (problem) return { ok: false, error: problem };
     }
+    const viewProblem = savedViewProblem(d);
+    if (viewProblem) return { ok: false, error: viewProblem };
     const images = Object.values(d.widgets).filter((w) => w.type === 'image').length;
     if (images > 20) return { ok: false, error: 'At most 20 images per dashboard' };
     return { ok: true, value: d };

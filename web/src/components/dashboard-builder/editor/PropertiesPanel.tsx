@@ -13,6 +13,7 @@ import { dimLabel, getMetric, metricLabel } from '@/lib/builder/catalog';
 import { tableColumns, widgetMeta, widgetMetrics } from '@/lib/builder/registry';
 import { removeWidget, duplicateWidget, updateWidget } from '@/lib/builder/docOps';
 import { MENU_PRESETS, PRESETS } from '@/lib/builder/dates';
+import { COMPARE_OPTIONS, compareOptionId, type CompareOption } from '@/lib/builder/compare';
 import type { ControlDef, DashboardDocV2, FilterControl, MetricRef, SourceRef, TableColumn, WidgetDef } from '@/lib/builder/types';
 import { useEditorStore } from '@/stores/dashboardEditorStore';
 import { useResolvedTheme } from '@/lib/theme';
@@ -24,6 +25,7 @@ import { GrainControlProps, MetricControlProps, SearchTypeControlProps, SiteCont
 import { VariablesEditor } from './VariablesEditor';
 import { CalcList } from './CalcEditor';
 import { TABLE_TREND_ROWS, TREND_DAILY_MAX_DAYS, trendMetric, trendUnsupported } from '@/lib/builder/trend';
+import { WidgetDatesField } from './WidgetDatesField';
 import { WidgetFilters } from './WidgetFilters';
 
 type Patch = (w: WidgetDef) => WidgetDef;
@@ -90,6 +92,7 @@ function WidgetProps({ widget, doc, sites, defaultLabel }: { widget: WidgetDef; 
                 {tab === 'setup' ? (
                     <>
                         <Setup widget={widget} edit={edit} sites={sites} defaultLabel={defaultLabel} doc={doc} />
+                        {!meta.static ? <div className="border-t border-border-subtle pt-4"><WidgetDatesField widget={widget} edit={edit} /></div> : null}
                         {!meta.static ? <div className="border-t border-border-subtle pt-4"><WidgetFilters widget={widget} doc={doc} edit={edit} /></div> : null}
                     </>
                 ) : <Style widget={widget} edit={edit} />}
@@ -423,7 +426,7 @@ function DashboardSettings({ doc, sites }: { doc: DashboardDocV2; sites: SiteOpt
                             <Choice ariaLabel="Default date range" value={dc.default.kind === 'preset' ? dc.default.id : '28d'} onChange={(v) => setDate({ default: { kind: 'preset', id: v } })} options={presetOptions(dc.default.kind === 'preset' ? dc.default.id : null)} />
                         </Field>
                         <Field label="Compare to">
-                            <Choice ariaLabel="Default comparison" value={dc.defaultCompare.mode === 'custom' ? 'none' : dc.defaultCompare.mode} onChange={(v) => setDate({ defaultCompare: { mode: v } })} options={[{ value: 'previous_period', label: 'Previous period' }, { value: 'previous_year', label: 'Same period last year' }, { value: 'none', label: 'No comparison' }]} />
+                            <Choice ariaLabel="Default comparison" value={compareOptionId(dc.defaultCompare) === 'custom' ? 'none' : (compareOptionId(dc.defaultCompare) as Exclude<CompareOption['id'], 'custom'>)} onChange={(v) => setDate({ defaultCompare: COMPARE_OPTIONS.find((o) => o.id === v)?.spec ?? { mode: 'none' } })} options={COMPARE_OPTIONS.filter((o) => o.spec).map((o) => ({ value: o.id as Exclude<CompareOption['id'], 'custom'>, label: o.label }))} />
                         </Field>
                         <Toggle label="Viewers can change dates" checked={dc.viewerCanChange} onChange={(v) => setDate({ viewerCanChange: v })} />
                     </>

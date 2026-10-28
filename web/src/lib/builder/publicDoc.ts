@@ -5,9 +5,11 @@
  * never come from the query string.
  */
 import { usesMetric } from './calc';
+import { viewerMayCompare } from './compare';
 import { compareFromParam, rangeFromParam } from './dates';
 import { drillFromParams, type DrillResolver } from './drill';
 import { clickableDims, interactionFromParam } from './interaction';
+import { publicDefaultQuery } from './savedViews';
 import { isSearchType } from './searchType';
 import { cleanVariable } from './variables';
 import type {
@@ -47,6 +49,8 @@ export interface PublicDocOptions {
      * publicSiteChoices). Missing or empty = the control is left out of the public doc.
      */
     siteChoices?: (control: SiteControl) => Array<{ key: string; label: string; siteId: string }>;
+    /** Round 9: the share's viewer permissions, so the owner's default view reaches viewers only as far as they may change it. */
+    viewerControls?: { date: boolean; compare: boolean; filters: boolean };
 }
 
 /** A site control as a public viewer gets it: opaque keys and labels only, or nothing. */
@@ -71,6 +75,7 @@ export function publicDoc(doc: DashboardDocV2, labelOf: (s: SourceRef) => string
     const theme = { ...doc.theme };
     delete theme.legacy;
     const calcs = (doc.calcs ?? []).filter((c) => usesMetric(widgets, c.id));
+    const defaultViewQuery = opts.viewerControls ? publicDefaultQuery({ ...doc, pages }, { viewerControls: opts.viewerControls }) : undefined;
     return {
         schemaVersion: 2,
         name: doc.name,
@@ -93,6 +98,7 @@ export function publicDoc(doc: DashboardDocV2, labelOf: (s: SourceRef) => string
         meta: {},
         // Round 7 (B3): names of the calculated metrics the visible widgets use (ids hold no site data).
         ...(calcs.length ? { calcs } : {}),
+        ...(defaultViewQuery ? { defaultViewQuery } : {}),
     };
 }
 
@@ -119,7 +125,7 @@ export function publicControlsFromQuery(
         const r = rangeFromParam(q.get('range'), q.get('from'), q.get('to'));
         if (r && r.kind !== 'rolling') range = r;
     }
-    if (share.viewerControls.compare && dc.viewerCanCompare) {
+    if (viewerMayCompare(share.viewerControls, dc)) {
         const c = compareFromParam(q.get('compare'));
         if (c) compare = c;
     }

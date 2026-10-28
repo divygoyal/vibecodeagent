@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Skeleton } from '@/components/ui';
 import { DashboardView, pickedSiteLabel, useUrlControls, viewerSelection } from '@/components/dashboard-builder/DashboardView';
 import { DashboardBrandHeader } from '@/components/dashboard-builder/DashboardBrandHeader';
+import type { ViewsHandlers } from '@/components/dashboard-builder/ViewsMenu';
+import { defaultViewOf, removeView, saveView, setDefaultView, stateQuery, viewIsCurrent } from '@/lib/builder/savedViews';
 import { brandCompanyName } from '@/lib/builder/placeholders';
 import { ShareDialog } from '@/components/dashboard-builder/ShareDialog';
 import { EmailScheduleDialog } from '@/components/dashboard-builder/EmailScheduleDialog';
@@ -72,7 +74,8 @@ export default function DashboardViewPage({ params }: { params: Promise<{ id: st
 function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: DashboardRecord; onRecord: (r: DashboardRecord) => void; openShare: boolean; tv: boolean; created: boolean; router: ReturnType<typeof useRouter> }) {
     const doc = rec.doc;
     const appMode = useResolvedTheme();
-    const ctl = useUrlControls(doc, { date: true, compare: true, filters: true });
+    // Round 9: the owner's default view stands in when the URL carries no state.
+    const ctl = useUrlControls(doc, { date: true, compare: true, filters: true }, { defaultQuery: defaultViewOf(doc)?.query });
     const [fresh, setFresh] = useState(false);
     const key = `owner:${rec.id}:${rec.rev}:${canonicalJson(ctl.state)}`;
     const page = usePageResults(key, ownerPageLoader(rec.id, ctl.state.pageId ?? doc.pages[0].id, ctl.state, fresh), tv ? tvRefreshMs(doc) : doc.settings.autoRefreshSec * 1000);
@@ -115,6 +118,35 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
         } catch (e) {
             toast.error(e instanceof Error ? e.message : 'Could not save');
         }
+    };
+    /** Saved views live in the doc (no table): each change is a normal save. Returns a problem text, or null when saved. */
+    const persistViews = async (next: DashboardDocV2): Promise<string | null> => {
+        try {
+            const r = await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${rec.id}`, { method: 'PUT', headers: { 'If-Match': String(rec.rev) }, body: JSON.stringify({ doc: next, versionLabel: 'Views changed' }) });
+            onRecord(r.dashboard);
+            return null;
+        } catch (e) {
+            return e instanceof Error ? e.message : 'Could not save the view';
+        }
+    };
+    const savedViews = doc.views ?? [];
+    const views: ViewsHandlers = {
+        owner: {
+            views: savedViews,
+            defaultId: doc.defaultViewId,
+            currentId: savedViews.find((v) => viewIsCurrent(v, ctl.query))?.id,
+            canSave: true,
+            onSave: async (name) => {
+                const r = saveView(doc, name, stateQuery(ctl.query, { page: false }));
+                return r.ok ? persistViews(r.doc) : r.error;
+            },
+            onDelete: (viewId) => { void persistViews(removeView(doc, viewId)).then((p) => (p ? toast.error(p) : toast.success('View deleted'))); },
+            onDefault: (viewId) => { void persistViews(setDefaultView(doc, viewId)).then((p) => (p ? toast.error(p) : toast.success(viewId ? 'Default view set' : 'Default view cleared'))); },
+        },
+        onApply: ctl.applyView,
+        onReset: ctl.resetView,
+        hasDefault: Boolean(defaultViewOf(doc)),
+        link: ctl.viewLink,
     };
     const duplicate = async (asTemplate: boolean) => {
         try {
@@ -236,6 +268,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
                 shell="panel"
                 appMode={appMode}
                 notes={{ kind: 'owner', defaultSource: doc.defaultSource, canAdd: true }}
+                views={views}
             />
             {page.error ? <Banner variant="danger" className="mt-4">{page.error instanceof Error ? page.error.message : 'Could not load data'}</Banner> : null}
             <ShareDialog

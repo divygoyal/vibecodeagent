@@ -17,6 +17,7 @@ import { AXIS_LABEL_GAP, AXIS_LAST_TICK_PAD, categoryAxisWidth, fitLabel } from 
 import { countryName } from '@/lib/builder/countries';
 import { friendlyDimValue } from '@/lib/builder/levelLabels';
 import { autoGranularity, toDay } from '@/lib/builder/dates';
+import { widgetCompareText } from '@/lib/builder/widgetDates';
 import type { BarWidget, CellValue, PieWidget, TimeSeriesWidget } from '@/lib/builder/types';
 import { BuilderTimeSeries, breakdownColor, breakdownLabel } from '../charts/BuilderTimeSeries';
 import { useWidgetNotes } from '../charts/chartNotes';
@@ -59,7 +60,9 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
     const ok = okResult(result);
     const frame = ok?.parts.series;
     const c = widget.config;
-    const granularity = c.granularity === 'auto' ? (resolved ? autoGranularity(resolved.range.start, resolved.range.end, 'line') : 'day') : c.granularity;
+    // The widget's own days (round 9): a widget with its own dates picks its granularity from those, as the engine does.
+    const days = props.dates?.range ?? resolved?.range;
+    const granularity = c.granularity === 'auto' ? (days ? autoGranularity(days.start, days.end, 'line') : 'day') : c.granularity;
     const rows = useMemo(() => frame?.rows ?? [], [frame]);
     const partialFrom = useMemo(() => {
         const pf = ok?.flags.preliminaryFrom;
@@ -122,6 +125,7 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
                     series={c.series.map((s) => ({ metric: s.metric.id, kind: s.kind, label: s.metric.label, axis: s.axis }))}
                     breakdown={breakdown}
                     compare={compare}
+                    compareName={props.dates ? widgetCompareText(props.dates).legend || undefined : undefined}
                     granularity={granularity}
                     partialFrom={partialFrom}
                     height={h}
@@ -149,7 +153,7 @@ function CategoryTick({ x, y, payload, maxPx }: { x?: number; y?: number; payloa
     );
 }
 
-function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, labels, onPick }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; height: number; currency?: string; labels?: Record<string, string>; onPick?: (value: string) => void }) {
+function BarChartPlot({ widget, rows, seriesKeys, compare, compareName = 'Previous period', height, currency, labels, onPick }: { widget: BarWidget; rows: Array<Record<string, CellValue>>; seriesKeys?: string[]; compare: boolean; compareName?: string; height: number; currency?: string; labels?: Record<string, string>; onPick?: (value: string) => void }) {
     const c = widget.config;
     const anim = !useReducedMotion();
     const vertical = c.orientation === 'vertical';
@@ -167,7 +171,7 @@ function BarChartPlot({ widget, rows, seriesKeys, compare, height, currency, lab
                 const v = row[`m:${id}`];
                 const pv = row[`m:${id}:prev`];
                 const r: ChartTooltipRow[] = [{ key: id, label: metricLabel(id), color: metricColor(id), value: fmtMetricValue(id, typeof v === 'number' ? v : null, { currency }) }];
-                if (compare && pv !== undefined) r.push({ key: `${id}-p`, label: 'Previous period', color: metricColor(id), dashed: true, value: fmtMetricValue(id, typeof pv === 'number' ? pv : null, { currency }) });
+                if (compare && pv !== undefined) r.push({ key: `${id}-p`, label: compareName, color: metricColor(id), dashed: true, value: fmtMetricValue(id, typeof pv === 'number' ? pv : null, { currency }) });
                 return r;
             });
         return <ChartTooltipCard title={String(row.__label ?? '')} rows={out} />;
@@ -245,7 +249,7 @@ export function BarView(props: WidgetViewProps<BarWidget>) {
                     />
                 </div>
             ) : (
-                <BarChartPlot widget={widget} rows={rows} seriesKeys={frame.seriesKeys} compare={compare} height={h} currency={ok?.flags.currency} labels={frame.labels} onPick={props.onFilterClick} />
+                <BarChartPlot widget={widget} rows={rows} seriesKeys={frame.seriesKeys} compare={compare} compareName={props.dates ? widgetCompareText(props.dates).legend || undefined : undefined} height={h} currency={ok?.flags.currency} labels={frame.labels} onPick={props.onFilterClick} />
             )}
         </WidgetFrame>
     );

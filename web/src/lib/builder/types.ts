@@ -47,9 +47,13 @@ export type DateRangeSpec =
 
 export type CompareSpec =
     | { mode: 'none' }
-    | { mode: 'previous_period' }
+    /** `align: 'weekday'` (round 9): shift back by whole weeks, so weekdays face the same weekdays. */
+    | { mode: 'previous_period'; align?: 'weekday' }
     | { mode: 'previous_year'; align?: 'date' | 'weekday' }
     | { mode: 'custom'; start: Iso; end: Iso };
+
+/** "N units earlier" (widgetDates.ts); amount 1-60. */
+export interface DateShift { unit: 'day' | 'week' | 'month' | 'year'; amount: number }
 
 export type ControlScope =
     | { mode: 'all' }
@@ -268,6 +272,22 @@ export interface DashboardDocV2 {
      * compute (lib/builder/calc.ts), so widgets use it like any MetricId. Missing = none.
      */
     calcs?: CalculatedMetric[];
+    /**
+     * Saved views (round 9, savedViews.ts): named bookmarks of the viewer state (the URL query), kept in the
+     * doc so they need no table. Owner pages only: a share link never receives this list.
+     */
+    views?: SavedView[];
+    /** The view the dashboard opens on when the URL carries no state (id of one of `views`). */
+    defaultViewId?: string;
+}
+
+/** A named bookmark of the viewer's state: the query string a link to that view would carry (savedViews.ts). */
+export interface SavedView {
+    id: string;
+    /** 1-60 characters. */
+    name: string;
+    /** URL query without the leading '?': range, compare, page, f.*, x, s.*, m.*, g.*, t.*, d.*. */
+    query: string;
 }
 
 /** A named calculated metric: id 'calc:<op>_<format>_<better>:<A>[:<B>]:<token>' (calc.ts). */
@@ -306,7 +326,8 @@ export interface WidgetBase<T extends string, C> {
     source: SourceRef;
     config: C;
     style?: WidgetStyle;
-    dateOverride?: { range?: DateRangeSpec; compare?: CompareSpec };
+    /** Own dates (round 9, widgetDates.ts): a fixed range, or the dashboard's range moved back; missing = the dashboard's. */
+    dateOverride?: { range?: DateRangeSpec; compare?: CompareSpec; shift?: DateShift };
     filters?: FilterClause[];
     ignoreControls?: ControlId[];
     interactions?: WidgetInteractions;
@@ -571,7 +592,9 @@ export interface PublicDashboard {
     share?: Pick<ShareState, 'allowCopy' | 'badge' | 'viewerControls'>;
     rev?: number;
 }
-export type PublicDashboardDoc = Omit<DashboardDocV2, 'defaultSource' | 'widgets' | 'meta'> & {
+export type PublicDashboardDoc = Omit<DashboardDocV2, 'defaultSource' | 'widgets' | 'meta' | 'views' | 'defaultViewId'> & {
+    /** The owner's default view as a query the share allows (savedViews.ts publicDefaultQuery); missing = none. */
+    defaultViewQuery?: string;
     defaultSource: PublicSourceRef;
     widgets: Record<WidgetId, Omit<WidgetDef, 'source'> & { source: PublicSourceRef | { type: 'default' } }>;
     meta: Record<string, never>;

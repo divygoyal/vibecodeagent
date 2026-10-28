@@ -17,6 +17,7 @@ import { applyViewerControls, canonicalJson, compileWidget } from '../compile';
 import { alpha2ToGsc, gscToAlpha2 } from '../countries';
 import { lastCompleteDay, searchWindowOf } from '@/lib/dateRange';
 import { addDays, autoGranularity, eachDay, fromDay, monthStart, resolveCompare, resolveRange, toDay, todayIn, weekStart } from '../dates';
+import { resolveWidgetDates } from '../widgetDates';
 import { widgetMeta } from '../registry';
 import { searchTypeProblem } from '../searchType';
 import { tableTrendQuery } from '../trend';
@@ -465,9 +466,14 @@ function withComponents(metrics: string[]): string[] {
 // ── Planning per widget ──────────────────────────────────────────────────
 
 /** A GSC leaf's window: the GA4 window moved onto Search Console's last complete day; the comparison moves with it. */
-function searchWindows(range: Range, compare: Range | undefined, today: Iso): { range: Range; compare?: Range } {
+function searchWindows(range: Range, compare: Range | undefined, today: Iso, fixedCompare = false): { range: Range; compare?: Range } {
     const r = searchWindowOf(range, today);
     const shift = toDay(range.end) - toDay(r.end);
+    if (fixedCompare && compare) {
+        // A comparison the viewer typed in stays on its days; it only stops at Search Console's last complete day.
+        const last = lastCompleteDay('gsc', today);
+        return { range: r, compare: compare.end > last ? (compare.start > last ? undefined : { start: compare.start, end: last }) : compare };
+    }
     return { range: r, compare: compare && shift ? { start: addDays(compare.start, -shift), end: addDays(compare.end, -shift) } : compare };
 }
 
@@ -574,7 +580,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     const tz = input.timezone || 'UTC';
     const today = todayIn(tz, now);
     const baseRange = resolveRange(input.controls.date.range, today);
-    const baseCompare = resolveCompare(baseRange, input.controls.date.compare);
+    const baseCompare = resolveCompare(baseRange, input.controls.date.compare, today);
     const baseSearch = searchWindowOf(baseRange, today);
     const stats: ExecStats = { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 };
     const results: Record<string, WidgetResult> = {};
@@ -623,8 +629,8 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     // 1. Plan (a function: the trend round below plans its extra query the same way).
     const planWidget = (widget: WidgetDef, pageId: string | undefined, extra?: { queries: WidgetQuery[]; filter: FilterClause }): WidgetPlan => {
         const plan: WidgetPlan = { widget, queries: [], flags: {}, sourceLabel: '' };
-        const range = widget.dateOverride?.range ? resolveRange(widget.dateOverride.range, today) : baseRange;
-        const compare = widget.dateOverride?.compare ? resolveCompare(range, widget.dateOverride.compare) : widget.dateOverride?.range ? resolveCompare(range, input.controls.date.compare) : baseCompare;
+        // Own dates (round 9): a fixed range, a time shift or an own comparison; one rule for engine and labels (widgetDates.ts).
+        const { range, compare, compareSpec } = resolveWidgetDates(widget.dateOverride, { range: baseRange, compare: baseCompare, compareSpec: input.controls.date.compare, today });
         const compiled = compileWidget(widget, { controlDefs: input.controlDefs, controls: input.controls, pageId });
         const queries = extra ? extra.queries : compiled.queries;
         const filterOrigins = extra ? [...compiled.filterOrigins, { clause: extra.filter }] : compiled.filterOrigins;
@@ -699,7 +705,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             // Search Console reads its own window (lib/dateRange: through 2 days ago), the days the site page and the
             // portfolio count, except on a date axis it shares with GA4 (its newest day is then marked preliminary).
             const gscOnly = families.length === 1 && families[0] === 'gsc';
-            const gscWin = timeDim && !gscOnly ? null : searchWindows(range, qCompare, today);
+            const gscWin = timeDim && !gscOnly ? null : searchWindows(range, qCompare, today, compareSpec.mode === 'custom');
             const gscRange = gscWin?.range ?? range;
             const gscCompare = gscWin ? gscWin.compare : qCompare;
 
