@@ -164,8 +164,8 @@ export function KpiStrip({ items, selected, onSelect, comparisonLabel = 'previou
                                 </span>
                                 {it.loading ? (
                                     <span className={cn('flex items-center gap-2', slim ? 'mt-1' : 'mt-1.5')}>
-                                        <Skeleton className={slim ? 'h-5 w-16' : 'h-7 w-20'} />
-                                        <Skeleton className="h-3.5 w-10" />
+                                        <Skeleton delay={0} className={slim ? 'h-5 w-16' : 'h-7 w-20'} />
+                                        <Skeleton delay={0} className="h-3.5 w-10" />
                                     </span>
                                 ) : (
                                     // Two lines per tile (critique #11): label, then the value with its delta inline.
