@@ -9,7 +9,7 @@ import { useId, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 
 import { METRIC_LIST, metricFamilies } from '@/lib/builder/catalog';
-import { FUNNEL_MAX_STEPS, FUNNEL_MIN_STEPS, FUNNEL_NOTE } from '@/lib/builder/charts/funnel';
+import { FUNNEL_MAX_STEPS, FUNNEL_MIN_STEPS, FUNNEL_NOTE, funnelWarnings } from '@/lib/builder/charts/funnel';
 import type { ChartWidgetDef, FunnelStep, FunnelWidget, HeatmapWidget, PivotWidget, ScatterWidget, TreemapWidget } from '@/lib/builder/charts/types';
 import type { WidgetDef } from '@/lib/builder/types';
 import { pivotTotalsAvailable } from '@/lib/builder/charts/pivot';
@@ -101,6 +101,7 @@ function FunnelSetup({ widget, edit, source }: Props<FunnelWidget>) {
         set({ steps });
     };
     const input = 'h-9 w-full rounded-control border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint';
+    const warnings = funnelWarnings(c);
     return (
         <>
             {source}
@@ -125,6 +126,7 @@ function FunnelSetup({ widget, edit, source }: Props<FunnelWidget>) {
                         <input aria-label={`Step ${i + 1} ${st.kind === 'event' ? 'event name' : 'page path'}`} className={input} list={st.kind === 'event' ? listId : undefined} value={st.value} maxLength={200}
                             placeholder={st.kind === 'event' ? 'event name, e.g. add_to_cart' : '/pricing'} onChange={(e) => setStep(i, { value: e.target.value.trim() }, `step${i}v`)} />
                         <input aria-label={`Step ${i + 1} label`} className={input} value={st.label ?? ''} maxLength={40} placeholder="Label (optional)" onChange={(e) => setStep(i, { label: e.target.value || undefined }, `step${i}l`)} />
+                        {warnings.filter((w) => w.step === i + 1).map((w) => <p key={w.kind} role="status" className="text-meta text-warn">{w.text}</p>)}
                     </li>
                 ))}
             </ol>

@@ -72,6 +72,35 @@ export function funnelProblem(w: FunnelWidget): string | null {
     return null;
 }
 
+/** The identity of a step: the same event or the same page match counts the same thing. */
+const stepIdentity = (s: FunnelStep): string => (s.kind === 'event' ? `e:${s.value.trim()}` : `p:${s.match ?? 'exact'}:${s.value.trim()}`);
+
+export interface FunnelWarning {
+    /** 1-based step the warning is about (the later one of a duplicate pair). */
+    step: number;
+    kind: 'duplicate' | 'raw';
+    text: string;
+}
+
+/**
+ * Things worth fixing in the steps: a step that counts the same event or page as an earlier step (it repeats
+ * that step's numbers, so its conversion reads 100%), and an event step with no label (it shows the raw
+ * event name, "click"). Steps not filled in yet are ignored.
+ */
+export function funnelWarnings(c: FunnelConfig): FunnelWarning[] {
+    const out: FunnelWarning[] = [];
+    const seen = new Map<string, number>();
+    c.steps.slice(0, FUNNEL_MAX_STEPS).forEach((s, i) => {
+        if (!s.value.trim()) return;
+        const id = stepIdentity(s);
+        const first = seen.get(id);
+        if (first !== undefined) out.push({ step: i + 1, kind: 'duplicate', text: `Step ${i + 1} counts the same ${s.kind === 'event' ? 'event' : 'page'} as step ${first} (${s.value.trim()}), so it repeats those numbers.` });
+        else seen.set(id, i + 1);
+        if (s.kind === 'event' && !s.label?.trim()) out.push({ step: i + 1, kind: 'raw', text: `Step ${i + 1} shows the raw event name "${s.value.trim()}". Give it a label people understand.` });
+    });
+    return out;
+}
+
 // ── shaping ──────────────────────────────────────────────────────────────
 
 export interface FunnelRow {
