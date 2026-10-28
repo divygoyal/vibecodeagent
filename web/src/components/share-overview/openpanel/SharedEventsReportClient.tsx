@@ -81,9 +81,11 @@ function buildSearch({
 function SharedEventsReportPage({
     token,
     siteUrl,
+    showMadeWith = true,
 }: {
     token: string;
     siteUrl?: string;
+    showMadeWith?: boolean;
 }) {
     const searchParams = useSearchParams();
     const {
@@ -273,7 +275,7 @@ function SharedEventsReportPage({
                     </div>
                 </Card>
             </main>
-            <ShareFooter />
+            {showMadeWith ? <ShareFooter /> : null}
         </SharePage>
     );
 }
@@ -281,9 +283,11 @@ function SharedEventsReportPage({
 export default function SharedEventsReportClient({
     token,
     siteUrl,
+    showMadeWith = true,
 }: {
     token: string;
     siteUrl?: string;
+    showMadeWith?: boolean;
 }) {
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
@@ -298,7 +302,7 @@ export default function SharedEventsReportClient({
     return (
         <QueryClientProvider client={queryClient}>
             <NuqsAdapter>
-                <SharedEventsReportPage token={token} siteUrl={siteUrl} />
+                <SharedEventsReportPage token={token} siteUrl={siteUrl} showMadeWith={showMadeWith} />
             </NuqsAdapter>
         </QueryClientProvider>
     );

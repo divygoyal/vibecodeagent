@@ -1,3 +1,4 @@
+import { madeWithVisible } from '@/lib/growth/madeWith';
 import { NextResponse } from 'next/server';
 import { checkUnlockKey, clientIp, publicSiteChoices, rateLimited, unlockKeyFrom } from '@/lib/builder/server/access';
 import { directoryFor, jsonError, safeLabeler } from '@/lib/builder/server/service';
@@ -26,7 +27,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
         const dir = row.ownerIdentifier ? await directoryFor(row.ownerIdentifier) : null;
         // Site switcher (round 7): only the sites the owner allowed, as opaque keys and labels.
         body.doc = publicDoc(rec.doc, safeLabeler(dir), { siteChoices: (c) => publicSiteChoices(c, dir, token) });
-        body.share = { allowCopy: rec.share.allowCopy, badge: rec.share.badge && rec.doc.theme.badge.show, viewerControls: rec.share.viewerControls };
+        body.share = { allowCopy: rec.share.allowCopy, badge: madeWithVisible(rec.share.badge, rec.doc.theme.badge.show), viewerControls: rec.share.viewerControls };
         body.rev = rec.rev;
         if (!preview) void getPublicRow(token, true).catch(() => null); // count the view
     }

@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Favicon } from '@/components/ui/Favicon';
 import { BrandMark, Wordmark } from '@/components/shell/BrandMark';
+import { MadeWithTrafficClaw } from '@/components/share/MadeWith';
+import { madeWithUrl, type MadeWithKind } from '@/lib/growth/madeWith';
 
 /**
  * Chrome shared by the public share pages (/share/[token], its events report,
@@ -39,7 +41,7 @@ export function shareSiteLabel(siteUrl?: string | null): string {
 }
 
 /** Owner logo when the share has one, else the TrafficClaw mark + wordmark. */
-export function ShareBrand({ branding, size = 24 }: { branding?: ShareBrandingLike | null; size?: number }) {
+export function ShareBrand({ branding, size = 24, kind = 'share' }: { branding?: ShareBrandingLike | null; size?: number; kind?: MadeWithKind }) {
     if (branding?.logoUrl) {
         return (
             // eslint-disable-next-line @next/next/no-img-element
@@ -47,7 +49,7 @@ export function ShareBrand({ branding, size = 24 }: { branding?: ShareBrandingLi
         );
     }
     return (
-        <a href={HOME_URL} target="_blank" rel="noopener noreferrer" className="tap-area flex shrink-0 items-center gap-2" aria-label={`${BRAND_NAME} home`}>
+        <a href={madeWithUrl(kind)} target="_blank" rel="noopener noreferrer" className="tap-area flex shrink-0 items-center gap-2" aria-label={`${BRAND_NAME} home`}>
             <BrandMark size={size} />
             <Wordmark />
         </a>
@@ -107,14 +109,11 @@ export function ShareHeader({
     );
 }
 
-/** "Built with TrafficClaw" line under a share page. */
-export function ShareFooter({ compact = false, className }: { compact?: boolean; className?: string }) {
+/** "Made with TrafficClaw — free" line under a share page (kind: share page, or embed inside someone's iframe). */
+export function ShareFooter({ compact = false, kind = 'share', className }: { compact?: boolean; kind?: MadeWithKind; className?: string }) {
     return (
-        <footer className={cn('text-center', compact ? 'py-4' : 'py-8', className)}>
-            <a href={HOME_URL} target="_blank" rel="noopener noreferrer" className="tap-area inline-flex items-center gap-1.5 text-meta text-fg-muted transition-colors hover:text-fg">
-                <BrandMark size={14} />
-                Built with {BRAND_NAME}
-            </a>
+        <footer className={cn('flex justify-center px-4', compact ? 'py-4' : 'py-8', className)}>
+            <MadeWithTrafficClaw kind={kind} />
         </footer>
     );
 }
