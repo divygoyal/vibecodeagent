@@ -10,6 +10,7 @@ import {
 import type { EmbedWidget } from '@/lib/builder/types';
 import { useEmbedProbe } from '../useEmbedProbe';
 import { WidgetFrame, type WidgetViewProps } from './WidgetFrame';
+import { BRAND_NAME } from '@/lib/brand';
 
 function Notice({ icon: Icon, title, text, action }: { icon: typeof Globe; title: string; text?: string; action?: React.ReactNode }) {
     return (
@@ -53,7 +54,13 @@ export function EmbedView(props: WidgetViewProps<EmbedWidget>) {
                     action={open}
                 />
             ) : (
-                <div className="group/embed relative h-full min-h-0">
+                <div className="group/embed relative flex h-full min-h-0 flex-col">
+                    {!editing ? (
+                        // Always say where the content comes from, so a page framed on a public link can't pass as ours.
+                        <p data-embed-source="" className="mb-1.5 flex shrink-0 items-center gap-1 truncate text-meta text-fg-muted">
+                            <Globe aria-hidden size={12} /> From {host} · not part of {BRAND_NAME}
+                        </p>
+                    ) : null}
                     <iframe
                         // Remount when the address changes so a stale page never lingers.
                         key={href}
@@ -65,7 +72,7 @@ export function EmbedView(props: WidgetViewProps<EmbedWidget>) {
                         loading="lazy"
                         scrolling={c.scroll ? 'auto' : 'no'}
                         data-embed-frame=""
-                        className={cn('block w-full border-0 bg-surface', editing && 'pointer-events-none')}
+                        className={cn('block min-h-0 w-full flex-1 border-0 bg-surface', editing && 'pointer-events-none')}
                         style={{ height: c.heightPx ? c.heightPx : '100%' }}
                     />
                     {!editing ? (
