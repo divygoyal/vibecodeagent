@@ -140,6 +140,11 @@ test('pivot totals: nothing left over means no Other row; a missing report falls
     assert.equal(exact.otherRow, null);
     assert.equal(exact.complete, true);
     assert.equal(exact.grand, 270);
+    // Reports that differ by rounding (a gap of 1 in 270) are not a row of their own: the total stays the sum of what is shown.
+    const noise = shapePivot(F, pv().config, totalsFrame([['desktop', 146], ['mobile', 113], ['(other)', 12]]));
+    assert.equal(noise.otherRow, null);
+    assert.equal(noise.grand, 270);
+    assert.equal(noise.complete, true);
     const none = shapePivot(F, pv().config);
     assert.equal(none.otherRow, null);
     assert.equal(none.complete, false); // the view labels it "Total (top 3)"

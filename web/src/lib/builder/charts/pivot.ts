@@ -155,12 +155,14 @@ export function shapePivot(frame: DataFrame, c: PivotConfig, totals?: DataFrame)
     let otherRow: PivotModel['otherRow'] = null;
     let complete = false;
     if (truth) {
-        colTotals = truth.all;
-        const rest = truth.all.map((t, j) => {
-            const d = t - (shown[j] ?? 0);
-            return d > Math.max(1e-6, Math.abs(t) * 1e-9) ? d : 0;
-        });
-        if (rest.some((v) => v > 0)) otherRow = { cells: rest.map((v) => (v > 0 ? v : null)), total: rest.reduce((a, b) => a + b, 0) };
+        const rest = truth.all.map((t, j) => Math.max(0, t - (shown[j] ?? 0)));
+        const restTotal = rest.reduce((a, b) => a + b, 0);
+        const whole = truth.all.reduce((a, b) => a + b, 0);
+        // Two Google reports can differ by a few units (rounding, sampling): a gap of a unit or two, or under 0.2%, is noise, not a row.
+        if (restTotal > Math.max(1.5, whole * 0.002)) {
+            colTotals = truth.all;
+            otherRow = { cells: rest.map((v) => (v > 0 ? v : null)), total: restTotal };
+        }
         complete = !truth.hidden;
     }
     const all = cells.flat().filter((v): v is number => v !== null);
