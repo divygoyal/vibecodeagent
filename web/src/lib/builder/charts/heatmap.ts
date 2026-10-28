@@ -161,3 +161,57 @@ export function calendarModel(rows: Array<Record<string, CellValue>>, metric: Me
         rows: order.map((d) => WEEKDAY_SHORT[d]),
     };
 }
+
+// ── calendar geometry ────────────────────────────────────────────────────
+
+export interface CalendarGeometry {
+    /** Cell width and height in px. */
+    w: number;
+    h: number;
+    /** Short ranges: wide cells that fill the card and carry their value as text. */
+    roomy: boolean;
+    /** The value fits inside the cell as text. */
+    text: boolean;
+}
+
+export const CALENDAR_GAP = 2;
+export const CALENDAR_LABEL_W = 30;
+export const CALENDAR_ROOMY_MAX_W = 120;
+export const CALENDAR_ROOMY_H = 28;
+
+/**
+ * Cell size of the calendar for a card `width` px wide and `cols` week columns. Short ranges (28 days is five
+ * columns) fill the width with roomy cells (up to 120 x 28 px) that show their value; long ranges keep squares of
+ * 8 to 18 px (the grid scrolls below that). Unmeasured (width 0) gives the small squares.
+ */
+export function calendarGeometry(width: number, cols: number): CalendarGeometry {
+    const natural = Math.floor((width - CALENDAR_LABEL_W) / Math.max(1, cols)) - CALENDAR_GAP;
+    if (width > 0 && natural >= 22) {
+        const w = Math.min(natural, CALENDAR_ROOMY_MAX_W);
+        return { w, h: CALENDAR_ROOMY_H, roomy: true, text: w >= 44 };
+    }
+    const s = Math.max(8, Math.min(18, natural));
+    return { w: s, h: s, roomy: false, text: false };
+}
+
+// ── wording ──────────────────────────────────────────────────────────────
+
+const hourName = (h: number) => `${h % 12 === 0 ? 12 : h % 12} ${h % 24 < 12 ? 'am' : 'pm'}`;
+
+/** "1–4 pm", "11 am–2 pm", "10 pm–1 am" (end hour may be 24). */
+export function hourSpan(start: number, end: number): string {
+    const [an, ap] = hourName(start).split(' ');
+    const [bn, bp] = hourName(end % 24).split(' ');
+    return ap === bp ? `${an}–${bn} ${bp}` : `${an} ${ap}–${bn} ${bp}`;
+}
+
+/**
+ * The line above a weekday x hour heatmap: "Fri 1–4 pm is 2.5× busier than an average 3-hour slot." (the
+ * window is the busiest run of `length` hours in one day; ratio is its total over the average run).
+ * `total` is everything in the grid: with too little in it there is no pattern to name.
+ */
+export function peakSentence(w: { day: number; hour: number; length: number; ratio: number }, total: number, unit: string): string {
+    if (total < 20) return `Too few ${unit} in this period to show a pattern.`;
+    const slot = `${WEEKDAY_SHORT[w.day]} ${hourSpan(w.hour, w.hour + w.length)}`;
+    return w.ratio >= 1.15 ? `${slot} is ${w.ratio.toFixed(1)}× busier than an average ${w.length}-hour slot.` : `${slot} is the busiest ${w.length}-hour slot, but not by much.`;
+}

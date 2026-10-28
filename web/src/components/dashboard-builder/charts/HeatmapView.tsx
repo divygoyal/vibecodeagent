@@ -13,14 +13,15 @@ import { cn } from '@/lib/cn';
 import { EmptyState } from '@/components/ui';
 import { WeekHourHeatmap } from '@/components/charts/WeekHourHeatmap';
 import { FindingLine } from '@/components/site/Finding';
-import { peakHoursFinding, peakWindow } from '@/components/site/lib/findings';
+import { peakWindow } from '@/components/site/lib/findings';
 import { fmtDayLong } from '@/lib/format';
 import { fmtMetricValue, getMetric, metricColor, metricLabel } from '@/lib/builder/catalog';
-import { calendarModel, heatLevel, weekdayHourGrid, type CalendarCell, type CalendarModel } from '@/lib/builder/charts/heatmap';
+import { calendarGeometry, CALENDAR_GAP, CALENDAR_LABEL_W, calendarModel, heatLevel, peakSentence, weekdayHourGrid, type CalendarCell, type CalendarModel } from '@/lib/builder/charts/heatmap';
 import type { HeatmapWidget } from '@/lib/builder/charts/types';
 import { useElementWidth } from '../useElementWidth';
 import { okResult, WidgetFrame, type WidgetViewProps } from '../widgets/WidgetFrame';
 
+const TIME_ZONE_NOTE = 'Hours are in the Analytics property’s time zone.';
 const LEVEL_PCT = [0, 18, 38, 58, 78, 100];
 
 /** Fill of a cell at a level: the metric colour mixed into the card (works in light and dark). */
@@ -45,17 +46,17 @@ export function HeatmapView(props: WidgetViewProps<HeatmapWidget>) {
     const peak = week && additive ? peakWindow(week.grid, 3) : null;
     const empty = calendar ? !cal || cal.max <= 0 : !week || week.cells === 0 || (additive && week.total <= 0);
     return (
-        <WidgetFrame props={props} footnote={calendar ? undefined : { node: 'Hours are in the Analytics property’s time zone', text: 'Hours are in the Analytics property’s time zone' }}>
+        <WidgetFrame props={props}>
             {!frame ? null : empty ? (
                 <EmptyState variant="inline" title={`No ${label} in this period`} />
             ) : (
                 <div className="h-full min-h-0 overflow-y-auto">
                     {week ? (
                         <>
-                            {c.finding && additive ? <FindingLine finding={peakHoursFinding(week.grid, label)} /> : null}
-                            <WeekHourHeatmap grid={week.grid} color={color} format={fmt} unit={label} highlight={peak && peak.ratio >= 1.15 ? peak : null} />
+                            {c.finding && additive && peak ? <FindingLine finding={{ text: peakSentence(peak, week.total, label), tone: 'info' }} /> : null}
+                            <WeekHourHeatmap grid={week.grid} color={color} format={fmt} unit={label} highlight={peak && peak.ratio >= 1.15 ? peak : null} legend note={TIME_ZONE_NOTE} />
                         </>
-                    ) : cal ? <CalendarHeat model={cal} color={color} format={fmt} unit={label} /> : null}
+                    ) : cal ? <CalendarHeat model={cal} color={color} format={fmt} short={(v) => fmtMetricValue(id, v, { currency, compact: true })} unit={label} /> : null}
                 </div>
             )}
         </WidgetFrame>
@@ -64,10 +65,10 @@ export function HeatmapView(props: WidgetViewProps<HeatmapWidget>) {
 
 // ── Calendar ─────────────────────────────────────────────────────────────
 
-const GAP = 2;
-const LABEL_W = 30;
+const GAP = CALENDAR_GAP;
+const LABEL_W = CALENDAR_LABEL_W;
 
-function CalendarHeat({ model, color, format, unit }: { model: CalendarModel; color: string; format: (v: number) => string; unit: string }) {
+function CalendarHeat({ model, color, format, short, unit }: { model: CalendarModel; color: string; format: (v: number) => string; short: (v: number) => string; unit: string }) {
     const [box, width] = useElementWidth<HTMLDivElement>();
     const scroller = useRef<HTMLDivElement | null>(null);
     const [hover, setHover] = useState<CalendarCell | null>(null);
@@ -76,8 +77,7 @@ function CalendarHeat({ model, color, format, unit }: { model: CalendarModel; co
         return { c: 0, r: Math.max(0, r) };
     });
     const cols = model.weeks.length;
-    // Cells fill the width up to 18 px; below 8 px the grid scrolls (newest days in view).
-    const s = Math.max(8, Math.min(18, Math.floor((width - LABEL_W) / cols) - GAP));
+    const { w: s, h: sh, roomy, text: showText } = calendarGeometry(width, cols);
     const gridW = LABEL_W + cols * (s + GAP);
     const scrolls = width > 0 && gridW > width + 1;
     useEffect(() => {
@@ -132,11 +132,11 @@ function CalendarHeat({ model, color, format, unit }: { model: CalendarModel; co
                         ))}
                     </div>
                     {model.rows.map((rowLabel, r) => (
-                        <div key={r} role="row" className="flex items-center" style={{ height: s + GAP }}>
-                            <span role="rowheader" className="shrink-0 pr-1 text-caption text-fg-muted" style={{ width: LABEL_W }}>{r % 2 === 0 ? rowLabel : ''}<span className="sr-only">{r % 2 === 0 ? '' : rowLabel}</span></span>
+                        <div key={r} role="row" className="flex items-center" style={{ height: sh + GAP }}>
+                            <span role="rowheader" className="shrink-0 pr-1 text-caption text-fg-muted" style={{ width: LABEL_W }}>{roomy || r % 2 === 0 ? rowLabel : ''}<span className="sr-only">{roomy || r % 2 === 0 ? '' : rowLabel}</span></span>
                             {model.weeks.map((w, ci) => {
                                 const cell = w[r];
-                                if (!cell) return <span key={ci} role="gridcell" aria-hidden className="shrink-0" style={{ width: s, height: s, marginRight: GAP }} />;
+                                if (!cell) return <span key={ci} role="gridcell" aria-hidden className="shrink-0" style={{ width: s, height: sh, marginRight: GAP }} />;
                                 const level = heatLevel(cell.value, model.thresholds);
                                 const isActive = active.c === ci && active.r === r;
                                 return (
@@ -150,9 +150,11 @@ function CalendarHeat({ model, color, format, unit }: { model: CalendarModel; co
                                         onMouseEnter={() => setHover(cell)}
                                         onFocus={() => { setHover(cell); setActive({ c: ci, r }); }}
                                         onBlur={() => setHover(null)}
-                                        className={cn('block shrink-0 rounded-[3px] outline-offset-1', hover?.date === cell.date && 'outline-2 outline-fg-muted')}
-                                        style={{ width: s, height: s, marginRight: GAP, background: heatFill(color, level) }}
-                                    />
+                                        className={cn('flex shrink-0 items-center justify-center overflow-hidden rounded-[3px] text-caption tabular-nums outline-offset-1', level >= 5 ? 'text-white' : 'text-fg', hover?.date === cell.date && 'outline-2 outline-fg-muted')}
+                                        style={{ width: s, height: sh, marginRight: GAP, background: heatFill(color, level) }}
+                                    >
+                                        {showText && typeof cell.value === 'number' ? <span aria-hidden>{short(cell.value)}</span> : null}
+                                    </span>
                                 );
                             })}
                         </div>
