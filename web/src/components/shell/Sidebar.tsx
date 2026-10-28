@@ -7,6 +7,7 @@ import useSWR from 'swr';
 import { Gauge, PanelLeft, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
+import { messageBalance } from '@/lib/plans';
 import { useCredits } from '@/lib/useDashboardData';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { BrandMark, Wordmark } from './BrandMark';
@@ -17,10 +18,6 @@ import { useCurrentSite } from './useCurrentSite';
 import { UserMenu } from './UserMenu';
 import { useDemoSession } from '@/components/demo/useDemoSession';
 
-/** Credits per plan for the meter (same table as the old CreditsCard). */
-function planMax(plan: string): number {
-    return plan === 'pro' ? 300 : plan === 'growth' ? 150 : plan === 'starter' ? 50 : 20;
-}
 
 function isActive(pathname: string, item: NavItem): boolean {
     if (item.href === '/dashboard') return pathname === '/dashboard' || pathname === '/dashboard/portfolio';
@@ -82,10 +79,11 @@ function GroupLabel({ children, detail, collapsed }: { children: string; detail?
 function AiMeter({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
     const { credits, plan } = useCredits();
     if (credits === null || credits === undefined) return null;
-    const max = Math.max(planMax(plan), credits);
-    const pct = max > 0 ? Math.max(0, Math.min(100, (credits / max) * 100)) : 0;
+    // Round 5: the denominator is the plan's allowance (lib/plans, what the backend grants), not an old
+    // table (Pro 300 vs 100). Messages above it are bonus, shown apart: "300 left · 100 + 200 bonus".
+    const b = messageBalance(credits, plan);
     if (collapsed) {
-        return <NavLink href="/dashboard/plan" label={`AI messages: ${credits} left`} icon={Gauge} collapsed onClick={onNavigate} />;
+        return <NavLink href="/dashboard/plan" label={`AI messages: ${b.total} left`} icon={Gauge} collapsed onClick={onNavigate} />;
     }
     return (
         <Link href="/dashboard/plan" onClick={onNavigate} className="mx-3 block rounded-control bg-surface-sunken p-3 transition-colors duration-120 hover:bg-subtle">
@@ -93,9 +91,12 @@ function AiMeter({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: 
                 <span className="text-meta text-fg-muted">AI messages</span>
                 <span className="text-meta font-medium text-brand-text">Get more</span>
             </span>
-            <span className="mt-0.5 block text-body-sm font-medium text-fg tabular-nums">{credits} of {max} left</span>
+            <span className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-body-sm font-medium text-fg tabular-nums">
+                {b.bonus > 0 ? `${b.total} left` : `${b.total} of ${b.allowance} left`}
+                {b.bonus > 0 ? <span className="text-meta font-normal text-fg-muted">{b.fromPlan} + {b.bonus} bonus</span> : null}
+            </span>
             <span className="mt-2 block h-1 overflow-hidden rounded-full bg-subtle" aria-hidden>
-                <span className={cn('block h-full rounded-full', credits === 0 ? 'bg-down' : pct < 20 ? 'bg-warn' : 'bg-brand')} style={{ width: `${pct}%` }} />
+                <span className={cn('block h-full rounded-full', b.level === 'out' ? 'bg-down' : b.level === 'low' ? 'bg-warn' : 'bg-brand')} style={{ width: `${b.pct}%` }} />
             </span>
         </Link>
     );

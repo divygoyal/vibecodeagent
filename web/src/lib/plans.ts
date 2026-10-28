@@ -46,3 +46,40 @@ export function dodoCheckoutUrl(productId: string, email: string): string {
 export function pricePerMessage(plan: PaidPlan): string {
     return `$${(plan.priceUsd / plan.credits).toFixed(2)}`;
 }
+
+/** Ask messages a plan grants: per month for paid plans (Starter is legacy), once for Free. */
+export function planAllowance(plan: string): number {
+    if (plan === 'starter') return 50;
+    return PAID_PLANS.find((p) => p.key === plan)?.credits ?? FREE_START_CREDITS;
+}
+
+export interface MessageBalance {
+    /** What the plan grants (the meter's denominator). */
+    allowance: number;
+    /** Messages left in total (the one balance the backend keeps). */
+    total: number;
+    /** The part of `total` that is the plan's own allowance. */
+    fromPlan: number;
+    /**
+     * Messages above the allowance (a grant, a referral, a seed). A renewal sets the balance back to
+     * the allowance (webhook `reset_credits`), so these are used first and do not carry over.
+     */
+    bonus: number;
+    /** Meter fill, 0-100: the plan part of the allowance. */
+    pct: number;
+    level: 'ok' | 'low' | 'out';
+}
+
+/**
+ * Split the single credits balance into the plan allowance and bonus messages (round 5, audit item 31),
+ * so the meter, the Plan page and the plan cards all say the same thing ("100 + 200 bonus").
+ */
+export function messageBalance(credits: number, plan: string): MessageBalance {
+    const allowance = planAllowance(plan);
+    const total = Math.max(0, Math.floor(credits));
+    const fromPlan = Math.min(total, allowance);
+    const bonus = Math.max(0, total - allowance);
+    const pct = allowance > 0 ? Math.max(0, Math.min(100, (fromPlan / allowance) * 100)) : 0;
+    const level = total === 0 ? 'out' : bonus === 0 && pct < 20 ? 'low' : 'ok';
+    return { allowance, total, fromPlan, bonus, pct, level };
+}

@@ -3,14 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 
-import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Favicon } from '@/components/ui/Favicon';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { BoardRowItem } from '@/components/leaderboard/BoardRows';
 import { boardColumns } from '@/lib/leaderboard/columns';
-import { CategoryBadge, CountValue, PctDelta, VerificationBadge } from '@/components/leaderboard/shared';
-import { engagementText } from '@/lib/leaderboard/format';
+import { CategoryText, CountValue, OpenToText, PctDelta, VerifiedMark } from '@/components/leaderboard/shared';
+import { engagementText, timeAgo } from '@/lib/leaderboard/format';
 import { PRIVACY_SECTIONS } from '@/lib/leaderboard/constants';
 import type { BoardRow, MyEntry, OpenTo, PrivacySettings, ProfilePayload, RangeKey } from '@/lib/leaderboard/types';
 
@@ -59,7 +58,10 @@ export function PreviewPanel({ entry, draft, range = '28d' }: { entry: MyEntry; 
     return (
         <div className="flex flex-col gap-3" aria-label="Public preview">
             <div className="flex items-center justify-between">
-                <h3 className="text-title-sm text-fg">Public preview</h3>
+                <h3 className="text-title-sm text-fg">
+                    Public preview
+                    {entry.last_refreshed ? <span className="ml-2 text-meta font-normal text-fg-muted">numbers {timeAgo(entry.last_refreshed)}</span> : null}
+                </h3>
                 {entry.public_path && !entry.is_paused && entry.verification.ranked ? (
                     <a href={entry.public_path} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-body-sm font-medium text-brand-text hover:underline">
                         Open live page <ExternalLink aria-hidden size={13} />
@@ -89,11 +91,8 @@ export function PreviewPanel({ entry, draft, range = '28d' }: { entry: MyEntry; 
                                 <div className="flex items-start gap-3">
                                     <Favicon host={(p.website_url || p.name).replace(/^https?:\/\//, '').replace(/\/.*$/, '')} size={32} />
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-title-sm text-fg">{p.name}</p>
-                                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                            <VerificationBadge v={p.verification} compact />
-                                            <CategoryBadge name={p.category} />
-                                        </div>
+                                        <p className="flex flex-wrap items-center gap-x-1.5 text-title-sm text-fg">{p.name}<VerifiedMark v={p.verification} /></p>
+                                        <CategoryText name={p.category} />
                                         {p.description ? <p className="mt-2 line-clamp-2 text-body-sm text-fg-secondary">{p.description}</p> : null}
                                     </div>
                                 </div>
@@ -120,7 +119,7 @@ export function PreviewPanel({ entry, draft, range = '28d' }: { entry: MyEntry; 
                                     {shown.length ? <>Breakdowns shown: {shown.map((s) => s.label).join(', ')}.</> : 'No breakdowns shown (countries, sources, devices, pages, queries).'}
                                 </p>
                                 {p.live.enabled ? <p className="mt-1 text-meta text-fg-muted">Live visitor count is on.</p> : null}
-                                {p.open_to.length ? <div className="mt-2 flex flex-wrap gap-1">{p.open_to.map((o) => <Badge key={o} variant="outline">{o}</Badge>)}</div> : null}
+                                {p.open_to.length ? <p className="mt-1"><OpenToText items={p.open_to} className="text-meta" /></p> : null}
                             </Card>
                         </div>
                     ) : null}

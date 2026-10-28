@@ -19,6 +19,7 @@ import { Table } from '@/components/ui/Table';
 import { cn } from '@/lib/cn';
 import { getSafeRedirectUrl } from '@/lib/checkout';
 import { fmtDay, fmtDayYear, fmtFull } from '@/lib/format';
+import { messageBalance } from '@/lib/plans';
 import { useCredits } from '@/lib/useDashboardData';
 import { FAQ, INCLUDED_IN_ALL, PLANS, planByKey, type PlanDef } from './billing';
 import { DemoNotice } from '@/components/demo/DemoNotice';
@@ -128,7 +129,15 @@ function PlanContent() {
                     </div>
                     <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                         {PLANS.filter((p) => p.available).map((p) => (
-                            <PlanCard key={p.key} def={p} current={plan} email={session?.user?.email ?? ''} />
+                            <PlanCard
+                                key={p.key}
+                                def={p}
+                                current={plan}
+                                email={session?.user?.email ?? ''}
+                                cancelled={subscriptionCancelled}
+                                renewal={renewal}
+                                onDowngradeToFree={() => { setCancelError(null); setShowCancelModal(true); }}
+                            />
                         ))}
                     </div>
                     <p className="mt-3 text-center text-meta text-fg-muted">Secure payments by Dodo Payments. Switch plans freely.</p>
@@ -172,9 +181,9 @@ function UsageCard({ current, credits, renewal, cancelled, onCancel }: {
     onCancel: () => void;
 }) {
     const paid = current.key !== 'free';
-    const max = Math.max(current.messages, credits ?? 0);
-    const pct = credits !== null && max > 0 ? Math.max(0, Math.min(100, (credits / max) * 100)) : 0;
-    const level = credits === 0 ? 'out' : pct < 20 ? 'low' : 'ok';
+    // One balance in the backend; the meter counts against the plan allowance and anything above it is bonus (round 5).
+    const b = credits === null ? null : messageBalance(credits, current.key);
+    const level = b?.level ?? 'ok';
 
     return (
         <Card as="section" aria-labelledby="usage-title">
@@ -193,28 +202,38 @@ function UsageCard({ current, credits, renewal, cancelled, onCancel }: {
             </div>
 
             <div className="mt-5">
-                {credits === null ? (
+                {b === null ? (
                     <Skeleton className="h-9 w-48" delay={0} />
                 ) : (
-                    <p className="flex flex-wrap items-baseline gap-x-2 text-fg">
-                        <span className="text-stat-lg tabular-nums">{fmtFull(credits)}</span>
-                        <span className="text-body text-fg-muted">
-                            {credits === 1 ? 'message' : 'messages'} left{paid ? ` of ${fmtFull(max)} this month` : ''}
-                        </span>
-                        {level === 'out' ? <Badge variant="down">Out of messages</Badge> : level === 'low' ? <Badge variant="warn">Running low</Badge> : null}
-                    </p>
+                    <>
+                        <p className="flex flex-wrap items-baseline gap-x-2 text-fg">
+                            <span className="text-stat-lg tabular-nums">{fmtFull(b.total)}</span>
+                            <span className="text-body text-fg-muted">
+                                {b.total === 1 ? 'message' : 'messages'} left
+                                {b.bonus === 0 ? ` of ${fmtFull(b.allowance)}${paid ? ' this month' : ''}` : ''}
+                            </span>
+                            {level === 'out' ? <Badge variant="down">Out of messages</Badge> : level === 'low' ? <Badge variant="warn">Running low</Badge> : null}
+                        </p>
+                        {b.bonus > 0 ? (
+                            <p className="mt-1 text-body-sm text-fg-secondary tabular-nums">
+                                <span className="font-medium text-fg">{fmtFull(b.fromPlan)} of {fmtFull(b.allowance)}</span> {paid ? `${current.label} messages this month` : 'free messages'}
+                                {' + '}<span className="font-medium text-fg">{fmtFull(b.bonus)} bonus</span>
+                            </p>
+                        ) : null}
+                    </>
                 )}
                 <div
                     role="progressbar"
-                    aria-label="Ask messages left"
+                    aria-label={`${current.label} plan messages left`}
                     aria-valuemin={0}
-                    aria-valuemax={max}
-                    aria-valuenow={credits ?? 0}
+                    aria-valuemax={b?.allowance ?? 0}
+                    aria-valuenow={b?.fromPlan ?? 0}
+                    aria-valuetext={b ? `${b.fromPlan} of ${b.allowance}${b.bonus ? `, plus ${b.bonus} bonus` : ''}` : undefined}
                     className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-subtle"
                 >
                     <span
                         className={cn('block h-full rounded-full transition-[width] duration-300', level === 'out' ? 'bg-down' : level === 'low' ? 'bg-warn' : 'bg-brand')}
-                        style={{ width: `${pct}%` }}
+                        style={{ width: `${b?.pct ?? 0}%` }}
                     />
                 </div>
                 <p className="mt-3 flex items-start gap-2 text-body-sm text-fg-muted">
@@ -230,7 +249,9 @@ function UsageCard({ current, credits, renewal, cancelled, onCancel }: {
             {paid ? (
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-4">
                     <p className="text-body-sm text-fg-muted">
-                        {cancelled ? `Cancelled. Your plan stays active until ${renewal ?? 'the end of the billing period'}.` : 'Messages reset every billing cycle and do not roll over.'}
+                        {cancelled
+                            ? `Cancelled. Your plan stays active until ${renewal ?? 'the end of the billing period'}.`
+                            : `Resets to ${fmtFull(current.messages)} ${renewal ? `on ${renewal}` : 'every billing cycle'}. ${b && b.bonus > 0 ? 'Bonus messages are used first and do not carry over.' : 'Unused messages do not roll over.'}`}
                     </p>
                     {!cancelled ? <Button variant="ghost" size="sm" onClick={onCancel} className="text-fg-muted hover:text-down">Cancel subscription</Button> : null}
                 </div>
@@ -241,7 +262,15 @@ function UsageCard({ current, credits, renewal, cancelled, onCancel }: {
 
 /* ─── plan cards ─── */
 
-function PlanCard({ def, current, email }: { def: PlanDef; current: string; email: string }) {
+function PlanCard({ def, current, email, cancelled, renewal, onDowngradeToFree }: {
+    def: PlanDef;
+    current: string;
+    email: string;
+    cancelled: boolean;
+    renewal: string | null;
+    /** Free has no checkout: moving down to it is cancelling the subscription. */
+    onDowngradeToFree: () => void;
+}) {
     const isCurrent = def.key === current;
     const isFree = def.key === 'free';
     const returnUrl = getSafeRedirectUrl('/dashboard/plan?upgraded=true');
@@ -249,7 +278,11 @@ function PlanCard({ def, current, email }: { def: PlanDef; current: string; emai
         ? `https://checkout.dodopayments.com/buy/${def.productId}?email=${encodeURIComponent(email)}&redirect_url=${encodeURIComponent(returnUrl)}`
         : '';
     const order = PLANS.filter((p) => p.available).map((p) => p.key);
-    const isUpgrade = order.indexOf(current as PlanDef['key']) < order.indexOf(def.key);
+    const currentPaid = current !== 'free';
+    // A legacy plan (Starter) is not in `order`: everything sold is above it except Free.
+    const currentIdx = order.indexOf(current as PlanDef['key']);
+    const currentRank = currentIdx >= 0 ? currentIdx : 0.5;
+    const isUpgrade = currentRank < order.indexOf(def.key);
     const perMessage = !isFree && def.messages > 0 ? `$${(def.price / def.messages).toFixed(2)} per message` : null;
 
     return (
@@ -278,13 +311,20 @@ function PlanCard({ def, current, email }: { def: PlanDef; current: string; emai
                 {isCurrent ? (
                     <Button variant="secondary" className="w-full" disabled>Current plan</Button>
                 ) : isFree ? (
-                    <Button variant="secondary" className="w-full" disabled>Included</Button>
+                    // Round 5: a paid user sees how to move down, not "Included".
+                    currentPaid && cancelled ? (
+                        <Button variant="secondary" className="w-full" disabled>{renewal ? `Moves to Free on ${renewal}` : 'Moves to Free at renewal'}</Button>
+                    ) : currentPaid ? (
+                        <Button variant="secondary" className="w-full" onClick={onDowngradeToFree}>Downgrade to Free</Button>
+                    ) : (
+                        <Button variant="secondary" className="w-full" disabled>Included</Button>
+                    )
                 ) : !checkoutUrl ? (
                     <Button variant="secondary" className="w-full" disabled>Email required</Button>
                 ) : (
-                    <Button asChild variant={def.recommended ? 'primary' : 'secondary'} className="w-full" trailingIcon={ArrowRight}>
+                    <Button asChild variant={def.recommended && isUpgrade ? 'primary' : 'secondary'} className="w-full" trailingIcon={isUpgrade ? ArrowRight : undefined}>
                         <a href={checkoutUrl} target="_blank" rel="noopener noreferrer">
-                            {isUpgrade || current === 'free' ? `Get ${def.label}` : `Switch to ${def.label}`}
+                            {current === 'free' || isUpgrade ? `Get ${def.label}` : `Downgrade to ${def.label}`}
                         </a>
                     </Button>
                 )}

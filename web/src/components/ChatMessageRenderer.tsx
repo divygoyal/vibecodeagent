@@ -17,6 +17,10 @@ import { MessageFeedback } from './chat/MessageFeedback';
 import { preprocessMarkers } from './chat/InlineMarkers';
 import { CriticBadge, type CriticVerdict } from './chat/CriticBadge';
 import { highlightNumbersInChildren } from './chat/HighlightedNumbers';
+import { AnswerLink, AnswerTable, AnswerTd, AnswerTh } from './chat/AnswerParts';
+import { useCurrentSite } from './shell/useCurrentSite';
+import { linkAnswer, type AnswerSite } from '@/lib/chat/answerFormat';
+import type { SiteEntry } from '@/lib/sites/siteDirectory';
 import { safeParseToolResult } from '@/lib/chatUtils';
 
 /* ─── Code Block ─── */
@@ -176,33 +180,34 @@ const markdownComponents: Components = {
     em: ({ children }) => (
         <em className="text-fg-muted">{children}</em>
     ),
+    // Links into the app (site names, "its Search tab", added by linkAnswer) stay in the app; others open a new tab.
     a: ({ href, children }) => (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-brand-text underline decoration-border-strong underline-offset-2 transition-colors hover:decoration-brand-text">
-            {children}<ExternalLink aria-hidden className="size-3" />
-        </a>
+        <AnswerLink
+            href={href}
+            external={(h, c) => (
+                <a href={h} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-brand-text underline decoration-border-strong underline-offset-2 transition-colors hover:decoration-brand-text">
+                    {c}<ExternalLink aria-hidden className="size-3" />
+                </a>
+            )}
+        >
+            {children}
+        </AnswerLink>
     ),
     ul: ({ children }) => (
         <ul className="my-3 space-y-2">{children}</ul>
     ),
+    // Numbered steps: react-markdown 10 no longer tells `li` whether its list is ordered, so the number badge is a
+    // CSS counter shown only under an <ol> (before round 5 every step rendered as a bullet).
     ol: ({ children }) => (
-        <ol className="my-3 list-none space-y-2">{children}</ol>
+        <ol className="my-3 list-none space-y-2 [counter-reset:answer-step]">{children}</ol>
     ),
-    li: ({ children, ...props }) => {
-        const ordered = (props as { ordered?: boolean }).ordered;
-        const index = (props as { index?: number }).index;
-        return (
-            <li className="flex gap-3 text-body-lg text-fg">
-                {ordered ? (
-                    <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-subtle text-meta font-medium text-fg-secondary tabular-nums">
-                        {(index ?? 0) + 1}
-                    </span>
-                ) : (
-                    <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-full bg-fg-faint" />
-                )}
-                <div className="min-w-0 flex-1">{highlightNumbersInChildren(children, 'li')}</div>
-            </li>
-        );
-    },
+    li: ({ children }) => (
+        <li className="flex gap-3 text-body-lg text-fg [counter-increment:answer-step]">
+            <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-full bg-fg-faint [ol>li>&]:hidden" />
+            <span aria-hidden className="mt-0.5 hidden size-6 shrink-0 items-center justify-center rounded-full bg-subtle text-meta font-medium text-fg-secondary tabular-nums before:content-[counter(answer-step)] [ol>li>&]:flex" />
+            <div className="min-w-0 flex-1">{highlightNumbersInChildren(children, 'li')}</div>
+        </li>
+    ),
     blockquote: ({ children }) => (
         <div className="my-4 border-l-2 border-border-strong py-0.5 pl-4">
             <div className="text-body text-fg-muted italic">{children}</div>
@@ -219,26 +224,28 @@ const markdownComponents: Components = {
         );
     },
     pre: ({ children }) => <>{children}</>,
-    // Tables: thin rules, muted headers, tabular numbers; scrolls inside the message.
-    table: ({ children }) => (
-        <div className="my-4 overflow-x-auto rounded-card border border-border-subtle">
-            <table className="w-full border-collapse text-body-sm tabular-nums">{children}</table>
-        </div>
-    ),
+    // Tables (AnswerParts): numeric columns right-aligned, changes as ▲▼, a heat bar on the ranked
+    // count, a sparkline above a table of dates. Scrolls inside the message.
+    table: ({ node, children }) => <AnswerTable node={node}>{children}</AnswerTable>,
     thead: ({ children }) => (
         <thead className="border-b border-border-subtle bg-surface-sunken">{children}</thead>
     ),
     tbody: ({ children }) => <tbody className="divide-y divide-border-subtle">{children}</tbody>,
     tr: ({ children }) => <tr className="transition-colors hover:bg-subtle/50">{children}</tr>,
-    th: ({ children }) => (
-        <th className="whitespace-nowrap px-3 py-2 text-left text-meta font-medium text-fg-muted">{children}</th>
-    ),
-    td: ({ children }) => (
-        <td className="px-3 py-2 align-top text-fg">
-            {highlightNumbersInChildren(children, 'td')}
-        </td>
-    ),
+    th: ({ node, children }) => <AnswerTh node={node}>{children}</AnswerTh>,
+    td: ({ node, children }) => <AnswerTd node={node}>{children}</AnswerTd>,
 };
+
+/* ─── Site links ─── */
+
+/** The names an answer may use for each of the user's sites (host, www. host, GA4 name, stream host). */
+function answerSites(sites: SiteEntry[]): AnswerSite[] {
+    return sites.map((s) => {
+        const names = [s.label, s.streamHost ?? '', s.ga4Name ? s.ga4Name.replace(/\s*[–—-]\s*(web|ga4|website|app|site)$/i, '') : ''];
+        if (!/^ga4-\d+$/.test(s.host)) names.push(s.host.replace(/--\d+$/, ''), `www.${s.host.replace(/--\d+$/, '')}`);
+        return { host: s.host, names: names.filter(Boolean) };
+    });
+}
 
 /* ─── Suggestion Chip Parser ─── */
 function parseSuggestions(text: string): { cleanContent: string; suggestions: string[] } {
@@ -304,7 +311,11 @@ export default memo(function ChatMessageRenderer({ content, tools, thinking, pla
             .filter(Boolean) as { key: string; result: StructuredToolResult }[];
     }, [tools]);
 
-    const segments = useMemo(() => splitContentOnChartTags(cleanContent || ''), [cleanContent]);
+    // Site names and "its Search tab" link into the app (the site Ask is about when no site is named).
+    const { sites, host: currentHost } = useCurrentSite();
+    const linkSites = useMemo(() => answerSites(sites), [sites]);
+    const linked = useMemo(() => linkAnswer(cleanContent || '', linkSites, currentHost), [cleanContent, linkSites, currentHost]);
+    const segments = useMemo(() => splitContentOnChartTags(linked), [linked]);
 
     return (
         <div className="chat-message-content">
