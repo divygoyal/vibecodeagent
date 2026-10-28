@@ -20,6 +20,8 @@ import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { Choice, DimensionPicker, Field, MetricList, MetricPicker, NumberInput, SourcePicker, TextInput, Toggle, type SiteOption } from './Fields';
 import { RulesEditor } from './RulesEditor';
 import { VariablesEditor } from './VariablesEditor';
+import { CalcList } from './CalcEditor';
+import { TABLE_TREND_ROWS, TREND_DAILY_MAX_DAYS, trendMetric, trendUnsupported } from '@/lib/builder/trend';
 import { WidgetFilters } from './WidgetFilters';
 
 type Patch = (w: WidgetDef) => WidgetDef;
@@ -107,7 +109,7 @@ function Setup({ widget, edit, sites, defaultLabel, doc }: { widget: WidgetDef; 
             return (
                 <>
                     {source}
-                    <Field label="Metric"><MetricPicker value={widget.config.metric.id} onChange={(id) => edit((w) => cfg(w as typeof widget, { metric: { ...widget.config.metric, id } }))} /></Field>
+                    <Field label="Metric"><MetricPicker value={widget.config.metric.id} noShare onChange={(id) => edit((w) => cfg(w as typeof widget, { metric: { ...widget.config.metric, id } }))} /></Field>
                     <Toggle label="Show comparison" checked={widget.config.comparison.show} onChange={(v) => edit((w) => cfg(w as typeof widget, { comparison: { ...widget.config.comparison, show: v } }))} />
                     <Toggle label="Sparkline" checked={widget.config.sparkline.show} onChange={(v) => edit((w) => cfg(w as typeof widget, { sparkline: { ...widget.config.sparkline, show: v } }))} />
                     <ScorecardTarget widget={widget} edit={edit} />
@@ -117,7 +119,7 @@ function Setup({ widget, edit, sites, defaultLabel, doc }: { widget: WidgetDef; 
             return (
                 <>
                     {source}
-                    <Field label="Metrics (up to 6)"><MetricList value={widget.config.metrics} max={6} onChange={(v: MetricRef[]) => edit((w) => cfg(w as typeof widget, { metrics: v }))} /></Field>
+                    <Field label="Metrics (up to 6)"><MetricList value={widget.config.metrics} max={6} noShare onChange={(v: MetricRef[]) => edit((w) => cfg(w as typeof widget, { metrics: v }))} /></Field>
                     <Toggle label="Show comparison" checked={widget.config.comparison.show} onChange={(v) => edit((w) => cfg(w as typeof widget, { comparison: { ...widget.config.comparison, show: v } }))} />
                     <Toggle label="Sparklines" checked={widget.config.sparkline.show} onChange={(v) => edit((w) => cfg(w as typeof widget, { sparkline: { ...widget.config.sparkline, show: v } }))} />
                 </>
@@ -284,8 +286,24 @@ function TableSetup({ widget, edit, source, portfolio }: { widget: Extract<Widge
             <Toggle label="Pagination" checked={c.pagination} onChange={(v) => edit((w) => cfg(w as typeof widget, { pagination: v }))} />
             <Toggle label="Search box" checked={c.search} onChange={(v) => edit((w) => cfg(w as typeof widget, { search: v }))} />
             <Toggle label="Totals row" checked={c.totalsRow} onChange={(v) => edit((w) => cfg(w as typeof widget, { totalsRow: v }))} />
+            <TrendToggle widget={widget} edit={edit} />
             <div className="border-t border-border-subtle pt-4"><RulesEditor widget={widget} edit={edit} /></div>
         </>
+    );
+}
+
+/** Trend column (round 7): each row's line of the sort metric, top rows only; says why when a table cannot have one. */
+function TrendToggle({ widget, edit }: { widget: Extract<WidgetDef, { type: 'table' }>; edit: (fn: Patch, key?: string) => void }) {
+    const why = trendUnsupported(widget);
+    const metric = trendMetric(widget);
+    return (
+        <Toggle
+            label="Trend column"
+            checked={Boolean(widget.config.trend) && !why}
+            disabled={Boolean(why)}
+            onChange={(v) => edit((w) => cfg(w as typeof widget, { trend: v || undefined }))}
+            description={why ?? `A line of ${metric ? metricLabelLower(metric) : 'the sort metric'} per row over the date range, for the top ${TABLE_TREND_ROWS} rows. Daily up to ${TREND_DAILY_MAX_DAYS} days, then weekly.`}
+        />
     );
 }
 
@@ -408,6 +426,7 @@ function DashboardSettings({ doc, sites }: { doc: DashboardDocV2; sites: SiteOpt
                 <Field label="Width"><Choice ariaLabel="Width" value={doc.settings.widthMode} onChange={(v) => set((d) => ({ ...d, settings: { ...d.settings, widthMode: v } }))} options={[{ value: 'contained', label: 'Contained' }, { value: 'full', label: 'Full width' }]} /></Field>
                 <Field label="Auto-refresh"><Choice ariaLabel="Auto-refresh" value={String(doc.settings.autoRefreshSec) as '0'} onChange={(v) => set((d) => ({ ...d, settings: { ...d.settings, autoRefreshSec: Number(v) as 0 } }))} options={[{ value: '0', label: 'Off' }, { value: '300', label: 'Every 5 minutes' }, { value: '900', label: 'Every 15 minutes' }, { value: '1800', label: 'Every 30 minutes' }, { value: '3600', label: 'Every hour' }]} /></Field>
                 <div className="border-t border-border-subtle pt-4"><VariablesEditor doc={doc} set={set} /></div>
+                <div className="border-t border-border-subtle pt-4"><CalcList doc={doc} /></div>
                 <div className="space-y-3 border-t border-border-subtle pt-4">
                     <p className="text-caption uppercase tracking-[0.04em] text-fg-muted">TV mode</p>
                     <Field label="Change page every" hint={doc.pages.filter((p) => !p.hidden).length > 1 ? 'Open with Present, or add ?tv=1 to the dashboard or share link. Data refreshes at least every 5 minutes.' : 'Add pages to rotate them. Open with Present, or add ?tv=1 to the link.'}>

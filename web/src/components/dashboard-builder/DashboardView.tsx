@@ -12,6 +12,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import { EmptyState } from '@/components/ui';
 import { fmtDateRange } from '@/lib/format';
+import { registerCalcs } from '@/lib/builder/calc';
 import { compareFromParam, compareToParam, rangeFromParam, rangeToParam } from '@/lib/builder/dates';
 import { dateControlOf, defaultControlState } from '@/lib/builder/publicDoc';
 import { isDefaultLook, type Mode } from '@/lib/builder/themes';
@@ -139,6 +140,8 @@ export interface DashboardViewProps {
 export function DashboardView({
     doc, mode, siteLabel, state, onPage, onDate, onFilter, allow, data, loading, refetching, onRetry, options, header, footer, exportRef, onChooseSource, shell, appMode, tv, fitHeight, onVariable, onInteraction,
 }: DashboardViewProps) {
+    // Names of the dashboard's calculated metrics, before any widget or the cover renders (round 7).
+    registerCalcs(doc.calcs);
     const [ref, width] = useElementWidth<HTMLDivElement>();
     const bp: Bp = bpForWidth(width || 1200);
     const pages = doc.pages.filter((p) => !p.hidden);

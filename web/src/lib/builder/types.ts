@@ -203,6 +203,18 @@ export interface DashboardDocV2 {
         createdFrom?: string;
         migratedFromV1?: { at: string; propertyId: string; siteUrl?: string };
     };
+    /**
+     * Calculated metrics (round 7): the names of the dashboard's calculations. The id says what to
+     * compute (lib/builder/calc.ts), so widgets use it like any MetricId. Missing = none.
+     */
+    calcs?: CalculatedMetric[];
+}
+
+/** A named calculated metric: id 'calc:<op>_<format>_<better>:<A>[:<B>]:<token>' (calc.ts). */
+export interface CalculatedMetric {
+    id: MetricId;
+    /** Up to 60 characters. */
+    label: string;
 }
 
 // ── Widgets ──────────────────────────────────────────────────────────────
@@ -355,6 +367,11 @@ export interface TableConfig {
      * so "Declining pages" never lists a page that held steady or grew (round 4 polish).
      */
     changeOnly?: boolean;
+    /**
+     * Trend column (round 7): each row's daily (weekly past 92 days) line of the sort metric, for the
+     * top TABLE_TREND_ROWS rows. Single-dimension tables only. Missing = off.
+     */
+    trend?: boolean;
 }
 export type TableWidget = WidgetBase<'table', TableConfig>;
 

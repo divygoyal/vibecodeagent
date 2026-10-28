@@ -6,12 +6,15 @@
  * dimension and source pickers. Builder-specific; generic inputs come from components/ui.
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import { Check, ChevronDown, Plus, X } from 'lucide-react';
+import { Calculator, Check, ChevronDown, Plus, X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Popover, PopoverContent, PopoverTrigger, SearchInput, Select, Switch } from '@/components/ui';
-import { dimsForFamilies, getMetric, metricColor, metricLabel, searchMetrics, METRIC_LIST, type Family, dimLabel } from '@/lib/builder/catalog';
+import { dimsForFamilies, getMetric, metricColor, metricFamilies, metricLabel, searchMetrics, METRIC_LIST, type Family, dimLabel } from '@/lib/builder/catalog';
+import { parseCalcId } from '@/lib/builder/calc';
 import type { MetricRef, SourceRef } from '@/lib/builder/types';
+import { useEditorStore } from '@/stores/dashboardEditorStore';
+import { CalcDialog, MAX_CALCS } from './CalcEditor';
 
 export function Field({ label, hint, children, htmlFor }: { label: string; hint?: ReactNode; children: ReactNode; htmlFor?: string }) {
     return (
@@ -38,8 +41,8 @@ export function NumberInput({ id, value, onChange, min, max }: { id?: string; va
     );
 }
 
-export function Toggle({ label, checked, onChange, description }: { label: string; checked: boolean; onChange: (v: boolean) => void; description?: string }) {
-    return <Switch size="sm" checked={checked} onCheckedChange={onChange} label={label} description={description} />;
+export function Toggle({ label, checked, onChange, description, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; description?: string; disabled?: boolean }) {
+    return <Switch size="sm" checked={checked} onCheckedChange={onChange} label={label} description={description} disabled={disabled} />;
 }
 
 export function Choice<T extends string>({ value, onChange, options, ariaLabel }: { value: T; onChange: (v: T) => void; options: Array<{ value: T; label: string }>; ariaLabel: string }) {
@@ -48,56 +51,85 @@ export function Choice<T extends string>({ value, onChange, options, ariaLabel }
 
 // ── Metric picker ────────────────────────────────────────────────────────
 
-export function MetricPicker({ value, onChange, families, ariaLabel = 'Metric', exclude = [] }: { value: string; onChange: (id: string) => void; families?: Family[]; ariaLabel?: string; exclude?: string[] }) {
+/**
+ * `calcs` (round 7): list the dashboard's calculated metrics under "Calculated" and offer "New
+ * calculated metric" (default true; the calc dialog's own A/B pickers pass false). `noShare` hides
+ * "% of total" calcs where a single number would always read 100% (scorecards, KPI strips).
+ */
+export function MetricPicker({ value, onChange, families, ariaLabel = 'Metric', exclude = [], calcs = true, noShare }: { value: string; onChange: (id: string) => void; families?: Family[]; ariaLabel?: string; exclude?: string[]; calcs?: boolean; noShare?: boolean }) {
     const [open, setOpen] = useState(false);
     const [q, setQ] = useState('');
     const [more, setMore] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const docCalcs = useEditorStore((s) => s.doc?.calcs);
+    const hasDoc = useEditorStore((s) => Boolean(s.doc));
     const list = useMemo(() => searchMetrics(q, METRIC_LIST.filter((m) => (!families || families.includes(m.family)) && !exclude.includes(m.id))), [q, families, exclude]);
-    const groups: Array<[string, typeof list]> = [
-        ['Search Console', list.filter((m) => m.family === 'gsc')],
-        ['Analytics', list.filter((m) => m.family === 'ga4' && (m.tier === 'core' || q))],
+    const calcList = useMemo(() => {
+        if (!calcs) return [];
+        const s = q.trim().toLowerCase();
+        return (docCalcs ?? []).filter((c) => {
+            const spec = parseCalcId(c.id);
+            if (!spec || exclude.includes(c.id) || (noShare && spec.op === 'share')) return false;
+            if (families && !metricFamilies(c.id).every((f) => families.includes(f))) return false;
+            return !s || c.label.toLowerCase().includes(s);
+        }).map((c) => c.id);
+    }, [calcs, docCalcs, q, families, exclude, noShare]);
+    const groups: Array<[string, string[]]> = [
+        ['Calculated', calcList],
+        ['Search Console', list.filter((m) => m.family === 'gsc').map((m) => m.id)],
+        ['Analytics', list.filter((m) => m.family === 'ga4' && (m.tier === 'core' || q)).map((m) => m.id)],
     ];
     const moreList = list.filter((m) => m.family === 'ga4' && m.tier === 'more' && !q);
     const def = getMetric(value);
+    const canCreate = calcs && hasDoc && (docCalcs?.length ?? 0) < MAX_CALCS;
     return (
-        <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQ(''); }}>
-            <PopoverTrigger asChild>
-                <button type="button" aria-label={`${ariaLabel}: ${metricLabel(value)}`} className="flex h-9 w-full items-center gap-2 rounded-control border border-border bg-surface px-3 text-left text-body text-fg hover:border-border-strong">
-                    <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: metricColor(value) }} />
-                    <span className="min-w-0 flex-1 truncate">{def?.label ?? value}</span>
-                    <span className="text-caption text-fg-faint">{def?.family === 'gsc' ? 'Search' : 'Analytics'}</span>
-                    <ChevronDown aria-hidden size={14} className="text-fg-muted" />
-                </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-72 p-2" aria-label={ariaLabel}>
-                <SearchInput value={q} onValueChange={setQ} placeholder="Search metrics (visitors, rank…)" size="sm" className="mb-2" autoFocus />
-                <div role="listbox" aria-label={ariaLabel} className="max-h-72 overflow-y-auto">
-                    {groups.map(([title, items]) => items.length ? (
-                        <div key={title} className="mb-1">
-                            <p className="px-2 py-1 text-caption uppercase tracking-[0.04em] text-fg-muted">{title}</p>
-                            {items.map((m) => <MetricOption key={m.id} id={m.id} active={m.id === value} onPick={() => { onChange(m.id); setOpen(false); }} />)}
-                        </div>
-                    ) : null)}
-                    {moreList.length ? (
-                        <div>
-                            <button type="button" onClick={() => setMore((v) => !v)} className="flex w-full items-center justify-between px-2 py-1 text-caption uppercase tracking-[0.04em] text-fg-muted hover:text-fg">
-                                More metrics <ChevronDown aria-hidden size={12} className={cn('transition-transform', more && 'rotate-180')} />
-                            </button>
-                            {more ? moreList.map((m) => <MetricOption key={m.id} id={m.id} active={m.id === value} onPick={() => { onChange(m.id); setOpen(false); }} />) : null}
-                        </div>
+        <>
+            <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQ(''); }}>
+                <PopoverTrigger asChild>
+                    <button type="button" aria-label={`${ariaLabel}: ${metricLabel(value)}`} className="flex h-9 w-full items-center gap-2 rounded-control border border-border bg-surface px-3 text-left text-body text-fg hover:border-border-strong">
+                        <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: metricColor(value) }} />
+                        <span className="min-w-0 flex-1 truncate">{def?.label ?? value}</span>
+                        <span className="text-caption text-fg-faint">{def?.calc ? 'Calculated' : def?.family === 'gsc' ? 'Search' : 'Analytics'}</span>
+                        <ChevronDown aria-hidden size={14} className="text-fg-muted" />
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-2" aria-label={ariaLabel}>
+                    <SearchInput value={q} onValueChange={setQ} placeholder="Search metrics (visitors, rank…)" size="sm" className="mb-2" autoFocus />
+                    <div role="listbox" aria-label={ariaLabel} className="max-h-72 overflow-y-auto">
+                        {groups.map(([title, items]) => items.length ? (
+                            <div key={title} className="mb-1">
+                                <p className="px-2 py-1 text-caption uppercase tracking-[0.04em] text-fg-muted">{title}</p>
+                                {items.map((id) => <MetricOption key={id} id={id} active={id === value} onPick={() => { onChange(id); setOpen(false); }} />)}
+                            </div>
+                        ) : null)}
+                        {moreList.length ? (
+                            <div>
+                                <button type="button" onClick={() => setMore((v) => !v)} className="flex w-full items-center justify-between px-2 py-1 text-caption uppercase tracking-[0.04em] text-fg-muted hover:text-fg">
+                                    More metrics <ChevronDown aria-hidden size={12} className={cn('transition-transform', more && 'rotate-180')} />
+                                </button>
+                                {more ? moreList.map((m) => <MetricOption key={m.id} id={m.id} active={m.id === value} onPick={() => { onChange(m.id); setOpen(false); }} />) : null}
+                            </div>
+                        ) : null}
+                        {!list.length && !calcList.length ? <p className="px-2 py-3 text-body-sm text-fg-muted">No metric matches “{q}”.</p> : null}
+                    </div>
+                    {canCreate ? (
+                        <button type="button" onClick={() => { setOpen(false); setCreating(true); }} className="mt-1 flex w-full items-center gap-2 rounded-md border-t border-border-subtle px-2 pb-1 pt-2 text-left text-body-sm font-medium text-brand-text hover:bg-subtle">
+                            <Plus aria-hidden size={14} /> New calculated metric
+                        </button>
                     ) : null}
-                    {!list.length ? <p className="px-2 py-3 text-body-sm text-fg-muted">No metric matches “{q}”.</p> : null}
-                </div>
-            </PopoverContent>
-        </Popover>
+                </PopoverContent>
+            </Popover>
+            {creating ? <CalcDialog open onOpenChange={(o) => { if (!o) setCreating(false); }} onSaved={onChange} /> : null}
+        </>
     );
 }
 
 function MetricOption({ id, active, onPick }: { id: string; active: boolean; onPick: () => void }) {
-    const m = getMetric(id)!;
+    const m = getMetric(id);
+    if (!m) return null;
     return (
         <button type="button" role="option" aria-selected={active} onClick={onPick} title={m.description} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body-sm text-fg hover:bg-subtle">
-            <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: metricColor(id) }} />
+            {m.calc ? <Calculator aria-hidden size={12} className="shrink-0 text-fg-muted" /> : <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: metricColor(id) }} />}
             <span className="min-w-0 flex-1 truncate">{m.label}</span>
             {active ? <Check aria-hidden size={14} className="text-brand-text" /> : null}
         </button>
@@ -105,12 +137,12 @@ function MetricOption({ id, active, onPick }: { id: string; active: boolean; onP
 }
 
 /** 1..max metrics with add / remove. */
-export function MetricList({ value, onChange, max, min = 1, families }: { value: MetricRef[]; onChange: (v: MetricRef[]) => void; max: number; min?: number; families?: Family[] }) {
+export function MetricList({ value, onChange, max, min = 1, families, noShare }: { value: MetricRef[]; onChange: (v: MetricRef[]) => void; max: number; min?: number; families?: Family[]; noShare?: boolean }) {
     return (
         <div className="space-y-2">
             {value.map((m, i) => (
                 <div key={`${m.id}-${i}`} className="flex items-center gap-1.5">
-                    <div className="min-w-0 flex-1"><MetricPicker value={m.id} families={families} onChange={(id) => onChange(value.map((x, j) => (j === i ? { ...x, id } : x)))} ariaLabel={`Metric ${i + 1}`} /></div>
+                    <div className="min-w-0 flex-1"><MetricPicker value={m.id} families={families} noShare={noShare} onChange={(id) => onChange(value.map((x, j) => (j === i ? { ...x, id } : x)))} ariaLabel={`Metric ${i + 1}`} /></div>
                     {value.length > min ? (
                         <button type="button" aria-label={`Remove ${metricLabel(m.id)}`} onClick={() => onChange(value.filter((_, j) => j !== i))} className="rounded p-1 text-fg-muted hover:bg-subtle hover:text-fg"><X aria-hidden size={14} /></button>
                     ) : null}
@@ -133,7 +165,7 @@ export function MetricList({ value, onChange, max, min = 1, families }: { value:
 // ── Dimension and source ─────────────────────────────────────────────────
 
 export function DimensionPicker({ value, onChange, metrics, allowNone, allowSite, allowTime, ariaLabel = 'Dimension' }: { value: string | undefined; onChange: (v: string | undefined) => void; metrics: string[]; allowNone?: boolean; allowSite?: boolean; allowTime?: boolean; ariaLabel?: string }) {
-    const families = [...new Set(metrics.map((m) => (m.startsWith('gsc:') ? 'gsc' : 'ga4')))] as Family[];
+    const families = [...new Set(metrics.flatMap((m) => metricFamilies(m)))];
     const dims = dimsForFamilies(families.length ? families : ['ga4']).filter((d) => allowTime || d.kind !== 'time');
     const options = [
         ...(allowNone ? [{ value: '__none', label: 'None' }] : []),

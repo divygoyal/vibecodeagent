@@ -109,7 +109,9 @@ function enqueue(widget: WidgetDef, ctx: InlineCtx, ctxKey: string) {
 /** Stable key: what the widget asks Google for, not how it looks. */
 export function widgetDataKey(widget: WidgetDef, ctx: InlineCtx): string {
     const compiled = compileWidget(widget, { controlDefs: ctx.controlDefs, controls: ctx.controls, pageId: ctx.pageId });
-    return canonicalJson({ q: compiled.queries, d: widget.dateOverride ?? null, t: widget.type === 'table' ? (widget.config.sortByChange ?? false) : null });
+    // Tables: the change order and (round 7) the trend column change what the engine returns.
+    const t = widget.type === 'table' ? (widget.config.trend ? [widget.config.sortByChange ?? false, 'trend'] : (widget.config.sortByChange ?? false)) : null;
+    return canonicalJson({ q: compiled.queries, d: widget.dateOverride ?? null, t });
 }
 
 export function useInlineResult(widget: WidgetDef, ctx: InlineCtx, enabled = true) {
