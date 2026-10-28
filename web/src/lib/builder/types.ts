@@ -463,7 +463,14 @@ export interface DashboardQueryRequest {
     fresh?: boolean;
 }
 
-export interface ResolvedDates { range: { start: Iso; end: Iso }; compare?: { start: Iso; end: Iso }; timezone: string; today: Iso }
+export interface ResolvedDates {
+    range: { start: Iso; end: Iso };
+    compare?: { start: Iso; end: Iso };
+    /** Search Console's days when they differ from `range` (it runs a day behind GA4: lib/dateRange). */
+    search?: { start: Iso; end: Iso };
+    timezone: string;
+    today: Iso;
+}
 
 export interface DashboardQueryResponse {
     results: Record<WidgetId, WidgetResult>;

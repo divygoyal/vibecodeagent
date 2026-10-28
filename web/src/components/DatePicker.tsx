@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 
+import { resolveLegacyWindow } from '@/lib/dateRange';
+import { fmtDateRange } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import {
     DropdownMenu,
@@ -39,7 +41,8 @@ const PRESETS: PresetItem[] = [
     { separator: true },
     { label: 'Last 7 days', value: '7d', shortcut: 'W' },
     { label: 'Last 14 days', value: '14d' },
-    { label: 'Last 30 days', value: '30d', shortcut: 'T' },
+    { label: 'Last 28 days', value: '28d', shortcut: 'T' },
+    { label: 'Last 30 days', value: '30d' },
     { label: 'Last 60 days', value: '60d' },
     { label: 'Last 90 days', value: '90d' },
     { separator: true },
@@ -68,6 +71,9 @@ export function getDateRangeText(range: string): string {
     const now = new Date();
     const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const fmtYear = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    // Rolling and "this ..." ranges: the days the data covers (lib/dateRange, complete days through yesterday).
+    const w = resolveLegacyWindow(range, 'ga4', now);
+    if (w) return fmtDateRange(w.start, w.end);
 
     switch (range) {
         case 'today':

@@ -26,6 +26,7 @@
  * follow-up messages in the same thread are free.
  */
 import { cachedFetch } from './apiCache';
+import { rollingWindow } from './dateRange';
 import { detectTopInsights, inferSiteProfile, type RankedInsight, type SiteProfile, isBrandedQuery } from './insightEngine';
 import { fetchPageMetaBatch, type PageMeta } from './pageMeta';
 import { fetchRetentionCohorts, fetchJourneyData, runFlexibleGAReport } from './googleApi';
@@ -159,8 +160,8 @@ function fmt(d: Date): string {
 /**
  * Compute a date window + the prior comparison window of equal length.
  *
- * Default (no args): the rolling 28-day window ending yesterday + the prior
- * 28-day window — preserves the original behavior of all existing callers.
+ * Default (no args): Search Console's last 28 complete days (lib/dateRange: through 2 days ago, the site page's
+ * window) + the prior 28 days.
  *
  * With `range`: the window is the given { startDate, endDate } (both inclusive),
  * and the comparison window is the immediately preceding window of equal length.
@@ -178,12 +179,16 @@ function get28dWindows(range?: { startDate: Date; endDate: Date }) {
         const compStart = new Date(compEnd); compStart.setDate(compStart.getDate() - (days - 1));
         return { startDate, endDate, compStart, compEnd };
     }
-    const now = new Date();
-    const endDate = new Date(now); endDate.setDate(endDate.getDate() - 1);
-    const startDate = new Date(endDate); startDate.setDate(startDate.getDate() - 27);
-    const compEnd = new Date(startDate); compEnd.setDate(compEnd.getDate() - 1);
-    const compStart = new Date(compEnd); compStart.setDate(compStart.getDate() - 27);
-    return { startDate, endDate, compStart, compEnd };
+    // The app's one window rule (lib/dateRange): Search Console's last 28 complete days, as on the site page.
+    const w = rollingWindow(28, 'gsc');
+    const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
+    return { startDate: d(w.start), endDate: d(w.end), compStart: d(w.prevStart!), compEnd: d(w.prevEnd!) };
+}
+
+/** GA4's last 28 complete days (lib/dateRange), the site page's "last 28 days". */
+function ga4Default28d(): { startDate: string; endDate: string } {
+    const w = rollingWindow(28, 'ga4');
+    return { startDate: w.start, endDate: w.end };
 }
 
 // ─── Fetchers ───
@@ -479,8 +484,8 @@ interface BuildArgs {
      *      length.
      *   2. Else if `dateRange.days` is provided, it's treated as "last N days
      *      ending yesterday" — startDate is set to N-1 days before endDate.
-     *   3. Else the existing default behavior is used (rolling 28d for GSC,
-     *      28daysAgo→today for GA4).
+     *   3. Else the app's 28-day windows (lib/dateRange: GA4 through yesterday,
+     *      Search Console through 2 days ago), as on the site page.
      *
      * IMPORTANT — partial analyzer coverage:
      *   - GSC analyzers (winners-losers, cannibalization, mobile-gap) honor
@@ -510,7 +515,7 @@ async function fetchEventsTop(
     try {
         const gaRange = range
             ? { startDate: fmt(range.startDate), endDate: fmt(range.endDate) }
-            : { startDate: '28daysAgo', endDate: 'today' };
+            : ga4Default28d();
         const data = await runFlexibleGAReport(
             token, propertyId,
             ['eventName'],
@@ -542,7 +547,7 @@ async function fetchGeoConversion(
     try {
         const gaRange = range
             ? { startDate: fmt(range.startDate), endDate: fmt(range.endDate) }
-            : { startDate: '28daysAgo', endDate: 'today' };
+            : ga4Default28d();
         const data = await runFlexibleGAReport(
             token, propertyId,
             ['country'],
@@ -574,7 +579,7 @@ async function fetchTimePatterns(
     try {
         const gaRange = range
             ? { startDate: fmt(range.startDate), endDate: fmt(range.endDate) }
-            : { startDate: '28daysAgo', endDate: 'today' };
+            : ga4Default28d();
         const [hourly, dow] = await Promise.all([
             runFlexibleGAReport(
                 token, propertyId,

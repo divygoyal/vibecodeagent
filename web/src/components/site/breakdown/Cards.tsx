@@ -15,7 +15,7 @@ import { siteHref } from '@/components/shell/nav';
 import { countryFromIso3 } from '../lib/geo';
 import { displayPage, isAiSource, pageRef } from '../lib/rules';
 import { deviceLabel } from '../lib/sources';
-import type { Ga4BreakdownResponse, Ga4Row, GscRowsResponse } from '../lib/types';
+import type { Ga4BreakdownResponse, Ga4Row, Ga4Summary, GscRowsResponse } from '../lib/types';
 import { PageRows } from '../pages/PageRows';
 import { LoadError } from '../SiteStates';
 import { PagePath } from '../PagePath';
@@ -43,10 +43,14 @@ const channelRender = (r: Ga4Row) => ({
 const sourceRender = (r: Ga4Row) => sourceParts(r.dims.sessionSource);
 const aiOnly = (r: Ga4Row) => isAiSource(r.dims.sessionSource);
 
+/**
+ * The AI tab's count: the summary's AI sessions, the same number as the "AI traffic" tile and footer (one source,
+ * one definition: sessionSource matching AI_SOURCE_PATTERN over the page's window). Summing the tab's rows could
+ * differ (rows cut at the report limit, rounding), so it is not used.
+ */
 function AiCount() {
-    const q = useGa4<Ga4BreakdownResponse>('referrers');
-    if (!q.data) return null;
-    const n = q.data.rows.filter(aiOnly).reduce((a, r) => a + (r.cur.sessions ?? 0), 0);
+    const q = useGa4<Ga4Summary>('summary');
+    const n = q.data?.totals.ai ?? 0;
     return n > 0 ? <>{fmtFull(n)}</> : null;
 }
 

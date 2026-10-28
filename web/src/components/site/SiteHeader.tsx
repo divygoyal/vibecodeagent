@@ -16,6 +16,11 @@ export interface SiteHeaderProps {
     source?: ReactNode;
     /** Use the Search Console days (end 2 days ago) in the subtitle and hide 24 hours. */
     search?: boolean;
+    /**
+     * The page shows both sources (Overview, Pages, Actions): name both windows when the site has both
+     * ("Traffic Sep 30 – Oct 27 · Search Sep 29 – Oct 26"), as they end on different days.
+     */
+    both?: boolean;
     /** Extra actions before the date range control. */
     actions?: ReactNode;
     tabs?: ReactNode;
@@ -28,11 +33,16 @@ export interface SiteHeaderProps {
 }
 
 /** Site page header: favicon + host, range facts, date range control last (no source badges: the subtitle names the source). */
-export function SiteHeader({ section, source, search, actions, tabs, noRange, rangeNote, backHref, title }: SiteHeaderProps) {
-    const { site, label, gsc } = useSite();
+export function SiteHeader({ section, source, search, both, actions, tabs, noRange, rangeNote, backHref, title }: SiteHeaderProps) {
+    const { site, label, gsc, hasGa4, hasGsc } = useSite();
     const dr = useDateRange();
-    const r = search ? dr.resolvedSearch : dr.resolved;
-    const range = `${fmtDateRange(r.start, r.end)}${r.prevStart && r.prevEnd ? ` vs ${fmtDateRange(r.prevStart, r.prevEnd)}` : ''}`;
+    // A Search-Console-only site has no GA4 days: its pages cover the Search Console window.
+    const searchDays = search || (hasGsc && !hasGa4);
+    const r = searchDays ? dr.resolvedSearch : dr.resolved;
+    const s = dr.resolvedSearch;
+    const range = both && hasGa4 && hasGsc && (r.start !== s.start || r.end !== s.end)
+        ? `Traffic ${fmtDateRange(r.start, r.end)} · Search ${fmtDateRange(s.start, s.end)}${dr.compareLabel ? ` · ${dr.compareLabel}` : ''}`
+        : `${fmtDateRange(r.start, r.end)}${r.prevStart && r.prevEnd ? ` vs ${fmtDateRange(r.prevStart, r.prevEnd)}` : ''}`;
     const facts = [source, noRange ? rangeNote : range].filter(Boolean);
     return (
         <PageHeader
@@ -50,8 +60,8 @@ export function SiteHeader({ section, source, search, actions, tabs, noRange, ra
                     {actions}
                     {noRange ? null : (
                         <span className="flex shrink-0 items-center gap-1">
-                            <PeriodStepper search={search} />
-                            <DateRangeControl searchOnly={search} />
+                            <PeriodStepper search={searchDays} />
+                            <DateRangeControl searchOnly={searchDays} />
                         </span>
                     )}
                 </>

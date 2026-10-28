@@ -5,6 +5,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
+import { endsToday, partialTailFrom } from '@/lib/dateRange';
 import { fmtDateRange, fmtFull } from '@/lib/format';
 import { fmtMetric, METRICS, type MetricKey } from '@/lib/metrics';
 import { ChartCard } from '@/components/charts/ChartCard';
@@ -130,14 +131,14 @@ export function TrafficSummary({ href, className }: { href?: string; className?:
                                 ]}
                             />
                         ) : undefined}
-                        footer={d ? <AiFooter value={d.totals.ai} previous={compareOn ? d.previous?.ai ?? null : undefined} /> : undefined}
+                        footer={d ? <AiFooter value={d.totals.ai} previous={compareOn ? d.previous?.ai ?? null : undefined} partial={endsToday(dr.resolved.end)} /> : undefined}
                     >
                         <FindingLine finding={finding} />
                         <TimeSeriesChart
                             data={series as unknown as Record<string, number | string | null>[]}
                             series={[{ metric: chartMetric, key: chartMetric, compareKey: compareOn ? `prev_${chartMetric}` : undefined, currency }]}
                             compareDateKey="prevDate"
-                            partialFrom={series.length > 1 ? series.length - 1 : undefined}
+                            partialFrom={partialTailFrom(series.length, dr.resolved.end)}
                             annotations={toAnnotations(marks.markers)}
                             height={240}
                             ariaLabel={`${METRICS[chartMetric].label} per ${interval}, ${fmtDateRange(dr.resolved.start, dr.resolved.end)}`}
@@ -150,13 +151,13 @@ export function TrafficSummary({ href, className }: { href?: string; className?:
     );
 }
 
-function AiFooter({ value, previous }: { value: number; previous?: number | null }) {
+function AiFooter({ value, previous, partial }: { value: number; previous?: number | null; partial: boolean }) {
     return (
         <span className="inline-flex flex-wrap items-center gap-1.5">
             <span aria-hidden className="size-2 rounded-full" style={{ background: METRICS.ai.color }} />
             AI traffic: <span className="font-medium text-fg tabular-nums">{fmtFull(value)}</span> sessions from AI assistants
             {previous !== undefined ? <MetricDelta metric="ai" current={value} previous={previous} /> : null}
-            <span className="text-fg-faint">· today is partial</span>
+            {partial ? <span className="text-fg-faint">· today is partial</span> : null}
         </span>
     );
 }

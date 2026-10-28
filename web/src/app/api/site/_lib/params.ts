@@ -1,4 +1,5 @@
 /** Query-string parsing for /api/site/* (validated; the client sends resolved days). */
+import { rollingWindow, type DataSource } from '@/lib/dateRange';
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
@@ -37,11 +38,11 @@ function validWindow(start: string | null, end: string | null): Window | null {
     return { start, end };
 }
 
-/** ?start=&end=[&cmpStart=&cmpEnd=]. Falls back to the last 28 days (ending `lagDays` ago). */
-export function parseRange(sp: URLSearchParams, lagDays = 0): RangeParams {
+/** ?start=&end=[&cmpStart=&cmpEnd=]. Falls back to the source's last 28 complete days (lib/dateRange rollingWindow). */
+export function parseRange(sp: URLSearchParams, source: DataSource = 'ga4'): RangeParams {
     const cur = validWindow(sp.get('start'), sp.get('end')) ?? (() => {
-        const end = isoDay(Date.now() - lagDays * DAY_MS);
-        return { start: addDays(end, -27), end };
+        const w = rollingWindow(28, source);
+        return { start: w.start, end: w.end };
     })();
     const cmp = validWindow(sp.get('cmpStart'), sp.get('cmpEnd'));
     return { cur, cmp };

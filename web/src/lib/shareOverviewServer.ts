@@ -94,7 +94,7 @@ export function parseOverviewRequest(req: Request) {
     const intervalParam = searchParams.get('overrideInterval') || searchParams.get('interval');
 
     return {
-        range: searchParams.get('range') || '30d',
+        range: searchParams.get('range') || '28d',
         interval: intervalParam || 'day',
         startDate: searchParams.get('start'),
         endDate: searchParams.get('end'),

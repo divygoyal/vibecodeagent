@@ -152,6 +152,13 @@ export const SiteCard = memo(function SiteCard({
             ? { s: [{ metric: 'clicks' as const, values: site.series.clicks ?? [] }, { metric: 'impressions' as const, values: site.series.impressions ?? [] }], d: dates.search }
             : null;
     const window = trafficFirst && hasTraffic ? windows.traffic : hasSearch ? windows.search : windows.traffic;
+    // A paired card shows numbers from both sources, whose windows end on different days (GA4 yesterday,
+    // Search Console 2 days ago): name the other one's last day too, the full pair in the tooltip.
+    const other = hasTraffic && hasSearch ? (window === windows.traffic ? windows.search : windows.traffic) : null;
+    const otherLabel = window && other && other.curEnd !== window.curEnd ? `${window === windows.traffic ? 'search' : 'traffic'} to ${fmtDay(other.curEnd)}` : null;
+    const windowTitle = otherLabel && windows.traffic && windows.search
+        ? `Traffic ${fmtDateRange(windows.traffic.curStart, windows.traffic.curEnd)} · Search ${fmtDateRange(windows.search.curStart, windows.search.curEnd)}`
+        : undefined;
     const chip = alertChipText(site);
     const critical = site.alerts[0]?.severity === 'critical';
     const sparkHeight = compact ? 56 : 72;
@@ -251,8 +258,8 @@ export const SiteCard = memo(function SiteCard({
                         </span>
                     </Tooltip>
                 ) : window && !loadingData ? (
-                    <span className="min-w-0 truncate text-meta whitespace-nowrap text-fg-muted">
-                        {greyed && site.lastSyncedAt ? `Last data ${fmtDay(new Date(site.lastSyncedAt * 1000))}` : fmtDateRange(window.curStart, window.curEnd)}
+                    <span className="min-w-0 truncate text-meta whitespace-nowrap text-fg-muted" title={greyed ? undefined : windowTitle}>
+                        {greyed && site.lastSyncedAt ? `Last data ${fmtDay(new Date(site.lastSyncedAt * 1000))}` : `${fmtDateRange(window.curStart, window.curEnd)}${otherLabel ? ` · ${otherLabel}` : ''}`}
                     </span>
                 ) : null}
                 <span className="flex-1" />

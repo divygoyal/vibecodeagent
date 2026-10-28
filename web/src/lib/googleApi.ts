@@ -5,6 +5,7 @@
  * Token refresh is cached in-memory so we only refresh once per hour.
  */
 
+import { resolveLegacyWindow, rollingWindow, type DataSource } from '@/lib/dateRange';
 import { scopedFetch } from '@/lib/demo/sampleScope';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -20,57 +21,40 @@ const tokenCache = new Map<string, { accessToken: string; expiresAt: number }>()
 
 // ─── Date Range Resolution ───
 // GA4 accepts relative dates ("NdaysAgo", "today", "yesterday") or YYYY-MM-DD strings.
-// This helper resolves all supported range values to { startDate, endDate } strings.
+// Legacy range keys resolve through the app's one window rule (lib/dateRange: complete days only,
+// GA4 through yesterday, Search Console through 2 days ago), so "Last 28 days" on the client share
+// page, in Ask and in the old APIs covers the same days as the site pages and dashboards. Only
+// 'today', 'yesterday' and '24h' name a partial day on purpose.
 
 function fmtDate(d: Date): string {
     return d.toISOString().split('T')[0];
 }
 
-function rollingRange(days: number): { startDate: string; endDate: string } {
-    return { startDate: `${days - 1}daysAgo`, endDate: 'today' };
+type Span = { startDate: string; endDate: string };
+
+function span(w: { start: string; end: string }): Span {
+    return { startDate: w.start, endDate: w.end };
 }
 
-function previousRollingRange(days: number): { startDate: string; endDate: string } {
-    return { startDate: `${(days * 2) - 1}daysAgo`, endDate: `${days}daysAgo` };
+function prevSpan(w: { prevStart: string | null; prevEnd: string | null; start: string; end: string }): Span {
+    if (w.prevStart && w.prevEnd) return { startDate: w.prevStart, endDate: w.prevEnd };
+    const days = Math.round((Date.parse(`${w.end}T00:00:00Z`) - Date.parse(`${w.start}T00:00:00Z`)) / 86_400_000) + 1;
+    const pe = new Date(Date.parse(`${w.start}T00:00:00Z`) - 86_400_000);
+    return { startDate: fmtDate(new Date(pe.getTime() - (days - 1) * 86_400_000)), endDate: fmtDate(pe) };
 }
 
-/** Resolve a range key to GA4-compatible { startDate, endDate } */
-export function resolveRange(range: string): { startDate: string; endDate: string } {
+/** Resolve a range key to GA4-compatible { startDate, endDate } (Search Console: pass source 'gsc'). */
+export function resolveRange(range: string, source: DataSource = 'ga4'): Span {
+    const w = resolveLegacyWindow(range, source);
+    if (w) return span(w);
     const now = new Date();
     switch (range) {
         case 'today':
             return { startDate: 'today', endDate: 'today' };
         case 'yesterday':
             return { startDate: 'yesterday', endDate: 'yesterday' };
-        case '7d':
-            return rollingRange(7);
-        case '14d':
-            return rollingRange(14);
-        case '30d':
-            return rollingRange(30);
-        case '60d':
-            return rollingRange(60);
-        case '90d':
-            return rollingRange(90);
-        // Redesign presets (lib/dateRange.ts). Approximations of calendar
-        // months for the GA4 relative-date API.
         case '24h':
             return { startDate: 'yesterday', endDate: 'today' };
-        case '28d':
-            return rollingRange(28);
-        case '3m':
-            return rollingRange(91);
-        case '16m':
-            return rollingRange(487);
-        case '6m':
-            return rollingRange(180);
-        case '12m':
-            return rollingRange(365);
-        case 'this_week': {
-            const start = new Date(now);
-            start.setDate(start.getDate() - start.getDay()); // Sunday
-            return { startDate: fmtDate(start), endDate: 'today' };
-        }
         case 'last_week': {
             const end = new Date(now);
             end.setDate(end.getDate() - end.getDay() - 1); // Last Saturday
@@ -78,71 +62,43 @@ export function resolveRange(range: string): { startDate: string; endDate: strin
             start.setDate(start.getDate() - 6); // Last Sunday
             return { startDate: fmtDate(start), endDate: fmtDate(end) };
         }
-        case 'this_month': {
-            const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            return { startDate: fmtDate(start), endDate: 'today' };
-        }
         case 'last_month': {
             const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             const end = new Date(now.getFullYear(), now.getMonth(), 0);
             return { startDate: fmtDate(start), endDate: fmtDate(end) };
-        }
-        case 'this_year': {
-            const start = new Date(now.getFullYear(), 0, 1);
-            return { startDate: fmtDate(start), endDate: 'today' };
         }
         case 'last_year': {
             const start = new Date(now.getFullYear() - 1, 0, 1);
             const end = new Date(now.getFullYear() - 1, 11, 31);
             return { startDate: fmtDate(start), endDate: fmtDate(end) };
         }
-        case 'all':
-            return rollingRange(365);
         default:
-            return rollingRange(30);
+            return span(rollingWindow(30, source));
     }
 }
 
-/** Resolve the *previous* comparison period for a range (same duration, shifted back) */
-export function resolvePrevRange(range: string): { startDate: string; endDate: string } {
+/** Resolve the *previous* comparison period for a range (same duration, right before it). */
+export function resolvePrevRange(range: string, source: DataSource = 'ga4'): Span {
+    const w = resolveLegacyWindow(range, source);
+    if (w) {
+        // This year compares with the same days of last year; the other periods with the days right before.
+        if (range === 'this_year') {
+            const lastYear = (iso: string) => {
+                const d = `${Number(iso.slice(0, 4)) - 1}${iso.slice(4)}`;
+                return d.endsWith('-02-29') ? `${d.slice(0, 4)}-02-28` : d;
+            };
+            return { startDate: lastYear(w.start), endDate: lastYear(w.end) };
+        }
+        return prevSpan(w);
+    }
     const now = new Date();
     switch (range) {
         case 'today':
             return { startDate: 'yesterday', endDate: 'yesterday' };
         case 'yesterday':
             return { startDate: '2daysAgo', endDate: '2daysAgo' };
-        case '7d':
-            return previousRollingRange(7);
-        case '14d':
-            return previousRollingRange(14);
-        case '30d':
-            return previousRollingRange(30);
-        case '60d':
-            return previousRollingRange(60);
-        case '90d':
-            return previousRollingRange(90);
         case '24h':
             return { startDate: '3daysAgo', endDate: '2daysAgo' };
-        case '28d':
-            return previousRollingRange(28);
-        case '3m':
-            return previousRollingRange(91);
-        case '16m':
-            return previousRollingRange(487);
-        case '6m':
-            return previousRollingRange(180);
-        case '12m':
-            return previousRollingRange(365);
-        case 'this_week': {
-            const thisStart = new Date(now);
-            thisStart.setDate(thisStart.getDate() - thisStart.getDay());
-            const daysSoFar = Math.ceil((now.getTime() - thisStart.getTime()) / 86400000) + 1;
-            const prevEnd = new Date(thisStart);
-            prevEnd.setDate(prevEnd.getDate() - 1);
-            const prevStart = new Date(prevEnd);
-            prevStart.setDate(prevStart.getDate() - daysSoFar + 1);
-            return { startDate: fmtDate(prevStart), endDate: fmtDate(prevEnd) };
-        }
         case 'last_week': {
             const end = new Date(now);
             end.setDate(end.getDate() - end.getDay() - 1);
@@ -152,34 +108,18 @@ export function resolvePrevRange(range: string): { startDate: string; endDate: s
             prevStart.setDate(prevStart.getDate() - 6);
             return { startDate: fmtDate(prevStart), endDate: fmtDate(prevEnd) };
         }
-        case 'this_month': {
-            const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-            const daysSoFar = now.getDate();
-            const prevEnd = new Date(thisMonthStart);
-            prevEnd.setDate(prevEnd.getDate() - 1);
-            const prevStart = new Date(prevEnd);
-            prevStart.setDate(prevStart.getDate() - daysSoFar + 1);
-            return { startDate: fmtDate(prevStart), endDate: fmtDate(prevEnd) };
-        }
         case 'last_month': {
             const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
             const prevMonthEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0);
             return { startDate: fmtDate(prevMonthStart), endDate: fmtDate(prevMonthEnd) };
-        }
-        case 'this_year': {
-            const start = new Date(now.getFullYear() - 1, 0, 1);
-            const end = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-            return { startDate: fmtDate(start), endDate: fmtDate(end) };
         }
         case 'last_year': {
             const start = new Date(now.getFullYear() - 2, 0, 1);
             const end = new Date(now.getFullYear() - 2, 11, 31);
             return { startDate: fmtDate(start), endDate: fmtDate(end) };
         }
-        case 'all':
-            return previousRollingRange(365);
         default:
-            return previousRollingRange(30);
+            return prevSpan(rollingWindow(30, source));
     }
 }
 
@@ -955,8 +895,8 @@ export async function runGSCQuery(
 export async function fetchSeoDashboard(token: string, siteUrl: string, range = '30d', signal?: AbortSignal) {
     const result: any = { kpis: null, queries: [], pages: [], trend: [], recommendations: [] };
 
-    const { startDate, endDate } = resolveRange(range);
-    const { startDate: prevStartDate, endDate: prevEndDate } = resolvePrevRange(range);
+    const { startDate, endDate } = resolveRange(range, 'gsc');
+    const { startDate: prevStartDate, endDate: prevEndDate } = resolvePrevRange(range, 'gsc');
 
     const currentStart = resolveDateTokenToAbsolute(startDate);
     const currentEnd = resolveDateTokenToAbsolute(endDate);

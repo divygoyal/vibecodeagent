@@ -6,6 +6,7 @@ import {
     runFlexibleRealtimeReport,
 } from '@/lib/googleApi';
 import { createHash } from 'node:crypto';
+import { weekdayAlignedPrevious } from '@/lib/dateRange';
 import { cachedFetch } from '@/lib/apiCache';
 import { hasPageScopedFilter, type ShareOverviewFilter, type ShareOverviewFilterName } from '@/lib/shareOverviewFilters';
 
@@ -246,24 +247,32 @@ function resolveDateToken(value: string): string {
     return value;
 }
 
-function resolveOverviewRange(range: string, startDate?: string | null, endDate?: string | null) {
-    if (range === 'custom' && startDate && endDate) {
-        return {
-            current: { startDate, endDate },
-            previous: getPreviousCustomRange(startDate, endDate),
-        };
-    }
+/** Rolling day ranges of the share page: their comparison is shifted back by whole weeks (lib/dateRange). */
+const WEEKDAY_ALIGNED_RANGES = new Set(['7d', '14d', '28d', '30d', '60d', '90d', 'all', 'custom']);
 
-    return {
-        current: {
-            startDate: resolveDateToken(resolveRange(range).startDate),
-            endDate: resolveDateToken(resolveRange(range).endDate),
-        },
-        previous: {
-            startDate: resolveDateToken(resolvePrevRange(range).startDate),
-            endDate: resolveDateToken(resolvePrevRange(range).endDate),
-        },
-    };
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Current and previous windows of a share-page range. Days follow the app's one window rule (lib/dateRange via
+ * googleApi.resolveRange: complete days through yesterday); the previous period of a day range is shifted back by
+ * whole weeks, so the dashed line's weekend dips sit under the current ones. `shiftDays` is that offset.
+ */
+export function resolveOverviewRange(range: string, startDate?: string | null, endDate?: string | null) {
+    const current = range === 'custom' && startDate && endDate
+        ? { startDate, endDate }
+        : { startDate: resolveDateToken(resolveRange(range).startDate), endDate: resolveDateToken(resolveRange(range).endDate) };
+    const days = Math.round((Date.parse(`${current.endDate}T00:00:00Z`) - Date.parse(`${current.startDate}T00:00:00Z`)) / DAY_MS) + 1;
+    let previous: OverviewRangeResult;
+    if (WEEKDAY_ALIGNED_RANGES.has(range) && days >= 7) {
+        const p = weekdayAlignedPrevious({ start: current.startDate, end: current.endDate });
+        previous = { startDate: p.start, endDate: p.end };
+    } else if (range === 'custom' && startDate && endDate) {
+        previous = getPreviousCustomRange(startDate, endDate);
+    } else {
+        previous = { startDate: resolveDateToken(resolvePrevRange(range).startDate), endDate: resolveDateToken(resolvePrevRange(range).endDate) };
+    }
+    const shiftDays = Math.round((Date.parse(`${current.startDate}T00:00:00Z`) - Date.parse(`${previous.startDate}T00:00:00Z`)) / DAY_MS);
+    return { current, previous, shiftDays };
 }
 
 function getNoValueFilter(fieldName: string): GaFilterExpression {
@@ -465,9 +474,14 @@ function parseStatsTotals(row?: GAReportRow, revenueIndex?: number) {
     };
 }
 
-function alignPreviousSeries(current: MetricPoint[], previous: MetricPoint[]) {
+/**
+ * Previous-period values per current point. Day, hour and week buckets pair by date (the point `shiftDays` earlier, the
+ * same weekday and hour), so a day missing from either report never shifts the line; months pair by position.
+ */
+function alignPreviousSeries(current: MetricPoint[], previous: MetricPoint[], interval: OverviewInterval, shiftDays: number) {
+    const byDate = interval === 'month' ? null : new Map(previous.map((p) => [p.date, p]));
     return current.map((point, index) => {
-        const prev = previous[index];
+        const prev = byDate ? byDate.get(new Date(Date.parse(point.date) - shiftDays * DAY_MS).toISOString()) : previous[index];
         return {
             ...point,
             prev_unique_visitors: prev?.unique_visitors ?? 0,
@@ -526,7 +540,7 @@ export async function fetchShareOverviewStats(input: {
     filters: ShareOverviewFilter[];
     events?: string[];
 }) {
-    const { current, previous } = resolveOverviewRange(input.range, input.startDate, input.endDate);
+    const { current, previous, shiftDays } = resolveOverviewRange(input.range, input.startDate, input.endDate);
     const filterExpression = buildDimensionFilter(input.filters, input.events);
     const dimension = input.interval === 'hour' ? 'dateHour' : 'date';
     const baseMetrics = ['activeUsers', 'sessions', 'screenPageViews', 'newUsers', 'bounceRate', 'averageSessionDuration'];
@@ -607,7 +621,9 @@ export async function fetchShareOverviewStats(input: {
             prev_views_per_session: previousMetrics.views_per_session,
             prev_total_revenue: previousMetrics.total_revenue,
         },
-        series: alignPreviousSeries(currentPoints, previousPoints),
+        series: alignPreviousSeries(currentPoints, previousPoints, input.interval, shiftDays),
+        /** The days behind the numbers, so the page can print them and dot a point that is still coming in. */
+        window: { start: current.startDate, end: current.endDate, prevStart: previous.startDate, prevEnd: previous.endDate },
     };
 }
 

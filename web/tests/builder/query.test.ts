@@ -148,14 +148,17 @@ test('GSC widgets honour the date range and compare (v1 bug: always 30 days)', a
     const res = await evaluateWidgets(input([w], controls('7d')), deps());
     const bodies = gscCalls().map((c) => c.body);
     assert.equal(bodies.length, 3, 'total, previous total, spark');
-    assert.ok(bodies.some((b) => b.startDate === '2026-10-19' && b.endDate === '2026-10-25'));
-    assert.ok(bodies.some((b) => b.startDate === '2026-10-12' && b.endDate === '2026-10-18'));
+    // Round 7: Search Console reads its own complete days (lib/dateRange: through 2 days ago), the site page's window.
+    assert.ok(bodies.some((b) => b.startDate === '2026-10-18' && b.endDate === '2026-10-24'));
+    assert.ok(bodies.some((b) => b.startDate === '2026-10-11' && b.endDate === '2026-10-17'));
     assert.ok(bodies.every((b) => b.dataState === 'all'));
+    assert.deepEqual(res.resolved.search, { start: '2026-10-18', end: '2026-10-24' }, 'the header can name the Search Console days');
     const r = res.results[w.id];
     assert.equal(r.status, 'ok');
     if (r.status === 'ok') {
-        assert.ok(r.flags.preliminaryFrom, 'Search Console lag days are flagged');
+        assert.equal(r.flags.preliminaryFrom, undefined, 'complete days only: nothing preliminary');
         assert.equal(r.parts.spark.rows.length, 7);
+        assert.equal(r.parts.spark.rows[6]['d:date'], '2026-10-24');
     }
 });
 

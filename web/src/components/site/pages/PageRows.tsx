@@ -16,6 +16,7 @@ import { displayPage, pageRef } from '../lib/rules';
 import { PagePath } from '../PagePath';
 import type { Ga4PageTrends, GscRowsResponse } from '../lib/types';
 import { LoadError } from '../SiteStates';
+import { endsToday } from '@/lib/dateRange';
 import { useActiveFilters, useGa4, useGsc, useSite, useSiteRange } from '../useSiteData';
 
 interface Row {
@@ -38,7 +39,9 @@ interface Row {
  */
 export function PageRows({ limit = 8, action = 'open', withSearch = true }: { limit?: number; action?: 'open' | 'filter'; withSearch?: boolean }) {
     const site = useSite();
-    const { compareOn } = useSiteRange();
+    const { compareOn, dr } = useSiteRange();
+    // The last bar is still filling in only when the range runs into today (24 hours, a custom range).
+    const partialLast = endsToday(dr.resolved.end);
     const click = useFilterClick();
     const pathFilter = useActiveFilters().path;
     const ga = useGa4<Ga4PageTrends>(site.hasGa4 ? 'pageTrends' : null, { extra: { limit: String(limit) } });
@@ -115,7 +118,7 @@ export function PageRows({ limit = 8, action = 'open', withSearch = true }: { li
                             {site.hasGa4 ? (
                                 <span className="flex flex-col items-end gap-0.5 sm:items-start">
                                     {r.trend && bars ? (
-                                        <TrendBars values={r.trend} max={trendMax} color={METRICS.pageviews.color} partialLast className="max-sm:hidden" />
+                                        <TrendBars values={r.trend} max={trendMax} color={METRICS.pageviews.color} partialLast={partialLast} className="max-sm:hidden" />
                                     ) : <span className="max-sm:hidden" />}
                                     {/* Phones: the value column is hidden; show value + chip here. */}
                                     <span className="flex items-center gap-1.5 sm:hidden">

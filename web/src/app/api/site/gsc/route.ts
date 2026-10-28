@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     const report = sp.get('report') ?? 'summary';
     const ctx = await getSiteContext(req, { kind: 'gsc', id: site });
     if (ctx instanceof NextResponse) return ctx;
-    const range = parseRange(sp, 2);
+    const range = parseRange(sp, 'gsc');
     const ok = (data: unknown) => NextResponse.json(data, { headers: PRIVATE_CACHE });
 
     try {

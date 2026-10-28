@@ -33,6 +33,7 @@ export function SiteOverview() {
     return (
         <div className="flex flex-col gap-6">
             <SiteHeader
+                both
                 source={hasGa4 && hasGsc ? 'Search + traffic' : hasGsc ? 'Search Console only' : 'Google Analytics only'}
                 actions={<AskButton prompt={`Give me a quick health check of ${site.siteHost ?? label}: what changed in traffic and search, and what should I fix first?`} site={askSite} label="Ask AI about this site" from="site:overview" />}
             />

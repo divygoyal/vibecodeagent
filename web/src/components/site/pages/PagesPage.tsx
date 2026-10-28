@@ -25,6 +25,7 @@ import { sourceParts } from '../SourceIcon';
 import { AskButton, LoadError } from '../SiteStates';
 import { PagePath } from '../PagePath';
 import { pageLabel } from '../lib/pagePath';
+import { endsToday, partialTailFrom } from '@/lib/dateRange';
 import { downloadCsv, useGa4, useGsc, useSite, useSiteRange } from '../useSiteData';
 import { useStringParam } from '../useTabParam';
 
@@ -49,7 +50,8 @@ function change(r: Row, ga: boolean): { cur: number; prev: number | null | undef
 /** Pages (DESIGN 5.7): GA4 and Search Console joined by normalised path, segments, page drawer. */
 export function PagesPage() {
     const site = useSite();
-    const { compareOn } = useSiteRange();
+    const { compareOn, dr } = useSiteRange();
+    const partialLast = endsToday(dr.resolved.end);
     const ga = useGa4<Ga4BreakdownResponse>(site.hasGa4 ? 'pages' : null);
     const sc = useGsc<GscRowsResponse>(site.hasGsc ? 'pages' : null);
     const decay = useGsc<{ rows: DecayRow[] }>(site.hasGsc ? 'decay' : null);
@@ -112,7 +114,7 @@ export function PagesPage() {
             key: 'trend', header: 'Trend', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
             cell: (r: Row) => {
                 const t = trendBy.get(r.key);
-                return t ? <TrendBars values={t} max={trendMax} color={METRICS.pageviews.color} partialLast ariaLabel={`Views trend for ${r.label}`} /> : <span className="text-meta text-fg-faint" title="Trend bars show for the top 30 pages by views">–</span>;
+                return t ? <TrendBars values={t} max={trendMax} color={METRICS.pageviews.color} partialLast={partialLast} ariaLabel={`Views trend for ${r.label}`} /> : <span className="text-meta text-fg-faint" title="Trend bars show for the top 30 pages by views">–</span>;
             },
         }] : []),
         ...(site.hasGa4 ? [
@@ -147,6 +149,7 @@ export function PagesPage() {
             <SiteHeader
                 section="Pages"
                 search={!site.hasGa4}
+                both
                 source={site.hasGa4 && site.hasGsc ? 'Every URL with Analytics and Search data side by side' : site.hasGa4 ? 'Analytics pages (link Search Console to add clicks and rankings)' : 'Search Console pages (link GA4 to add views and engagement)'}
             />
             {err ? <LoadError error={err.error} onRetry={err.mutate} className="mb-4" /> : null}
@@ -197,7 +200,7 @@ export function PagesPage() {
 /** Page drawer: KPIs, views chart, queries for this page, sources, Ask. */
 function PageDrawer({ row, pageKey, knownTitle, currency, loading, onClose }: { row: Row | null; pageKey: string | null; knownTitle: string | null; currency?: string; loading: boolean; onClose: () => void }) {
     const site = useSite();
-    const { compareOn } = useSiteRange();
+    const { compareOn, dr } = useSiteRange();
     const open = Boolean(pageKey);
     const gaPage = useGa4<{ series: Record<string, number | string | null>[]; totals: { pageviews: number; users: number; engagement: number; conversions: number }; previous: { pageviews: number; users: number } | null; sources: { name: string; views: number }[]; title?: string | null }>(
         open && row?.gaPath ? 'page' : null,
@@ -249,7 +252,7 @@ function PageDrawer({ row, pageKey, knownTitle, currency, loading, onClose }: { 
                             <p className="mb-2 text-body-sm font-medium text-fg">Views per day</p>
                             {gaPage.state === 'error' ? <LoadError error={gaPage.error} onRetry={gaPage.mutate} /> : !gaPage.data ? <Skeleton className="h-48" /> : (
                                 <TimeSeriesChart data={gaPage.data.series} series={[{ metric: 'pageviews', key: 'pageviews', compareKey: compareOn ? 'prev_pageviews' : undefined }]} compareDateKey="prevDate"
-                                    partialFrom={gaPage.data.series.length - 1} height={200} ariaLabel={`Views per day for ${title}`} />
+                                    partialFrom={partialTailFrom(gaPage.data.series.length, dr.resolved.end)} height={200} ariaLabel={`Views per day for ${title}`} />
                             )}
                         </div>
                     ) : null}

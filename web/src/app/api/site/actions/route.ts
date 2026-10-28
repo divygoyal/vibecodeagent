@@ -27,13 +27,13 @@ export async function GET(req: Request) {
     const gaCtx = siteUrl && property ? await getSiteContext(req, { kind: 'ga4', id: property }) : ctx;
     if (gaCtx instanceof NextResponse) return gaCtx;
 
-    const search = parseRange(sp, 2);
+    const search = parseRange(sp, 'gsc');
     const t = new URLSearchParams();
     for (const [from, to] of [['tStart', 'start'], ['tEnd', 'end'], ['tCmpStart', 'cmpStart'], ['tCmpEnd', 'cmpEnd']]) {
         const v = sp.get(from);
         if (v) t.set(to, v);
     }
-    const traffic = parseRange(t, 0);
+    const traffic = parseRange(t, 'ga4');
 
     try {
         const data = await cachedResult(

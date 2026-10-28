@@ -23,7 +23,7 @@ import { evaluateWidgets } from '@/lib/builder/server/engine';
 import { buildDirectory } from '@/lib/builder/server/sources';
 import { buildFromTemplate } from '@/lib/builder/templates';
 import type { ControlState, DatePresetId, ResolvedDates, WidgetDef, WidgetResult } from '@/lib/builder/types';
-import { compareSuffix, resolveDateRange, type DateRangeValue } from '@/lib/dateRange';
+import { compareSuffix, resolveWindow, type DateRangeValue } from '@/lib/dateRange';
 import { demoAccessToken, getDemoSites } from '@/lib/demo/catalog';
 import { sampleGoogleFetch } from '@/lib/demo/fetchShim';
 import { runWithSampleGoogle } from '@/lib/demo/sampleScope';
@@ -199,10 +199,11 @@ export async function buildHomeLive(slug: string, now: number = Date.now()): Pro
     const homeUrl = gsc.startsWith('sc-domain:') ? `https://${gsc.slice('sc-domain:'.length)}/` : new URL(gsc).origin + '/';
     const token = demoAccessToken();
     const today = new Date(now);
-    // One window for the whole page: the hero's and the sample dashboard's 28 days (GA4 through yesterday, Search
-    // Console through 2 days ago, as Google reports it), so a number reads the same in every row; each row shows it.
-    const dr = resolveDateRange(RANGE, { now: today, lagDays: 1 });
-    const drs = resolveDateRange(RANGE, { now: today, lagDays: 2 });
+    // One window for the whole page and the whole app (lib/dateRange resolveWindow: GA4 through yesterday, Search
+    // Console through 2 days ago): the hero's, the sample dashboard's and the demo site page's 28 days, so a number
+    // reads the same in every row and on the page it links to; each row shows it.
+    const dr = resolveWindow(RANGE, 'ga4', { now: today });
+    const drs = resolveWindow(RANGE, 'gsc', { now: today });
     const traffic = rangeParams(dr);
     const search = rangeParams(drs);
     const compareText = compareSuffix(RANGE).replace(/^vs\s+/, '');
@@ -216,7 +217,7 @@ export async function buildHomeLive(slug: string, now: number = Date.now()): Pro
         window: { start: dr.start, end: dr.end, searchStart: drs.start, searchEnd: drs.end },
         links: { site: demoHref(base), traffic: demoHref(`${base}/traffic`), search: demoHref(`${base}/search`) },
     };
-    const ctx: FindingContext = { compareOn: true, compareText, siteHost: host, daily: true };
+    const ctx: FindingContext = { compareOn: true, compareText, siteHost: host, daily: true, now: today };
 
     return runWithSampleGoogle(sampleGoogleFetch, async () => {
         const [ga, gs, channels, pages, referrers, gPages, gQueries, actions, dashboards] = await Promise.all([
