@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 
+import { ALTERNATIVES } from '@/components/marketing/alternatives/data';
 import { FREE_TOOLS } from '@/components/marketing/tools/catalog';
 import { SITE_URL } from '@/lib/brand';
 import { lbAdmin } from '@/lib/leaderboard/admin';
@@ -26,6 +27,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         { path: '/leaderboard/advertise', priority: 0.6, changeFrequency: 'weekly' },
         { path: '/tools', priority: 0.8, changeFrequency: 'monthly' },
         ...FREE_TOOLS.map((t) => ({ path: `/tools/${t.slug}`, priority: 0.7, changeFrequency: 'monthly' as Freq })),
+        { path: '/alternatives', priority: 0.7, changeFrequency: 'monthly' },
+        ...ALTERNATIVES.map((a) => ({ path: `/alternatives/${a.slug}`, priority: 0.7, changeFrequency: 'monthly' as Freq })),
+        { path: '/guides/connect-search-console-to-claude', priority: 0.7, changeFrequency: 'monthly' },
         { path: '/security', priority: 0.5, changeFrequency: 'monthly' },
         { path: '/changelog', priority: 0.5, changeFrequency: 'weekly' },
         { path: '/about', priority: 0.5, changeFrequency: 'monthly' },

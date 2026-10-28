@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { ALTERNATIVES } from '@/components/marketing/alternatives/data';
 import { FREE_TOOLS } from '@/components/marketing/tools/catalog';
 import { BRAND_NAME, SITE_HOST, SITE_URL } from '@/lib/brand';
 import { FREE_START_CREDITS, PAID_PLANS } from '@/lib/plans';
@@ -22,6 +23,9 @@ Everything is free with no site limit: the portfolio, per-site traffic and searc
 - [Sponsor slots](${SITE_URL}/leaderboard/advertise): labelled sponsor placements on the leaderboard
 - [Free SEO tools](${SITE_URL}/tools): no sign-up tools
 ${FREE_TOOLS.map((t) => `  - [${t.title}](${SITE_URL}/tools/${t.slug}): ${t.short}`).join('\n')}
+- [Guide: connect Search Console and GA4 to Claude](${SITE_URL}/guides/connect-search-console-to-claude): step-by-step setup of the free MCP connector in Claude and ChatGPT, with example questions
+- [Alternatives](${SITE_URL}/alternatives): honest comparisons with other tools, including where they are better
+${ALTERNATIVES.map((a) => `  - [${a.title}](${SITE_URL}/alternatives/${a.slug}): ${a.blurb}`).join('\n')}
 - [Security and data](${SITE_URL}/security): exactly what ${BRAND_NAME} reads (read-only scopes), what it stores and how, what it never does, how to revoke access and delete data
 - [Changelog](${SITE_URL}/changelog): what shipped, newest first
 - [About](${SITE_URL}/about): who it is for and how ${BRAND_NAME} makes money
