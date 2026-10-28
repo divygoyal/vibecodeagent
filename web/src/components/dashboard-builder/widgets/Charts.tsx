@@ -16,7 +16,7 @@ import { fmtMetricValue, getMetric, metricColor, metricLabel, dimLabel } from '@
 import { countryName } from '@/lib/builder/countries';
 import { autoGranularity, toDay } from '@/lib/builder/dates';
 import type { BarWidget, CellValue, PieWidget, TimeSeriesWidget } from '@/lib/builder/types';
-import { BuilderTimeSeries, MarkBadge, breakdownColor, breakdownLabel } from '../charts/BuilderTimeSeries';
+import { BuilderTimeSeries, breakdownColor, breakdownLabel } from '../charts/BuilderTimeSeries';
 import { useWidgetNotes } from '../charts/chartNotes';
 import { okResult, WidgetFrame, type WidgetViewProps } from './WidgetFrame';
 import { dsFormat, dsKey } from './metricUi';
@@ -84,19 +84,11 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
         partialFrom,
         fmt: (id, v) => fmtMetricValue(id, v, { compact: true, currency }),
     }) : [];
+    // Plain text, so it ellipsises on phones (numbers match the glyphs on the chart; the tooltip has the details).
+    const footnoteText = marks.map((m) => `${m.n} ${m.label}`).join(' · ');
     const footnote = marks.length ? {
         text: `${hidden ? `${hidden} earlier marker${hidden === 1 ? '' : 's'} not shown · ` : ''}${marks.map((m) => `${m.n} ${m.label} (${fmtDay(m.date)})`).join(' · ')}`,
-        node: (
-            <>
-                {marks.map((m, i) => (
-                    <span key={m.key} className="inline-flex items-center gap-1 align-middle">
-                        {i ? <span aria-hidden className="mx-1">·</span> : null}
-                        <MarkBadge mark={m} />
-                        <span>{m.label}</span>
-                    </span>
-                ))}
-            </>
-        ),
+        node: footnoteText,
     } : undefined;
     const addNote = notes.canAdd && props.mode === 'view' && range ? (
         <NotesPopover
