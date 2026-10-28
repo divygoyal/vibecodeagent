@@ -1,5 +1,5 @@
-import { ImageResponse } from 'next/og';
 import { BRAND_NAME } from '@/lib/brand';
+import { OgDelta, OgMark, OgTick, ogRender } from '@/components/marketing/site/og';
 import { deltaText, metricText } from '@/lib/leaderboard/format';
 import { getEmbed } from '@/lib/leaderboard/server';
 
@@ -35,37 +35,38 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     const spark = e?.spark ? sparkPath(e.spark.values, 520, 150) : null;
     const rank = e?.rank_overall ? `#${e.rank_overall} overall` : null;
 
-    return new ImageResponse(
+    return ogRender(
         (
-            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: C.bg, color: C.fg, padding: 56, fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: C.bg, color: C.fg, padding: 56, fontFamily: 'Geist' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 12, background: C.brand, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 800 }}>T</div>
-                        <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em' }}>{BRAND_NAME}</span>
+                        <OgMark size={48} />
+                        <span style={{ display: 'flex', fontSize: 28, fontWeight: 700, letterSpacing: -0.6 }}>{BRAND_NAME}</span>
                     </div>
-                    <span style={{ fontSize: 18, fontWeight: 600, color: C.muted }}>Verified traffic leaderboard</span>
+                    <span style={{ display: 'flex', fontSize: 20, color: C.muted }}>Verified traffic leaderboard</span>
                 </div>
 
                 <div style={{ display: 'flex', flex: 1, marginTop: 36, background: C.card, border: `1px solid ${C.border}`, borderRadius: 28, padding: 48, justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', maxWidth: 560 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                                <span style={{ display: 'flex', fontSize: 19, fontWeight: 700, padding: '8px 16px', borderRadius: 999, background: C.brandSoft, color: C.brandText }}>
-                                    {e?.verification.level === 'owner' ? '✓ Verified owner (Search Console)' : e ? e.verification.label : 'Not listed'}
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 20, fontWeight: 700, padding: '8px 16px', borderRadius: 999, background: C.brandSoft, color: C.brandText }}>
+                                    {e?.verification.level === 'owner' ? <OgTick size={20} color={C.brandText} /> : null}
+                                    <span style={{ display: 'flex' }}>{e?.verification.level === 'owner' ? 'Verified owner (Search Console)' : e ? e.verification.label : 'Not listed'}</span>
                                 </span>
-                                {e?.category ? <span style={{ display: 'flex', fontSize: 19, fontWeight: 600, padding: '8px 16px', borderRadius: 999, background: '#eff1f4', color: C.muted }}>{e.category}</span> : null}
+                                {e?.category ? <span style={{ display: 'flex', fontSize: 20, padding: '8px 16px', borderRadius: 999, background: '#eff1f4', color: C.muted }}>{e.category}</span> : null}
                             </div>
-                            <div style={{ display: 'flex', fontSize: (e?.name.length ?? 0) > 22 ? 56 : 68, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05 }}>{e?.name ?? 'Profile not found'}</div>
+                            <div style={{ display: 'flex', fontSize: (e?.name.length ?? 0) > 22 ? 56 : 68, fontWeight: 700, letterSpacing: -2, lineHeight: 1.05 }}>{e?.name ?? 'Profile not found'}</div>
                         </div>
-                        {rank ? <div style={{ display: 'flex', fontSize: 24, fontWeight: 600, color: C.muted }}>{rank}{e?.rank_category && e.category ? `  ·  #${e.rank_category} in ${e.category}` : ''}</div> : <div style={{ display: 'flex' }} />}
+                        {rank ? <div style={{ display: 'flex', fontSize: 26, color: C.muted }}>{rank}{e?.rank_category && e.category ? `  ·  #${e.rank_category} in ${e.category}` : ''}</div> : <div style={{ display: 'flex' }} />}
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', width: 520 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                            <div style={{ display: 'flex', fontSize: 104, fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1 }}>{headline ?? '–'}</div>
+                            <div style={{ display: 'flex', fontSize: 104, fontWeight: 700, letterSpacing: -4, lineHeight: 1 }}>{headline ?? 'Verified'}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
-                                <span style={{ display: 'flex', fontSize: 22, color: C.muted }}>{headlineLabel}</span>
-                                {deltaLabel ? <span style={{ display: 'flex', fontSize: 24, fontWeight: 700, color: (delta ?? 0) >= 0 ? C.up : C.down }}>{deltaLabel}</span> : null}
+                                <span style={{ display: 'flex', fontSize: 24, color: C.muted }}>{headlineLabel}</span>
+                                {deltaLabel ? <OgDelta label={deltaLabel} size={26} up={C.up} down={C.down} /> : null}
                             </div>
                         </div>
                         {spark ? (
@@ -78,6 +79,5 @@ export default async function Image({ params }: { params: Promise<{ id: string }
                 </div>
             </div>
         ),
-        { ...size },
     );
 }

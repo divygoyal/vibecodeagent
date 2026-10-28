@@ -37,9 +37,9 @@ function path(values: number[], w: number, h: number): string {
         .join(' ');
 }
 
-function Mark() {
+export function OgMark({ size = 56 }: { size?: number }) {
     return (
-        <svg width="56" height="56" viewBox="0 0 36 36">
+        <svg width={size} height={size} viewBox="0 0 36 36">
             <defs>
                 <linearGradient id="g" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
                     <stop offset="0" stopColor="#43b28e" />
@@ -77,7 +77,7 @@ function ogFonts(): Promise<OgFont[]> {
     return fontsPromise;
 }
 
-async function render(node: React.ReactElement): Promise<ImageResponse> {
+export async function ogRender(node: React.ReactElement): Promise<ImageResponse> {
     const fonts = await ogFonts();
     return new ImageResponse(node, { ...OG_SIZE, ...(fonts.length ? { fonts } : {}) });
 }
@@ -88,11 +88,11 @@ export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: strin
     const W = 360;
     const H = 120;
     const titleSize = title.length > 46 ? 56 : title.length > 30 ? 64 : 72;
-    return render(
+    return ogRender(
         (
             <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: C.canvas, padding: 72, color: C.fg, fontFamily: 'Geist' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                    <Mark />
+                    <OgMark />
                     <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: -0.5, color: C.fg }}>{BRAND_NAME}</div>
                 </div>
 
@@ -120,6 +120,73 @@ export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: strin
                             <path d={path(b, W, H)} stroke={C.impressions} strokeWidth={3} fill="none" strokeLinejoin="round" />
                         </svg>
                         <div style={{ display: 'flex', marginTop: 12, fontSize: 18, color: C.muted }}>{SITE_HOST}</div>
+                    </div>
+                </div>
+            </div>
+        ),
+    );
+}
+
+/** A check mark drawn as SVG (Geist has no tick glyph). */
+export function OgTick({ size = 20, color = '#157459' }: { size?: number; color?: string }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 18 18"><path d="M3.5 9.5 L7.5 13 L14.5 5" stroke={color} strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    );
+}
+
+/** A change figure ("18.4%") with its arrow drawn as SVG (Geist has no triangle glyphs). `label` is deltaText(): "▲ 18.4%". */
+export function OgDelta({ label, size = 24, up = '#157f3c', down = '#c92a2a' }: { label: string; size?: number; up?: string; down?: string }) {
+    const isUp = !label.includes('▼') && !label.trim().startsWith('-');
+    const color = isUp ? up : down;
+    const text = label.replace(/[▲▼+\-−\s]/g, '');
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: size, fontWeight: 700, color }}>
+            <svg width={size * 0.7} height={size * 0.7} viewBox="0 0 12 12">{isUp ? <path d="M6 1.5 L11 10.5 L1 10.5 Z" fill={color} /> : <path d="M6 10.5 L11 1.5 L1 1.5 Z" fill={color} />}</svg>
+            <div style={{ display: 'flex' }}>{text}</div>
+        </div>
+    );
+}
+
+/**
+ * Share card for a public dashboard or share page: the same light look as the marketing cards, with an abstract dashboard
+ * (skeleton tiles and one line, no numbers, no labels) on the right, so nothing here can be mistaken for the owner's data.
+ */
+export function sharedOgImage({ eyebrow, title, subtitle, lock }: { eyebrow: string; title: string; subtitle?: string; lock?: boolean }): Promise<ImageResponse> {
+    const a = curve(30, 0.7, 0.5);
+    const W = 372;
+    const H = 150;
+    const t = title.length > 60 ? `${title.slice(0, 57)}...` : title;
+    const titleSize = t.length > 40 ? 54 : t.length > 24 ? 64 : 76;
+    const sub = subtitle && subtitle.length > 120 ? `${subtitle.slice(0, 117)}...` : subtitle;
+    return ogRender(
+        (
+            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: C.canvas, padding: 72, color: C.fg, fontFamily: 'Geist' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+                    <OgMark />
+                    <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: -0.5, color: C.fg }}>{BRAND_NAME}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 48 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 640 }}>
+                        <div style={{ display: 'flex', alignSelf: 'flex-start', alignItems: 'center', gap: 10, marginBottom: 24, padding: '8px 18px', borderRadius: 999, background: C.brandSoft, color: C.brandSoftFg, fontSize: 24 }}>
+                            {lock ? <svg width="20" height="20" viewBox="0 0 20 20"><rect x="4" y="9" width="12" height="8" rx="2" fill={C.brandSoftFg} /><path d="M7 9 V6.5 a3 3 0 0 1 6 0 V9" stroke={C.brandSoftFg} strokeWidth="2" fill="none" /></svg> : null}
+                            <div style={{ display: 'flex' }}>{eyebrow}</div>
+                        </div>
+                        <div style={{ display: 'flex', fontSize: titleSize, fontWeight: 700, lineHeight: 1.06, letterSpacing: -2.5, color: C.fg }}>{t}</div>
+                        {sub ? <div style={{ display: 'flex', marginTop: 24, fontSize: 28, lineHeight: 1.35, color: C.fg2 }}>{sub}</div> : null}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', width: 412, padding: 20, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: '0 1px 3px rgba(16,19,26,0.06)' }}>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            {[0, 1, 2].map((i) => (
+                                <div key={i} style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10, padding: 12, border: `1px solid ${C.border}`, borderRadius: 12 }}>
+                                    <div style={{ display: 'flex', width: 40, height: 8, borderRadius: 4, background: '#e3e7ec' }} />
+                                    <div style={{ display: 'flex', width: 64 - i * 8, height: 16, borderRadius: 6, background: '#cfd5dd' }} />
+                                </div>
+                            ))}
+                        </div>
+                        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ marginTop: 16 }}>
+                            <path d={`${path(a, W, H - 8)} L${W} ${H} L0 ${H} Z`} fill={C.users} fillOpacity={0.1} />
+                            <path d={path(a, W, H - 8)} stroke={C.users} strokeWidth={3} fill="none" strokeLinejoin="round" />
+                        </svg>
                     </div>
                 </div>
             </div>
@@ -181,13 +248,13 @@ export function homeOgImage(theme: 'dark' | 'light' = 'dark'): Promise<ImageResp
     const D = theme === 'light' ? L : DARK;
     const W = 112;
     const H = 38;
-    return render(
+    return ogRender(
         <div style={{ width: '100%', height: '100%', display: 'flex', position: 'relative', background: D.canvas, color: D.fg, fontFamily: 'Geist', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: -260, right: -180, width: 760, height: 760, borderRadius: 999, display: 'flex', background: `radial-gradient(circle, ${theme === 'light' ? 'rgba(22,130,93,0.10)' : 'rgba(67,209,158,0.20)'} 0%, rgba(67,209,158,0) 65%)` }} />
 
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: 600, padding: '64px 0 60px 64px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <Mark />
+                    <OgMark />
                     <div style={{ display: 'flex', fontSize: 32, fontWeight: 700, letterSpacing: -0.5 }}>{BRAND_NAME}</div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
