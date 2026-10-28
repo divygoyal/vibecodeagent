@@ -15,6 +15,7 @@ import { ClipboardCopy, Copy, GripVertical, MoreHorizontal, MoveRight, Trash2, S
 import 'react-grid-layout/css/styles.css';
 
 import { cn } from '@/lib/cn';
+import { Skeleton } from '@/components/ui';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui';
 import { registerCalcs } from '@/lib/builder/calc';
 import { layoutFor } from '@/lib/builder/docOps';
@@ -136,6 +137,22 @@ export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit
     }, [edit, bp]);
 
     if (!items.length && !editing) return <>{empty}</>;
+
+    // Before the first width is known (server render, first paint) a viewer sees the page's own layout as skeleton blocks,
+    // not a blank page with the footer pill right under the toolbar.
+    if (width === 0 && !editing) {
+        return (
+            <div
+                aria-hidden
+                className="grid"
+                style={{ gridTemplateColumns: `repeat(${COLS[bp]}, minmax(0, 1fr))`, gridAutoRows: `${rowH}px`, gap }}
+            >
+                {items.map((l) => (
+                    <Skeleton key={l.i} delay={0} rounded="card" className="block h-full w-full" style={{ gridColumn: `${Math.min(l.x, COLS[bp] - 1) + 1} / span ${Math.min(l.w, COLS[bp])}`, gridRow: `${l.y + 1} / span ${l.h}` }} />
+                ))}
+            </div>
+        );
+    }
 
     // Phones in view mode: plain stacked list (no drag library, no transforms).
     if (bp === 'sm' && !editing) {
