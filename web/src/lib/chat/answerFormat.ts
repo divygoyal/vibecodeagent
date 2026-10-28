@@ -283,3 +283,11 @@ export function analyzeTable(header: string[], rows: string[][]): TableShape {
         timeSeries: timeSeries && seriesCol > 0, seriesCol,
     };
 }
+
+/** First column of a numbered list ("#", "Rank", "No."). */
+export const isRankHeader = (h: string): boolean => /^(#|rank|no\.?)$/i.test(h.trim());
+
+/** Index of a "Page" / "URL" column in the third place of a numbered list (# | Task | Page | ...), else -1. */
+export function pageFoldColumn(header: string[], numeric: boolean[]): number {
+    return header.length >= 4 && isRankHeader(header[0]) && /^(page|url|path)$/i.test(header[2].trim()) && !numeric[1] && !numeric[2] ? 2 : -1;
+}
