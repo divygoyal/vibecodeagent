@@ -1,8 +1,9 @@
 /**
  * Client-side filtering and sorting of portfolio sites. Pure.
  */
+import { fmtDay } from '@/lib/format';
 import { pctChange } from './build';
-import type { Compared, PortfolioSite, TrafficTotals } from './types';
+import type { Compared, PortfolioResponse, PortfolioSite, TrafficTotals } from './types';
 
 export type SortKey = 'clicks' | 'impressions' | 'users' | 'growth' | 'drop' | 'position' | 'name';
 export type FilterKey = 'all' | 'gsc' | 'ga4' | 'starred';
@@ -23,6 +24,17 @@ export function parseSort(v: string | null | undefined): SortKey {
 
 export function parseFilter(v: string | null | undefined): FilterKey {
     return v === 'gsc' || v === 'ga4' || v === 'starred' ? v : 'all';
+}
+
+/**
+ * "traffic to Oct 27, search to Oct 26": the two sources' windows end on different days (lib/dateRange). Null when they
+ * end on the same day, and for a portfolio with no sites (there is no data to date).
+ */
+export function windowsNote(data: Pick<PortfolioResponse, 'sites' | 'windows'> | undefined): string | null {
+    if (!data || !data.sites.length) return null;
+    const t = data.windows.traffic;
+    const s = data.windows.search;
+    return t && s && t.curEnd !== s.curEnd ? `traffic to ${fmtDay(t.curEnd)}, search to ${fmtDay(s.curEnd)}` : null;
 }
 
 /** Percent change of the site's headline metric (clicks, or users for GA4-only sites). */

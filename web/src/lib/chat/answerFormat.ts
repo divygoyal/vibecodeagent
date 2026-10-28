@@ -217,6 +217,11 @@ export interface TableShape {
     betterDown: boolean[];
     /** Per column: position changes (new minus old), drawn as rank moves: ▲ green = better (a lower number). */
     rankDelta: boolean[];
+    /**
+     * Per column: a change column that follows a plain number column. On phones it has no column of its own: the change
+     * is drawn under the number it belongs to, so a table of five columns needs no sideways scroll.
+     */
+    foldDelta: boolean[];
     /** Column that gets heat bars (a ranked count), or -1. */
     barCol: number;
     barMax: number;
@@ -270,8 +275,10 @@ export function analyzeTable(header: string[], rows: string[][]): TableShape {
     if (barMax <= 0) barCol = -1;
     const seriesCol = timeSeries ? candidates[0] ?? numeric.findIndex((n, c) => n && !delta[c]) : -1;
 
+    const foldDelta = delta.map((d, c) => d && c >= 2 && numeric[c - 1] && !delta[c - 1]);
+
     return {
-        numeric, delta, betterDown, rankDelta,
+        numeric, delta, betterDown, rankDelta, foldDelta,
         barCol, barMax, barMetric: barCol >= 0 ? metricForLabel(header[barCol]) : null,
         timeSeries: timeSeries && seriesCol > 0, seriesCol,
     };

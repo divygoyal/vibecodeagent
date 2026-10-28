@@ -59,7 +59,7 @@ test('naming: GA4 key events are "Key events"; revenue is its own metric', () =>
 test('revenue findings use money, not counts', () => {
     const fmt = (n) => fmtCurrency(n, 'USD', { compact: true });
     const up = trendFinding({ metric: 'Revenue', cur: 61805, prev: 50000, compareText: 'previous 28 days', drivers: [{ label: 'Paid Search', cur: 20000, prev: 10000 }, { label: 'Email', cur: 5000, prev: 4800 }], driverUnit: '', fmt });
-    assert.equal(up.text, 'Revenue up 24% vs previous 28 days, led by Paid Search (+$10K).');
+    assert.equal(up.text, 'Revenue up 23.6% vs previous 28 days, led by Paid Search (+$10K).');
     const busy = trendFinding({ metric: 'Revenue', cur: 100, series: [{ date: '2026-10-01', value: 10 }, { date: '2026-10-02', value: 90 }, { date: '2026-10-03', value: 10 }, { date: '2026-10-04', value: 0 }], partialLast: true, fmt });
     assert.match(busy.text, /^Busiest day: .*Oct 2, \$90 in revenue/);
 });

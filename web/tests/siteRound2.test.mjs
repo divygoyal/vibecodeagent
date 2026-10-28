@@ -9,6 +9,7 @@ const { sourceInfo, sourceMediumInfo, deviceLabel, geoLabel } = await import('..
 const { parseFilterParams, filtersToParams, ga4DimensionFilter, andFilters, cleanFilters, hasFilters } = await import('../src/components/site/lib/filters.ts');
 const { bucketStart, isoWeekMonday, gaBucketDate, bucketDates, snapToBucket, bucketGscSeries, effectiveInterval, allowedIntervals } = await import('../src/components/site/lib/intervals.ts');
 const { trendFinding, rateFinding, updateImpactFinding, peakHoursFinding, peakWindow, hourRange, overlayFinding, ctrBenchmarkFinding, geoFinding, topDriver } = await import('../src/components/site/lib/findings.ts');
+const fmtMod = await import('../src/lib/format.ts');
 const { GOOGLE_UPDATES, googleUpdatesIn, googleUpdateOn } = await import('../src/components/site/lib/googleUpdates.ts');
 
 test('source names and favicon domains', () => {
@@ -105,12 +106,12 @@ test('trend findings name the change and its biggest driver', () => {
         metric: 'Clicks', cur: 1180, prev: 1000, compareText: 'previous 28 days', driverUnit: 'clicks',
         drivers: [{ label: '/pricing', cur: 400, prev: 260 }, { label: '/blog', cur: 300, prev: 280 }, { label: '/old', cur: 10, prev: 30 }],
     });
-    assert.equal(f.text, 'Clicks up 18% vs previous 28 days, led by /pricing (+140 clicks).');
+    assert.equal(f.text, 'Clicks up 18.0% vs previous 28 days, led by /pricing (+140 clicks).');
     assert.equal(f.tone, 'good');
     const down = trendFinding({ metric: 'Users', cur: 900, prev: 1000, compareText: 'previous 28 days', drivers: [{ label: 'Organic Search', cur: 500, prev: 600 }] });
-    assert.equal(down.text, 'Users down 10% vs previous 28 days, mostly from Organic Search (−100).');
+    assert.equal(down.text, 'Users down 10.0% vs previous 28 days, mostly from Organic Search (−100).');
     assert.equal(down.tone, 'bad');
-    assert.equal(trendFinding({ metric: 'Users', cur: 1010, prev: 1000, compareText: 'previous 7 days' }).text, 'Users steady vs previous 7 days (+1%).');
+    assert.equal(trendFinding({ metric: 'Users', cur: 1010, prev: 1000, compareText: 'previous 7 days' }).text, 'Users steady vs previous 7 days (+1.0%).');
     const pos = trendFinding({ metric: 'Avg. position', cur: 8, prev: 10, lowerIsBetter: true });
     assert.equal(pos.tone, 'good');
     // Without a comparison: the busiest full day.
@@ -120,6 +121,16 @@ test('trend findings name the change and its biggest driver', () => {
     // A driver that explains less than a fifth of the change is not named.
     assert.equal(topDriver([{ label: 'a', cur: 11, prev: 10 }, { label: 'b', cur: 20, prev: 10 }, { label: 'c', cur: 60, prev: 10 }], 1).label, 'c');
     assert.equal(topDriver([{ label: 'a', cur: 5, prev: 10 }], 1), null);
+});
+
+test('finding percents use the KPI tiles\' precision (10.3%, 17.2%, not 10%, 17%)', () => {
+    const { computeDelta } = fmtMod;
+    for (const [cur, prev] of [[1103, 1000], [11720, 10000], [450, 1000], [3500, 1000]]) {
+        const tile = computeDelta(cur, prev).text;
+        const f = trendFinding({ metric: 'Users', cur, prev, compareText: 'previous 28 days' });
+        assert.ok(f.text.startsWith(`Users ${cur > prev ? 'up' : 'down'} ${tile} vs`), `${f.text} vs tile ${tile}`);
+    }
+    assert.equal(trendFinding({ metric: 'Users', cur: 1103, prev: 1000 }).text, 'Users up 10.3%.');
 });
 
 test('CTR and position findings use points and positions', () => {
@@ -133,7 +144,7 @@ test('a Google update that moved clicks is named', () => {
     const series = [];
     for (let i = 1; i <= 30; i++) series.push({ date: `2026-05-${String(i).padStart(2, '0')}`, value: i < 21 ? 100 : 70 });
     const f = updateImpactFinding(series, [{ name: 'May 2026 core update', start: '2026-05-21' }], 'Clicks');
-    assert.equal(f.text, 'Clicks down 30% a day on average since the May 2026 core update began (May 21).');
+    assert.equal(f.text, 'Clicks down 30.0% a day on average since the May 2026 core update began (May 21).');
     assert.equal(updateImpactFinding(series.map((x) => ({ ...x, value: 100 })), [{ name: 'x', start: '2026-05-21' }], 'Clicks'), null);
     assert.equal(updateImpactFinding(series, [{ name: 'late', start: '2026-05-28' }], 'Clicks'), null); // fewer than 7 days after
 });
@@ -161,7 +172,7 @@ test('overlay, CTR benchmark and geo findings', () => {
     assert.match(ctrBenchmarkFinding([{ potential: 600 }, { potential: 640 }], 40).text, /^2 of 40 queries get fewer clicks than usual for their position: about \+1,240 clicks/);
     assert.equal(ctrBenchmarkFinding([], 12).tone, 'good');
     assert.equal(geoFinding([{ label: 'United States', cur: 440, prev: 400 }, { label: 'India', cur: 138, prev: 100 }, { label: 'France', cur: 422, prev: 420 }]).text,
-        'United States brings 44% of users; India grew fastest (+38%).');
+        'United States brings 44% of users; India grew fastest (+38.0%).');
 });
 
 test('Google update list is sorted, well formed and searchable', () => {

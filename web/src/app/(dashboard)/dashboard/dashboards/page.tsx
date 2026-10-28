@@ -68,7 +68,7 @@ function TemplateStrip({ mode }: { mode: 'light' | 'dark' }) {
                             <div className={theme.id ? 'w-full' : 'w-full'}><Thumbnail items={thumb} className="w-full" /></div>
                         </DashThemeRoot>
                         <div className="flex min-w-0 flex-col justify-center gap-0.5 px-3 py-2.5">
-                            <span className="truncate text-body-sm font-medium text-fg">{meta.name}</span>
+                            <span title={meta.name} className="line-clamp-2 text-body-sm leading-snug font-medium text-fg">{meta.name}</span>
                             <span className="line-clamp-2 text-meta text-fg-muted">{meta.audience ?? meta.description}</span>
                         </div>
                     </Link>

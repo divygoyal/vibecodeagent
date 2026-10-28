@@ -24,6 +24,22 @@ export function splitPagePath(display: string): [string, string] {
 }
 
 
+/**
+ * A page named inside a sentence ("led by the homepage (+1,377 clicks)"): "/" reads "the homepage", a long path keeps its
+ * first and last segment ("/es/…/generator"), anything else is the path as shown in the lists.
+ */
+export function sentencePage(display: string, max = 36): string {
+    const d = (display || '/').trim() || '/';
+    if (d === '/') return 'the homepage';
+    if (d.length <= max) return d;
+    const parts = d.split('/');
+    const last = `/${parts[parts.length - 1]}`;
+    if (parts.length <= 3 || last.length >= max - 4) return `${d.slice(0, max - 1)}…`;
+    const short = `/${parts[1]}/…${last}`;
+    return short.length <= max ? short : `…${last}`;
+}
+
+
 // ─── Page titles (GA4 pageTitle) ──────────────────────────────────────────
 
 /** Separators sites put between a page name and the brand: "Pricing | Acme", "Pricing – Acme", "Acme · Pricing". */

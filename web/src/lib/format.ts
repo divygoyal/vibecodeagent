@@ -230,7 +230,7 @@ function none(text: string, state: 'none' | 'new'): DeltaResult {
 }
 
 /** Always 1 decimal under 100% (`9.0%`, `18.4%`) so a delta column never mixes `9%` with `8.5%`. */
-function fmtPercentChange(absPct: number): string {
+export function fmtPercentChange(absPct: number): string {
     if (absPct >= 999.5) return '>999%';
     if (absPct >= 99.95) return `${Math.round(absPct)}%`;
     return `${absPct.toFixed(1)}%`;

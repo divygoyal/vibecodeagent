@@ -3,7 +3,7 @@
  * cost): "Clicks up 18% vs previous 28 days, led by /pricing (+340)."
  * Pure; tested in web/tests/siteFindings.test.mjs.
  */
-import { fmtCompact, fmtDayLong, fmtFull } from '@/lib/format';
+import { fmtCompact, fmtDayLong, fmtFull, fmtPercentChange } from '@/lib/format';
 
 export type FindingTone = 'good' | 'bad' | 'flat' | 'info';
 
@@ -44,9 +44,9 @@ function pct(cur: number, prev: number): number {
     return prev === 0 ? 0 : ((cur - prev) / Math.abs(prev)) * 100;
 }
 
+/** The KPI tiles' precision (lib/format fmtPercentChange): "10.3%", "17.2%", "174%", so a sentence never rounds differently from the tile beside it. */
 function fmtPct(p: number): string {
-    const a = Math.abs(p);
-    return a >= 10 ? `${Math.round(a)}%` : `${a.toFixed(1).replace(/\.0$/, '')}%`;
+    return fmtPercentChange(Math.abs(p));
 }
 
 function signed(n: number, fmt?: (n: number) => string): string {

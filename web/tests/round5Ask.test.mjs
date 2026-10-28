@@ -60,6 +60,7 @@ test('analyzeTable: numbers right, changes coloured, bars on the ranked count, s
     ]);
     assert.deepEqual(movers.numeric, [false, true, true, true, true]);
     assert.deepEqual(movers.delta, [false, false, true, false, true]);
+    assert.deepEqual(movers.foldDelta, [false, false, true, false, true], 'on phones each change sits under its number: no sideways scroll');
     assert.equal(movers.barCol, 1);
     assert.equal(movers.barMetric, 'users');
     const queries = analyzeTable(['Query', 'Clicks', 'Impressions', 'CTR', 'Position'], [
@@ -72,6 +73,8 @@ test('analyzeTable: numbers right, changes coloured, bars on the ranked count, s
     assert.equal(pos.rankDelta[2], true, 'a position change is drawn as a rank move');
     assert.equal(movers.rankDelta.some(Boolean), false);
     const weeks = analyzeTable(['Week', 'Clicks', 'Change'], [['Sep 29', '1,240', '–'], ['Oct 6', '1,310', '+6%'], ['Oct 13', '1,402', '+7%'], ['Oct 20', '1,612', '+15%']]);
+    assert.deepEqual(weeks.foldDelta, [false, false, true]);
+    assert.equal(analyzeTable(['Change', 'Clicks'], [['+5%', '1'], ['+6%', '2']]).foldDelta.some(Boolean), false);
     assert.equal(weeks.timeSeries, true);
     assert.equal(weeks.seriesCol, 1);
     assert.equal(weeks.barCol, -1, 'a time series gets a sparkline, not bars');
