@@ -41,6 +41,21 @@ export const FOOTER_COLUMNS: Array<{ title: string; links: NavLink[] }> = [
         ],
     },
     {
+        title: 'Compare',
+        links: [
+            { label: 'All alternatives', href: '/alternatives' },
+            { label: 'Looker Studio alternative', href: '/alternatives/looker-studio' },
+            { label: 'SEOgets alternative', href: '/alternatives/seogets' },
+            { label: 'QuickSEO alternative', href: '/alternatives/quickseo' },
+        ],
+    },
+    {
+        title: 'Guides',
+        links: [
+            { label: 'Connect Search Console to Claude', href: '/guides/connect-search-console-to-claude' },
+        ],
+    },
+    {
         title: 'Company',
         links: [
             { label: 'About', href: '/about' },
