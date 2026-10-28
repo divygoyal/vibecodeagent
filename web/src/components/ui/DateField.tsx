@@ -125,7 +125,7 @@ function MonthCalendar({ value, min, max, hint, onPick }: { value: string; min?:
             <div className="mb-2 flex items-center gap-1">
                 <Button variant="ghost" size="sm" iconOnly icon={ChevronLeft} aria-label="Previous month" disabled={prevOff} onClick={() => step(-1)} />
                 <span className="min-w-0 flex-1 text-center text-body-sm font-medium text-fg">{MONTHS[view.m]}</span>
-                <Select<string> size="sm" ariaLabel="Year" className="min-w-0 w-[72px] px-2" contentClassName="max-h-56" value={String(view.y)} onValueChange={(y) => setView((v) => ({ ...v, y: Number(y) }))} options={years.map((y) => ({ value: y, label: y }))} />
+                <Select<string> size="sm" ariaLabel="Year" className="w-[76px]! min-w-0! px-2!" contentClassName="max-h-56" value={String(view.y)} onValueChange={(y) => setView((v) => ({ ...v, y: Number(y) }))} options={years.map((y) => ({ value: y, label: y }))} />
                 <Button variant="ghost" size="sm" iconOnly icon={ChevronRight} aria-label="Next month" disabled={nextOff} onClick={() => step(1)} />
             </div>
             <div ref={grid} role="grid" aria-label={`${MONTHS[view.m]} ${view.y}`} onKeyDown={onKey} className="grid grid-cols-7 gap-y-0.5 text-center">
