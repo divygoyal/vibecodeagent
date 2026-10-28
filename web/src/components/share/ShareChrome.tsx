@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Favicon } from '@/components/ui/Favicon';
 import { BrandMark, Wordmark } from '@/components/shell/BrandMark';
+import { EmbedHeightReporter } from '@/components/share/EmbedHeightReporter';
 import { MadeWithTrafficClaw } from '@/components/share/MadeWith';
 import { madeWithUrl, type MadeWithKind } from '@/lib/growth/madeWith';
 
@@ -24,9 +25,17 @@ export const SHARE_CONTAINER = 'mx-auto w-full max-w-[1440px] px-4 md:px-6';
 
 const HOME_URL = 'https://trafficclaw.com';
 
-/** Page root: canvas background, app type scale. */
-export function SharePage({ children, className }: { children: ReactNode; className?: string }) {
-    return <div className={cn('tc-root min-h-dvh overflow-x-hidden bg-canvas text-fg', className)}>{children}</div>;
+/**
+ * Page root: canvas background, app type scale. `embed` (a page inside someone's iframe) drops the full-height minimum,
+ * so the root is exactly as tall as its content, and reports that height to the host page.
+ */
+export function SharePage({ children, className, embed = false }: { children: ReactNode; className?: string; embed?: boolean }) {
+    return (
+        <div className={cn('tc-root overflow-x-hidden bg-canvas text-fg', embed ? null : 'min-h-dvh', className)}>
+            {embed ? <EmbedHeightReporter /> : null}
+            {children}
+        </div>
+    );
 }
 
 export interface ShareBrandingLike {
@@ -121,7 +130,7 @@ export function ShareFooter({ compact = false, kind = 'share', className }: { co
 /** Invalid or revoked token. */
 export function ShareNotFound({ isEmbed = false, what = 'shared dashboard', temporary = false }: { isEmbed?: boolean; what?: string; temporary?: boolean }) {
     return (
-        <SharePage className="flex items-center justify-center p-6">
+        <SharePage embed={isEmbed} className={cn('flex items-center justify-center p-6', isEmbed ? 'min-h-[200px]' : 'min-h-dvh')}>
             <EmptyState
                 variant="page"
                 icon={Link2Off}

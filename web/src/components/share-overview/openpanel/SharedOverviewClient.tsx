@@ -1531,7 +1531,7 @@ function ShareOverviewPage() {
     );
 
     return (
-        <SharePage>
+        <SharePage embed={isEmbed}>
             {isEmbed ? null : <ShareHeader siteUrl={runtime.siteUrl} views={runtime.views} branding={branding} label="Shared analytics" />}
             {controls}
             <main className={cn(SHARE_CONTAINER, 'grid gap-4 py-4 md:grid-cols-2 md:py-6')}>
