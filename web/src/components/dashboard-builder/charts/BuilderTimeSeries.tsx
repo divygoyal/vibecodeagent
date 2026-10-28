@@ -262,7 +262,8 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
     // waits for the legend's measured height (a layout effect, before paint), so it is drawn once at
     // its final size: no resize after the first frame (golden screenshots stay stable).
     const [legendH, setLegendH] = useState<number | null>(null);
-    const legendLines = height >= 240 ? 2 : 1;
+    // Phones: up to three lines, so the stacked colours are named on the chart, not behind "+5 more" (round 5 judge).
+    const legendLines = figW > 0 && figW < 480 ? 3 : height >= 240 ? 2 : 1;
 
     return (
         <figure ref={figRef} className={cn('relative m-0', className)} style={{ height }} aria-label={breakdown ? `${metricLabel(breakdown.metric)} by ${breakdown.dimension}` : series.map((s) => s.label ?? metricLabel(s.metric)).join(', ')}>

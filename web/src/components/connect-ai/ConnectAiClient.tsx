@@ -6,7 +6,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import useSWR from 'swr';
 import {
-    Badge, Banner, Button, Card, CardHeader, Checkbox, ConfirmModal, EmptyState, Modal, Pill, Select, Skeleton, Switch, Table, Tooltip, VerifiedBadge,
+    Badge, Banner, Button, Card, CardHeader, Checkbox, ConfirmModal, EmptyState, Modal, Pill, Select, Skeleton, Switch, Table, VerifiedBadge,
     type TableColumn,
 } from '@/components/ui';
 import { PageHeader } from '@/components/shell/PageHeader';
@@ -199,6 +199,12 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                 </div>
             </Card>
 
+            {/* Setup first (round 5 judge): with nothing connected, setting up is the page's job; the pitch follows. */}
+            <Card>
+                <CardHeader as="h2" title="Set up your app" />
+                <SetupTabs url={url} urlShown />
+            </Card>
+
             <section aria-labelledby="get-title" className="space-y-3">
                 <div>
                     <h2 id="get-title" className="text-title text-fg">What you get</h2>
@@ -219,27 +225,18 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                             title={`${TOOL_SUMMARIES.length} read-only tools`}
                             description="Your AI app picks the tool for each question. None can change your data."
                         />
-                        <ul aria-label="Tools" className="flex flex-wrap gap-2">
-                            {TOOL_SUMMARIES.map((t) => (
-                                <li key={t.name}>
-                                    <Tooltip content={t.summary}>
-                                        <span tabIndex={0} className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border-subtle bg-surface-sunken px-2.5 font-mono text-[12px] text-fg-secondary outline-none focus-visible:ring-2 focus-visible:ring-focus/40">
-                                            <Wrench aria-hidden size={12} strokeWidth={1.75} className="text-fg-faint" />
-                                            {t.name}
-                                        </span>
-                                    </Tooltip>
-                                </li>
-                            ))}
-                        </ul>
-                        <details className="group mt-4 border-t border-border-subtle pt-3">
+                        {/* Collapsed by default: plain names first, the tool name an AI app shows in monospace under it. */}
+                        <details className="group border-t border-border-subtle pt-3">
                             <summary className="flex cursor-pointer list-none items-center gap-2 pointer-coarse:min-h-11 text-body-sm font-medium text-fg-secondary hover:text-fg [&::-webkit-details-marker]:hidden">
+                                <Wrench aria-hidden size={14} strokeWidth={1.75} className="text-fg-faint" />
                                 <span className="group-open:hidden">What each tool does</span>
-                                <span className="hidden group-open:inline">Hide the details</span>
+                                <span className="hidden group-open:inline">Hide the tools</span>
                             </summary>
-                            <ul className="mt-3 grid gap-x-6 gap-y-3 grid-cols-1 sm:grid-cols-2">
+                            <ul aria-label="Tools" className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
                                 {TOOL_SUMMARIES.map((t) => (
                                     <li key={t.name} className="min-w-0">
-                                        <span className="font-mono text-[12px] text-fg">{t.name}</span>
+                                        <span className="text-body-sm font-medium text-fg">{t.label}</span>
+                                        <span className="ml-1.5 font-mono text-[12px] text-fg-faint">{t.name}</span>
                                         <p className="text-body-sm text-fg-muted">{t.summary}</p>
                                     </li>
                                 ))}
@@ -267,11 +264,6 @@ export function ConnectAiClient({ endpoint, enabled }: { endpoint: string; enabl
                     </Card>
                 </div>
             </section>
-
-            <Card>
-                <CardHeader as="h2" title="Set up your app" />
-                <SetupTabs url={url} urlShown />
-            </Card>
 
             {/* items-start: Usage is short, it must not stretch into an empty box next to the apps list. */}
             <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">

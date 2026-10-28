@@ -150,26 +150,36 @@ export interface DeltaText {
     tone: 'good' | 'bad' | 'neutral';
     /** The change as the answer wrote it, with a typographic minus. */
     text: string;
+    /** Position changes: what the arrow means in words ("improved 0.3", "worse by 1.6"); also the tooltip. */
+    spoken?: string;
 }
 
 /**
  * A signed change: "+882%", "−7%", "-4.5%", "+3 pp", "0%". Unsigned values are not changes (except 0).
  * `bare` also accepts numbers without a unit ("+342", "−1.6"), for columns that are known to hold changes.
  */
-export function parseDelta(text: string, opts: { betterDown?: boolean; neutral?: boolean; bare?: boolean } = {}): DeltaText | null {
+export function parseDelta(text: string, opts: { betterDown?: boolean; neutral?: boolean; bare?: boolean; rank?: boolean } = {}): DeltaText | null {
     const s = text.trim();
     const m = /^([+\-\u2212\u2013])?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s*(%|pp|pts?)?$/.exec(s);
     if (!m) return null;
     if (!m[4] && !opts.bare) return null;
     const zero = Number(`${m[2].replace(/,/g, '')}${m[3] ? `.${m[3]}` : ''}`) === 0;
     if (!m[1] && !zero) return null;
+    const value = `${m[2]}${m[3] ? `.${m[3]}` : ''}`;
+    if (opts.rank && !m[4]) {
+        // A position change written as new minus old ("+1.6" = the number rose = the page fell). Same convention as
+        // the app's MetricDelta for position: the arrow shows where the rank moved (▲ = better), green when better.
+        if (zero) return { direction: 'flat', tone: 'neutral', text: value, spoken: 'no change' };
+        const better = m[1] !== '+';
+        return { direction: better ? 'up' : 'down', tone: better ? 'good' : 'bad', text: value, spoken: better ? `improved ${value}` : `worse by ${value}` };
+    }
     const direction = zero ? 'flat' : m[1] === '+' ? 'up' : 'down';
     const good = direction === 'flat' || opts.neutral ? null : (direction === 'up') !== Boolean(opts.betterDown);
     const unit = m[4] === '%' ? '%' : m[4] ? ` ${m[4]}` : '';
     return {
         direction,
         tone: good === null ? 'neutral' : good ? 'good' : 'bad',
-        text: `${direction === 'up' ? '+' : direction === 'down' ? '−' : ''}${m[2]}${m[3] ? `.${m[3]}` : ''}${unit}`,
+        text: `${direction === 'up' ? '+' : direction === 'down' ? '−' : ''}${value}${unit}`,
     };
 }
 
@@ -178,8 +188,8 @@ export function betterDownFor(label: string): boolean {
     return /\b(position|pos\.?|rank|ranking|bounce|exit rate|load time|lcp|cls|inp|ttfb|cost|cpc|errors?)\b/i.test(label);
 }
 
-/** Changes in a position column: "+2.1" could mean better or worse, so it gets no colour. */
-export function ambiguousChange(label: string): boolean {
+/** Changes in a position column ("+1.6" = the position number rose): drawn as rank moves, like the app. */
+export function rankChange(label: string): boolean {
     return /\b(position|pos\.?|rank)\b/i.test(label);
 }
 
@@ -205,8 +215,8 @@ export interface TableShape {
     delta: boolean[];
     /** Per column: lower is better (position, bounce). */
     betterDown: boolean[];
-    /** Per column: changes whose good direction is unclear (position deltas). */
-    neutralDelta: boolean[];
+    /** Per column: position changes (new minus old), drawn as rank moves: ▲ green = better (a lower number). */
+    rankDelta: boolean[];
     /** Column that gets heat bars (a ranked count), or -1. */
     barCol: number;
     barMax: number;
@@ -225,7 +235,7 @@ export function analyzeTable(header: string[], rows: string[][]): TableShape {
     const numeric: boolean[] = [];
     const delta: boolean[] = [];
     const betterDown: boolean[] = [];
-    const neutralDelta: boolean[] = [];
+    const rankDelta: boolean[] = [];
     for (let c = 0; c < cols; c++) {
         const cells = rows.map((r) => (r[c] ?? '').trim()).filter((v) => v && !/^[–—-]$|^n\/?a$/i.test(v));
         const nums = cells.filter((v) => parseNumber(v) !== null);
@@ -235,7 +245,7 @@ export function analyzeTable(header: string[], rows: string[][]): TableShape {
         // A bare "vs before" / "Change" is about the column before it ("Position", "vs before").
         const subject = CHANGE_HEADER.test(header[c]) && !METRIC_WORD.test(header[c]) && c > 0 ? `${header[c - 1]} ${header[c]}` : header[c];
         betterDown[c] = betterDownFor(subject);
-        neutralDelta[c] = ambiguousChange(subject) && !cells.some((v) => /%/.test(v));
+        rankDelta[c] = rankChange(subject) && !cells.some((v) => /%/.test(v));
     }
 
     const timeSeries = rows.length >= 4 && rows.filter((r) => DATE_RE.test((r[0] ?? '').trim())).length >= rows.length - 1;
@@ -261,7 +271,7 @@ export function analyzeTable(header: string[], rows: string[][]): TableShape {
     const seriesCol = timeSeries ? candidates[0] ?? numeric.findIndex((n, c) => n && !delta[c]) : -1;
 
     return {
-        numeric, delta, betterDown, neutralDelta,
+        numeric, delta, betterDown, rankDelta,
         barCol, barMax, barMetric: barCol >= 0 ? metricForLabel(header[barCol]) : null,
         timeSeries: timeSeries && seriesCol > 0, seriesCol,
     };

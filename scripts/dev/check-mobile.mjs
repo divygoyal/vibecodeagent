@@ -3,7 +3,8 @@
  * Mobile layout audit: every page route at phone widths, with touch, in light
  * (and dark for /dashboard routes). Finds what a phone user would hit:
  *
- *   overflow     the page scrolls sideways (documentElement.scrollWidth > innerWidth)
+ *   overflow     the page scrolls sideways (documentElement.scrollWidth > the phone's width; not innerWidth, which
+ *                a mobile browser widens to fit content that is too wide, hiding the problem)
  *   offscreen    elements whose box goes past the viewport edge (outermost only; elements
  *                inside a horizontal scroll container are skipped, they are meant to scroll)
  *   clipped      text or controls cut by an overflow:hidden ancestor (straddling its edge)
@@ -123,8 +124,10 @@ const isApp = (p) => p === '/dashboard' || p.startsWith('/dashboard/');
 
 // ---------------------------------------------------------------- in-page audit
 /* eslint-disable no-undef */
-function pageAudit() {
-    const vw = window.innerWidth;
+function pageAudit(screenWidth) {
+    // A phone widens the layout viewport (innerWidth) to fit content that is too wide, so measure against the
+    // width the page was asked to fit (round 5 Ask demo: innerWidth 524 on a 390 phone, nothing flagged).
+    const vw = Math.min(window.innerWidth, screenWidth || window.innerWidth);
     const vh = window.innerHeight;
     const doc = document.documentElement;
     window.__mcSeq = window.__mcSeq || 0;
@@ -468,7 +471,7 @@ async function visit(context, route, theme) {
         await withTimeout(page.evaluate(() => window.scrollTo(0, 0)), 10_000);
         let w;
         try {
-            w = await deadline(page.evaluate(pageAudit), 60_000, 'audit');
+            w = await deadline(page.evaluate(pageAudit, width), 60_000, 'audit');
         } catch (err) {
             res.widths[width] = { auditError: err.message.split('\n')[0] };
             continue;

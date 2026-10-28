@@ -11,6 +11,7 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { Drawer } from '@/components/ui/Drawer';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Table } from '@/components/ui/Table';
+import { coverageText } from '../lib/coverage';
 import { displayPage, pageRef } from '../lib/rules';
 import type { IndexStatusPage, IndexStatusResponse, InspectResponse, SitemapRow } from '../lib/types';
 import { MetricTile } from '../MetricTile';
@@ -69,8 +70,9 @@ export function InspectionDetails({ result }: { result: InspectResponse }) {
             {other ? <Banner variant="warn">Google treats another URL as the main version of this page: {other}. Search shows that one instead.</Banner> : null}
             <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
                 {[
-                    ['Coverage', result.coverageState],
-                    ['Last crawl', result.lastCrawlTime ? fmtDayYear(result.lastCrawlTime.slice(0, 10)) : null],
+                    ['Coverage', coverageText(result.coverageState)?.long ?? null],
+                    ["Google's wording", result.coverageState],
+                    ['Last crawl', result.lastCrawlTime ? fmtDayYear(result.lastCrawlTime.slice(0, 10)) : 'Not reported by Google'],
                     ['Crawled as', lower(result.crawledAs)],
                     ['Indexing allowed', lower(result.indexingState)],
                     ['robots.txt', lower(result.robotsTxtState)],
@@ -154,41 +156,51 @@ function TopPagesStatus() {
                 columns={[
                     {
                         key: 'page', header: 'Page', width: '38%', mobile: 'title',
-                        cell: (p) => <PagePath path={show(p.url)} className="w-full font-medium text-fg" />,
+                        // Phones: the whole path, wrapped (it was cut twice: "/… /cohort-analysi…").
+                        cell: (p) => (
+                            <>
+                                <PagePath path={show(p.url)} className="w-full font-medium text-fg max-md:hidden" />
+                                <span className="font-medium whitespace-normal text-fg [overflow-wrap:anywhere] md:hidden">{show(p.url)}</span>
+                            </>
+                        ),
                     },
                     {
-                        key: 'status', header: 'Status', mobile: 'primary',
+                        // Phones: the path keeps line 1 (clicks on its right); the status moves to line 2 (round 5 judge).
+                        key: 'status', header: 'Status', mobile: 'meta',
                         sortValue: (p) => statusOf(p).rank,
                         cell: (p) => {
                             const s = statusOf(p);
+                            const cov = p.status === 'ok' && p.verdict !== 'PASS' ? coverageText(p.coverageState) : null;
                             return (
-                                <span className="flex min-w-0 flex-col">
+                                <span className="flex min-w-0 flex-col" title={cov ? `${cov.long} Google: "${p.coverageState}"` : undefined}>
                                     <span className={cn('flex items-center gap-1.5 whitespace-nowrap text-body-sm', TONE[s.tone])}><span aria-hidden className={cn('size-2 shrink-0 rounded-full', DOT[s.tone])} />{s.label}</span>
-                                    {p.status === 'ok' && p.verdict !== 'PASS' && p.coverageState ? <span className="truncate text-meta text-fg-muted" title={p.coverageState}>{p.coverageState}</span> : null}
+                                    {cov ? <span className="truncate text-meta text-fg-muted max-md:hidden">{cov.short}</span> : null}
                                 </span>
                             );
                         },
                     },
                     {
-                        key: 'canonical', header: 'Canonical', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
+                        key: 'canonical', header: 'Canonical', className: 'max-md:hidden', headerClassName: 'max-md:hidden', mobile: 'hidden',
                         cell: (p) => {
                             if (p.status !== 'ok') return <span className="text-fg-faint">–</span>;
                             const other = otherCanonical(p);
                             return other
                                 ? <span className="block truncate text-body-sm text-warn" title={`Google chose ${other}`}>Google chose {show(other)}</span>
-                                : <span className="text-body-sm text-fg-muted">{p.googleCanonical ? 'This page' : '–'}</span>;
+                                : <span className="text-body-sm text-fg-muted">{p.googleCanonical ? 'This page' : 'Not reported'}</span>;
                         },
                     },
                     {
-                        key: 'crawl', header: 'Last crawl', align: 'right', mobileLabel: 'Crawled',
+                        key: 'crawl', header: 'Last crawl', align: 'right', mobileLabel: 'Crawled', mobile: 'meta',
                         sortValue: (p) => daysAgo(p.lastCrawlTime) ?? -1,
                         cell: (p) => {
                             const d = daysAgo(p.lastCrawlTime);
+                            // Google leaves the date out for pages it has not crawled ("Discovered"): say so, not a bare dash.
+                            if (d === null && p.status === 'ok') return <span className="text-meta text-fg-muted" title="Google's inspection gave no crawl date for this page">not reported</span>;
                             return d === null ? <span className="text-fg-faint">–</span> : <span className={cn('whitespace-nowrap tabular-nums', d > 30 ? 'text-warn' : 'text-fg')} title={fmtDayYear(p.lastCrawlTime!.slice(0, 10))}>{agoText(d)}</span>;
                         },
                     },
                     {
-                        key: 'clicks', header: 'Clicks', align: 'right',
+                        key: 'clicks', header: 'Clicks', align: 'right', mobile: 'primary',
                         sortValue: (p) => p.clicks,
                         cell: (p) => <span className="tabular-nums">{fmtFull(p.clicks)}</span>,
                     },

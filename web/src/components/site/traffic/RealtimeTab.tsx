@@ -152,8 +152,14 @@ export function TrafficRealtimeTab() {
                     tabs={[
                         {
                             value: 'pages', label: 'Pages',
-                            content: <BarList items={(d?.pages ?? []).map((r) => ({ key: r.name, label: r.name, text: r.name, value: r.users }))} metric="users" valueHeader="Active users" limit={8} loading={!d} labelHeader="Page" viewAllTitle="Live pages"
-                                empty={<EmptyState variant="inline" title="Nobody on the site right now" />} />,
+                            content: (
+                                <>
+                                    <BarList items={(d?.pages ?? []).map((r) => ({ key: r.name, label: r.name, text: r.name, value: r.users }))} metric="users" valueHeader="Active users" limit={8} loading={!d} labelHeader="Page" viewAllTitle="Live pages"
+                                        empty={<EmptyState variant="inline" title="Nobody on the site right now" />} />
+                                    {/* Users per page are not a split of the total: one visitor can open several pages in 30 minutes. */}
+                                    {d && d.pages.length > 1 ? <p className="mt-2 text-meta text-fg-muted">Active users per page. One visitor can view several pages, so these can add up to more than the {fmtFull(d.activeUsers)} on the site.</p> : null}
+                                </>
+                            ),
                         },
                         {
                             value: 'countries', label: 'Countries',

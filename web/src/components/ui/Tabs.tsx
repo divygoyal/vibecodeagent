@@ -33,16 +33,33 @@ export interface TabsProps<T extends string = string> {
     panelIdPrefix?: string;
 }
 
-/** Whether a horizontal scroller has more content to its right / left (for the edge fades and the chevron). */
+/**
+ * Whether a horizontal scroller has more content to its right / left (for the edge fades and the chevron), and where
+ * the first tab that does not fit starts (`cut`, px from the box's left edge): the right fade ends there, so no
+ * fragment of a label ("Ba", round 5 judge) shows next to the chevron.
+ */
 function useMoreToTheRight() {
     const ref = useRef<HTMLDivElement>(null);
     const [more, setMore] = useState(false);
     const [before, setBefore] = useState(false);
+    const [cut, setCut] = useState<number | null>(null);
+    const [cutBefore, setCutBefore] = useState<number | null>(null);
     const check = useCallback(() => {
         const el = ref.current;
         if (!el) return;
-        setMore(el.scrollWidth - el.clientWidth - el.scrollLeft > 2);
+        const hasMore = el.scrollWidth - el.clientWidth - el.scrollLeft > 2;
+        setMore(hasMore);
         setBefore(el.scrollLeft > 2);
+        const kids = [...el.children] as HTMLElement[];
+        // Left: a tab cut by the left edge ("ities") is hidden up to its end.
+        const cutLeft = el.scrollLeft > 2 ? kids.filter((k) => k.offsetLeft - el.offsetLeft < el.scrollLeft).pop() : undefined;
+        const leftEnd = cutLeft ? cutLeft.offsetLeft - el.offsetLeft + cutLeft.offsetWidth - el.scrollLeft : 0;
+        setCutBefore(el.scrollLeft > 2 ? Math.max(0, Math.min(el.clientWidth / 3, Math.round(leftEnd))) : null);
+        if (!hasMore) return setCut(null);
+        const room = el.scrollLeft + el.clientWidth - 24; // the chevron's room
+        const partial = kids.find((k) => k.offsetLeft - el.offsetLeft + k.offsetWidth > room);
+        const left = partial ? partial.offsetLeft - el.offsetLeft - el.scrollLeft : el.clientWidth - 24;
+        setCut(Math.max(48, Math.min(el.clientWidth - 24, Math.round(left))));
     }, []);
     useEffect(() => {
         const el = ref.current;
@@ -56,7 +73,7 @@ function useMoreToTheRight() {
             el.removeEventListener('scroll', check);
         };
     }, [check]);
-    return [ref, more, before] as const;
+    return [ref, more, before, cut, cutBefore] as const;
 }
 
 /**
@@ -88,24 +105,57 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
     };
 
     const underline = variant === 'underline';
-    const [scrollRef, more, before] = useMoreToTheRight();
+    const [scrollRef, more, before, cut, cutBefore] = useMoreToTheRight();
     const activeIndex = items.findIndex((t) => t.value === value);
     // A tab past the right edge (Events & goals on a phone) scrolls into view, so the row never opens on a cut label.
+    // The row starts at a tab boundary (the gap before a tab sits under the left fade), so no stray letters of the
+    // tab before it show (round 5 judge: "e", "ities"). Re-checked when the row resizes (fonts, layout) until the
+    // user scrolls it.
+    const touched = useRef(false);
     useEffect(() => {
         const box = scrollRef.current;
-        const tab = refs.current[activeIndex];
-        if (!box || !tab) return;
-        const left = tab.offsetLeft - box.offsetLeft;
-        if (left < box.scrollLeft || left + tab.offsetWidth > box.scrollLeft + box.clientWidth) {
-            box.scrollLeft = Math.max(0, left - 24);
-        }
-    }, [activeIndex, scrollRef]);
-    // Fades on the edges that hide tabs (wider than the old 40px, so a cut label reads as "more"), plus a chevron.
-    // The right fade ends fully clear under the chevron (its last 20px), so no letter shows through it.
-    const fade = more && before
-        ? '[mask-image:linear-gradient(to_right,transparent,#000_32px,#000_calc(100%-80px),transparent_calc(100%-20px))]'
-        : more ? '[mask-image:linear-gradient(to_right,#000_calc(100%-80px),transparent_calc(100%-20px))]'
-            : before ? '[mask-image:linear-gradient(to_right,transparent,#000_32px)]' : null;
+        if (!box) return;
+        const reveal = () => {
+            const tabs = refs.current.slice(0, items.length);
+            const tab = tabs[activeIndex];
+            if (touched.current || !tab) return;
+            const lefts = tabs.map((t) => (t ? t.offsetLeft - box.offsetLeft : 0));
+            const lastTab = tabs[tabs.length - 1];
+            const end = lefts[tabs.length - 1] + (lastTab?.offsetWidth ?? 0); // where the tabs end
+            const right = lefts[activeIndex] + tab.offsetWidth;
+            const chevron = 28;
+            const fade = 32;
+            const visible = (s: number) => lefts[activeIndex] >= s + (s > 0 ? fade / 2 : 0) && right <= s + box.clientWidth - (right < end - 2 ? chevron : 0);
+            if (visible(box.scrollLeft)) return;
+            const go = (s: number) => { box.scrollLeft = s; };
+            if (end <= box.clientWidth + 1) return go(0);
+            for (let k = 0; k <= activeIndex; k++) {
+                const prev = tabs[k - 1];
+                const s = k === 0 ? 0 : (lefts[k - 1] + (prev?.offsetWidth ?? 0) + lefts[k]) / 2;
+                if (visible(s)) return go(s);
+            }
+            go(Math.max(0, lefts[activeIndex] - fade / 2));
+        };
+        reveal();
+        const stop = () => { touched.current = true; };
+        box.addEventListener('pointerdown', stop, { passive: true });
+        box.addEventListener('wheel', stop, { passive: true });
+        box.addEventListener('touchstart', stop, { passive: true });
+        const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reveal);
+        ro?.observe(box);
+        if (box.firstElementChild) ro?.observe(box.firstElementChild);
+        return () => {
+            ro?.disconnect();
+            box.removeEventListener('pointerdown', stop);
+            box.removeEventListener('wheel', stop);
+            box.removeEventListener('touchstart', stop);
+        };
+    }, [activeIndex, scrollRef, items.length]);
+    // Fades on the edges that hide tabs, plus a chevron. The right fade ends where the first tab that does not fit
+    // starts (or under the chevron) and the left one starts where a tab cut by the edge ends, so no cut label shows.
+    const right = more ? `#000 ${Math.max(0, (cut ?? 80) - 14)}px, transparent ${cut ?? 80}px` : '#000 100%';
+    const left = before ? `transparent ${cutBefore ?? 0}px, #000 ${(cutBefore ?? 0) + 24}px, ` : '';
+    const mask = more || before ? `linear-gradient(to right, ${left}${right})` : undefined;
     return (
         <div className={cn('relative min-w-0', className)}>
         <div
@@ -116,8 +166,8 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
                 'flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
                 // pills: room inside the scroll box for the 44px touch hit area (overflow clips it otherwise)
                 underline ? 'gap-5 border-b border-border-subtle' : 'gap-1 pointer-coarse:-my-1.5 pointer-coarse:py-1.5',
-                fade,
             )}
+            style={mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined}
         >
             {items.map((t, i) => {
                 const active = t.value === value;

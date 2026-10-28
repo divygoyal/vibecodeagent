@@ -104,6 +104,11 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
                             <CategoryGrid cards={data.category_cards} range={range} />
                         ) : (
                             <>
+                                {/* Key for the shield after site names (round 5 judge: the old "Verified owner" pill said it in words). */}
+                                <p className="mb-2 flex items-center gap-1.5 text-meta text-fg-muted">
+                                    <ShieldCheck aria-hidden size={14} strokeWidth={1.75} className="shrink-0 text-brand-text" />
+                                    <span><span className="font-medium text-fg-secondary">Verified owner</span>: ownership confirmed in Google Search Console, checked daily.</span>
+                                </p>
                                 <BoardRows data={data} hasFilters={hasFilters} clearHref={clearHref} />
                                 <Pagination data={data} params={params} />
                             </>

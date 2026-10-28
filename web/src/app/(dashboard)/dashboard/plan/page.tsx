@@ -229,13 +229,27 @@ function UsageCard({ current, credits, renewal, cancelled, onCancel }: {
                     aria-valuemax={b?.allowance ?? 0}
                     aria-valuenow={b?.fromPlan ?? 0}
                     aria-valuetext={b ? `${b.fromPlan} of ${b.allowance}${b.bonus ? `, plus ${b.bonus} bonus` : ''}` : undefined}
-                    className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-subtle"
+                    className="mt-3 flex h-1.5 w-full gap-0.5 overflow-hidden rounded-full bg-subtle"
                 >
-                    <span
-                        className={cn('block h-full rounded-full transition-[width] duration-300', level === 'out' ? 'bg-down' : level === 'low' ? 'bg-warn' : 'bg-brand')}
-                        style={{ width: `${b?.pct ?? 0}%` }}
-                    />
+                    {b && b.bonus > 0 ? (
+                        // Plan part and bonus side by side on one scale, so "100 + 200 bonus" is not one full bar.
+                        <>
+                            <span className="block h-full rounded-full bg-brand transition-[width] duration-300" style={{ width: `${(b.fromPlan / (b.allowance + b.bonus)) * 100}%` }} />
+                            <span className="block h-full rounded-full bg-brand/40 transition-[width] duration-300" style={{ width: `${(b.bonus / (b.allowance + b.bonus)) * 100}%` }} />
+                        </>
+                    ) : (
+                        <span
+                            className={cn('block h-full rounded-full transition-[width] duration-300', level === 'out' ? 'bg-down' : level === 'low' ? 'bg-warn' : 'bg-brand')}
+                            style={{ width: `${b?.pct ?? 0}%` }}
+                        />
+                    )}
                 </div>
+                {b && b.bonus > 0 ? (
+                    <p aria-hidden className="mt-1.5 flex flex-wrap gap-x-4 text-meta text-fg-muted">
+                        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-brand" />{current.label} messages</span>
+                        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-brand/40" />Bonus</span>
+                    </p>
+                ) : null}
                 <p className="mt-3 flex items-start gap-2 text-body-sm text-fg-muted">
                     <Plug aria-hidden size={14} className="mt-0.5 shrink-0" />
                     <span>
@@ -289,7 +303,8 @@ function PlanCard({ def, current, email, cancelled, renewal, onDowngradeToFree }
         <Card
             as="article"
             aria-label={`${def.label} plan`}
-            className={cn('flex flex-col', isCurrent ? 'border-brand ring-1 ring-brand' : undefined)}
+            // Phones: the current plan first (the cards stack; it came last, below Free and Growth).
+            className={cn('flex flex-col', isCurrent ? 'border-brand ring-1 ring-brand max-md:order-first' : undefined)}
         >
             <div className="flex items-center justify-between gap-2">
                 <h3 className="text-title text-fg">{def.label}</h3>

@@ -43,6 +43,10 @@ test('parseDelta: signs, unicode minus, polarity, flat and ambiguous', () => {
     assert.equal(parseDelta('12%'), null, 'unsigned is a value, not a change');
     assert.equal(parseDelta('+342'), null, 'bare numbers only in change columns');
     assert.equal(parseDelta('+1.6', { bare: true, neutral: true }).tone, 'neutral');
+    // Position changes (new minus old), the app's MetricDelta convention: ▲ green = better (a lower number).
+    assert.deepEqual(parseDelta('+1.6', { bare: true, rank: true }), { direction: 'down', tone: 'bad', text: '1.6', spoken: 'worse by 1.6' });
+    assert.deepEqual(parseDelta('−0.3', { bare: true, rank: true }), { direction: 'up', tone: 'good', text: '0.3', spoken: 'improved 0.3' });
+    assert.equal(parseDelta('0.0', { bare: true, rank: true }).direction, 'flat');
     assert.equal(parseNumber('1,551'), 1551);
     assert.equal(parseNumber('12.4K'), 12400);
     assert.equal(parseNumber('–'), null);
@@ -65,7 +69,8 @@ test('analyzeTable: numbers right, changes coloured, bars on the ranked count, s
     assert.equal(queries.betterDown[4], true);
     const pos = analyzeTable(['Query', 'Position', 'vs before'], [['a', '4.8', '+1.6'], ['b', '6.1', '−0.4'], ['c', '9.0', '+2.0']]);
     assert.equal(pos.delta[2], true);
-    assert.equal(pos.neutralDelta[2], true, 'a position change has no clear good direction');
+    assert.equal(pos.rankDelta[2], true, 'a position change is drawn as a rank move');
+    assert.equal(movers.rankDelta.some(Boolean), false);
     const weeks = analyzeTable(['Week', 'Clicks', 'Change'], [['Sep 29', '1,240', '–'], ['Oct 6', '1,310', '+6%'], ['Oct 13', '1,402', '+7%'], ['Oct 20', '1,612', '+15%']]);
     assert.equal(weeks.timeSeries, true);
     assert.equal(weeks.seriesCol, 1);
