@@ -81,8 +81,9 @@ test('every row builds from the app code on sample data, without the network', a
         const row = kpi.parts.total.rows[0];
         assert.equal(row['m:ga4:sessions'], live.site.traffic.totals.sessions);
         assert.equal(row['m:ga4:activeUsers'], live.site.traffic.totals.users);
-        // Search Console: the same days; the one-report total may differ from the sum of days by a click (rounding).
-        assert.ok(Math.abs(Number(row['m:gsc:clicks']) - live.site.search.totals.clicks) <= 2);
+        // Search Console: the same days and the same clicks (the demo's one-report total is the sum of its days).
+        assert.equal(row['m:gsc:clicks'], live.site.search.totals.clicks);
+        assert.equal(row['m:gsc:clicks'], card.search!.cur.clicks);
     }
 
     assert.deepEqual(calls, [], 'no call left the sample scope');
