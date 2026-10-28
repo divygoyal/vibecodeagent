@@ -50,7 +50,7 @@ export function OpportunitiesTab() {
     // A month = 28 days, as on Actions ("+7,681 clicks a month"), whatever the range.
     const monthly = (r: OpportunityRow) => per28(r.potentialClicks, searchDays);
     const sum = (list: OpportunityRow[]) => list.reduce((a, r) => a + monthly(r), 0);
-    const target = fmtPercent(expectedCtr(STRIKING_TARGET), { tile: true });
+    const target = fmtPercent(expectedCtr(STRIKING_TARGET), { axis: true });
     if (q.state === 'error') return <LoadError error={q.error} onRetry={q.mutate} />;
     return (
         <div className="flex flex-col gap-4">
@@ -147,7 +147,7 @@ export function CannibalizationTab() {
                                             <span aria-hidden className="absolute inset-y-0 left-0 heatbar-impressions" style={{ width: `${Math.max(1, p.share * 100)}%` }} />
                                             <span className="relative flex items-center justify-between gap-3 px-2.5 py-1.5 text-body-sm">
                                                 <span className="min-w-0 truncate text-fg" title={p.page}>{displayPage(pageRef(p.page), site.siteHost)}</span>
-                                                <span className="shrink-0 text-fg-secondary tabular-nums">{fmtPercent(p.share, { tile: true })} · pos {fmtPosition(p.position)}</span>
+                                                <span className="shrink-0 text-fg-secondary tabular-nums">{fmtPercent(p.share, { axis: true })} · pos {fmtPosition(p.position)}</span>
                                             </span>
                                         </li>
                                     ))}
@@ -155,7 +155,7 @@ export function CannibalizationTab() {
                             </div>
                             <div className="flex items-center gap-2 border-t border-border-subtle bg-surface-sunken/60 px-4 py-2">
                                 <AskButton size="sm" variant="ghost" from="seo:cannibalization" label="Ask AI which page to keep"
-                                    prompt={`On ${site.siteHost ?? site.label}, ${c.pages.length} pages compete for "${c.query}": ${c.pages.slice(0, 4).map((p) => `${displayPage(pageRef(p.page), site.siteHost)} (${fmtPercent(p.share, { tile: true })} of impressions, position ${fmtPosition(p.position)})`).join(', ')}. Which page should I keep and what should I do with the others?`}
+                                    prompt={`On ${site.siteHost ?? site.label}, ${c.pages.length} pages compete for "${c.query}": ${c.pages.slice(0, 4).map((p) => `${displayPage(pageRef(p.page), site.siteHost)} (${fmtPercent(p.share, { axis: true })} of impressions, position ${fmtPosition(p.position)})`).join(', ')}. Which page should I keep and what should I do with the others?`}
                                     site={{ ga4: site.ga4, gsc: site.gsc }} />
                             </div>
                         </Card>

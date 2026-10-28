@@ -43,9 +43,9 @@ test('parseDelta: signs, unicode minus, polarity, flat and ambiguous', () => {
     assert.equal(parseDelta('12%'), null, 'unsigned is a value, not a change');
     assert.equal(parseDelta('+342'), null, 'bare numbers only in change columns');
     assert.equal(parseDelta('+1.6', { bare: true, neutral: true }).tone, 'neutral');
-    // Position changes (new minus old), the app's MetricDelta convention: ▲ green = better (a lower number).
-    assert.deepEqual(parseDelta('+1.6', { bare: true, rank: true }), { direction: 'down', tone: 'bad', text: '1.6', spoken: 'worse by 1.6' });
-    assert.deepEqual(parseDelta('−0.3', { bare: true, rank: true }), { direction: 'up', tone: 'good', text: '0.3', spoken: 'improved 0.3' });
+    // Position changes (new minus old), the app's MetricDelta convention (r10): the arrow is where the number moved, the colour says better or worse.
+    assert.deepEqual(parseDelta('+1.6', { bare: true, rank: true }), { direction: 'up', tone: 'bad', text: '1.6', spoken: 'worse by 1.6' });
+    assert.deepEqual(parseDelta('−0.3', { bare: true, rank: true }), { direction: 'down', tone: 'good', text: '0.3', spoken: 'improved 0.3' });
     assert.equal(parseDelta('0.0', { bare: true, rank: true }).direction, 'flat');
     assert.equal(parseNumber('1,551'), 1551);
     assert.equal(parseNumber('12.4K'), 12400);

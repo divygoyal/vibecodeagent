@@ -4,7 +4,7 @@ import { Info } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { MetricDelta, Skeleton, Tooltip } from '@/components/ui';
 import { Sparkline } from '@/components/charts';
-import { getMetric, metricColor, metricLabel, fmtMetricValue } from '@/lib/builder/catalog';
+import { getMetric, metricColor, metricLabel, fmtMetricValue, fmtMetricPair } from '@/lib/builder/catalog';
 import { compareText, compareTail, type CompareText } from '@/lib/builder/compare';
 import { widgetCompareText } from '@/lib/builder/widgetDates';
 import { DateChip } from './DateChip';
@@ -37,6 +37,9 @@ function Tile({ m, total, spark, showDelta, showSpark, sparkHeight, big, cmp, cu
     const values = spark?.rows.map((r) => (typeof r[`m:${m.id}`] === 'number' ? (r[`m:${m.id}`] as number) : null)) ?? [];
     const dates = spark?.rows.map((r) => String(r['d:date'] ?? '')) ?? [];
     const label = m.label || metricLabel(m.id);
+    // The value and the "vs …" figure are written together: never "65% vs 65%" with a change between them, and the
+    // delta chip (lib/format computeDelta) takes the same decimals.
+    const pair = fmtMetricPair(m.id, value, showDelta && typeof prev === 'number' ? prev : null, { compact: true, tile: true, currency, format: m.format });
     return (
         <div className="@container/tile flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex min-w-0 items-center gap-2">
@@ -51,14 +54,14 @@ function Tile({ m, total, spark, showDelta, showSpark, sparkHeight, big, cmp, cu
             </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className={cn('text-fg', big ? 'text-stat-lg' : 'text-stat')} title={missing ? 'No source for this metric' : undefined}>
-                    {missing ? '–' : fmtMetricValue(m.id, value, { compact: true, tile: true, currency, format: m.format })}
+                    {missing ? '–' : pair.value}
                 </span>
                 {showDelta && prev !== undefined && !missing ? (
-                    <MetricDelta current={value} previous={prev} format={dsFormat(m.id)} better={metricBetter(m.id)} variant="chip" comparisonLabel={cmp.short ? cmp.short.replace(/^vs /, 'versus ') : undefined} />
+                    <MetricDelta current={value} previous={prev} format={dsFormat(m.id)} better={metricBetter(m.id)} decimals={pair.deltaDecimals} variant="chip" comparisonLabel={cmp.short ? cmp.short.replace(/^vs /, 'versus ') : undefined} />
                 ) : null}
             </div>
             {showDelta && compareLine && prev !== undefined && cmp.short && !missing ? (
-                <p title={cmp.title} className={cn('text-meta text-fg-muted', wrapCompare ? 'line-clamp-2' : 'truncate')}>vs {fmtMetricValue(m.id, prev, { compact: true, tile: true, currency })} {compareTail(cmp)}</p>
+                <p title={cmp.title} className={cn('text-meta text-fg-muted', wrapCompare ? 'line-clamp-2' : 'truncate')}>vs {typeof prev === 'number' ? pair.previous : fmtMetricValue(m.id, prev, { compact: true, tile: true, currency, format: m.format })} {compareTail(cmp)}</p>
             ) : null}
             {showSpark && values.length > 1 && !missing ? (
                 <div className="mt-auto pt-1">

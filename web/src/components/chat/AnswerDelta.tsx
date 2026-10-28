@@ -8,7 +8,7 @@ const TONE_TEXT = { good: 'text-up', bad: 'text-down', neutral: 'text-fg-muted' 
 export function AnswerDelta({ delta, className }: { delta: DeltaText; className?: string }) {
     const value = delta.text.replace(/^[+−]/, '');
     const spoken = delta.spoken ?? (delta.direction === 'flat' ? `no change, ${value}` : `${delta.direction} ${value}`);
-    // Position changes say what the arrow means (▲ = a better, lower position), like MetricDelta's tooltip.
+    // Position changes say what the colour means (a rising number is a worse position), like MetricDelta's tooltip.
     const title = delta.spoken ? `Position ${delta.spoken} (lower is better)` : undefined;
     return (
         <span title={title} className={cn('inline-flex items-center gap-0.5 font-semibold tabular-nums whitespace-nowrap', TONE_TEXT[delta.tone], className)}>

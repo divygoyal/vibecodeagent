@@ -106,9 +106,9 @@ function fmtCell(n: number): string {
     return Math.abs(n) < 1_000_000 ? fmtFull(n) : fmtCompact(n);
 }
 
-function fmtOverview(format: OverviewFormat, value: number | null | undefined, opts: { compact?: boolean } = {}) {
+function fmtOverview(format: OverviewFormat, value: number | null | undefined, opts: { compact?: boolean; axis?: boolean } = {}) {
     if (value === null || value === undefined || !Number.isFinite(value)) return '–';
-    if (format === 'percent') return fmtPercent(value / 100, { tile: opts.compact });
+    if (format === 'percent') return fmtPercent(value / 100, { tile: opts.compact, axis: opts.axis });
     if (format === 'duration') return fmtDuration(value);
     if (format === 'decimal') return value.toFixed(2);
     return opts.compact ? fmtCompact(value) : fmtFull(value);
@@ -651,7 +651,7 @@ function OverviewChart({ data, metric, interval, partialFrom, height = 260 }: { 
         }),
         [data, metric.key, p],
     );
-    const yFmt = (v: number) => (metric.format === 'count' ? fmtAxis(v) : metric.format === 'decimal' ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : fmtOverview(metric.format, v, { compact: true }));
+    const yFmt = (v: number) => (metric.format === 'count' ? fmtAxis(v) : metric.format === 'decimal' ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : fmtOverview(metric.format, v, { compact: true, axis: true }));
     // The app's axis rules (components/charts/axis.ts, round 4 audit #6): round steps (0 / 1K / 2K / 3K)
     // and evenly spaced dates anchored on the last day, thinned to the plot width.
     const [figRef, figW] = useBoxWidth<HTMLElement>();

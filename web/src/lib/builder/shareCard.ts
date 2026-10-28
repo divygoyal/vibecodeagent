@@ -4,7 +4,7 @@
  * (scorecards and KPI strips of the first visible page). Pure: no Google, no network, no React, so tests feed it canned
  * results. The server loader (server/shareCard.ts) runs the query and caches.
  */
-import { fmtMetricValue, getMetric, isCalcMetric, metricDeltaFor, metricLabel } from './catalog';
+import { fmtMetricPair, getMetric, isCalcMetric, metricDeltaFor, metricLabel } from './catalog';
 import { presetLabel } from './dates';
 import type { ControlState, DashboardDocV2, DashboardQueryResponse, WidgetResultOk } from './types';
 
@@ -88,8 +88,8 @@ export function shareCardNumbers(doc: Pick<DashboardDocV2, 'pages' | 'widgets'>,
             if (typeof raw !== 'number' || !Number.isFinite(raw)) continue;
             // A metric whose Google product the source lacks shows "–" in the dashboard: not on a share card.
             if (ok.flags.missingFamilies?.includes(m.id.split(':')[0] as 'ga4' | 'gsc')) continue;
-            const kpi: ShareCardKpi = { label: m.label || metricLabel(m.id), value: fmtMetricValue(m.id, raw, { compact: true, tile: true, currency: ok.flags.currency, format: m.format }) };
             const prev = row[`m:${m.id}:prev`];
+            const kpi: ShareCardKpi = { label: m.label || metricLabel(m.id), value: fmtMetricPair(m.id, raw, showDelta && typeof prev === 'number' ? prev : null, { compact: true, tile: true, currency: ok.flags.currency, format: m.format }).value };
             if (showDelta && prev !== undefined) {
                 const d = metricDeltaFor(m.id, raw, typeof prev === 'number' ? prev : null);
                 if (d.state === 'change' || d.state === 'flat') kpi.delta = { text: d.text, dir: d.direction, tone: d.tone };
