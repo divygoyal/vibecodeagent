@@ -127,7 +127,7 @@ test('compile: the widget\'s search type reaches every query; web, Analytics and
     assert.equal(tableTrendQuery(t, rq, rows, { start: '2026-09-28', end: '2026-10-25' })?.query.searchType, 'video', 'the trend column reads the same search type');
 });
 
-test('compile: the switcher moves Search Console widgets in scope; a control left on Web keeps each widget\'s own type', () => {
+test('compile: the switcher moves Search Console widgets left on Web; a widget with its own non-web type keeps it', () => {
     const own = gscSeries('w1', ['gsc:clicks'], 'video');
     const plain = gscSeries('w2');
     const ga = gaSeries('w3');
@@ -135,13 +135,17 @@ test('compile: the switcher moves Search Console widgets in scope; a control lef
     // No pick, default Web: widgets keep their own.
     assert.equal(applyViewerControls(own, ctxOf(base(), defs)).searchType, 'video');
     assert.equal(applyViewerControls(plain, ctxOf(base(), defs)).searchType, undefined);
-    // A pick moves every eligible widget, including one that had its own type; Analytics widgets are untouched.
+    // A pick moves every eligible widget left on Web; a widget with its own non-web type keeps it (its title
+    // would contradict the data otherwise); Analytics widgets are untouched.
     const picked = base({ searchType: { t1: 'discover' } });
-    assert.equal(applyViewerControls(own, ctxOf(picked, defs)).searchType, 'discover');
+    assert.equal(applyViewerControls(own, ctxOf(picked, defs)).searchType, 'video', 'own search type wins over the page control');
+    assert.equal(applyViewerControls(own, ctxOf(base({ searchType: { t1: 'web' } }), defs)).searchType, 'video');
+    assert.equal(compileWidget(own, ctxOf(picked, defs)).queries[0].searchType, 'video');
+    assert.equal(applyViewerControls({ ...own, searchType: 'web' } as Series, ctxOf(picked, defs)).searchType, 'discover', 'an explicit web widget follows the control');
     assert.equal(applyViewerControls(plain, ctxOf(picked, defs)).searchType, 'discover');
     assert.equal(applyViewerControls(ga, ctxOf(picked, defs)).searchType, undefined);
     assert.equal(applyViewerControls(gscSeries('m', ['gsc:clicks', 'ga4:sessions']), ctxOf(picked, defs)).searchType, undefined, 'mixed widgets stay');
-    // Picking Web back (a control that starts elsewhere) overrides a widget's own type.
+    // Picking Web back (a control that starts elsewhere) overrides a Web widget's default.
     const startsOnImage = [typeCtl({ default: 'image' })];
     assert.equal(applyViewerControls(plain, ctxOf(base(), startsOnImage)).searchType, 'image');
     assert.equal(applyViewerControls(plain, ctxOf(base({ searchType: { t1: 'web' } }), startsOnImage)).searchType, undefined);
