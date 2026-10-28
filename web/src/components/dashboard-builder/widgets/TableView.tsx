@@ -276,7 +276,7 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                         {/* With a change next to the value, a fill would sit behind the change alone and read as its chip
                             (round 5 judge): the bar becomes the app's underline under the value and change instead. */}
                         {/* Phones (round 8 judge): a fill behind a short value is a few pixels wide and read as clipped at the card edge; the underline never is. */}
-                        {pct && ((showDelta && pv !== undefined) || narrow) ? (
+                        {pct && ((showDelta && pv !== undefined) || narrow || props.bp === 'sm') ? (
                             <span aria-hidden className={cn('absolute bottom-0 right-1 h-[3px] rounded-full', metricHeatbar(id))} style={{ width: `${Math.max(pct, 1.5)}%`, ['--tc-heatbar' as string]: '45%' }} />
                         ) : pct ? <span aria-hidden className={cn('absolute inset-y-0.5 right-[-6px] rounded-md', metricHeatbar(id))} style={{ width: `calc(${pct}% + 6px)` }} /> : null}
                         <span className={cf ? `relative tc-cf-cell tc-cf-${cf} font-medium` : 'relative'} title={cf ? (cf === 'good' ? 'Meets a good rule' : cf === 'bad' ? 'Matches a bad rule' : 'Needs attention') : narrow && v !== null ? fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format }) : undefined}>
