@@ -200,6 +200,7 @@ export function GoalsPanel() {
                                 <ChartCard title="Completions per day" height={220} state={g.trend.length ? 'ready' : 'empty'} bare>
                                     <TimeSeriesChart data={g.trend as unknown as Record<string, number | string>[]} series={[{ metric: 'conversions', key: 'conversions', label: 'Goal completions' }]} height={220} partialFrom={partialFrom(g.trend)} ariaLabel={`${current.item.name} completions per day`} />
                                 </ChartCard>
+                                {partialFrom(g.trend) !== undefined ? <p className="-mt-2 text-meta text-fg-muted">Dotted: today, still coming in.</p> : null}
                                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                     <div>
                                         <p className="mb-2 text-body-sm font-medium text-fg">By source</p>
@@ -394,6 +395,7 @@ export function FunnelsTab() {
                                 <ChartCard title="Completions per day" height={220} state={f.trend.length ? 'ready' : 'empty'} bare>
                                     <TimeSeriesChart data={f.trend as unknown as Record<string, number | string>[]} series={[{ metric: 'conversions', key: 'completions', label: 'Completions' }]} height={220} partialFrom={partialFrom(f.trend)} ariaLabel="Funnel completions per day" />
                                 </ChartCard>
+                                {partialFrom(f.trend) !== undefined ? <p className="-mt-2 text-meta text-fg-muted">Dotted: today, still coming in.</p> : null}
                             </div>
                         )}
                     </div>

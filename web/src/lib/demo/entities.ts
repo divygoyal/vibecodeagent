@@ -355,8 +355,9 @@ export function sitePages(site: DemoSite): DemoPage[] {
             l: isHome ? weight * 2.4 : isApp ? weight * 0.25 : /cart|checkout/.test(path) ? weight * 0.05 : weight,
             k: isConv ? weight * 12 : path === '/pricing' ? weight * 2 : weight * 0.25,
             r: /success/.test(path) ? 50 : /checkout/.test(path) ? 5 : 0.02,
-            eng: isApp ? 1.2 : isHome ? 0.9 : 1,
-            dur: isApp ? 1.6 : path.includes('pricing') ? 1.1 : 1,
+            // Each page its own engagement and length (round 5 polish: section pages all read as the site average).
+            eng: isApp ? 1.2 : isHome ? 0.9 : isConv ? 1.12 : 0.86 + 0.26 * unit(site.key, 'seng', path),
+            dur: isApp ? 1.6 : path.includes('pricing') ? 1.1 : isConv ? 1.3 + 0.2 * unit(site.key, 'sdur', path) : 0.82 + 0.32 * unit(site.key, 'sdur', path),
             section: path === '/' ? 'home' : path.split('/')[1] || 'home',
         });
     }
@@ -421,10 +422,14 @@ function pageGroup(site: DemoSite): Group {
 
 function landingGroup(site: DemoSite): Group {
     const pages = sitePages(site);
+    // Key events of sessions that START on the page: its entrances times a conversion lift (round 5 polish: the
+    // page's own key-event share gave a checkout landing page 41 sessions and 249 key events).
+    const lift = (path: string) => (/signup|welcome|thank|success|contact|download|checkout|cart/.test(path) ? 2.2
+        : path === '/pricing' ? 1.8 : path === '/' ? 0.9 : 0.55 + 0.9 * unit(site.key, 'llift', path));
     const entities: Entity[] = pages.map(p => ({
         key: p.path,
         w: p.landing * 0.985,
-        wKey: p.key,
+        wKey: p.landing * lift(p.path),
         vals: { landingPage: p.path, landingPagePlusQueryString: p.path },
         f: { eng: p.eng, dur: p.dur },
     }));

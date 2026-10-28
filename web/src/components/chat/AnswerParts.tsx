@@ -10,6 +10,7 @@ import { area as d3area, curveMonotoneX, line as d3line } from 'd3-shape';
 import { useElementWidth } from '@/components/charts/useElementWidth';
 import { METRICS, type MetricKey } from '@/lib/metrics';
 import { Favicon } from '@/components/ui/Favicon';
+import { useScrollEdges } from '@/components/ui/useScrollEdges';
 import { analyzeTable, metricForLabel, parseDelta, parseNumber, type TableShape } from '@/lib/chat/answerFormat';
 import { AnswerDelta } from './AnswerDelta';
 import { highlightNumbersInChildren } from './HighlightedNumbers';
@@ -134,13 +135,21 @@ function TrendStrip({ info }: { info: TableInfo }) {
     const last = t.values[t.values.length - 1];
     const change = first > 0 ? parseDelta(`${last >= first ? '+' : '−'}${Math.abs(Math.round((last / first - 1) * 100))}%`) : null;
     const fmt = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 1 });
+    // The change is first row to last row; the answer's text may compare other points (the low, a week). Name the
+    // window, and the low when it sits in between, so both readings show on the chart.
+    const lowAt = t.values.indexOf(Math.min(...t.values));
+    const lowInside = lowAt > 0 && lowAt < t.values.length - 1;
     return (
         <figure className="border-b border-border-subtle px-4 pt-3 pb-2">
             <figcaption className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-meta text-fg-muted">
                 <span className="font-medium text-fg-secondary">{t.label}</span>
-                <span className="flex items-center gap-1.5 tabular-nums">
-                    {fmt(first)} → <span className="font-semibold text-fg">{fmt(last)}</span>
-                    {change ? <AnswerDelta delta={change} /> : null}
+                <span className="flex flex-wrap items-center gap-x-1.5 tabular-nums">
+                    <span>{t.labels[0]} to {t.labels[t.labels.length - 1]}:</span>
+                    <span className="flex items-center gap-1.5">
+                        {fmt(first)} → <span className="font-semibold text-fg">{fmt(last)}</span>
+                        {change ? <AnswerDelta delta={change} /> : null}
+                    </span>
+                    {lowInside ? <span>· low {fmt(t.values[lowAt])} ({t.labels[lowAt]})</span> : null}
                 </span>
             </figcaption>
             <TrendLine values={t.values} labels={t.labels} metric={metric} />
@@ -148,20 +157,37 @@ function TrendStrip({ info }: { info: TableInfo }) {
     );
 }
 
-/** Tables: thin rules, muted headers, tabular numbers; scrolls inside the message. */
+/**
+ * Tables: thin rules, muted headers, tabular numbers. Each table scrolls sideways in its own box (`relative`, so the
+ * screen-reader text inside cells cannot widen the page); on phones the first column stays put while the rest
+ * scrolls, and a fade on the right edge says there is more.
+ */
 export function AnswerTable({ node, children }: { node?: unknown; children?: ReactNode }) {
     const info = useMemo(() => tableInfo(node as HastNode | undefined), [node]);
+    const [ref, { more, scrolled }] = useScrollEdges();
     return (
         <TableCtx.Provider value={info}>
-            <div className="my-4 overflow-hidden rounded-card border border-border-subtle bg-surface">
+            <div className="relative my-4 min-w-0 max-w-full overflow-hidden rounded-card border border-border-subtle bg-surface">
                 {info?.trend ? <TrendStrip info={info} /> : null}
-                <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-body-sm tabular-nums">{children}</table>
+                <div className="relative">
+                    <div
+                        ref={ref}
+                        data-scrolled={scrolled ? '' : undefined}
+                        // Keyboard users can scroll a table that is wider than its box.
+                        tabIndex={more || scrolled ? 0 : undefined}
+                        className="group/answer-table relative overflow-x-auto overscroll-x-contain focus-visible:-outline-offset-2"
+                    >
+                        <table className="w-full border-collapse text-body-sm tabular-nums">{children}</table>
+                    </div>
+                    {more ? <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent" /> : null}
                 </div>
             </div>
         </TableCtx.Provider>
     );
 }
+
+/** Phones: the first column (the row's name) stays put while the numbers scroll under it. */
+const STICKY_FIRST = 'max-md:first:sticky max-md:first:left-0 max-md:first:z-[1] max-md:group-data-[scrolled]/answer-table:first:shadow-[inset_-1px_0_0_var(--tc-border-subtle)]';
 
 function useCell(node: unknown): { info: TableInfo | null; col: number } {
     const info = useContext(TableCtx);
@@ -174,7 +200,7 @@ export function AnswerTh({ node, children }: { node?: unknown; children?: ReactN
     const { info, col } = useCell(node);
     const numeric = info && col >= 0 ? info.shape.numeric[col] : false;
     return (
-        <th className={cn('whitespace-nowrap px-3 py-2 text-meta font-medium text-fg-muted first:pl-4 last:pr-4', numeric ? 'text-right' : 'text-left')}>{children}</th>
+        <th className={cn('whitespace-nowrap px-3 py-2 text-meta font-medium text-fg-muted first:pl-4 last:pr-4 max-md:first:bg-surface-sunken', STICKY_FIRST, numeric ? 'text-right' : 'text-left')}>{children}</th>
     );
 }
 
@@ -183,13 +209,14 @@ const UNDERLINE_HEAT = (pct: number) => ({ width: `${Math.max(pct, 1.5)}%`, ['--
 
 export function AnswerTd({ node, children }: { node?: unknown; children?: ReactNode }) {
     const { info, col } = useCell(node);
-    const base = 'px-3 py-2 align-top text-fg first:pl-4 last:pr-4';
+    // Phones: the name column keeps at least 9.5rem (words wrap whole) so about three columns show; the rest scroll.
+    const base = cn('px-3 py-2 align-top text-fg first:pl-4 last:pr-4 max-md:first:min-w-[9.5rem] max-md:first:bg-surface max-md:first:break-words', STICKY_FIRST);
     if (!info || col < 0) return <td className={base}>{highlightNumbersInChildren(children, 'td')}</td>;
     const { shape } = info;
     const text = hastText(node as HastNode).trim();
     const numeric = shape.numeric[col];
     if (shape.delta[col]) {
-        const d = parseDelta(text, { bare: true, betterDown: shape.betterDown[col], neutral: shape.neutralDelta[col] });
+        const d = parseDelta(text, { bare: true, betterDown: shape.betterDown[col], rank: shape.rankDelta[col] });
         return <td className={cn(base, 'text-right whitespace-nowrap')}>{d ? <AnswerDelta delta={d} /> : children}</td>;
     }
     if (col === shape.barCol) {
@@ -229,7 +256,8 @@ export function AnswerLink({ href, children, external }: { href?: string; childr
                 )}
             >
                 {inTable ? <Favicon host={host} size={16} /> : null}
-                {inTable ? <span className="min-w-0 truncate">{children}</span> : children}
+                {/* Phones: the whole host (the name column is sticky and the numbers scroll), not "designstudio.exa…" */}
+                {inTable ? <span className="min-w-0 max-md:whitespace-nowrap md:truncate">{children}</span> : children}
             </Link>
         );
     }

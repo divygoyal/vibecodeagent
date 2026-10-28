@@ -421,12 +421,23 @@ export function demoUrlInspection(body: { inspectionUrl?: string; siteUrl?: stri
                     referringUrls: [`${origin}/`],
                     crawledAs: 'MOBILE',
                 }
-                : {
+                // A page that had clicks and fell out was crawled (Google reports when); "Discovered" pages never were.
+                : r >= 0.93 ? {
                     verdict: 'NEUTRAL',
-                    coverageState: r < 0.95 ? 'Discovered - currently not indexed' : 'Crawled - currently not indexed',
+                    coverageState: 'Crawled - currently not indexed',
                     robotsTxtState: 'ALLOWED',
                     indexingState: 'INDEXING_ALLOWED',
-                    pageFetchState: r < 0.95 ? 'PAGE_FETCH_STATE_UNSPECIFIED' : 'SUCCESSFUL',
+                    lastCrawlTime: crawlTime,
+                    pageFetchState: 'SUCCESSFUL',
+                    sitemap: [`${origin}/sitemap.xml`],
+                    referringUrls: [],
+                    crawledAs: 'MOBILE',
+                } : {
+                    verdict: 'NEUTRAL',
+                    coverageState: 'Discovered - currently not indexed',
+                    robotsTxtState: 'ALLOWED',
+                    indexingState: 'INDEXING_ALLOWED',
+                    pageFetchState: 'PAGE_FETCH_STATE_UNSPECIFIED',
                     sitemap: [`${origin}/sitemap.xml`],
                     referringUrls: [],
                     crawledAs: 'MOBILE',

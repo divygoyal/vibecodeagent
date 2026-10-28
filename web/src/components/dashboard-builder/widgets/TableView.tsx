@@ -190,7 +190,8 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                     const pick = props.onFilterClick && dim === c.dimensions[0] && raw && raw !== '(other)' ? props.onFilterClick : undefined;
                     // Sites: the host, then the GA4 property name in muted text (one naming rule, round 5 audit #14).
                     const sub = dim === 'site' ? frame?.sublabels?.[raw] : undefined;
-                    const subEl = sub ? <span className="ml-1.5 font-normal text-fg-muted">{sub}</span> : null;
+                    // Narrow (phones): the host only; a cut "Search …" subtitle says nothing (round 5 judge). Kept in the tooltip.
+                    const subEl = sub && !narrow ? <span className="ml-1.5 font-normal text-fg-muted">{sub}</span> : null;
                     return (
                         <span className="flex min-w-0 items-center gap-1">
                             {pick ? (
@@ -221,7 +222,11 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
                 const cf = c.rules?.length ? cellStyle(c.rules, col, r) : null;
                 return (
                     <span className="relative flex min-h-7 items-center justify-end gap-2">
-                        {pct ? <span aria-hidden className={cn('absolute inset-y-0.5 right-[-6px] rounded-md', metricHeatbar(id))} style={{ width: `calc(${pct}% + 6px)` }} /> : null}
+                        {/* With a change next to the value, a fill would sit behind the change alone and read as its chip
+                            (round 5 judge): the bar becomes the app's underline under the value and change instead. */}
+                        {pct && showDelta && pv !== undefined ? (
+                            <span aria-hidden className={cn('absolute bottom-0 right-0 h-[3px] rounded-full', metricHeatbar(id))} style={{ width: `${Math.max(pct, 1.5)}%`, ['--tc-heatbar' as string]: '45%' }} />
+                        ) : pct ? <span aria-hidden className={cn('absolute inset-y-0.5 right-[-6px] rounded-md', metricHeatbar(id))} style={{ width: `calc(${pct}% + 6px)` }} /> : null}
                         <span className={cf ? `relative tc-cf-cell tc-cf-${cf} font-medium` : 'relative'} title={cf ? (cf === 'good' ? 'Meets a good rule' : cf === 'bad' ? 'Matches a bad rule' : 'Needs attention') : narrow && v !== null ? fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format }) : undefined}>
                             {fmtMetricValue(id, v, { currency: ok?.flags.currency, format: col.format, compact: narrow })}
                         </span>

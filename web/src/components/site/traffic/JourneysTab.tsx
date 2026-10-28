@@ -92,7 +92,7 @@ function FlowSkeleton() {
 }
 
 /** GA4: channel -> landing page -> next page / key event (audit item 18). */
-function VisitFlowCard({ titles }: { titles: Map<string, string> }) {
+function VisitFlowCard({ titles, landingSessions }: { titles: Map<string, string>; landingSessions: Map<string, number> }) {
     const { siteHost } = useSite();
     const { dr } = useSiteRange();
     const q = useGa4<JourneysResponse>('journeys');
@@ -106,9 +106,7 @@ function VisitFlowCard({ titles }: { titles: Map<string, string> }) {
         if (!d) return null;
         const flow = buildJourneyFlow(d, mode);
         const page = (path: string) => displayPage(pageRef(path, siteHost), siteHost);
-        return {
-            flow,
-            styled: styleFlow(flow, (n) => {
+        const styled = styleFlow(flow, (n) => {
                 if (n.name === OTHER) return { label: n.col === 0 ? 'Other channels' : n.col === 1 ? 'Other landing pages' : 'Other pages' };
                 if (n.kind === 'key') return { label: 'Had a key event' };
                 if (n.kind === 'nokey') return { label: 'No key event' };
@@ -116,9 +114,17 @@ function VisitFlowCard({ titles }: { titles: Map<string, string> }) {
                 if (n.kind === 'channel') return { label: n.name };
                 const title = titles.get(n.name);
                 return { label: page(n.name), title: title ? `${title} (${page(n.name)})` : page(n.name) };
-            }),
-        };
-    }, [d, mode, siteHost, titles]);
+            });
+        // A landing page's number is its sessions from the landing page report, the table under this card: the
+        // same count GA4 gives for the page (its channel rows are each rounded, so their sum can be off by a few).
+        const flowNode = new Map(flow.nodes.map((n) => [n.id, n]));
+        styled.nodes = styled.nodes.map((n) => {
+            const src = flowNode.get(n.id);
+            const total = src && src.kind === 'landing' && src.name !== OTHER ? landingSessions.get(src.name) : undefined;
+            return total !== undefined ? { ...n, value: total } : n;
+        });
+        return { flow, styled };
+    }, [d, mode, siteHost, titles, landingSessions]);
     const keyShare = d ? d.entries.reduce((a, e) => a + e.keySessions, 0) / Math.max(1, d.entries.reduce((a, e) => a + e.sessions, 0)) : null;
     return (
         <Card as="section" aria-label="How visits flow">
@@ -211,6 +217,7 @@ export function JourneysTab() {
     const loading = summary.state === 'loading';
     const titles = useMemo(() => new Map((landing.data?.rows ?? []).filter((r) => r.dims.pageTitle).map((r) => [r.dims.landingPage, r.dims.pageTitle as string])), [landing.data]);
     const next = useMemo(() => (journeys.data ? nextPagesByLanding(journeys.data, 1) : null), [journeys.data]);
+    const landingSessions = useMemo(() => new Map((landing.data?.rows ?? []).map((r) => [r.dims.landingPage, r.cur.sessions ?? 0])), [landing.data]);
     const rows = useMemo(() => (landing.data?.rows ?? []).filter((r) => r.dims.landingPage && r.dims.landingPage !== '(not set)').map((r) => {
         const ref = pageRef(r.dims.landingPage, siteHost);
         return { r, label: displayPage(ref, siteHost), next: next?.get(r.dims.landingPage)?.[0] ?? null };
@@ -224,7 +231,7 @@ export function JourneysTab() {
                 <MetricTile metric="sessions" label="Engaged sessions" value={t?.engagedSessions} previous={prev === undefined ? undefined : prev?.engagedSessions ?? null} loading={loading} comparisonLabel={compareText} />
                 <MetricTile metric="sessions" label="Bounce rate" format="percent" better="down" value={t ? 1 - t.engagementRate : null} previous={prev === undefined ? undefined : prev ? 1 - prev.engagementRate : null} loading={loading} comparisonLabel={compareText} />
             </div>
-            <VisitFlowCard titles={titles} />
+            <VisitFlowCard titles={titles} landingSessions={landingSessions} />
             {hasGsc ? <SearchFlowCard /> : null}
             {landing.state === 'error' ? <LoadError error={landing.error} onRetry={landing.mutate} /> : (
                 <BreakdownTable
@@ -245,12 +252,12 @@ export function JourneysTab() {
                     columns={[
                         { key: 'sessions', header: 'Sessions', value: (x) => v(x.r, 'sessions'), previous: compareOn ? (x) => p(x.r, 'sessions') : undefined },
                         ...(hasNext ? [{
-                            key: 'next', header: 'Usual next page', format: 'percent' as const, hideOnMobile: true, mobile: 'hidden' as const, width: '26%',
+                            key: 'next', header: 'Usual next page', format: 'percent' as const, hideOnMobile: true, mobile: 'hidden' as const, width: '34%',
                             value: (x: (typeof rows)[number]) => (x.next ? x.next.share : null),
                             csv: (x: (typeof rows)[number]) => (x.next ? `${x.next.next} (${fmtShare(x.next.share)})` : ''),
                             cell: (x: (typeof rows)[number]) => (x.next ? (
                                 <span className="whitespace-nowrap" title={`${fmtShare(x.next.share)} of these sessions opened ${x.next.next} next`}>
-                                    {clipLabel(displayPage(pageRef(x.next.next, siteHost), siteHost), 34)}{' '}
+                                    {clipLabel(displayPage(pageRef(x.next.next, siteHost), siteHost), 56)}{' '}
                                     <span className="text-meta text-fg-muted tabular-nums">{fmtShare(x.next.share)}</span>
                                 </span>
                             ) : <span className="text-fg-faint">–</span>),

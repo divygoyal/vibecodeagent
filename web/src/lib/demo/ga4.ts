@@ -248,6 +248,8 @@ interface Combo {
     vals: Record<string, string>;
     u: number; pv: number; ev: number; key: number; rev: number;
     f: Required<Factors>;
+    /** The entity of each crossed group (group name, entity key), for per-entity noise. */
+    ids: Array<[string, string]>;
 }
 
 const MAX_COMBOS = 40_000;
@@ -261,8 +263,8 @@ function crossGroups(site: DemoSite, groupNames: string[]): Combo[] {
         groups = groups.map((g, i) => (i === largest ? [...g].sort((a, b) => b.w - a.w).slice(0, Math.max(1, Math.floor(g.length * 0.7))) : g));
         size = groups.reduce((s, g) => s * g.length, 1);
     }
-    let combos: Combo[] = [{ vals: {}, u: 1, pv: 1, ev: 1, key: 1, rev: 1, f: { eng: 1, dur: 1, nu: 1 } }];
-    for (const entities of groups) {
+    let combos: Combo[] = [{ vals: {}, u: 1, pv: 1, ev: 1, key: 1, rev: 1, f: { eng: 1, dur: 1, nu: 1 }, ids: [] }];
+    groups.forEach((entities, gi) => {
         const next: Combo[] = [];
         for (const c of combos) {
             for (const e of entities as Entity[]) {
@@ -275,12 +277,90 @@ function crossGroups(site: DemoSite, groupNames: string[]): Combo[] {
                     key: c.key * (e.wKey ?? e.w),
                     rev: c.rev * (e.wRev ?? e.wKey ?? e.w),
                     f: { eng: c.f.eng * (e.f?.eng ?? 1), dur: c.f.dur * (e.f?.dur ?? 1), nu: c.f.nu * (e.f?.nu ?? 1) },
+                    ids: [...c.ids, [groupNames[gi], e.key]],
                 });
             }
         }
         combos = next;
-    }
+    });
     return combos;
+}
+
+/**
+ * Range noise per entity (round 5 polish), normalised within its group so the group still sums to the site total.
+ * A row's noise is the product over its entities, so a two-dimension report (channel x landing page) sums to the
+ * one-dimension report (landing page) exactly, as GA4's do; per-row noise made them disagree by a few percent.
+ */
+const entityNoiseCache = new Map<string, Map<string, number>>();
+
+function entityNoise(site: DemoSite, group: string, start: number, end: number): Map<string, number> {
+    const ck = `${site.key}|${group}|${start}|${end}`;
+    const hit = entityNoiseCache.get(ck);
+    if (hit) return hit;
+    if (entityNoiseCache.size > 400) entityNoiseCache.clear();
+    const entities = siteGroup(site, group).entities;
+    const raw = entities.map(e => noise(0.07, site.key, 'ent', group, e.key, start, end));
+    const W = entities.reduce((s, e) => s + e.w, 0) || 1;
+    const norm = entities.reduce((s, e, i) => s + e.w * raw[i], 0) / W || 1;
+    const out = new Map(entities.map((e, i) => [e.key, raw[i] / norm]));
+    entityNoiseCache.set(ck, out);
+    return out;
+}
+
+/**
+ * Channel x landing page (round 5 polish): in real data each landing page has its own channel mix (articles get
+ * search, the home page direct visits); independent groups gave every page the site's mix. A combination is scaled
+ * by 1 + k·a(channel)·b(page), with a and b centred on the groups' noisy weights for the range, so every channel's
+ * total and every page's total stay what the one-dimension reports say.
+ */
+const CHANNEL_CONTENT_AFFINITY: Record<string, number> = {
+    'Organic Search': 1, 'Organic Social': 0.35, Referral: 0.2, 'Organic Video': 0.3,
+    Direct: -1, Email: -0.45, 'Paid Search': -0.35, 'Paid Social': -0.2, Display: -0.3, Affiliates: -0.1,
+};
+const affinityCache = new Map<string, { a: Map<string, number>; b: Map<string, number>; k: number }>();
+
+function channelLanding(site: DemoSite, start: number, end: number) {
+    const ck = `${site.key}|${start}|${end}`;
+    const hit = affinityCache.get(ck);
+    if (hit) return hit;
+    if (affinityCache.size > 200) affinityCache.clear();
+    const centred = (group: string, raw: (e: Entity) => number) => {
+        const entities = siteGroup(site, group).entities;
+        const n = entityNoise(site, group, start, end);
+        const wt = (e: Entity) => e.w * (n.get(e.key) ?? 1);
+        const W = entities.reduce((s, e) => s + wt(e), 0) || 1;
+        const mean = entities.reduce((s, e) => s + wt(e) * raw(e), 0) / W;
+        return new Map(entities.map(e => [e.key, raw(e) - mean]));
+    };
+    const a = centred('source', e => CHANNEL_CONTENT_AFFINITY[e.vals.sessionDefaultChannelGroup ?? ''] ?? 0);
+    const b = centred('landing', e => {
+        const path = e.key;
+        if (path === '(not set)') return 0;
+        if (path === '/') return -0.9;
+        if (path.startsWith(site.topicPrefix)) return 0.35 + 0.5 * unit(site.key, 'aff', path);
+        if (/pricing|signup|login|app|checkout|cart/.test(path)) return -0.45;
+        return 0.3 * (unit(site.key, 'aff', path) - 0.5);
+    });
+    const worst = Math.max(...[...a.values()].map(Math.abs)) * Math.max(...[...b.values()].map(Math.abs));
+    const out = { a, b, k: worst > 0 ? Math.min(0.9, 0.75 / worst) : 0 }; // every factor stays at 0.25 or more
+    affinityCache.set(ck, out);
+    return out;
+}
+
+function comboNoise(site: DemoSite, c: Combo, start: number, end: number): number {
+    let f = 1;
+    let src: string | undefined;
+    let land: string | undefined;
+    for (const [g, key] of c.ids) {
+        f *= entityNoise(site, g, start, end).get(key) ?? 1;
+        if (g === 'source') src = key;
+        else if (g === 'landing') land = key;
+    }
+    if (src !== undefined && land !== undefined) {
+        const { a, b, k } = channelLanding(site, start, end);
+        f *= 1 + k * (a.get(src) ?? 0) * (b.get(land) ?? 0);
+    }
+    return f;
 }
 
 // ─── Time values ───
@@ -583,14 +663,17 @@ function buildRows(site: DemoSite, dims: string[], dimensionFilter: any, ranges:
     if (dimensionFilter) {
         combos = combos.filter(c => evalGaExpression(dimensionFilter, f => (TIME_DIMS.has(f) ? undefined : c.vals[f] ?? (DIMENSION_GROUP[f] ? undefined : '(not set)'))) !== false);
     }
-    // Pass 2: merge combinations that share the requested dimension values.
-    const merged = new Map<string, Combo & { key2: string }>();
+    // Pass 2: merge combinations that share the requested dimension values. `un` keeps each range's
+    // noise-weighted share (the fast path's scale), from the entities' noise.
+    const merged = new Map<string, Combo & { key2: string; un: number[] }>();
+    const rangeBounds = ranges.map(r => [r.start, r.end] as const);
     for (const c of combos) {
         const values = entDims.map(d => c.vals[d] ?? '(not set)');
         const k = values.join('\u0001');
+        const un = needTime ? [] : rangeBounds.map(([rs, re]) => c.u * comboNoise(site, c, rs, re));
         const m = merged.get(k);
         if (!m) {
-            merged.set(k, { ...c, vals: Object.fromEntries(entDims.map((d, i) => [d, values[i]])), key2: k, f: { ...c.f } });
+            merged.set(k, { ...c, vals: Object.fromEntries(entDims.map((d, i) => [d, values[i]])), key2: k, f: { ...c.f }, un });
         } else {
             const total = m.u + c.u || 1;
             m.f = {
@@ -599,6 +682,7 @@ function buildRows(site: DemoSite, dims: string[], dimensionFilter: any, ranges:
                 nu: (m.f.nu * m.u + c.f.nu * c.u) / total,
             };
             m.u += c.u; m.pv += c.pv; m.ev += c.ev; m.key += c.key; m.rev += c.rev;
+            un.forEach((x, i) => { m.un[i] += x; });
         }
     }
 
@@ -608,7 +692,7 @@ function buildRows(site: DemoSite, dims: string[], dimensionFilter: any, ranges:
     const hours = needHour ? hourProfile(site) : null;
     const out = new Map<string, OutRow>();
 
-    for (const range of ranges) {
+    ranges.forEach((range, ri) => {
         const s = Math.max(range.start, windowStart);
         const e = Math.min(range.end, today);
         for (const row of merged.values()) {
@@ -618,7 +702,7 @@ function buildRows(site: DemoSite, dims: string[], dimensionFilter: any, ranges:
                 const days = e - s + 1;
                 if (days <= 0) continue;
                 const base = rangeComps(table, s, e);
-                const scale = rowNoiseKey ? noise(0.07, site.key, rowNoiseKey, range.start, range.end) : 1;
+                const scale = rowNoiseKey && row.u > 0 ? row.un[ri] / row.u : 1;
                 const k = `${rowNoiseKey}\u0002${range.name}`;
                 const acc = out.get(k) || { dims: [...entDims.map(d => row.vals[d]), ...(ranges.length > 1 ? [range.name] : [])], comps: emptyComps(), vals: row.vals };
                 addScaled(acc.comps, base, row, scale);
@@ -651,7 +735,7 @@ function buildRows(site: DemoSite, dims: string[], dimensionFilter: any, ranges:
                 }
             }
         }
-    }
+    });
     // A row that aggregates days (e.g. yearMonth) de-duplicates users; daily rows do not.
     for (const r of out.values()) {
         if (r.comps.span === 0) r.comps.span = 1;
