@@ -30,7 +30,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     // Drill down (round 8): d.<widgetId> carries signed keys the server issued with the data; anything else is ignored.
     const controls = publicControlsFromQuery(sp, rec.doc, rec.share, (picks) => sitePicksFromKeys(rec.doc.controls, picks, dir, token), drillResolver(token));
     try {
-        const res = attachDrillKeys(await evaluateDoc(rec.doc, controls, ownerDeps(row.ownerIdentifier, 'public'), { pageId: controls.pageId }), rec.doc, controls, token);
+        const data = await evaluateDoc(rec.doc, controls, ownerDeps(row.ownerIdentifier, 'public'), { pageId: controls.pageId });
+        // Keys only where the share lets viewers filter (drill is a viewer filter).
+        const res = rec.share.viewerControls.filters ? attachDrillKeys(data, rec.doc, controls, token) : data;
         return NextResponse.json(res, {
             headers: {
                 'Cache-Control': rec.share.hasPassword ? 'private, no-store' : 'public, s-maxage=300, stale-while-revalidate=3600',
