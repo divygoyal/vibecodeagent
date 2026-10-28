@@ -89,7 +89,7 @@ export function BreakdownTable<T>({
                 <span className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
                     <span>{fmtCell(c.value(r), c.format, currency)}</span>
                     {c.previous ? (
-                        <MetricDelta current={c.value(r)} previous={c.previous(r)} format={c.format ?? 'count'} better={c.better ?? 'up'} />
+                        <MetricDelta current={c.value(r)} previous={c.previous(r)} format={c.format === 'decimal' ? 'count' : c.format ?? 'count'} better={c.better ?? 'up'} />
                     ) : null}
                 </span>
             ),
