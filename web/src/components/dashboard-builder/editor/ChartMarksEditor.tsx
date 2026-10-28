@@ -94,10 +94,10 @@ function LineRow({ index, line, metrics, onChange, onRemove }: { index: number; 
                 <Choice ariaLabel={`Line ${index + 1} metric`} value={metric} onChange={(m) => onChange({ metric: m })} options={metrics.map((m) => ({ value: m, label: metricLabel(m) }))} />
             ) : null}
             {!isAvg ? (
-                <div className="flex items-center gap-2">
-                    <input aria-label={`Line ${index + 1} value`} inputMode="decimal" value={draft} placeholder={pct ? 'e.g. 3 (%)' : 'e.g. 500'} onChange={(e) => commit(e.target.value)} className={`${field} w-28 tabular-nums`} />
+                <div className="flex flex-col gap-2">
+                    <input aria-label={`Line ${index + 1} value`} inputMode="decimal" value={draft} placeholder={pct ? 'e.g. 3 (%)' : 'e.g. 500'} onChange={(e) => commit(e.target.value)} className={`${field} w-full tabular-nums`} />
                     {def?.additive ? (
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0">
                             <Choice<NonNullable<RefLine['per']>> ariaLabel={`Line ${index + 1} counts`} value={line.per ?? 'point'} onChange={(p) => onChange({ per: p })}
                                 options={[{ value: 'point', label: 'Per point' }, { value: 'day', label: 'Per day' }, { value: 'week', label: 'Per week' }, { value: 'month', label: 'Per month' }, { value: 'period', label: 'For the period' }]} />
                         </div>

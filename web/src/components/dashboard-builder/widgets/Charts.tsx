@@ -106,7 +106,7 @@ export function TimeSeriesView(props: WidgetViewProps<TimeSeriesWidget>) {
             hint={notes.scope ? 'A launch, a campaign, a site change. It shows on this site’s charts and dashboards.' : 'A launch, a campaign, a site change. It shows on the charts of all your sites.'}
             trigger={(
                 <Button size="sm" variant="ghost" iconOnly icon={StickyNote} aria-label="Add a note to this chart" title="Add a note"
-                    className="size-6 text-fg-faint opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100" />
+                    className="tap-area size-6 text-fg-faint pointer-coarse:size-6 opacity-0 transition-opacity hover:text-fg focus-visible:opacity-100 group-hover/frame:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100" />
             )}
         />
     ) : null;
