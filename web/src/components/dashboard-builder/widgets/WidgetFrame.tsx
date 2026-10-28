@@ -6,6 +6,7 @@ import { AlertTriangle, Download, Info, Link2, PlugZap, RefreshCw } from 'lucide
 import { cn } from '@/lib/cn';
 import { Button, Skeleton, Tooltip } from '@/components/ui';
 import { fmtDay } from '@/lib/format';
+import { metricLabel } from '@/lib/builder/catalog';
 import { widgetTitle } from '@/lib/builder/registry';
 import type { CompareSpec, ResolvedDates, WidgetDef, WidgetResult, WidgetResultOk } from '@/lib/builder/types';
 
@@ -62,7 +63,8 @@ export function downloadCsv(widget: WidgetDef, r: WidgetResultOk) {
     const frame = r.parts.rows ?? r.parts.series ?? r.parts.sites ?? r.parts.total;
     if (!frame) return;
     const keys = frame.seriesKeys?.length ? [frame.columns[0]?.id, ...frame.seriesKeys].filter(Boolean) as string[] : frame.columns.map((c) => c.id);
-    const labelOf = (k: string) => frame.columns.find((c) => c.id === k)?.label ?? k.replace(/^[dmb]:/, '');
+    // Calculated metrics (round 7): the dashboard's name, which the editor's inline queries do not send.
+    const labelOf = (k: string) => (k.startsWith('m:calc:') ? metricLabel(k.slice(2)) : frame.columns.find((c) => c.id === k)?.label ?? k.replace(/^[dmb]:/, ''));
     const esc = (v: unknown) => {
         const t = v === null || v === undefined ? '' : String(v);
         return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
