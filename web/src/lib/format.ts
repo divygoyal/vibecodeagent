@@ -275,10 +275,13 @@ export function fmtValue(format: MetricFormat, value: Num, opts: { compact?: boo
     }
 }
 
-/** `fmtValue` for a value and its comparison together: rates and positions share the decimals of `pairDecimals` (`2.64%` vs `2.68%`). */
-export function fmtValuePair(format: MetricFormat, value: Num, previous: Num, opts: { compact?: boolean; tile?: boolean; axis?: boolean; currency?: string | null; cents?: boolean } = {}): { value: string; previous: string } {
+/**
+ * `fmtValue` for a value and its comparison together: rates and positions share the decimals of `pairDecimals` (`2.64%` vs `2.68%`).
+ * `deltaDecimals` is what the delta next to them must use (`MetricDelta decimals`), so the three never disagree.
+ */
+export function fmtValuePair(format: MetricFormat, value: Num, previous: Num, opts: { compact?: boolean; tile?: boolean; axis?: boolean; currency?: string | null; cents?: boolean } = {}): { value: string; previous: string; deltaDecimals?: number } {
     const decimals = format === 'percent' || format === 'position' ? pairDecimals(format, value, previous) : undefined;
-    return { value: fmtValue(format, value, { ...opts, decimals }), previous: fmtValue(format, previous, { ...opts, decimals }) };
+    return { value: fmtValue(format, value, { ...opts, decimals }), previous: fmtValue(format, previous, { ...opts, decimals }), deltaDecimals: decimals };
 }
 
 // ─── Deltas ────────────────────────────────────────────────────────────────

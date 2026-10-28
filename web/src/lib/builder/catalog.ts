@@ -347,7 +347,7 @@ export function fmtMetricPair(
     current: number | null | undefined,
     previous: number | null | undefined,
     opts: MetricValueOptions = {},
-): { value: string; previous: string } {
+): { value: string; previous: string; deltaDecimals?: number } {
     const kind = formatKindOf(id, opts.format);
     const num = (v: number | null | undefined) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
     const c = num(current);
@@ -367,7 +367,7 @@ export function fmtMetricPair(
         value = fmtMetricValue(id, c, full);
         prev = fmtMetricValue(id, p, full);
     }
-    return { value, previous: prev };
+    return { value, previous: prev, deltaDecimals: kind === 'percent' || kind === 'position' ? decimals : undefined };
 }
 
 /**

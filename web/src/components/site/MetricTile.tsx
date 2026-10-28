@@ -45,6 +45,7 @@ export function MetricTile({
     const m = METRICS[metric];
     const fmt = format ?? m.format;
     const name = label ?? m.label;
+    const pair = fmtValuePair(fmt, value, typeof previous === 'number' ? previous : null, { compact: true, tile: true, currency, cents });
     const body = (
         <>
             <span className="flex items-center gap-2">
@@ -59,12 +60,13 @@ export function MetricTile({
             ) : (
                 <>
                     <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="text-stat text-fg">{fmtValuePair(fmt, value, typeof previous === 'number' ? previous : null, { compact: true, tile: true, currency, cents }).value}</span>
+                        <span className="text-stat text-fg">{pair.value}</span>
                         {previous !== undefined ? (
                             <MetricDelta
                                 current={value}
                                 previous={previous}
                                 format={fmt}
+                                decimals={pair.deltaDecimals}
                                 better={better ?? m.better}
                                 comparisonLabel={comparisonLabel ? `versus ${comparisonLabel}` : undefined}
                             />

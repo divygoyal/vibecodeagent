@@ -57,7 +57,7 @@ function Tile({ m, total, spark, showDelta, showSpark, sparkHeight, big, cmp, cu
                     {missing ? '–' : pair.value}
                 </span>
                 {showDelta && prev !== undefined && !missing ? (
-                    <MetricDelta current={value} previous={prev} format={dsFormat(m.id)} better={metricBetter(m.id)} variant="chip" comparisonLabel={cmp.short ? cmp.short.replace(/^vs /, 'versus ') : undefined} />
+                    <MetricDelta current={value} previous={prev} format={dsFormat(m.id)} better={metricBetter(m.id)} decimals={pair.deltaDecimals} variant="chip" comparisonLabel={cmp.short ? cmp.short.replace(/^vs /, 'versus ') : undefined} />
                 ) : null}
             </div>
             {showDelta && compareLine && prev !== undefined && cmp.short && !missing ? (

@@ -13,6 +13,12 @@ export interface MetricDeltaProps {
     /** @deprecated One delta style everywhere: 'chip' renders like 'text'. */
     variant?: 'text' | 'chip';
     size?: 'sm' | 'md';
+    /**
+     * Decimals of a points / position change. Default 1, the precision of a lone value (tables, cards): a change that
+     * rounds to nothing reads "no change". Tiles that print the comparison next to the value pass the decimals of
+     * `fmtMetricPair` / `fmtValuePair` (`deltaDecimals`) so the pair and the change agree.
+     */
+    decimals?: number;
     /** Spoken after the change: "versus previous 3 months". */
     comparisonLabel?: string;
     className?: string;
@@ -29,11 +35,11 @@ export function DeltaArrow({ direction, className }: { direction: 'up' | 'down';
 
 const TONE_TEXT = { good: 'text-up', bad: 'text-down', neutral: 'text-fg-muted' } as const;
 
-export function deltaFor(props: Pick<MetricDeltaProps, 'current' | 'previous' | 'metric' | 'format' | 'better'>): DeltaResult {
+export function deltaFor(props: Pick<MetricDeltaProps, 'current' | 'previous' | 'metric' | 'format' | 'better' | 'decimals'>): DeltaResult {
     const m = props.metric ? METRICS[props.metric] : null;
     const format = props.format ?? m?.format ?? 'count';
     const better = props.better ?? m?.better ?? 'up';
-    return computeDelta(props.current, props.previous, deltaOptionsFor(format, better));
+    return computeDelta(props.current, props.previous, { ...deltaOptionsFor(format, better), decimals: props.decimals ?? 1 });
 }
 
 /**

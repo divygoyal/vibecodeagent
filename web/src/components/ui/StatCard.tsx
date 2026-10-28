@@ -60,7 +60,7 @@ export function StatCard({ metric, value, previous, label, comparisonLabel, info
                             {pair.value}
                         </span>
                         {previous !== undefined ? (
-                            <MetricDelta metric={metric} current={value} previous={previous} size={size === 'lg' ? 'md' : 'sm'} comparisonLabel={comparisonLabel ? `versus ${comparisonLabel}` : undefined} />
+                            <MetricDelta metric={metric} current={value} previous={previous} decimals={pair.deltaDecimals} size={size === 'lg' ? 'md' : 'sm'} comparisonLabel={comparisonLabel ? `versus ${comparisonLabel}` : undefined} />
                         ) : null}
                     </div>
                     {comparisonLabel && previous !== undefined ? (

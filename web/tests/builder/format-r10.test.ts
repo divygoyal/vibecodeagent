@@ -48,8 +48,10 @@ test('item 4: rates keep one decimal, so the equal-looking pairs of round 9 diff
 
 test('item 4 (counts): two compact values that would read the same fall back to full numbers', () => {
     const p = fmtMetricPair('ga4:sessions', 12_345, 12_320, TILE);
-    assert.deepEqual(p, { value: '12,345', previous: '12,320' });
-    assert.deepEqual(fmtMetricPair('ga4:sessions', 12_345, 20_320, TILE), { value: '12.3K', previous: '20.3K' });
+    assert.deepEqual({ value: p.value, previous: p.previous }, { value: '12,345', previous: '12,320' });
+    const q = fmtMetricPair('ga4:sessions', 12_345, 20_320, TILE);
+    assert.deepEqual({ value: q.value, previous: q.previous }, { value: '12.3K', previous: '20.3K' });
+    assert.equal(q.deltaDecimals, undefined, 'counts have percent deltas, no decimals to share');
 });
 
 test('item 10: position — the arrow is where the number moved, the colour says good or bad, the tooltip says why', () => {

@@ -145,19 +145,22 @@ test('position delta: absolute, arrow = where the number moved, colour = good or
     assert.equal(flat.srText, 'no change');
 });
 
+const texts = (p) => ({ value: p.value, previous: p.previous });
+
 test('pairDecimals + deltas: a value, its comparison and the delta never contradict (judge r9 items 3-4)', () => {
     // Item 3: "Key event rate 2.6%  0 pt  vs 2.7%".
     assert.equal(pairDecimals('percent', 0.0264, 0.0268), 2);
     const kev = fmtValuePair('percent', 0.0264, 0.0268, { tile: true });
-    assert.deepEqual(kev, { value: '2.64%', previous: '2.68%' });
+    assert.equal(kev.deltaDecimals, 2, 'the delta next to the pair takes its decimals');
+    assert.deepEqual(texts(kev), { value: '2.64%', previous: '2.68%' });
     assert.equal(computeDelta(0.0264, 0.0268, { mode: 'points' }).text, '0.04 pt');
     // Item 4: "65% ▼0.3 pt vs 65%", "35% ▲0.5 pt vs 35%": one decimal always, so the values differ.
-    assert.deepEqual(fmtValuePair('percent', 0.6522, 0.6551, { tile: true }), { value: '65.2%', previous: '65.5%' });
+    assert.deepEqual(texts(fmtValuePair('percent', 0.6522, 0.6551, { tile: true })), { value: '65.2%', previous: '65.5%' });
     assert.equal(computeDelta(0.6522, 0.6551, { mode: 'points' }).text, '0.3 pt');
-    assert.deepEqual(fmtValuePair('percent', 0.3549, 0.35, { tile: true }), { value: '35.5%', previous: '35.0%' });
+    assert.deepEqual(texts(fmtValuePair('percent', 0.3549, 0.35, { tile: true })), { value: '35.5%', previous: '35.0%' });
     assert.equal(computeDelta(0.3549, 0.35, { mode: 'points' }).text, '0.5 pt');
     // "3% ▲0.1 pt vs 2.9%"
-    assert.deepEqual(fmtValuePair('percent', 0.0298, 0.0289, { tile: true }), { value: '3.0%', previous: '2.9%' });
+    assert.deepEqual(texts(fmtValuePair('percent', 0.0298, 0.0289, { tile: true })), { value: '3.0%', previous: '2.9%' });
     // Equal at 1 decimal but the delta would say 0.1: more decimals.
     assert.equal(pairDecimals('percent', 0.6516, 0.6524), 2);
     assert.equal(computeDelta(0.6516, 0.6524, { mode: 'points' }).text, '0.08 pt');
@@ -166,9 +169,9 @@ test('pairDecimals + deltas: a value, its comparison and the delta never contrad
     assert.equal(computeDelta(0.4, 0.4, { mode: 'points' }).text, '0 pt');
     // Positions: 17.16 vs 17.04 shows 17.2 vs 17.0 and 0.1; 17.04 vs 17.06 would show 17.0 / 17.1 / 0.0, so 2 decimals.
     assert.equal(pairDecimals('position', 17.06, 17.04), 2);
-    assert.deepEqual(fmtValuePair('position', 17.06, 17.04), { value: '17.06', previous: '17.04' });
+    assert.deepEqual(texts(fmtValuePair('position', 17.06, 17.04)), { value: '17.06', previous: '17.04' });
     assert.equal(computeDelta(17.06, 17.04, { mode: 'absolute', better: 'down' }).text, '0.02');
-    assert.deepEqual(fmtValuePair('position', 17.2, 17.1), { value: '17.2', previous: '17.1' });
+    assert.deepEqual(texts(fmtValuePair('position', 17.2, 17.1)), { value: '17.2', previous: '17.1' });
     // The pt delta follows the same decimals as the values everywhere (shared by MetricDelta, email, share cards).
     assert.equal(computeDelta(0.0264, 0.0268, { mode: 'points', decimals: 1 }).state, 'flat');
 });

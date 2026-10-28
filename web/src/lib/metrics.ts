@@ -122,7 +122,7 @@ export function fmtMetric(key: MetricKey, value: number | null | undefined, opts
 }
 
 /** `fmtMetric` for a value and its comparison together: the same decimals, so a change never sits between equal-looking figures. */
-export function fmtMetricPair(key: MetricKey, value: number | null | undefined, previous: number | null | undefined, opts: { compact?: boolean; tile?: boolean; currency?: string | null; cents?: boolean } = {}): { value: string; previous: string } {
+export function fmtMetricPair(key: MetricKey, value: number | null | undefined, previous: number | null | undefined, opts: { compact?: boolean; tile?: boolean; currency?: string | null; cents?: boolean } = {}): { value: string; previous: string; deltaDecimals?: number } {
     return fmtValuePair(METRICS[key].format, value, previous, opts);
 }
 
