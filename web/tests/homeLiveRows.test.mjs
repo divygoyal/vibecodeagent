@@ -85,7 +85,7 @@ test('live rows: static picture first, one lazy chunk per row, nothing from the 
     for (const k of ['SiteLive', 'TrafficLive', 'FixesLive', 'DashboardLive']) assert.match(row, new RegExp(`import\\('\\./${k}'\\)`));
     assert.match(row, /\{Live \? <Live data=\{data\} \/> : children\}/, 'children (the picture) until the chunk is in');
     const rows = src('components/marketing/home/FeatureRows.tsx');
-    assert.match(rows, /<LiveRow kind="site" data=\{live\.site\}>\{shot\}<\/LiveRow>/);
+    assert.match(rows, /<LiveRow kind="site" data=\{live\.site\} reserve=\{reserve\}>\{shot\}<\/LiveRow>/);
     assert.match(rows, /tourImages\.json/, 'the static pictures stay (placeholder, OG)');
     for (const f of ['SiteLive', 'TrafficLive', 'FixesLive', 'DashboardLive', 'parts']) {
         const s = src(`components/marketing/home/live/${f}.tsx`);

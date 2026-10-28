@@ -42,6 +42,9 @@ test('every row builds from the app code on sample data, without the network', a
     for (let i = 1; i < live.fixes.actions.length; i++) assert.ok(rank[live.fixes.actions[i - 1].impact] >= rank[live.fixes.actions[i].impact]);
     for (const a of live.fixes.actions) assert.ok(a.summary && a.fix.length && a.askPrompt);
     assert.equal(live.fixes.links.actions, home.tour.fixes);
+    // The same list as the app's Actions page and Overview (useSiteActions includeAudit): the 2 homepage-audit tasks
+    // are counted, so on this day the row says "of 18" like the live demo.
+    assert.equal(live.fixes.total, 18);
 
     // Dashboard row: three quick ranges, every widget answered, ranges really differ.
     const dash = live.dashboards;

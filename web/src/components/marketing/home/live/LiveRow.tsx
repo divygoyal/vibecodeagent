@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 
+import { cn } from '@/lib/cn';
 import type { HomeLive } from '../homeLive';
 
 export type LiveKind = keyof HomeLive;
@@ -25,7 +26,7 @@ const AHEAD = '900px 0px';
  * moves) until the row comes near the screen, then swaps in the real app components on the sample data. If the chunk
  * fails to load (offline, old browser), the picture simply stays.
  */
-export function LiveRow<K extends LiveKind>({ kind, data, children }: { kind: K; data: NonNullable<HomeLive[K]>; children: ReactNode }) {
+export function LiveRow<K extends LiveKind>({ kind, data, reserve, children }: { kind: K; data: NonNullable<HomeLive[K]>; reserve?: string; children: ReactNode }) {
     const ref = useRef<HTMLDivElement>(null);
     const [Live, setLive] = useState<ComponentType<{ data: NonNullable<HomeLive[K]> }> | null>(null);
 
@@ -57,7 +58,9 @@ export function LiveRow<K extends LiveKind>({ kind, data, children }: { kind: K;
     }, [kind]);
 
     return (
-        <div ref={ref} data-live-row={Live ? kind : undefined} className="min-w-0">
+        // Until the swap, the picture sits centred in a box as tall as the live row (`reserve`, per breakpoint), so the
+        // swap moves nothing below it, also when the row is on screen at load (a #tour-… link).
+        <div ref={ref} data-live-row={Live ? kind : undefined} className={cn('min-w-0', !Live && reserve && cn('flex flex-col justify-center', reserve))}>
             {Live ? <Live data={data} /> : children}
         </div>
     );

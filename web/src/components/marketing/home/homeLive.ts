@@ -17,6 +17,7 @@ import type { Finding } from '@/components/site/lib/findings';
 import { googleUpdatesIn } from '@/components/site/lib/googleUpdates';
 import { snapToBucket } from '@/components/site/lib/intervals';
 import { rankByImpact } from '@/components/site/lib/actionText';
+import { auditActions } from '@/components/site/lib/auditActions';
 import type { Ga4BreakdownResponse, Ga4SeriesPoint, Ga4Summary, GscRowsResponse, GscSummary, SiteAction } from '@/components/site/lib/types';
 import { evaluateWidgets } from '@/lib/builder/server/engine';
 import { buildDirectory } from '@/lib/builder/server/sources';
@@ -29,6 +30,7 @@ import { runWithSampleGoogle } from '@/lib/demo/sampleScope';
 import { fmtDateRange } from '@/lib/format';
 import type { MetricKey } from '@/lib/metrics';
 import { DEMO_NOTES } from '@/lib/publicDemo/config';
+import { getDemoAuditReport } from '@/lib/demoWorkspaceData';
 import { fetchInventory } from '@/lib/sites/fetchInventory';
 import { demoHref } from './demoLinks';
 import { TOUR_SITE_KEY } from './homeData';
@@ -189,6 +191,8 @@ export async function buildHomeLive(slug: string, now: number = Date.now()): Pro
     const ga4 = site.ga.propertyId;
     const gsc = site.gsc.siteUrl;
     const host = site.host.replace(/^www\./, '');
+    // useSite().homeUrl for a Search Console domain property, at the root like the demo's audit (demoUserUrl).
+    const homeUrl = gsc.startsWith('sc-domain:') ? `https://${gsc.slice('sc-domain:'.length)}/` : new URL(gsc).origin + '/';
     const token = demoAccessToken();
     const today = new Date(now);
     const dr = resolveDateRange(RANGE, { now: today });
@@ -244,8 +248,11 @@ export async function buildHomeLive(slug: string, now: number = Date.now()): Pro
 
         const trafficRow: LiveTrafficRow | null = leanTraffic ? { meta, traffic: leanTraffic, findings: trafficFindings, markers: trafficMarkers } : null;
 
-        // The Actions page's order (rankByImpact over open tasks); the row shows the first few, like its crop.
-        const open = actions ? rankByImpact(actions.actions) : [];
+        // The Actions page's list and order (useSiteActions with includeAudit, then rankByImpact over open tasks): the
+        // search and traffic tasks plus the homepage audit's issues. The demo answers the audit with its sample report
+        // (api/site/audit demoReport), which is pure, so the count matches the live demo.
+        const audit = auditActions(getDemoAuditReport(homeUrl), host);
+        const open = actions ? rankByImpact([...actions.actions, ...audit]) : [];
         const fixesRow: LiveFixesRow | null = open.length ? {
             site: { ga4, gsc, siteHost: host },
             actions: open.slice(0, 6).map((a) => ({ ...a, evidence: [] })),

@@ -84,13 +84,26 @@ function Shot({ row }: { row: FeatureRow }) {
  * Round 6: the product is live. Each row with sample data in `live` becomes the app's real components (clickable,
  * nothing saved) once it scrolls near the screen; until then, and for any row without data, it is the static crop.
  */
+/**
+ * The live rows' heights per breakpoint (measured on worker1 at 360-1440 px, round 6), reserved around the picture until
+ * the swap: no layout shift when a row goes live on screen. Values sit at or just under the live height at common
+ * widths (390, 768, 1024+), so the swap never leaves a gap and grows a row by at most a few pixels.
+ */
+const RESERVE: Record<FeatureKey, string> = {
+    site: 'min-h-[850px] sm:min-h-[800px] md:min-h-[890px]',
+    traffic: 'min-h-[670px] sm:min-h-[575px] md:min-h-[640px] lg:min-h-[628px]',
+    fixes: 'min-h-[800px] sm:min-h-[625px] md:min-h-[640px] lg:min-h-[630px] xl:min-h-[615px]',
+    dashboards: 'min-h-[825px] sm:min-h-[800px] md:min-h-[660px]',
+};
+
 function Product({ row, live }: { row: FeatureRow; live?: HomeLive }) {
     const shot = <Shot row={row} />;
+    const reserve = RESERVE[row.key];
     switch (row.key) {
-        case 'site': return live?.site ? <LiveRow kind="site" data={live.site}>{shot}</LiveRow> : shot;
-        case 'traffic': return live?.traffic ? <LiveRow kind="traffic" data={live.traffic}>{shot}</LiveRow> : shot;
-        case 'fixes': return live?.fixes ? <LiveRow kind="fixes" data={live.fixes}>{shot}</LiveRow> : shot;
-        case 'dashboards': return live?.dashboards ? <LiveRow kind="dashboards" data={live.dashboards}>{shot}</LiveRow> : shot;
+        case 'site': return live?.site ? <LiveRow kind="site" data={live.site} reserve={reserve}>{shot}</LiveRow> : shot;
+        case 'traffic': return live?.traffic ? <LiveRow kind="traffic" data={live.traffic} reserve={reserve}>{shot}</LiveRow> : shot;
+        case 'fixes': return live?.fixes ? <LiveRow kind="fixes" data={live.fixes} reserve={reserve}>{shot}</LiveRow> : shot;
+        case 'dashboards': return live?.dashboards ? <LiveRow kind="dashboards" data={live.dashboards} reserve={reserve}>{shot}</LiveRow> : shot;
         default: return shot;
     }
 }
