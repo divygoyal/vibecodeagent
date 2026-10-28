@@ -9,6 +9,8 @@ export interface MergedPage {
     label: string;
     /** Full URL when known (from Search Console), for "open page" links and GSC filters. */
     url: string | null;
+    /** The page's <title> from GA4 (most viewed, brand suffix removed), null when GA4 has none or the page is GSC-only. */
+    title: string | null;
     /** The GA4 pagePath / hostName as reported (for GA4 page filters). */
     gaPath: string | null;
     gaHost: string | null;
@@ -18,6 +20,8 @@ export interface MergedPage {
     engagement: number | null;
     engagementRate: number | null;
     conversions: number | null;
+    /** GA4 totalRevenue on this page (the page where purchases happened), in the property currency. */
+    revenue: number | null;
     clicks: number | null;
     impressions: number | null;
     ctr: number | null;
@@ -29,7 +33,7 @@ export interface MergedPage {
 export function mergePages(ga4: Ga4Row[] | undefined, gsc: GscRow[] | undefined, siteHost: string | null): MergedPage[] {
     const map = new Map<string, MergedPage>();
     const blank = (key: string, path: string, label: string): MergedPage => ({
-        key, path, label, url: null, gaPath: null, gaHost: null, views: null, users: null, engagement: null, engagementRate: null, conversions: null,
+        key, path, label, title: null, url: null, gaPath: null, gaHost: null, views: null, users: null, engagement: null, engagementRate: null, conversions: null, revenue: null,
         clicks: null, impressions: null, ctr: null, position: null, prevViews: undefined, prevClicks: undefined,
     });
     for (const r of ga4 ?? []) {
@@ -39,7 +43,9 @@ export function mergePages(ga4: Ga4Row[] | undefined, gsc: GscRow[] | undefined,
         if (!m.gaPath || views > (m.views ?? 0)) {
             m.gaPath = r.dims.pagePath ?? '/';
             m.gaHost = r.dims.hostName || null;
+            m.title = r.dims.pageTitle || m.title;
         }
+        if (!m.title && r.dims.pageTitle) m.title = r.dims.pageTitle;
         const users = r.cur.activeUsers ?? 0;
         // Several GA4 paths can normalise to one key (trailing slash, case): add them up.
         const prevUsers = m.users ?? 0;
@@ -49,6 +55,7 @@ export function mergePages(ga4: Ga4Row[] | undefined, gsc: GscRow[] | undefined,
         m.engagement = m.users > 0 ? eng / m.users : 0;
         m.engagementRate = r.cur.engagementRate ?? m.engagementRate;
         m.conversions = (m.conversions ?? 0) + (r.cur.keyEvents ?? 0);
+        m.revenue = (m.revenue ?? 0) + (r.cur.totalRevenue ?? 0);
         if (r.prev !== undefined) m.prevViews = r.prev === null ? null : (m.prevViews ?? 0) + (r.prev.screenPageViews ?? 0);
         map.set(ref.key, m);
     }

@@ -299,7 +299,8 @@ function OptionCard({ href, onClick, icon: Icon, title, subtitle, external }: {
             </span>
             <span className="min-w-0 flex-1">
                 <span className="block text-body font-medium text-fg">{title}</span>
-                <span className="block truncate text-body-sm text-fg-muted">{subtitle}</span>
+                {/* Wraps to a second line rather than cutting itself off in the 300px side column. */}
+                <span className="line-clamp-2 block text-body-sm text-fg-muted [overflow-wrap:anywhere]">{subtitle}</span>
             </span>
             <ArrowRight aria-hidden size={16} className="shrink-0 text-fg-faint transition-transform duration-120 group-hover:translate-x-0.5 group-hover:text-fg-muted" />
         </Card>

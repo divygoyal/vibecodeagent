@@ -12,6 +12,7 @@
 import { getToken, type JWT } from 'next-auth/jwt';
 import { cookies, headers } from 'next/headers';
 import { serverAuthUser, type ServerAuthUser } from '@/lib/authSession';
+import { demoSessionAllowed } from '@/lib/publicDemo/sessionGuard';
 import { fetchGoogleTokensFromDb, getValidAccessToken } from '@/lib/googleApi';
 import {
     accessForAsset,
@@ -46,18 +47,26 @@ function parseCookieHeader(header: string | null): Record<string, string> {
  */
 export async function getAuthJwt(req?: RequestLike | null): Promise<JWT | null> {
     try {
+        let token: JWT | null;
+        let reqHeaders: Headers;
         if (req) {
             const c = (req as { cookies?: { getAll?: unknown } }).cookies;
             // NextRequest has cookies.getAll(); a plain Request only has the header.
             const source = c && typeof c.getAll === 'function'
                 ? req
                 : { headers: req.headers, cookies: parseCookieHeader(req.headers.get('cookie')) };
-            return await getToken({ req: source as never });
+            token = await getToken({ req: source as never });
+            reqHeaders = req.headers;
+        } else {
+            const [c, h] = await Promise.all([cookies(), headers()]);
+            token = await getToken({
+                req: { headers: Object.fromEntries(h), cookies: Object.fromEntries(c.getAll().map((x) => [x.name, x.value])) } as never,
+            });
+            reqHeaders = h as unknown as Headers;
         }
-        const [c, h] = await Promise.all([cookies(), headers()]);
-        return await getToken({
-            req: { headers: Object.fromEntries(h), cookies: Object.fromEntries(c.getAll().map((x) => [x.name, x.value])) } as never,
-        });
+        // The public demo identity only counts inside a request middleware marked as a demo request.
+        if (token && !(await demoSessionAllowed(token, reqHeaders))) return null;
+        return token;
     } catch {
         return null;
     }

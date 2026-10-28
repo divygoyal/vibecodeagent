@@ -30,6 +30,7 @@ import { fmtMetricValue, getMetric, metricColor, metricLabel } from '@/lib/build
 import { countryName } from '@/lib/builder/countries';
 import type { CellValue } from '@/lib/builder/types';
 import { useElementWidth } from '../useElementWidth';
+import { useTvScreen } from '../TvMode';
 import { dsFormat, metricBetter } from '../widgets/metricUi';
 
 export interface TsSeries {
@@ -120,7 +121,8 @@ export function BuilderTimeSeries(props: BuilderTimeSeriesProps) {
 function Plot({ rows, series, breakdown, compare, granularity, partialFrom, height, currency, showLegend, className }: BuilderTimeSeriesProps) {
     const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
     const reduce = useReducedMotion();
-    const showY = height > 200;
+    // TV screens keep the y axis down to a 120 px plot (round 4): numbers read from across the room.
+    const showY = height > (useTvScreen() ? 120 : 200);
     // Evenly spaced dates anchored on the last day and round Y steps (components/charts/axis.ts, round 2 critique #2).
     const [figRef, figW] = useElementWidth<HTMLElement>();
     const dates = useMemo(() => rows.map((r) => String(r['d:date'] ?? '')), [rows]);

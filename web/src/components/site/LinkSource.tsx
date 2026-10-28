@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useMemo, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-import { BarChart3, ExternalLink, RotateCw, Search, UserPlus } from 'lucide-react';
+import { BarChart3, ChevronDown, ExternalLink, RotateCw, Search, UserPlus } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { fmtFull } from '@/lib/format';
@@ -52,6 +52,7 @@ export function LinkSource({ source, variant = 'card' }: { source: 'ga4' | 'gsc'
     const [saving, setSaving] = useState(false);
     const [checking, setChecking] = useState(false);
     const [checkedAt, setCheckedAt] = useState<number | null>(null);
+    const [helpOpen, setHelpOpen] = useState(false);
 
     const linkGsc = source === 'gsc';
     const ga4Host = useMemo(() => dir.data?.properties.find((p) => p.property === site.ga4)?.host ?? null, [dir.data, site.ga4]);
@@ -211,7 +212,15 @@ export function LinkSource({ source, variant = 'card' }: { source: 'ga4' | 'gsc'
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 border-t border-border-subtle pt-4 sm:grid-cols-2">
+            {/* Phones: the how-to folds into one line (it filled the middle of a GA-only Overview, round 4 polish). */}
+            {!helpOpen ? (
+                <button type="button" aria-expanded={false} onClick={() => setHelpOpen(true)}
+                    className="tap-area flex items-center gap-1 border-t border-border-subtle pt-3 text-left text-body-sm font-medium text-brand-text md:hidden">
+                    {linkGsc ? 'Not in Search Console yet, or in another account?' : 'Not in Google Analytics yet, or in another account?'}
+                    <ChevronDown aria-hidden size={14} className="shrink-0" />
+                </button>
+            ) : null}
+            <div className={cn('grid grid-cols-1 gap-4 border-t border-border-subtle pt-4 sm:grid-cols-2', !helpOpen && 'max-md:hidden')}>
                 <div className="min-w-0">
                     <p className="text-body-sm font-medium text-fg">{linkGsc ? 'Not in Search Console yet?' : 'Not in Google Analytics yet?'}</p>
                     <a href={linkGsc ? GSC_WELCOME : GA4_CREATE} target="_blank" rel="noopener noreferrer"

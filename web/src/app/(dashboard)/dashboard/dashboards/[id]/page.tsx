@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Skeleton } from '@/components/ui';
 import { DashboardView, useUrlControls } from '@/components/dashboard-builder/DashboardView';
 import { DashboardBrandHeader } from '@/components/dashboard-builder/DashboardBrandHeader';
+import { brandCompanyName } from '@/lib/builder/placeholders';
 import { ShareDialog } from '@/components/dashboard-builder/ShareDialog';
 import { TvFrame, tvRefreshMs } from '@/components/dashboard-builder/TvMode';
 import { dashRootProps } from '@/components/dashboard-builder/theme/DashTheme';
@@ -17,7 +18,7 @@ import { fetchJson, ownerPageLoader, usePageResults } from '@/components/dashboa
 import { canonicalJson } from '@/lib/builder/compile';
 import { presetLabel } from '@/lib/builder/dates';
 import { cssToHex, exportReportPdf, hasReportKit } from '@/lib/builder/reportPdf';
-import { themePreset } from '@/lib/builder/themes';
+import { themeMode } from '@/lib/builder/themes';
 import { exportDashboardToPDF } from '@/lib/dashboardPdfExport';
 import { useResolvedTheme } from '@/lib/theme';
 import type { DashboardDocV2, DashboardRecord, FilterControl, ShareState } from '@/lib/builder/types';
@@ -118,7 +119,7 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
             const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(bg);
             return m ? `#${[m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('')}` : '#f6f7f9';
         })();
-        toast.promise(exportDashboardToPDF(exportRef.current, { dashboardName: doc.name, dateRangeLabel: presetLabel(ctl.state.date.range), companyName: doc.theme.header.companyName, backgroundColor: hex }), { loading: 'Preparing PDF…', success: 'PDF downloaded', error: 'PDF export failed' });
+        toast.promise(exportDashboardToPDF(exportRef.current, { dashboardName: doc.name, dateRangeLabel: presetLabel(ctl.state.date.range), companyName: brandCompanyName(doc.theme) ?? undefined, backgroundColor: hex }), { loading: 'Preparing PDF…', success: 'PDF downloaded', error: 'PDF export failed' });
     }, [doc, ctl.state.date.range]);
     const del = async () => {
         await fetchJson(`/api/dashboards/${rec.id}`, { method: 'DELETE' });
@@ -164,7 +165,9 @@ function Loaded({ rec, onRecord, openShare, tv, router }: { rec: DashboardRecord
     );
 
     if (tv) {
-        const tvMode = doc.theme.mode === 'auto' ? (themePreset(doc.theme.id).preferredMode ?? appMode) : doc.theme.mode;
+        // The owner's TV view follows the app theme like the dashboard page does (theme.mode is the shared
+        // links' appearance); a preset with one mode keeps it (round 4 polish: TV ignored dark mode).
+        const tvMode = themeMode(doc.theme, appMode);
         const r = dashRootProps(doc.theme, tvMode);
         return (
             <TvFrame doc={doc} pageId={ctl.state.pageId} onPage={ctl.setPage} onExit={() => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); ctl.setTv(false); }}

@@ -33,15 +33,19 @@ import { dashRootProps } from '../theme/DashTheme';
 import { DateControl, FilterControlView } from '../Controls';
 import { ShareDialog } from '../ShareDialog';
 import { textVars } from '../DashboardView';
-import { useElementWidth } from '../useElementWidth';
+import { useElementHeight, useElementWidth } from '../useElementWidth';
 import { fetchJson, useInlineResult, QueryHttpError, type InlineCtx } from '../useWidgetData';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
 import { LeftPanel } from './LeftPanel';
 import { VersionsDialog } from './VersionsDialog';
 import { openAppearance, PropertiesPanel } from './PropertiesPanel';
+import { notifyReadOnly } from '@/components/demo/DemoBar';
+import { useDemoSession } from '@/components/demo/useDemoSession';
 import type { SiteOption } from './Fields';
 
 const VIEWPORT_W: Record<Viewport, number | null> = { desktop: null, tablet: 768, phone: 390 };
+/** Narrowest desktop canvas: about what the dashboard page gets on a 1280 px screen with the sidebar open. */
+const FIT_MIN_W = 1024;
 const CLIP_KEY = 'tc-dash-clipboard';
 
 /** Last copy in this browser (fallback when the system clipboard cannot be read). */
@@ -101,6 +105,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const [canvasRef, availWidth] = useElementWidth<HTMLDivElement>();
     const appMode = useResolvedTheme();
     const [themePreview, setThemePreview] = useState<Mode | null>(null);
+    const [zoomMode, setZoomMode] = useState<'fit' | '100'>('fit');
     const { data: sitesData } = useSWR<{ connected: boolean; sites: SiteOption[] }>('/api/dashboards/sites', (u: string) => fetchJson(u), { revalidateOnFocus: false });
     const sites = useMemo(() => sitesData?.sites ?? [], [sitesData]);
 
@@ -130,15 +135,25 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
             }
         }
     }, []);
+    // Public live demo: edits stay in this tab (nothing is saved, no "leave page?" prompt); say so once.
+    const { demo } = useDemoSession();
+    const demoNoticeShown = useRef(false);
     useEffect(() => {
         if (status !== 'dirty') return;
+        if (demo) {
+            if (!demoNoticeShown.current) notifyReadOnly();
+            demoNoticeShown.current = true;
+            return;
+        }
         const t = setTimeout(() => void save(), 800);
         return () => clearTimeout(t);
-    }, [doc, status, save]);
+    }, [doc, status, save, demo]);
+    const demoRef = useRef(demo);
+    demoRef.current = demo;
     useEffect(() => {
         const warn = (e: BeforeUnloadEvent) => {
             const st = useEditorStore.getState().status;
-            if (st === 'dirty' || st === 'saving') e.preventDefault();
+            if (!demoRef.current && (st === 'dirty' || st === 'saving')) e.preventDefault();
         };
         window.addEventListener('beforeunload', warn);
         return () => window.removeEventListener('beforeunload', warn);
@@ -146,7 +161,13 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
 
     const page = doc?.pages.find((p) => p.id === pageId) ?? doc?.pages[0];
     const bp = VIEWPORT_BP[viewport];
-    const canvasWidth = VIEWPORT_W[viewport] ? Math.min(VIEWPORT_W[viewport]!, Math.max(0, availWidth - 48)) : Math.max(0, availWidth - 48);
+    // Zoom to fit (round 4 audit #9, like Looker Studio): the canvas keeps a real dashboard width
+    // (desktop at least FIT_MIN_W, tablet 768, phone 390) and scales down to the room between the
+    // panels, so a 6-tile KPI strip or a wide table never clips. "100%" shows it unscaled.
+    const roomW = Math.max(0, availWidth - 48);
+    const canvasWidth = VIEWPORT_W[viewport] ?? Math.max(roomW, FIT_MIN_W);
+    const zoom = zoomMode === 'fit' && roomW > 0 ? Math.min(1, roomW / canvasWidth) : 1;
+    const [zoomBoxRef, zoomBoxH] = useElementHeight<HTMLDivElement>();
 
     const defaultSite = doc?.defaultSource.type === 'site' ? sites.find((x) => x.siteId === (doc.defaultSource as { siteId: string }).siteId) : undefined;
     const familyGa4 = doc?.defaultSource.type === 'portfolio' || Boolean(defaultSite?.ga4 ?? (doc?.defaultSource.type === 'site' && doc.defaultSource.ga4));
@@ -304,7 +325,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     const customTablet = Boolean(page.layouts.md?.length);
     const dc = doc.controls.find((c) => c.type === 'date');
 
-    const statusText = status === 'saving' ? 'Saving…' : status === 'dirty' ? 'Unsaved' : status === 'error' ? 'Not saved' : status === 'conflict' ? 'Changed elsewhere' : 'Saved';
+    const statusText = demo && status !== 'saved' ? 'Demo: not saved' : status === 'saving' ? 'Saving…' : status === 'dirty' ? 'Unsaved' : status === 'error' ? 'Not saved' : status === 'conflict' ? 'Changed elsewhere' : 'Saved';
     // Round 2: the canvas shows the dashboard's theme live (light or dark preview).
     const themed = !isDefaultLook(doc.theme);
     const canvasMode: Mode = themePreview ?? appMode;
@@ -429,12 +450,17 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                             options={[{ value: 'desktop', label: 'Desktop', icon: Monitor }, { value: 'tablet', label: 'Tablet', icon: Tablet }, { value: 'phone', label: 'Phone', icon: Smartphone }]} />
                         {viewport === 'phone' && customPhone ? <span className="flex items-center gap-2 text-meta text-fg-muted">Custom phone layout <button type="button" className="font-medium text-brand-text hover:underline" onClick={() => s.apply((d) => updatePage(d, page.id, (p) => ({ ...p, layouts: { ...p.layouts, sm: undefined } })))}>Reset to automatic</button></span> : null}
                         {viewport === 'tablet' && customTablet ? <span className="flex items-center gap-2 text-meta text-fg-muted">Custom tablet layout <button type="button" className="font-medium text-brand-text hover:underline" onClick={() => s.apply((d) => updatePage(d, page.id, (p) => ({ ...p, layouts: { ...p.layouts, md: undefined } })))}>Reset to automatic</button></span> : null}
+                        {roomW > 0 && roomW < canvasWidth ? (
+                            <SegmentedControl<'fit' | '100'> ariaLabel="Canvas zoom" variant="neutral" size="sm" value={zoomMode} onChange={setZoomMode}
+                                options={[{ value: 'fit', label: `Fit ${Math.round((roomW / canvasWidth) * 100)}%` }, { value: '100', label: '100%' }]} />
+                        ) : null}
                         {themed ? <SegmentedControl<Mode> ariaLabel="Theme preview" variant="neutral" size="sm" value={canvasMode} onChange={(m) => setThemePreview(m)} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} /> : null}
                     </div>
 
                     {/* Canvas */}
                     <div ref={canvasRef} {...look?.attrs} style={look?.style} className={cn('min-h-0 flex-1 overflow-auto px-6 pb-16', look && 'pt-4', look?.className)} onClick={(e) => { if (e.target === e.currentTarget) { s.select(null); s.selectControl(null); } }}>
-                        <div className="mx-auto" style={{ width: canvasWidth || undefined }}>
+                        <div className="mx-auto" style={{ width: canvasWidth ? canvasWidth * zoom : undefined, height: zoom < 1 && zoomBoxH ? zoomBoxH * zoom : undefined }}>
+                        <div ref={zoomBoxRef} style={{ width: canvasWidth || undefined, ...(zoom < 1 ? { transform: `scale(${zoom})`, transformOrigin: '0 0' } : null) }}>
                             {showCover ? (
                                 <div className="pointer-events-none mb-4" aria-label="Cover preview">
                                     <DashboardCover theme={doc.theme} name={doc.name} vars={vars} pages={doc.pages.filter((p) => !p.hidden)} currentPageId={page.id} dark={(look?.mode ?? canvasMode) === 'dark'} />
@@ -445,6 +471,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                 page={page}
                                 bp={bp}
                                 width={canvasWidth}
+                                zoom={zoom}
                                 mode={preview ? 'view' : 'edit'}
                                 renderWidget={(w, h, b) => <EditorWidget widget={w} ctx={ctx} height={h} bp={b} vars={vars} />}
                                 edit={preview ? undefined : {
@@ -475,6 +502,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                     <Plus aria-hidden size={16} /> Add widget
                                 </button>
                             ) : null}
+                        </div>
                         </div>
                     </div>
                 </main>

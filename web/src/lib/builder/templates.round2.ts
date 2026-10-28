@@ -205,8 +205,8 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                 [[kpi('w_kpis', ['gsc:clicks', 'gsc:impressions', 'ga4:activeUsers', 'ga4:sessions', 'ga4:keyEvents', 'ga4:engagementRate']), 12, 3]],
                 [[ts('w_search', 'Search clicks', ['gsc:clicks']), 6, 7], [ts('w_users', 'Users', ['ga4:activeUsers']), 6, 7]],
                 [[breakdownTs('w_channels', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 8], [pie('w_devices', 'Devices', 'device', 'ga4:sessions'), 4, 8]],
-                [[table('w_gain', 'Pages gaining clicks', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, pageSize: 5 }), 6, 8],
-                    [table('w_lose', 'Pages losing clicks', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, pageSize: 5 }), 6, 8]],
+                [[table('w_gain', 'Pages gaining clicks', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, pageSize: 5 }), 6, 8],
+                    [table('w_lose', 'Pages losing clicks', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, pageSize: 5 }), 6, 8]],
                 [[text('w_notes', '### Highlights and next steps\n- The one result worth celebrating\n- The one thing we are fixing\n- What we need from you', 'callout'), 12, 4]],
             ], w)],
         };
@@ -241,8 +241,8 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                 [[table('w_striking', 'Striking distance: position 8 to 20', ['query'], SEARCH_COLS, { rowFilters: [{ metric: 'gsc:position', op: 'between', value: [8, 20] }, { metric: 'gsc:impressions', op: 'gte', value: 100 }], bars: ['gsc:impressions'], sort: { by: 'm:gsc:impressions', dir: 'desc' }, maxRows: 5000 }), 6, 10],
                     [table('w_lowctr', 'Page one, low CTR', ['query'], SEARCH_COLS, { rowFilters: [{ metric: 'gsc:position', op: 'between', value: [1, 10] }, { metric: 'gsc:impressions', op: 'gte', value: 500 }, { metric: 'gsc:ctr', op: 'lt', value: 0.03 }], bars: ['gsc:impressions'], sort: { by: 'm:gsc:impressions', dir: 'desc' }, maxRows: 5000, rules: [{ column: 'm:gsc:ctr', op: 'lt', value: 0.015, style: 'bad' }] }), 6, 10]],
                 [[table('w_pages', 'Pages with untapped impressions', ['page'], SEARCH_COLS, { rowFilters: [{ metric: 'gsc:impressions', op: 'gte', value: 500 }, { metric: 'gsc:position', op: 'between', value: [4, 20] }], bars: ['gsc:impressions'], sort: { by: 'm:gsc:impressions', dir: 'desc' }, maxRows: 5000 }), 12, 9]],
-                [[table('w_rising', 'Queries rising fastest', ['query'], ['gsc:clicks', 'gsc:impressions', 'gsc:position'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, maxRows: 5000, pageSize: 10 }), 6, 9],
-                    [table('w_falling', 'Queries falling fastest', ['query'], ['gsc:clicks', 'gsc:impressions', 'gsc:position'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, maxRows: 5000, pageSize: 10 }), 6, 9]],
+                [[table('w_rising', 'Queries rising fastest', ['query'], ['gsc:clicks', 'gsc:impressions', 'gsc:position'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, maxRows: 5000, pageSize: 10 }), 6, 9],
+                    [table('w_falling', 'Queries falling fastest', ['query'], ['gsc:clicks', 'gsc:impressions', 'gsc:position'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, maxRows: 5000, pageSize: 10 }), 6, 9]],
             ], w)],
         };
     },
@@ -402,14 +402,14 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                 page('p_rank', 'Rankings', [
                     [[kpi('w_rk', ['gsc:position', 'gsc:ctr', 'gsc:impressions']), 12, 3]],
                     [[table('w_q', 'Top queries', ['query'], SEARCH_COLS, { bars: ['gsc:clicks'] }), 12, 9]],
-                    [[table('w_up', 'Queries that moved up', ['query'], ['gsc:clicks', 'gsc:position'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, pageSize: 5 }), 6, 8],
-                        [table('w_down', 'Queries that moved down', ['query'], ['gsc:clicks', 'gsc:position'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, pageSize: 5 }), 6, 8]],
+                    [[table('w_up', 'Queries that moved up', ['query'], ['gsc:clicks', 'gsc:position'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, pageSize: 5 }), 6, 8],
+                        [table('w_down', 'Queries that moved down', ['query'], ['gsc:clicks', 'gsc:position'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, pageSize: 5 }), 6, 8]],
                 ], w),
                 page('p_pages', 'Pages and traffic', [
                     [[table('w_pg', 'Top pages', ['page'], ['gsc:clicks', 'gsc:position', 'ga4:sessions', 'ga4:keyEvents'], { bars: ['gsc:clicks'] }), 12, 9]],
                     [[breakdownTs('w_ch', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 8], [pie('w_chp', 'Channels', 'channel', 'ga4:sessions'), 4, 8]],
                 ], w),
-                page('p_conv', 'Conversions', [
+                page('p_conv', 'Key events', [
                     [[kpi('w_cv', ['ga4:keyEvents', 'ga4:sessionKeyEventRate', 'ga4:engagementRate']), 12, 3]],
                     [[ts('w_ke', 'Key events', ['ga4:keyEvents']), 8, 7], [table('w_kech', 'Key events by channel', ['channel'], ['ga4:keyEvents', 'ga4:sessionKeyEventRate'], { bars: ['ga4:keyEvents'] }), 4, 7]],
                     [[table('w_ken', 'Key events by name', ['eventName'], ['ga4:keyEvents', 'ga4:eventCount'], { rowFilters: [{ metric: 'ga4:keyEvents', op: 'gt', value: 0 }], bars: ['ga4:keyEvents'] }), 12, 8]],
@@ -432,8 +432,8 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                 page('p_health', 'Health', [
                     [[kpi('w_kpis', ['gsc:clicks', 'gsc:impressions', 'ga4:activeUsers', 'ga4:sessions', 'ga4:keyEvents']), 12, 3]],
                     [[gridCompact('w_grid'), 12, 12]],
-                    [[table('w_drops', 'Biggest drops', ['site'], ['gsc:clicks', 'ga4:sessions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, pageSize: 5, maxRows: 500 }), 6, 8],
-                        [table('w_gains', 'Biggest gains', ['site'], ['gsc:clicks', 'ga4:sessions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, pageSize: 5, maxRows: 500 }), 6, 8]],
+                    [[table('w_drops', 'Biggest drops', ['site'], ['gsc:clicks', 'ga4:sessions'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, pageSize: 5, maxRows: 500 }), 6, 8],
+                        [table('w_gains', 'Biggest gains', ['site'], ['gsc:clicks', 'ga4:sessions'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, pageSize: 5, maxRows: 500 }), 6, 8]],
                 ], w),
                 page('p_search', 'Search', [
                     [[breakdownTs('w_bysite', 'Clicks by site', 'gsc:clicks', 'site'), 8, 8], [barList('w_share', 'Share of clicks', 'site', 'gsc:clicks', { showShare: true }), 4, 8]],
@@ -456,10 +456,10 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
             pages: [page('p_main', 'Content decay', [
                 [[kpi('w_kpis', ['gsc:clicks', 'gsc:impressions', 'ga4:screenPageViews', 'ga4:engagementRate']), 12, 3]],
                 [[text('w_how', '### How to use this\nThe comparison is the **same period last year**, so seasonal pages are not flagged by mistake. Start with pages that lost the most clicks, open their queries below, then refresh the content, the title and the internal links.', 'callout'), 12, 3]],
-                [[table('w_lose', 'Pages losing the most clicks', ['page'], ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, maxRows: 2000, bars: ['gsc:clicks'] }), 6, 10],
-                    [table('w_gain', 'Pages gaining the most clicks', ['page'], ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, maxRows: 2000, bars: ['gsc:clicks'] }), 6, 10]],
-                [[table('w_queries', 'Queries behind the drop', ['query'], ['gsc:clicks', 'gsc:impressions', 'gsc:position'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, maxRows: 5000, search: true }), 12, 9]],
-                [[table('w_sessions', 'Pages losing visits (Analytics)', ['page'], ['ga4:sessions', 'ga4:engagementRate', 'ga4:keyEvents'], { sortByChange: true, sort: { by: 'm:ga4:sessions', dir: 'asc' }, maxRows: 2000 }), 6, 9],
+                [[table('w_lose', 'Pages losing the most clicks', ['page'], ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, maxRows: 2000, bars: ['gsc:clicks'] }), 6, 10],
+                    [table('w_gain', 'Pages gaining the most clicks', ['page'], ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, maxRows: 2000, bars: ['gsc:clicks'] }), 6, 10]],
+                [[table('w_queries', 'Queries behind the drop', ['query'], ['gsc:clicks', 'gsc:impressions', 'gsc:position'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, maxRows: 5000, search: true }), 12, 9]],
+                [[table('w_sessions', 'Pages losing visits (Analytics)', ['page'], ['ga4:sessions', 'ga4:engagementRate', 'ga4:keyEvents'], { sortByChange: true, changeOnly: true, sort: { by: 'm:ga4:sessions', dir: 'asc' }, maxRows: 2000 }), 6, 9],
                     [ts('w_clicks', 'Search clicks', ['gsc:clicks']), 6, 9]],
             ], w)],
         };
@@ -527,8 +527,8 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                     [[{ ...geo('w_geo', 'Users by country', 'ga4:activeUsers'), config: { ...geo('w_geo', '', 'ga4:activeUsers').config, topList: 0 } }, 8, 13], [barList('w_countries', 'Top countries', 'country', 'ga4:activeUsers', { top: 8 }), 4, 13]],
                 ], w),
                 page('p_movers', 'Movers', [
-                    [[table('w_up', 'Pages rising', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, pageSize: 10, pagination: false }), 6, 13],
-                        [table('w_down', 'Pages falling', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, pageSize: 10, pagination: false }), 6, 13]],
+                    [[table('w_up', 'Pages rising', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'desc' }, pageSize: 10, pagination: false }), 6, 13],
+                        [table('w_down', 'Pages falling', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, pageSize: 10, pagination: false }), 6, 13]],
                 ], w),
             ],
         };
@@ -537,7 +537,7 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
     // 16 ──────────────────────────────────────────────────────────────────
     'weekly-pulse': () => {
         const w: Rec = {};
-        const five = { pageSize: 5 as const, sortByChange: true, maxRows: 2000 };
+        const five = { pageSize: 5 as const, sortByChange: true, changeOnly: true, maxRows: 2000 };
         return {
             widgets: w,
             controls: [dateControl('7d', { mode: 'previous_period' })],

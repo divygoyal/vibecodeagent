@@ -21,6 +21,8 @@ import { getSafeRedirectUrl } from '@/lib/checkout';
 import { fmtDay, fmtDayYear, fmtFull } from '@/lib/format';
 import { useCredits } from '@/lib/useDashboardData';
 import { FAQ, INCLUDED_IN_ALL, PLANS, planByKey, type PlanDef } from './billing';
+import { DemoNotice } from '@/components/demo/DemoNotice';
+import { useDemoSession } from '@/components/demo/useDemoSession';
 
 /**
  * Plan and billing (DESIGN 5.15). Everything in TrafficClaw is free; paid plans
@@ -28,6 +30,18 @@ import { FAQ, INCLUDED_IN_ALL, PLANS, planByKey, type PlanDef } from './billing'
  * credits hook are the ones the page always used.
  */
 export default function PlanPage() {
+    // Public live demo: nothing to buy or cancel on the shared demo account.
+    const { demo } = useDemoSession();
+    if (demo) {
+        return (
+            <div className="space-y-6">
+                <PageHeader title="Plan" subtitle="Everything in TrafficClaw is free. Paid plans only add Ask messages." />
+                <DemoNotice title="Plans belong to your own account" secondary={{ href: '/pricing', label: 'See pricing' }}>
+                    This is the demo, so there is nothing to buy here. Connect Google to see your own sites, free.
+                </DemoNotice>
+            </div>
+        );
+    }
     return (
         <Suspense fallback={<PlanSkeleton />}>
             <PlanContent />

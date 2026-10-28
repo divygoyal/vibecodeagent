@@ -6,7 +6,7 @@ import { ArrowRight } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { fmtDateRange, fmtFull } from '@/lib/format';
-import { METRICS, type MetricKey } from '@/lib/metrics';
+import { fmtMetric, METRICS, type MetricKey } from '@/lib/metrics';
 import { ChartCard } from '@/components/charts/ChartCard';
 import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
 import { Card, CardHeader } from '@/components/ui/Card';
@@ -22,6 +22,13 @@ import type { Ga4Summary, GscSummary } from './lib/types';
 import { downloadCsv, useGa4, useGsc, useSite, useSiteRange } from './useSiteData';
 
 const TRAFFIC_TILES: MetricKey[] = ['users', 'sessions', 'pageviews', 'conversions'];
+/** With GA4 revenue above 0 (a shop): Revenue joins the tiles, plus revenue per session. */
+const TRAFFIC_TILES_REVENUE: MetricKey[] = [...TRAFFIC_TILES, 'revenue'];
+
+/** Revenue per session, null when there were no sessions. */
+export function revenuePerSession(t: { revenue: number; sessions: number } | null | undefined): number | null {
+    return t && t.sessions > 0 ? t.revenue / t.sessions : null;
+}
 const SEARCH_TILES: MetricKey[] = ['clicks', 'impressions', 'ctr', 'position'];
 
 function SectionTitle({ title, source, href, linkLabel }: { title: string; source: string; href?: string; linkLabel?: string }) {
@@ -57,7 +64,12 @@ export function TrafficSummary({ href, className }: { href?: string; className?:
     const spark = (k: MetricKey) => d?.series.map((p) => (p as unknown as Record<string, number>)[k] ?? 0);
     const series = d?.series ?? [];
     const empty = q.state === 'ready' && d && d.totals.sessions === 0 && d.totals.users === 0;
-    const finding = useTrafficFinding(metric, d, { daily: interval === 'day' });
+    // Revenue shows only for properties that report some (GA4 ecommerce, subscriptions or ads).
+    const hasRevenue = (d?.totals.revenue ?? 0) > 0 || (d?.previous?.revenue ?? 0) > 0;
+    const tiles = hasRevenue ? TRAFFIC_TILES_REVENUE : TRAFFIC_TILES;
+    const currency = d?.currency;
+    const chartMetric: MetricKey = metric === 'revenue' && !hasRevenue ? 'users' : metric;
+    const finding = useTrafficFinding(chartMetric, d, { daily: interval === 'day' });
     const marks = useChartMarkers(dates, dr.resolved.start, dr.resolved.end);
 
     return (
@@ -66,8 +78,8 @@ export function TrafficSummary({ href, className }: { href?: string; className?:
             {!hasGa4 ? <SourceMissing source="ga4" /> : (
                 <>
                     {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : null}
-                    <div className="grid grid-cols-2 gap-3">
-                        {TRAFFIC_TILES.map((k) => (
+                    <div className={cn('grid grid-cols-2 gap-3', hasRevenue && 'sm:grid-cols-3')}>
+                        {tiles.map((k) => (
                             <MetricTile
                                 key={k}
                                 metric={k}
@@ -76,21 +88,36 @@ export function TrafficSummary({ href, className }: { href?: string; className?:
                                 spark={spark(k)}
                                 sparkDates={dates}
                                 loading={q.state === 'loading'}
-                                selected={metric === k}
+                                selected={chartMetric === k}
                                 onSelect={() => setMetric(k)}
                                 comparisonLabel={compareText}
+                                currency={k === 'revenue' ? currency : undefined}
                             />
                         ))}
+                        {hasRevenue ? (
+                            <MetricTile
+                                metric="revenue"
+                                label="Revenue per session"
+                                value={revenuePerSession(d?.totals)}
+                                previous={compareOn ? revenuePerSession(d?.previous) : undefined}
+                                spark={series.map((p) => (p.sessions > 0 ? p.revenue / p.sessions : null))}
+                                sparkDates={dates}
+                                loading={q.state === 'loading'}
+                                comparisonLabel={compareText}
+                                currency={currency}
+                                cents
+                            />
+                        ) : null}
                     </div>
                     <ChartCard
-                        title={`${METRICS[metric].label} per ${interval}`}
+                        title={`${METRICS[chartMetric].label} per ${interval}`}
                         subtitle={compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')}` : undefined}
                         actions={<IntervalSwitch days={days} />}
                         state={q.state === 'error' ? 'error' : empty ? 'empty' : q.state}
                         error={{ message: q.error?.message, onRetry: q.mutate }}
                         empty={{ title: 'No visits in this period', description: 'Try a longer date range, or check the GA4 tag is installed.' }}
                         height={240}
-                        onDownloadCsv={d ? () => downloadCsv(`traffic-${dates[0] ?? ''}.csv`, ['date', 'users', 'sessions', 'pageviews', 'conversions', 'ai_sessions'], series.map((p) => [p.date, p.users, p.sessions, p.pageviews, p.conversions, p.ai])) : undefined}
+                        onDownloadCsv={d ? () => downloadCsv(`traffic-${dates[0] ?? ''}.csv`, ['date', 'users', 'sessions', 'pageviews', 'key_events', ...(hasRevenue ? [`revenue_${currency ?? 'USD'}`] : []), 'ai_sessions'], series.map((p) => [p.date, p.users, p.sessions, p.pageviews, p.conversions, ...(hasRevenue ? [p.revenue] : []), p.ai])) : undefined}
                         tableView={d ? (
                             <Table
                                 rows={series}
@@ -99,7 +126,7 @@ export function TrafficSummary({ href, className }: { href?: string; className?:
                                 pagination={{ pageSize: 50 }}
                                 columns={[
                                     { key: 'date', header: 'Date', cell: (r) => r.date },
-                                    ...TRAFFIC_TILES.map((k) => ({ key: k, header: METRICS[k].label, align: 'right' as const, cell: (r: (typeof series)[number]) => fmtFull((r as unknown as Record<string, number>)[k]) })),
+                                    ...tiles.map((k) => ({ key: k, header: METRICS[k].label, align: 'right' as const, cell: (r: (typeof series)[number]) => fmtMetric(k, (r as unknown as Record<string, number>)[k], { currency }) })),
                                 ]}
                             />
                         ) : undefined}
@@ -108,12 +135,12 @@ export function TrafficSummary({ href, className }: { href?: string; className?:
                         <FindingLine finding={finding} />
                         <TimeSeriesChart
                             data={series as unknown as Record<string, number | string | null>[]}
-                            series={[{ metric, key: metric, compareKey: compareOn ? `prev_${metric}` : undefined }]}
+                            series={[{ metric: chartMetric, key: chartMetric, compareKey: compareOn ? `prev_${chartMetric}` : undefined, currency }]}
                             compareDateKey="prevDate"
                             partialFrom={series.length > 1 ? series.length - 1 : undefined}
                             annotations={toAnnotations(marks.markers)}
                             height={240}
-                            ariaLabel={`${METRICS[metric].label} per ${interval}, ${fmtDateRange(dr.resolved.start, dr.resolved.end)}`}
+                            ariaLabel={`${METRICS[chartMetric].label} per ${interval}, ${fmtDateRange(dr.resolved.start, dr.resolved.end)}`}
                         />
                         <ChartMarkers markers={marks.markers} start={dr.resolved.start} end={dr.resolved.end} notesKey={marks.notesKey} scope={marks.scope} onChanged={marks.mutateNotes} notesFailed={marks.notesFailed} />
                     </ChartCard>

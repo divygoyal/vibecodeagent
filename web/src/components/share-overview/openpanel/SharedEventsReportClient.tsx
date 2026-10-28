@@ -35,7 +35,7 @@ type TopEventsResponse = {
 
 const EVENT_WIDGETS: Array<{ key: ShareOverviewEventTab; label: string }> = [
     { key: 'events', label: 'Events' },
-    { key: 'conversions', label: 'Conversions' },
+    { key: 'conversions', label: 'Key events' },
     { key: 'link_out', label: 'Link out' },
 ];
 

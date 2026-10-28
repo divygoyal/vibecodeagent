@@ -328,8 +328,9 @@ export function PortfolioView(props: PortfolioViewProps) {
                                     onChange={onFilterChange}
                                     options={[
                                         { value: 'all', label: <>All <Count n={counts.all} /></> },
-                                        { value: 'gsc', label: <>Search Console <Count n={counts.gsc} /></> },
-                                        { value: 'ga4', label: <>Analytics <Count n={counts.ga4} /></> },
+                                        // Phones: the short names, so all four chips fit at 360px with their counts.
+                                        { value: 'gsc', label: <><span className="sm:hidden">GSC</span><span className="max-sm:hidden">Search Console</span> <Count n={counts.gsc} /></>, ariaLabel: `Search Console ${counts.gsc}` },
+                                        { value: 'ga4', label: <><span className="sm:hidden">GA4</span><span className="max-sm:hidden">Analytics</span> <Count n={counts.ga4} /></>, ariaLabel: `Analytics ${counts.ga4}` },
                                         { value: 'starred', label: <>Starred <Count n={counts.starred} /></> },
                                     ]}
                                 />

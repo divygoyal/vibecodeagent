@@ -1120,6 +1120,11 @@ function shapeFrame(
         }
         return String(a.row[`d:${sortBy}`] ?? '').localeCompare(String(b.row[`d:${sortBy}`] ?? '')) * dir;
     });
+    // Mover lists ("Declining pages"): only rows that really moved that way, never a flat or rising row.
+    if (byChange && tableWidget?.config.changeOnly) {
+        const moved = (r: Record<string, CellValue>) => Number(r[`m:${sortBy}`] ?? 0) - Number(r[`m:${sortBy}:prev`] ?? 0);
+        rows = rows.filter(({ row }) => (dir < 0 ? moved(row) > 0 : moved(row) < 0));
+    }
     if (e.families.includes('gsc') && isMetricSort && sortBy !== 'gsc:clicks' && q.limit) flags.sortedWithinTop = q.limit;
 
     let out = rows.map((r) => r.row);

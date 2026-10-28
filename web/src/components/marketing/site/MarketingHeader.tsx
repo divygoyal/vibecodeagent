@@ -84,7 +84,7 @@ export function MarketingHeader() {
 
                 <div className="ml-auto flex items-center gap-2 xl:ml-0">
                     {signedIn ? null : <span className="hidden sm:block"><SignInButton /></span>}
-                    <span className="hidden md:block"><ConnectGoogleButton size="md" /></span>
+                    <span className="hidden md:block"><ConnectGoogleButton size="md" mark /></span>
                     <span className="xl:hidden">
                         <Button variant="ghost" iconOnly icon={Menu} aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)} />
                     </span>

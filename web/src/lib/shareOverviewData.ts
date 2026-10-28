@@ -5,6 +5,7 @@ import {
     runFlexibleGAReport,
     runFlexibleRealtimeReport,
 } from '@/lib/googleApi';
+import { createHash } from 'node:crypto';
 import { cachedFetch } from '@/lib/apiCache';
 import { hasPageScopedFilter, type ShareOverviewFilter, type ShareOverviewFilterName } from '@/lib/shareOverviewFilters';
 
@@ -57,6 +58,16 @@ type GaFilterExpression = {
         expressions: GaFilterExpression[];
     };
 };
+
+/**
+ * Cache scope = the credential the data was fetched with (a short hash of the access token). Inner caches here are
+ * shared by the public share routes and the signed-in overview routes; keyed by property alone, one user (or the
+ * public demo) could be served another user's cached rows for a property they cannot read. Same token = same scope,
+ * so an owner's dashboard and their own public share still share entries.
+ */
+function credentialScope(accessToken: string | null | undefined): string {
+    return createHash('sha256').update(accessToken || 'none').digest('hex').slice(0, 16);
+}
 
 function buildOverviewDataCacheKey(kind: string, parts: unknown[]) {
     return ['share-overview-data', kind, ...parts.map((part) => {
@@ -780,6 +791,7 @@ export async function fetchShareOverviewTopGenericSeries(input: {
 
     const topItems = await cachedFetch(
         buildOverviewDataCacheKey('top-generic-base', [
+            credentialScope(input.accessToken),
             input.propertyId,
             input.column,
             input.range,
@@ -824,6 +836,7 @@ export async function fetchShareOverviewTopGenericSeries(input: {
     const items = await Promise.all(
         topItems.items.slice(0, 8).map(async (item) => {
             const itemCacheKey = buildOverviewDataCacheKey('top-generic-series-item', [
+            credentialScope(input.accessToken),
                 input.propertyId,
                 input.column,
                 input.range,
@@ -1024,6 +1037,7 @@ export async function fetchShareOverviewTopConversions(input: {
 }) {
     const data = await cachedFetch(
         buildOverviewDataCacheKey('top-events-base', [
+            credentialScope(input.accessToken),
             input.propertyId,
             input.range,
             input.startDate || '',
@@ -1053,6 +1067,7 @@ export async function fetchShareOverviewTopLinkOut(input: {
 }) {
     const data = await cachedFetch(
         buildOverviewDataCacheKey('top-events-base', [
+            credentialScope(input.accessToken),
             input.propertyId,
             input.range,
             input.startDate || '',

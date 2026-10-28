@@ -2,25 +2,26 @@
 
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { AlertTriangle, ArrowRight, CheckCircle2, Info } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, TrendingUp } from 'lucide-react';
 
 import { fmtFull } from '@/lib/format';
-import { useAlerts } from '@/lib/useDashboardData';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { siteHref } from '@/components/shell/nav';
-import { ActionCard } from '../ActionCard';
-import type { Ga4Summary } from '../lib/types';
+import { ActionList, ActionRow } from '../ActionCard';
+import { siteAnomalies, windowText } from '../lib/anomalies';
+import type { Ga4Summary, GscRowsResponse, GscSummary } from '../lib/types';
 import { SiteHeader } from '../SiteHeader';
-import { AskButton, askHref, LoadError } from '../SiteStates';
+import { AskButton, LoadError } from '../SiteStates';
 import { SearchSummary, SectionCard, TrafficSummary } from '../SummaryPanels';
 import { PagesCard, SearchBreakdownCard, SourcesCard, TechCard } from '../breakdown/Cards';
 import { GeoCard } from '../breakdown/GeoCard';
 import { PageRows } from '../pages/PageRows';
 import { SearchVsTrafficCard } from './SearchVsTrafficCard';
 import { useSiteActions } from '../useSiteActions';
-import { useGa4, useSite, useSiteRange } from '../useSiteData';
+import { useGa4, useGsc, useSite, useSiteRange } from '../useSiteData';
 
 /** Site overview (DESIGN 5.4): GA4 and Search Console side by side for one site. */
 export function SiteOverview() {
@@ -58,7 +59,7 @@ export function SiteOverview() {
                 <GeoCard className="xl:col-span-2" />
                 {hasGa4 && hasGsc ? <SearchBreakdownCard /> : hasGa4 ? <TechCard /> : <AppearanceHint />}
             </div>
-            {/* Alerts are a compact strip sized to their content; the task cards get the full width. */}
+            {/* Alerts: anomalies only (one line when there are none); the fix list below holds the tasks. */}
             <AlertsCard />
             <NextActionsCard />
         </div>
@@ -90,102 +91,100 @@ function AppearanceHint() {
     );
 }
 
-interface AlertRow {
-    id: string;
-    severity: 'critical' | 'warning' | 'info' | 'success';
-    title: string;
-    description?: string;
-}
-
-/** GSC alerts from /api/alerts (shared with the bell) + GA4 drops computed from the summary already loaded. */
+/** Anomalies only (round 4, audit item 5): the numbers of the header tiles, with their window. Opportunities are tasks below. */
 function AlertsCard() {
     const site = useSite();
-    const { compareOn } = useSiteRange();
-    const { alerts, isLoading } = useAlerts(site.gsc ?? undefined, site.hasGsc);
+    const { dr, compareOn } = useSiteRange();
+    const gsc = useGsc<GscSummary>(site.hasGsc ? 'summary' : null);
     const ga = useGa4<Ga4Summary>(site.hasGa4 ? 'summary' : null);
-    const list = useMemo(() => {
-        const out: AlertRow[] = [];
-        const d = ga.data;
-        if (d) {
-            const full = d.series.slice(0, -1);
-            const tail = full.slice(-2);
-            if (tail.length === 2 && tail.every((p) => p.sessions === 0) && full.slice(0, -2).some((p) => p.sessions > 0)) {
-                out.push({ id: 'ga-zero', severity: 'critical', title: 'No visits recorded for 2 days', description: 'The GA4 tag may be missing or the site may be down.' });
-            }
-            if (compareOn && d.previous && d.previous.users >= 20) {
-                const ch = (d.totals.users - d.previous.users) / d.previous.users;
-                if (ch <= -0.3) out.push({ id: 'ga-drop', severity: ch <= -0.5 ? 'critical' : 'warning', title: `Users down ${Math.round(-ch * 100)}%`, description: `${fmtFull(d.previous.users)} → ${fmtFull(d.totals.users)} versus the previous period.` });
-            }
-        }
-        for (const a of alerts as Array<{ id: string | number; severity?: string; title?: string; description?: string }>) {
-            const sev = (a.severity === 'critical' || a.severity === 'warning' || a.severity === 'success' ? a.severity : 'info') as AlertRow['severity'];
-            out.push({ id: `gsc-${a.id}`, severity: sev, title: a.title ?? 'Alert', description: a.description });
-        }
-        const order = { critical: 0, warning: 1, info: 2, success: 3 };
-        return out.sort((a, b) => order[a.severity] - order[b.severity]).slice(0, 6);
-    }, [alerts, ga.data, compareOn]);
-    const loading = (site.hasGsc && isLoading) || (site.hasGa4 && ga.state === 'loading');
+    const queries = useGsc<GscRowsResponse>(site.hasGsc && compareOn ? 'queries' : null);
+    const { open } = useSiteActions({ includeAudit: true });
+    const gscWindow = useMemo(() => ({ start: dr.resolvedSearch.start, end: gsc.data?.lastDate ?? dr.resolvedSearch.end, prevStart: dr.resolvedSearch.prevStart, prevEnd: dr.resolvedSearch.prevEnd }), [dr.resolvedSearch, gsc.data?.lastDate]);
+    const list = useMemo(() => siteAnomalies({
+        gsc: gsc.data,
+        gscWindow,
+        ga4: ga.data,
+        ga4Window: dr.resolved,
+        queries: compareOn ? queries.data : null,
+    }), [gsc.data, gscWindow, ga.data, dr.resolved, compareOn, queries.data]);
+    const loading = (site.hasGsc && gsc.state === 'loading') || (site.hasGa4 && ga.state === 'loading');
+    const openTypes = new Set(open.map((a) => a.type));
+    // Search Console runs ~2 days behind, so its comparison ends earlier than the page range: say so instead
+    // of showing a window that does not match the header (round 4 polish).
+    const span = site.hasGsc && site.hasGa4 && windowText(gscWindow) !== windowText(dr.resolved)
+        ? `${windowText(dr.resolved)} (search: ${windowText(gscWindow)}, as Search Console data lags)`
+        : windowText(site.hasGsc ? gscWindow : dr.resolved);
+    const name = site.siteHost ?? site.label;
+
+    if (loading && list.length === 0) return <Skeleton className="h-12 rounded-card" />;
+    if (list.length === 0) {
+        return (
+            <Card as="section" padding="sm" aria-label="Alerts" className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <CheckCircle2 aria-hidden size={16} className="shrink-0 text-up" />
+                <h3 className="text-body-sm font-medium text-fg">No unusual changes</h3>
+                <p className="text-meta text-fg-muted">{span} · we flag swings of 20% or more, unusual days and queries that drop off page one</p>
+            </Card>
+        );
+    }
     return (
-        <SectionCard title="Alerts" description="Drops, spikes and ranking changes for this site">
-            {loading && list.length === 0 ? (
-                <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
-            ) : list.length === 0 ? (
-                <EmptyState variant="inline" icon={CheckCircle2} title="No alerts right now" description="Big drops and spikes show up here." />
-            ) : (
-                <ul className="grid grid-cols-1 gap-x-8 gap-y-3 md:grid-cols-2">
-                    {list.map((a) => {
-                        const Icon = a.severity === 'critical' || a.severity === 'warning' ? AlertTriangle : a.severity === 'success' ? CheckCircle2 : Info;
-                        const tone = a.severity === 'critical' ? 'text-down' : a.severity === 'warning' ? 'text-warn' : a.severity === 'success' ? 'text-up' : 'text-info';
-                        return (
-                            <li key={a.id} className="flex items-start gap-3">
-                                <Icon aria-hidden size={16} className={`mt-0.5 shrink-0 ${tone}`} />
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-body-sm font-medium text-fg">{a.title}</p>
-                                    {a.description ? <p className="mt-0.5 line-clamp-2 text-meta text-fg-muted">{a.description}</p> : null}
-                                </div>
-                                <Link
-                                    href={askHref(`About ${site.siteHost ?? site.label}: "${a.title}". ${a.description ?? ''} What caused it and what should I do?`, { ga4: site.ga4, gsc: site.gsc }, 'site:alert')}
-                                    className="tap-area shrink-0 text-meta font-medium text-brand-text hover:underline"
-                                >
-                                    Ask AI
-                                </Link>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
+        <SectionCard
+            title="Alerts"
+            description="Unusual changes in this site's numbers"
+            actions={<AskButton size="sm" variant="ghost" from="site:alert" label="Ask AI about these" site={{ ga4: site.ga4, gsc: site.gsc }}
+                prompt={`About ${name}: ${list.map((a) => `${a.title} (${a.detail})`).join('; ')}. What caused these changes and what should I do?`} />}
+        >
+            <ul className="grid grid-cols-1 gap-x-8 gap-y-3 md:grid-cols-2">
+                {list.map((a) => {
+                    const Icon = a.severity === 'success' ? TrendingUp : AlertTriangle;
+                    const tone = a.severity === 'critical' ? 'text-down' : a.severity === 'warning' ? 'text-warn' : 'text-up';
+                    const task = a.task && openTypes.has(a.task) ? a.task : null;
+                    return (
+                        <li key={a.id} className="flex items-start gap-3">
+                            <Icon aria-hidden size={16} className={`mt-0.5 shrink-0 ${tone}`} />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-body-sm font-medium text-fg">{a.title}</p>
+                                <p className="mt-0.5 text-meta text-fg-muted [overflow-wrap:anywhere]">{a.detail}</p>
+                            </div>
+                            {task ? (
+                                <Link href={`${siteHref(site.host, 'actions')}?type=${task}`} className="tap-area shrink-0 text-meta font-medium text-brand-text hover:underline">See the fix</Link>
+                            ) : null}
+                        </li>
+                    );
+                })}
+            </ul>
         </SectionCard>
     );
 }
 
 function NextActionsCard() {
     const site = useSite();
-    const { list, actions, setStatus, saveUnavailable } = useSiteActions();
-    const open = list.filter((a) => a.status === 'open');
+    // includeAudit: the same list (and count) as the Actions page.
+    const { open, settled, actions, setStatus, saveUnavailable } = useSiteActions({ includeAudit: true });
     const top = open.slice(0, 3);
+    // The rows show once the tasks load; the count waits for the audit too, so it always matches Actions.
+    const ready = Boolean(actions.data) || actions.state === 'error';
     return (
         <SectionCard
             title="What to fix next"
-            description={actions.data ? `${fmtFull(open.length)} open tasks, ranked by expected impact` : 'Ranked from your search and traffic data'}
-            actions={<Button asChild size="sm" variant="ghost" trailingIcon={ArrowRight}><Link href={siteHref(site.host, 'actions')}>All actions</Link></Button>}
+            description={settled ? (open.length > top.length ? `Top ${top.length} of ${fmtFull(open.length)} open tasks, ranked by expected impact` : `${fmtFull(open.length)} open ${open.length === 1 ? 'task' : 'tasks'}, ranked by expected impact`) : 'Ranked from your search and traffic data'}
+            actions={<Button asChild size="sm" variant="ghost" trailingIcon={ArrowRight}><Link href={siteHref(site.host, 'actions')}>{settled && open.length ? `All ${fmtFull(open.length)} actions` : 'All actions'}</Link></Button>}
         >
-            {actions.state === 'error' ? <LoadError error={actions.error} onRetry={actions.mutate} /> : actions.state === 'loading' ? (
-                <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24" />)}</div>
+            {actions.state === 'error' ? <LoadError error={actions.error} onRetry={actions.mutate} /> : !ready ? (
+                <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-9" />)}</div>
             ) : top.length === 0 ? (
                 <EmptyState variant="inline" icon={CheckCircle2} title="Nothing urgent to fix" description="We look for decaying pages, near-page-one queries, low CTR, cannibalization and traffic drops." />
             ) : (
-                <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-3">
+                <ActionList className="-mx-5 -mb-5 border-t border-border-subtle">
                     {top.map((a) => (
-                        <ActionCard
+                        <ActionRow
                             key={a.id}
                             action={a}
-                            compact
-                            site={{ ga4: site.ga4, gsc: site.gsc }}
+                            site={{ ga4: site.ga4, gsc: site.gsc, siteHost: site.siteHost }}
                             canSave={!saveUnavailable}
                             onStatus={(s, undo) => void setStatus(a, s, { undo })}
                         />
                     ))}
-                </div>
+                </ActionList>
             )}
         </SectionCard>
     );

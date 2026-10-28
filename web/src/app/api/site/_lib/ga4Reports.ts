@@ -4,6 +4,7 @@
  * dimension), so a card costs one GA4 request, not two.
  */
 import { andFilters } from '@/components/site/lib/filters';
+import { cleanTitle, titleBrand, usableTitle } from '@/components/site/lib/pagePath';
 import { bucketDates, gaBucketDate, type Interval } from '@/components/site/lib/intervals';
 import { AI_SOURCE_PATTERN } from '@/components/site/lib/rules';
 import type {
@@ -44,8 +45,9 @@ function byRange(report: GaReport, dimCount: number, multi: boolean) {
 
 // ─── Summary (KPIs + daily series + AI traffic) ───────────────────────────
 
-const TOTAL_METRICS = ['activeUsers', 'newUsers', 'sessions', 'engagedSessions', 'screenPageViews', 'keyEvents', 'engagementRate', 'averageSessionDuration'];
-const SERIES_METRICS = ['activeUsers', 'sessions', 'screenPageViews', 'keyEvents', 'engagementRate'];
+// totalRevenue = purchases + subscriptions + ad revenue (GA4); 0 for sites that sell nothing, and the UI then hides it.
+const TOTAL_METRICS = ['activeUsers', 'newUsers', 'sessions', 'engagedSessions', 'screenPageViews', 'keyEvents', 'engagementRate', 'averageSessionDuration', 'totalRevenue', 'transactions'];
+const SERIES_METRICS = ['activeUsers', 'sessions', 'screenPageViews', 'keyEvents', 'engagementRate', 'totalRevenue'];
 
 function totalsFrom(m: number[] | undefined, ai: number): Ga4Totals {
     const v = m ?? [];
@@ -58,6 +60,8 @@ function totalsFrom(m: number[] | undefined, ai: number): Ga4Totals {
         conversions: v[5] ?? 0,
         engagementRate: v[6] ?? 0,
         avgDuration: v[7] ?? 0,
+        revenue: v[8] ?? 0,
+        transactions: v[9] ?? 0,
         ai,
     };
 }
@@ -110,6 +114,7 @@ export async function ga4Summary(
             pageviews: m?.[2] ?? 0,
             conversions: m?.[3] ?? 0,
             engagementRate: m?.[4] ?? 0,
+            revenue: m?.[5] ?? 0,
             ai: aiCur.get(date) ?? 0,
         };
         if (r.cmp) {
@@ -120,6 +125,7 @@ export async function ga4Summary(
             p.prev_sessions = pd ? pm?.[1] ?? 0 : null;
             p.prev_pageviews = pd ? pm?.[2] ?? 0 : null;
             p.prev_conversions = pd ? pm?.[3] ?? 0 : null;
+            p.prev_revenue = pd ? pm?.[5] ?? 0 : null;
             p.prev_ai = pd ? aiCmp.get(pd) ?? 0 : null;
         }
         return p;
@@ -131,6 +137,7 @@ export async function ga4Summary(
         series: points,
         interval,
         ...(totals.metadata?.timeZone ? { timeZone: totals.metadata.timeZone } : {}),
+        ...(totals.metadata?.currencyCode ? { currency: totals.metadata.currencyCode } : {}),
     };
 }
 
@@ -144,7 +151,7 @@ interface BreakdownSpec {
     filter?: Record<string, unknown>;
 }
 
-const TRAFFIC = ['sessions', 'activeUsers', 'engagementRate', 'keyEvents', 'averageSessionDuration'];
+const TRAFFIC = ['sessions', 'activeUsers', 'engagementRate', 'keyEvents', 'averageSessionDuration', 'totalRevenue'];
 
 export const GA4_BREAKDOWNS: Record<Ga4Breakdown, BreakdownSpec> = {
     channels: { dims: ['sessionDefaultChannelGroup'], metrics: TRAFFIC, order: 'sessions', limit: 60 },
@@ -152,12 +159,12 @@ export const GA4_BREAKDOWNS: Record<Ga4Breakdown, BreakdownSpec> = {
     referrers: { dims: ['sessionSource'], metrics: TRAFFIC, order: 'sessions', limit: 300 },
     pages: {
         dims: ['hostName', 'pagePath'],
-        metrics: ['screenPageViews', 'activeUsers', 'userEngagementDuration', 'engagementRate', 'keyEvents'],
+        metrics: ['screenPageViews', 'activeUsers', 'userEngagementDuration', 'engagementRate', 'keyEvents', 'totalRevenue'],
         order: 'screenPageViews',
         limit: 1500,
     },
-    landing: { dims: ['landingPage'], metrics: ['sessions', 'activeUsers', 'engagementRate', 'keyEvents', 'averageSessionDuration', 'bounceRate'], order: 'sessions', limit: 600 },
-    countries: { dims: ['country', 'countryId'], metrics: ['activeUsers', 'sessions', 'engagementRate', 'keyEvents'], order: 'activeUsers', limit: 300 },
+    landing: { dims: ['landingPage'], metrics: ['sessions', 'activeUsers', 'engagementRate', 'keyEvents', 'averageSessionDuration', 'bounceRate', 'totalRevenue'], order: 'sessions', limit: 600 },
+    countries: { dims: ['country', 'countryId'], metrics: ['activeUsers', 'sessions', 'engagementRate', 'keyEvents', 'totalRevenue'], order: 'activeUsers', limit: 300 },
     cities: { dims: ['city', 'country'], metrics: ['activeUsers', 'sessions', 'engagementRate'], order: 'activeUsers', limit: 300 },
     languages: { dims: ['language'], metrics: ['activeUsers', 'sessions', 'engagementRate'], order: 'activeUsers', limit: 150 },
     devices: { dims: ['deviceCategory'], metrics: ['activeUsers', 'sessions', 'engagementRate', 'keyEvents'], order: 'activeUsers', limit: 12 },
@@ -171,19 +178,61 @@ export function isBreakdown(v: string | null): v is Ga4Breakdown {
     return typeof v === 'string' && v in GA4_BREAKDOWNS;
 }
 
+/** Rows of the page-title report: enough for every row of the pages breakdown. */
+const TITLE_ROWS = 2500;
+
+/**
+ * The most-viewed <title> of each page in the current range, brand suffix removed ("Pricing | Acme" ->
+ * "Pricing"). Keys are 'host\u0001path', plus 'path' alone (for landing pages, which have no host).
+ * A separate small report, so a title change never splits a page row in two. Null when GA4 refused it:
+ * the pages then show their paths alone.
+ */
+async function ga4PageTitles(userId: string, token: string, property: string, r: RangeParams, filter: GaFilter): Promise<Map<string, string> | null> {
+    const res = await ga4Report(userId, token, property, {
+        dateRanges: [{ startDate: r.cur.start, endDate: r.cur.end }],
+        dimensions: [{ name: 'hostName' }, { name: 'pagePath' }, { name: 'pageTitle' }],
+        metrics: [{ name: 'screenPageViews' }],
+        orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+        limit: TITLE_ROWS,
+        ...(filter ? { dimensionFilter: filter } : {}),
+    }).catch(() => null);
+    if (!res) return null;
+    // Rows come most-viewed first, so the first title seen for a page is its main one.
+    const raw = new Map<string, string>();
+    for (const row of res.rows ?? []) {
+        const [host = '', path = '', title] = (row.dimensionValues ?? []).map((d) => d.value ?? '');
+        const t = usableTitle(title);
+        if (!t || !path) continue;
+        const k = `${host}\u0001${path}`;
+        if (!raw.has(k)) raw.set(k, t);
+        if (!raw.has(path)) raw.set(path, t);
+    }
+    const brand = titleBrand([...raw.values()]);
+    const out = new Map<string, string>();
+    for (const [k, t] of raw) {
+        const c = cleanTitle(t, brand);
+        if (c) out.set(k, c);
+    }
+    return out;
+}
+
 export async function ga4Breakdown(userId: string, token: string, property: string, report: Ga4Breakdown, r: RangeParams, filter: GaFilter = null): Promise<Ga4BreakdownResponse> {
     const spec = GA4_BREAKDOWNS[report];
     const dimensionFilter = andFilters(spec.filter ?? null, filter);
     const multi = Boolean(r.cmp);
     const limit = multi ? spec.limit * 2 : spec.limit;
-    const res = await ga4Report(userId, token, property, {
-        dateRanges: ranges(r),
-        dimensions: spec.dims.map((name) => ({ name })),
-        metrics: spec.metrics.map((name) => ({ name })),
-        orderBys: [{ metric: { metricName: spec.order }, desc: true }],
-        limit,
-        ...(dimensionFilter ? { dimensionFilter } : {}),
-    });
+    const withTitles = report === 'pages' || report === 'landing';
+    const [res, titles] = await Promise.all([
+        ga4Report(userId, token, property, {
+            dateRanges: ranges(r),
+            dimensions: spec.dims.map((name) => ({ name })),
+            metrics: spec.metrics.map((name) => ({ name })),
+            orderBys: [{ metric: { metricName: spec.order }, desc: true }],
+            limit,
+            ...(dimensionFilter ? { dimensionFilter } : {}),
+        }),
+        withTitles ? ga4PageTitles(userId, token, property, r, filter) : Promise.resolve(null),
+    ]);
     const split = byRange(res, spec.dims.length, multi);
     const truncated = (res.rowCount ?? 0) > (res.rows?.length ?? 0);
     const keyOf = (dims: string[]) => dims.join('\u0001');
@@ -193,16 +242,17 @@ export async function ga4Breakdown(userId: string, token: string, property: stri
     const rows: Ga4Row[] = split.cur.map((x) => {
         const k = keyOf(x.dims);
         const pm = prevMap.get(k);
-        const row: Ga4Row = {
-            key: k,
-            dims: Object.fromEntries(spec.dims.map((d, i) => [d, x.dims[i] ?? ''])),
-            cur: toRec(x.m),
-        };
+        const dims: Record<string, string> = Object.fromEntries(spec.dims.map((d, i) => [d, x.dims[i] ?? '']));
+        if (titles) {
+            const title = report === 'pages' ? titles.get(`${dims.hostName ?? ''}\u0001${dims.pagePath ?? ''}`) ?? titles.get(dims.pagePath ?? '') : titles.get(dims.landingPage ?? '');
+            if (title) dims.pageTitle = title;
+        }
+        const row: Ga4Row = { key: k, dims, cur: toRec(x.m) };
         // Missing previous row: zero when GA4 returned everything, unknown when it was cut off.
         if (multi) row.prev = pm ? toRec(pm) : truncated ? null : toRec([]);
         return row;
     });
-    return { report, rows: rows.slice(0, spec.limit), truncated };
+    return { report, rows: rows.slice(0, spec.limit), truncated, ...(res.metadata?.currencyCode ? { currency: res.metadata.currencyCode } : {}) };
 }
 
 // ─── Realtime ───────────────────────────────────────────────────────────────
@@ -308,6 +358,9 @@ export async function ga4PageTrends(userId: string, token: string, property: str
         if (a) a.prev += x.m[0] ?? 0;
     }
     const ranked = [...pages.values()].sort((a, b) => b.views - a.views);
+    // One brand for the site ("… | Acme"), dropped from every title so the page's own name shows.
+    const brand = titleBrand(ranked.map((p) => p.title));
+    for (const p of ranked) p.title = cleanTitle(p.title, brand) ?? '';
     const chosen = ranked.slice(0, n);
     const titles = ranked.filter((p) => p.title).slice(0, 300).map((p) => ({ host: p.host, path: p.path, title: p.title }));
     if (!chosen.length) return { rows: [], bars: 0, barDays: 0, titles };
@@ -459,8 +512,10 @@ export async function ga4Retention(userId: string, token: string, property: stri
 
 export interface Ga4PageDetail {
     series: { date: string; pageviews: number; users: number; prevDate?: string | null; prev_pageviews?: number | null }[];
-    totals: { pageviews: number; users: number; engagement: number; conversions: number };
-    previous: { pageviews: number; users: number; engagement: number; conversions: number } | null;
+    totals: { pageviews: number; users: number; engagement: number; conversions: number; revenue: number };
+    previous: { pageviews: number; users: number; engagement: number; conversions: number; revenue: number } | null;
+    /** The property's currency (ISO 4217) for `revenue`. */
+    currency?: string;
     sources: { name: string; views: number }[];
     /** The page's most-viewed <title> in the range (null when GA4 has none). */
     title: string | null;
@@ -473,7 +528,7 @@ export async function ga4PageDetail(userId: string, token: string, property: str
     const dimensionFilter = exprs.length > 1 ? { andGroup: { expressions: exprs } } : exprs[0];
     const [daily, totals, sources, titles] = await Promise.all([
         ga4Report(userId, token, property, { dateRanges: ranges(r), dimensions: [{ name: 'date' }], metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }], dimensionFilter, limit: 2000 }),
-        ga4Report(userId, token, property, { dateRanges: ranges(r), metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }, { name: 'userEngagementDuration' }, { name: 'keyEvents' }], dimensionFilter, limit: 5 }),
+        ga4Report(userId, token, property, { dateRanges: ranges(r), metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }, { name: 'userEngagementDuration' }, { name: 'keyEvents' }, { name: 'totalRevenue' }], dimensionFilter, limit: 5 }),
         ga4Report(userId, token, property, { dateRanges: [{ startDate: r.cur.start, endDate: r.cur.end }], dimensions: [{ name: 'sessionSource' }], metrics: [{ name: 'screenPageViews' }], dimensionFilter, orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }], limit: 15 }),
         // The title is a nicety: a failure here must not lose the drawer.
         ga4Report(userId, token, property, { dateRanges: [{ startDate: r.cur.start, endDate: r.cur.end }], dimensions: [{ name: 'pageTitle' }], metrics: [{ name: 'screenPageViews' }], dimensionFilter, orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }], limit: 1 })
@@ -488,7 +543,7 @@ export async function ga4PageDetail(userId: string, token: string, property: str
     const cmpDays = r.cmp ? fillDays(r.cmp.start, r.cmp.end) : [];
     const tot = (m: number[] | undefined) => {
         const users = m?.[1] ?? 0;
-        return { pageviews: m?.[0] ?? 0, users, engagement: users > 0 ? (m?.[2] ?? 0) / users : 0, conversions: m?.[3] ?? 0 };
+        return { pageviews: m?.[0] ?? 0, users, engagement: users > 0 ? (m?.[2] ?? 0) / users : 0, conversions: m?.[3] ?? 0, revenue: m?.[4] ?? 0 };
     };
     return {
         series: curDays.map((date, i) => {
@@ -504,5 +559,6 @@ export async function ga4PageDetail(userId: string, token: string, property: str
         previous: multi ? tot(t.cmp[0]?.m) : null,
         sources: (sources.rows ?? []).map((row) => ({ name: row.dimensionValues?.[0]?.value || '(not set)', views: num(row.metricValues?.[0]?.value) })),
         title: rawTitle && rawTitle !== '(not set)' ? rawTitle : null,
+        ...(totals.metadata?.currencyCode ? { currency: totals.metadata.currencyCode } : {}),
     };
 }

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { clientAddress, clientKey } from '@/lib/clientIp';
 
 const RATE_LIMIT_MAP = new Map<string, number>();
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
 
 export async function POST(req: NextRequest) {
     try {
-        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+        const ip = clientKey(req.headers);
         const now = Date.now();
         const lastRequest = RATE_LIMIT_MAP.get(ip);
         if (lastRequest && now - lastRequest < RATE_LIMIT_WINDOW) {
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
                     'Content-Type': 'application/json',
                     'X-API-Key': adminKey,
                 },
-                body: JSON.stringify({ name, email, message, ip_address: ip }),
+                body: JSON.stringify({ name, email, message, ip_address: clientAddress(req.headers) }),
             });
 
             if (!res.ok) {

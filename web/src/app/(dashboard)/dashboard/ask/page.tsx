@@ -25,6 +25,8 @@ import { AskEmpty } from './AskEmpty';
 import { Composer } from './Composer';
 import { ProviderConnectionCallback, QuestionFromQuery, type DeepLinkOptions } from './DeepLink';
 import { HistoryDrawer } from './HistoryDrawer';
+import { DemoAsk } from '@/components/demo/DemoAsk';
+import { useDemoSession } from '@/components/demo/useDemoSession';
 
 type DashboardPropertyOption = {
     displayName?: string;
@@ -44,6 +46,12 @@ const statusFetcher = (url: string) => fetch(url, { cache: 'no-store' }).then((r
  * missing Google data, history, and `?q=` deep links.
  */
 export default function AskPage() {
+    // Public live demo: sample answers from the demo data, never a model call.
+    const { demo } = useDemoSession();
+    return demo ? <DemoAsk /> : <AskConversation />;
+}
+
+function AskConversation() {
     const {
         selectedSite,
         selectedProperty: workspaceProperty,

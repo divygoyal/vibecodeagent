@@ -15,6 +15,7 @@ import { GoogleTab } from './GoogleTab';
 import { NotificationsTab } from './NotificationsTab';
 import { PrivacyTab } from './PrivacyTab';
 import { ProfileTab } from './ProfileTab';
+import { useDemoSession } from '@/components/demo/useDemoSession';
 
 /**
  * Settings (DESIGN 5.14): Profile, Google connection, Appearance, Notifications,
@@ -51,8 +52,12 @@ function Settings() {
     const searchParams = useSearchParams();
     const { hasGoogleConnection, refresh: refreshContainer } = useConnections();
 
+    // Public live demo: no Danger zone (the shared demo account cannot be deleted or reset).
+    const { demo } = useDemoSession();
+    const tabItems = demo ? TAB_ITEMS.filter((t) => t.value !== 'danger') : TAB_ITEMS;
     const raw = searchParams.get('tab') ?? '';
-    const tab: TabKey = (TAB_VALUES as readonly string[]).includes(raw) ? (raw as TabKey) : LEGACY_TABS[raw] ?? 'profile';
+    const known = (TAB_VALUES as readonly string[]).includes(raw) && !(demo && raw === 'danger');
+    const tab: TabKey = known ? (raw as TabKey) : LEGACY_TABS[raw] ?? 'profile';
 
     const setTab = useCallback((next: TabKey) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -106,14 +111,14 @@ function Settings() {
             <PageHeader
                 title="Settings"
                 subtitle="Your account, Google connection and preferences"
-                tabs={<Tabs items={TAB_ITEMS} value={tab} onValueChange={setTab} ariaLabel="Settings sections" panelIdPrefix="settings" showIcons />}
+                tabs={<Tabs items={tabItems} value={tab} onValueChange={setTab} ariaLabel="Settings sections" panelIdPrefix="settings" showIcons />}
             />
             <div id={`settings-${tab}`} role="tabpanel" className="flex flex-col gap-4">
                 {tab === 'profile' ? <ProfileTab /> : null}
                 {tab === 'google' ? <GoogleTab connected={hasGoogleConnection} /> : null}
                 {tab === 'appearance' ? <AppearanceTab /> : null}
                 {tab === 'notifications' ? <NotificationsTab /> : null}
-                {tab === 'privacy' ? <PrivacyTab goToDanger={() => setTab('danger')} /> : null}
+                {tab === 'privacy' ? <PrivacyTab goToDanger={demo ? undefined : () => setTab('danger')} /> : null}
                 {tab === 'danger' ? <DangerTab /> : null}
             </div>
         </div>

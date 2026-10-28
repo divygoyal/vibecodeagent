@@ -14,6 +14,7 @@ import { BreakdownTable } from '../BreakdownTable';
 import { displayPage, pageRef } from '../lib/rules';
 import type { Ga4BreakdownResponse, Ga4Row, Ga4Summary, RetentionResponse } from '../lib/types';
 import { MetricTile } from '../MetricTile';
+import { PagePath } from '../PagePath';
 import { LoadError } from '../SiteStates';
 import { useGa4, useSite, useSiteRange } from '../useSiteData';
 import { GoalsPanel } from './GoalsFunnels';
@@ -27,9 +28,16 @@ export function EventsTab() {
     const events = useGa4<Ga4BreakdownResponse>('events');
     const summary = useGa4<Ga4Summary>('summary');
     const [only, setOnly] = useState<'all' | 'key'>('all');
-    const rows = useMemo(() => (events.data?.rows ?? []).filter((r) => only === 'all' || v(r, 'keyEvents') > 0), [events.data, only]);
+    const all = useMemo(() => events.data?.rows ?? [], [events.data]);
+    const keyNames = all.filter((r) => v(r, 'keyEvents') > 0);
+    const hasKey = keyNames.length > 0;
+    // Round 4: events with no hits this period (they only exist in the comparison) are trimmed, and the key-event
+    // columns show only under "Key events", so 11 rows of "0 / 0%" never fill the table.
+    const live = useMemo(() => all.filter((r) => v(r, 'eventCount') > 0), [all]);
+    const rows = useMemo(() => live.filter((r) => only === 'all' || !hasKey || v(r, 'keyEvents') > 0), [live, only, hasKey]);
+    const trimmed = all.length - live.length;
     const sessions = summary.data?.totals.sessions ?? 0;
-    const keyNames = (events.data?.rows ?? []).filter((r) => v(r, 'keyEvents') > 0);
+    const keyView = hasKey && only === 'key';
     const t = summary.data?.totals;
     const prev = compareOn ? summary.data?.previous ?? null : undefined;
     return (
@@ -37,9 +45,15 @@ export function EventsTab() {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <MetricTile metric="conversions" label="Key events" value={t?.conversions} previous={prev === undefined ? undefined : prev?.conversions ?? null} loading={summary.state === 'loading'} comparisonLabel={compareText} />
                 <MetricTile metric="conversions" label="Key event rate" format="percent" value={t && t.sessions ? t.conversions / t.sessions : null} previous={prev === undefined ? undefined : prev && prev.sessions ? prev.conversions / prev.sessions : null} loading={summary.state === 'loading'} comparisonLabel={compareText} />
-                <MetricTile metric="sessions" label="Event types" value={events.data?.rows.length ?? null} loading={events.state === 'loading'} />
+                <MetricTile metric="sessions" label="Event types" value={events.data ? live.length : null} loading={events.state === 'loading'} />
                 <MetricTile metric="conversions" label="Key event types" value={events.data ? keyNames.length : null} loading={events.state === 'loading'} />
             </div>
+            {events.data && !hasKey && live.length > 0 ? (
+                <Banner variant="neutral">
+                    None of these events is a key event yet. In GA4, open Admin › Data display › Events and turn on
+                    &ldquo;Mark as key event&rdquo; for the ones that matter (a sign-up, a purchase, a lead form). They show up here from then on.
+                </Banner>
+            ) : null}
             {events.state === 'error' ? <LoadError error={events.error} onRetry={events.mutate} /> : (
                 <BreakdownTable
                     caption="Events"
@@ -51,15 +65,27 @@ export function EventsTab() {
                     defaultSort="count"
                     exportName="events"
                     searchPlaceholder="Search events"
-                    toolbarExtra={<SegmentedControl ariaLabel="Events shown" size="sm" variant="neutral" value={only} onChange={setOnly} options={[{ value: 'all', label: 'All events' }, { value: 'key', label: 'Key events' }]} />}
+                    toolbarExtra={hasKey ? <SegmentedControl ariaLabel="Events shown" size="sm" variant="neutral" value={only} onChange={setOnly} options={[{ value: 'all', label: 'All events' }, { value: 'key', label: 'Key events' }]} /> : undefined}
                     columns={[
                         { key: 'count', header: 'Event count', value: (r) => v(r, 'eventCount'), previous: compareOn ? (r) => p(r, 'eventCount') : undefined },
                         { key: 'users', header: 'Users', value: (r) => v(r, 'totalUsers'), hideOnMobile: true },
-                        { key: 'key', header: 'Key events', value: (r) => v(r, 'keyEvents'), hideOnMobile: true },
-                        { key: 'rate', header: 'Per session', format: 'percent', value: (r) => (sessions ? v(r, 'keyEvents') / sessions : 0), hideOnMobile: true },
+                        // All events: a per-session rate every row has. Key events view: the key-event count and rate.
+                        ...(keyView ? [
+                            { key: 'key', header: 'Key events', value: (r: Ga4Row) => v(r, 'keyEvents'), hideOnMobile: true },
+                            { key: 'rate', header: 'Key event rate', format: 'percent' as const, value: (r: Ga4Row) => (sessions ? v(r, 'keyEvents') / sessions : null), hideOnMobile: true },
+                        ] : [
+                            { key: 'per', header: 'Per session', format: 'decimal' as const, value: (r: Ga4Row) => (sessions ? v(r, 'eventCount') / sessions : null), hideOnMobile: true },
+                        ]),
                     ]}
                 />
             )}
+            {trimmed > 0 || hasKey ? (
+                <p className="-mt-2 text-meta text-fg-muted">
+                    {trimmed > 0 ? `${fmtFull(trimmed)} ${trimmed === 1 ? 'event' : 'events'} with no hits in this period not shown. ` : ''}
+                    {/* GA4 can count a key event once per session, so its Event count may be higher than its key events (round 4 polish). */}
+                    {hasKey ? `Key events follow each event’s counting setting in GA4 (once per event or once per session), so a key event’s Event count can be higher than its key events.${keyView ? '' : ' Switch to Key events to see those counts.'}` : ''}
+                </p>
+            ) : null}
             <GoalsPanel />
         </div>
     );
@@ -100,8 +126,13 @@ export function JourneysTab() {
                     rows={rows}
                     rowKey={(x) => x.r.key}
                     loading={landing.state === 'loading'}
-                    label={{ header: 'Entry page', text: (x) => x.label }}
+                    label={{
+                        header: 'Entry page',
+                        text: (x) => `${x.r.dims.pageTitle ?? ''} ${x.label}`.trim(),
+                        cell: (x) => <PagePath path={x.label} title={x.r.dims.pageTitle} className="w-full font-medium text-fg md:w-auto" />,
+                    }}
                     heat={{ metric: 'sessions', value: (x) => v(x.r, 'sessions') }}
+                    twoLine
                     defaultSort="sessions"
                     exportName="entry-pages"
                     searchPlaceholder="Search entry pages"
@@ -111,7 +142,7 @@ export function JourneysTab() {
                         { key: 'rate', header: 'Went deeper', format: 'percent', value: (x) => v(x.r, 'engagementRate'), hideOnMobile: true },
                         { key: 'bounce', header: 'Left at once', format: 'percent', better: 'down', value: (x) => v(x.r, 'bounceRate'), hideOnMobile: true },
                         { key: 'dur', header: 'Avg. duration', format: 'duration', value: (x) => v(x.r, 'averageSessionDuration'), hideOnMobile: true },
-                        { key: 'conv', header: 'Conversions', value: (x) => v(x.r, 'keyEvents'), hideOnMobile: true },
+                        { key: 'conv', header: 'Key events', value: (x) => v(x.r, 'keyEvents'), hideOnMobile: true },
                     ]}
                 />
             )}

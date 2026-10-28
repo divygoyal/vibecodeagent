@@ -5,7 +5,7 @@
  */
 import { fmtFull } from '@/lib/format';
 import {
-    displayPage, expectedCtr, isDecaying, isLowCtr, isStriking, lowCtrPotential, median, pageRef, STRIKING_TARGET, strikingPotential,
+    displayPage, expectedCtr, isDecaying, isLowCtr, isStriking, lowCtrPotential, median, pageRef, STRIKING_TARGET, strikingPotential, strikingTitle,
 } from '@/components/site/lib/rules';
 import { actionId, impactFor, pct, per28, plural } from '@/components/site/lib/actionText';
 import type { ActionsResponse, SiteAction } from '@/components/site/lib/types';
@@ -135,7 +135,7 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
                 type: 'striking',
                 area: 'Search',
                 impact: impactFor(gain, scale),
-                title: `Push "${x.key}" onto the first page`,
+                title: strikingTitle(x.key, x.position),
                 summary: `Ranks ${pos(x.position)} with ${fmtFull(x.impressions)} impressions and ${fmtFull(x.clicks)} clicks${page ? ` (${show(page)})` : ''}. A result at position ${STRIKING_TARGET} usually gets about ${ctrText(expectedCtr(STRIKING_TARGET))} of clicks.`,
                 evidence: [
                     { label: 'Position', value: pos(x.position) },
@@ -152,7 +152,7 @@ async function searchActions(inp: ActionsInput, partial: string[]): Promise<Site
                 ],
                 page,
                 query: x.key,
-                askPrompt: `"${x.key}" ranks ${pos(x.position)} on ${host} with ${fmtFull(x.impressions)} impressions${page ? ` (page ${show(page)})` : ''}. How do I get it onto the first page and higher?`,
+                askPrompt: `"${x.key}" ranks ${pos(x.position)} on ${host} with ${fmtFull(x.impressions)} impressions${page ? ` (page ${show(page)})` : ''}. ${x.position < 10.5 ? 'How do I move it up into the top 5?' : 'How do I get it onto the first page and higher?'}`,
             });
         }
     }
@@ -283,7 +283,7 @@ async function trafficActions(inp: ActionsInput, partial: string[]): Promise<Sit
                     evidence: [
                         { label: 'Sessions', value: `${fmtFull(prev.sessions)} → ${fmtFull(summary.totals.sessions)}` },
                         { label: 'Users', value: `${fmtFull(prev.users)} → ${fmtFull(summary.totals.users)}` },
-                        { label: 'Conversions', value: `${fmtFull(prev.conversions)} → ${fmtFull(summary.totals.conversions)}` },
+                        { label: 'Key events', value: `${fmtFull(prev.conversions)} → ${fmtFull(summary.totals.conversions)}` },
                     ],
                     expectedImpact: `Recover up to ${fmtFull(per28(lost, days))} sessions a month`,
                     score: per28(lost, days),

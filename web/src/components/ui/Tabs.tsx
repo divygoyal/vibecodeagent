@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import type { LucideIcon } from 'lucide-react';
+import { ChevronRight, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 
@@ -33,14 +33,16 @@ export interface TabsProps<T extends string = string> {
     panelIdPrefix?: string;
 }
 
-/** True while a horizontal scroller has more content to its right (for the edge fade). */
+/** Whether a horizontal scroller has more content to its right / left (for the edge fades and the chevron). */
 function useMoreToTheRight() {
     const ref = useRef<HTMLDivElement>(null);
     const [more, setMore] = useState(false);
+    const [before, setBefore] = useState(false);
     const check = useCallback(() => {
         const el = ref.current;
         if (!el) return;
         setMore(el.scrollWidth - el.clientWidth - el.scrollLeft > 2);
+        setBefore(el.scrollLeft > 2);
     }, []);
     useEffect(() => {
         const el = ref.current;
@@ -54,7 +56,7 @@ function useMoreToTheRight() {
             el.removeEventListener('scroll', check);
         };
     }, [check]);
-    return [ref, more] as const;
+    return [ref, more, before] as const;
 }
 
 /**
@@ -86,8 +88,26 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
     };
 
     const underline = variant === 'underline';
-    const [scrollRef, more] = useMoreToTheRight();
+    const [scrollRef, more, before] = useMoreToTheRight();
+    const activeIndex = items.findIndex((t) => t.value === value);
+    // A tab past the right edge (Events & goals on a phone) scrolls into view, so the row never opens on a cut label.
+    useEffect(() => {
+        const box = scrollRef.current;
+        const tab = refs.current[activeIndex];
+        if (!box || !tab) return;
+        const left = tab.offsetLeft - box.offsetLeft;
+        if (left < box.scrollLeft || left + tab.offsetWidth > box.scrollLeft + box.clientWidth) {
+            box.scrollLeft = Math.max(0, left - 24);
+        }
+    }, [activeIndex, scrollRef]);
+    // Fades on the edges that hide tabs (wider than the old 40px, so a cut label reads as "more"), plus a chevron.
+    // The right fade ends fully clear under the chevron (its last 20px), so no letter shows through it.
+    const fade = more && before
+        ? '[mask-image:linear-gradient(to_right,transparent,#000_32px,#000_calc(100%-80px),transparent_calc(100%-20px))]'
+        : more ? '[mask-image:linear-gradient(to_right,#000_calc(100%-80px),transparent_calc(100%-20px))]'
+            : before ? '[mask-image:linear-gradient(to_right,transparent,#000_32px)]' : null;
     return (
+        <div className={cn('relative min-w-0', className)}>
         <div
             ref={scrollRef}
             role={isRouting ? undefined : 'tablist'}
@@ -96,8 +116,7 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
                 'flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
                 // pills: room inside the scroll box for the 44px touch hit area (overflow clips it otherwise)
                 underline ? 'gap-5 border-b border-border-subtle' : 'gap-1 pointer-coarse:-my-1.5 pointer-coarse:py-1.5',
-                more && '[mask-image:linear-gradient(to_right,#000_calc(100%-40px),transparent)]',
-                className,
+                fade,
             )}
         >
             {items.map((t, i) => {
@@ -152,6 +171,12 @@ export function Tabs<T extends string = string>({ items, value, onValueChange, v
                     </button>
                 );
             })}
+        </div>
+            {more ? (
+                <span aria-hidden className={cn('pointer-events-none absolute right-0 flex items-center text-fg-muted', underline ? 'top-0 h-10' : 'inset-y-0')}>
+                    <ChevronRight size={16} strokeWidth={2} />
+                </span>
+            ) : null}
         </div>
     );
 }

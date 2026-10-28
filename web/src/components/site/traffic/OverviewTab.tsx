@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
+import { cn } from '@/lib/cn';
 import { fmtDateRange } from '@/lib/format';
 import { channelColor, deviceColor, METRICS, type MetricKey } from '@/lib/metrics';
 import { BarList } from '@/components/charts/BarList';
@@ -19,11 +20,13 @@ import { FindingLine } from '../Finding';
 import type { Ga4BreakdownResponse, Ga4Summary } from '../lib/types';
 import { MetricTile } from '../MetricTile';
 import { LoadError } from '../SiteStates';
-import { SectionCard } from '../SummaryPanels';
+import { revenuePerSession, SectionCard } from '../SummaryPanels';
 import { downloadCsv, useGa4, useSiteRange } from '../useSiteData';
 import { PeakHoursCard } from './PeakHours';
 
 const STRIP: MetricKey[] = ['users', 'sessions', 'pageviews', 'conversions', 'ai'];
+/** A property with GA4 revenue above 0 (a shop, subscriptions, ads) adds a Revenue tile after Key events. */
+const STRIP_REVENUE: MetricKey[] = ['users', 'sessions', 'pageviews', 'conversions', 'revenue', 'ai'];
 
 export function Flag({ children }: { children: string }) {
     return children ? <span aria-hidden className="text-[14px] leading-none">{children}</span> : null;
@@ -46,7 +49,11 @@ export function TrafficOverviewTab() {
     const prev = compareOn ? d?.previous ?? null : undefined;
     const t = d?.totals;
     const empty = q.state === 'ready' && t && t.sessions === 0;
-    const finding = useTrafficFinding(metric, d, { daily: interval === 'day' });
+    const hasRevenue = (t?.revenue ?? 0) > 0 || (d?.previous?.revenue ?? 0) > 0;
+    const strip = hasRevenue ? STRIP_REVENUE : STRIP;
+    const currency = d?.currency;
+    const chartMetric: MetricKey = metric === 'revenue' && !hasRevenue ? 'users' : metric;
+    const finding = useTrafficFinding(chartMetric, d, { daily: interval === 'day' });
     const marks = useChartMarkers(dates, dr.resolved.start, dr.resolved.end);
 
     return (
@@ -54,46 +61,53 @@ export function TrafficOverviewTab() {
             {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : null}
             <KpiStrip
                 ariaLabel="Traffic metrics"
-                selected={metric}
+                selected={chartMetric}
                 onSelect={setMetric}
                 comparisonLabel={compareText || 'previous period'}
-                items={STRIP.map((k) => ({
+                items={strip.map((k) => ({
                     metric: k,
                     value: t ? (t as unknown as Record<string, number>)[k] : null,
                     previous: prev === undefined ? undefined : prev ? (prev as unknown as Record<string, number>)[k] : null,
                     loading,
+                    ...(k === 'revenue' ? { currency } : {}),
                 }))}
             >
                 <ChartCard
                     bare
-                    title={`${METRICS[metric].label} per ${interval}`}
+                    title={`${METRICS[chartMetric].label} per ${interval}`}
                     subtitle={compareOn ? `Dashed: ${dr.compareLabel.replace(/^vs /, '')} · today is partial` : 'Today is partial'}
                     actions={<IntervalSwitch days={days} />}
                     state={q.state === 'error' ? 'error' : empty ? 'empty' : q.state}
                     error={{ message: q.error?.message, onRetry: q.mutate }}
                     empty={{ title: 'No visits in this period', description: 'Try a longer range, or check the GA4 tag is installed.' }}
                     height="large"
-                    onDownloadCsv={d ? () => downloadCsv(`traffic-${interval}.csv`, ['date', ...STRIP], series.map((p) => [p.date, p.users, p.sessions, p.pageviews, p.conversions, p.ai])) : undefined}
+                    onDownloadCsv={d ? () => downloadCsv(`traffic-${interval}.csv`, ['date', 'users', 'sessions', 'pageviews', 'key_events', ...(hasRevenue ? [`revenue_${currency ?? 'USD'}`] : []), 'ai'], series.map((p) => [p.date, p.users, p.sessions, p.pageviews, p.conversions, ...(hasRevenue ? [p.revenue] : []), p.ai])) : undefined}
                 >
                     <FindingLine finding={finding} />
                     <TimeSeriesChart
                         data={series as unknown as Record<string, number | string | null>[]}
-                        series={[{ metric, key: metric, compareKey: compareOn ? `prev_${metric}` : undefined }]}
+                        series={[{ metric: chartMetric, key: chartMetric, compareKey: compareOn ? `prev_${chartMetric}` : undefined, currency }]}
                         compareDateKey="prevDate"
                         partialFrom={series.length > 1 ? series.length - 1 : undefined}
                         annotations={toAnnotations(marks.markers)}
                         height={300}
-                        ariaLabel={`${METRICS[metric].label} per ${interval}, ${fmtDateRange(dr.resolved.start, dr.resolved.end)}`}
+                        ariaLabel={`${METRICS[chartMetric].label} per ${interval}, ${fmtDateRange(dr.resolved.start, dr.resolved.end)}`}
                     />
                     <ChartMarkers markers={marks.markers} start={dr.resolved.start} end={dr.resolved.end} notesKey={marks.notesKey} scope={marks.scope} onChanged={marks.mutateNotes} notesFailed={marks.notesFailed} />
                 </ChartCard>
             </KpiStrip>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className={cn('grid grid-cols-2 gap-3', hasRevenue ? 'md:grid-cols-3 xl:grid-cols-6' : 'md:grid-cols-4')}>
                 <MetricTile metric="sessions" label="Engagement rate" format="percent" value={t?.engagementRate} previous={prev === undefined ? undefined : prev?.engagementRate ?? null} loading={loading} comparisonLabel={compareText} />
                 <MetricTile metric="sessions" label="Avg. session duration" format="duration" value={t?.avgDuration} previous={prev === undefined ? undefined : prev?.avgDuration ?? null} loading={loading} comparisonLabel={compareText} />
                 <MetricTile metric="users" label="New users" value={t?.newUsers} previous={prev === undefined ? undefined : prev?.newUsers ?? null} loading={loading} comparisonLabel={compareText} />
                 <MetricTile metric="pageviews" label="Views per session" format="position" better="up" value={t && t.sessions ? Math.round((t.pageviews / t.sessions) * 100) / 100 : null}
                     previous={prev === undefined ? undefined : prev && prev.sessions ? Math.round((prev.pageviews / prev.sessions) * 100) / 100 : null} loading={loading} comparisonLabel={compareText} />
+                {hasRevenue ? (
+                    <>
+                        <MetricTile metric="revenue" label="Transactions" format="count" value={t?.transactions} previous={prev === undefined ? undefined : prev?.transactions ?? null} loading={loading} comparisonLabel={compareText} />
+                        <MetricTile metric="revenue" label="Revenue per session" value={revenuePerSession(t)} previous={prev === undefined ? undefined : revenuePerSession(prev)} loading={loading} comparisonLabel={compareText} currency={currency} cents />
+                    </>
+                ) : null}
             </div>
             {/* One height per row: the side lists grow and keep "View all" at the bottom. */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -127,11 +141,13 @@ export function ChannelsDonut() {
 
 export function DevicesDonut() {
     const q = useGa4<Ga4BreakdownResponse>('devices');
+    // The centre shows the site's users (the header number); the slices can add up to more (several devices).
+    const summary = useGa4<Ga4Summary>('summary');
     const items = (q.data?.rows ?? []).map((r) => ({ key: r.key, label: cap(r.dims.deviceCategory), value: r.cur.activeUsers ?? 0, color: deviceColor(r.dims.deviceCategory) }));
     return (
         <SectionCard title="Devices" description="Users">
             {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : q.state === 'loading' ? <DonutSkeleton /> : items.length ? (
-                <Donut items={items} centerLabel="Users" size={136} legend="bottom" />
+                <Donut items={items} centerLabel="Users" centerValue={summary.data?.totals.users} size={136} legend="bottom" />
             ) : <EmptyState variant="inline" title="No users in this period" />}
         </SectionCard>
     );

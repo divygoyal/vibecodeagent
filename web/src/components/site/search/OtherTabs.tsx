@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CheckCircle2, ExternalLink, FileSearch, Search as SearchIcon } from 'lucide-react';
+import { CheckCircle2, ExternalLink, FileSearch, Info, Search as SearchIcon } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { fmtDayYear, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
@@ -16,36 +16,55 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Table } from '@/components/ui/Table';
 import { useDateRange } from '@/components/shell/DateRangeControl';
 import { BreakdownTable } from '../BreakdownTable';
-import { displayPage, moverKind, pageRef, type MoverKind } from '../lib/rules';
+import { per28 } from '../lib/actionText';
+import { displayPage, emptyMoversLine, expectedCtr, moverGroups, pageRef, STRIKING_TARGET, type MoverKind } from '../lib/rules';
 import type { CannibalizedQuery, GscRow, GscRowsResponse, InspectResponse, OpportunitiesResponse, OpportunityRow, SitemapRow } from '../lib/types';
 import { AskButton, LoadError } from '../SiteStates';
-import { downloadCsv, fetchJson, useGsc, useSite } from '../useSiteData';
+import { downloadCsv, fetchJson, useGsc, useSite, useSiteRange } from '../useSiteData';
 import { useStringParam } from '../useTabParam';
 import { SearchDetailDrawer } from './SearchDetailDrawer';
 
 // ─── Opportunities ──────────────────────────────────────────────────────────
 
 /** Search > Opportunities: striking distance and low CTR, with the page that ranks. */
+/**
+ * "rows: 3 queries, 1 page": the Low CTR card counts pages and queries, while Performance's "Low CTR" chip
+ * counts queries, so the card names both parts and its query count matches the chip (round 4 polish).
+ */
+function lowCtrSplit(rows: OpportunityRow[]): string {
+    const queries = rows.filter((r) => r.target === 'query').length;
+    const pages = rows.length - queries;
+    const part = (n: number, one: string, many: string) => `${fmtFull(n)} ${n === 1 ? one : many}`;
+    if (!pages) return queries === 1 ? 'query' : 'queries';
+    if (!queries) return pages === 1 ? 'page' : 'pages';
+    return `rows: ${part(queries, 'query', 'queries')}, ${part(pages, 'page', 'pages')}`;
+}
+
 export function OpportunitiesTab() {
     const site = useSite();
+    const { searchDays } = useSiteRange();
     const q = useGsc<OpportunitiesResponse>('opportunities');
     const [kind, setKind] = useState<'striking' | 'low_ctr'>('striking');
     const [detail, setDetail] = useStringParam('detail', 'push');
     const rows = kind === 'striking' ? q.data?.striking ?? [] : q.data?.lowCtr ?? [];
     const label = (r: OpportunityRow) => (r.target === 'page' ? displayPage(pageRef(r.key), site.siteHost) : r.key);
+    // A month = 28 days, as on Actions ("+7,681 clicks a month"), whatever the range.
+    const monthly = (r: OpportunityRow) => per28(r.potentialClicks, searchDays);
+    const sum = (list: OpportunityRow[]) => list.reduce((a, r) => a + monthly(r), 0);
+    const target = fmtPercent(expectedCtr(STRIKING_TARGET), { tile: true });
     if (q.state === 'error') return <LoadError error={q.error} onRetry={q.mutate} />;
     return (
         <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Card padding="sm">
                     <p className="text-body-sm font-medium text-fg">Striking distance</p>
-                    <p className="mt-0.5 text-meta text-fg-muted">Queries at position 8–20 with more impressions than your median query{q.data ? ` (${fmtFull(Math.round(q.data.medianImpressions))})` : ''}. A small push puts them on page one.</p>
-                    {q.data ? <p className="mt-2 text-stat-sm text-fg">{fmtFull(q.data.striking.length)} <span className="text-body-sm font-normal text-fg-muted">queries · +{fmtFull(q.data.striking.reduce((a, r) => a + r.potentialClicks, 0))} clicks at position 5</span></p> : <Skeleton className="mt-2 h-6 w-40" />}
+                    <p className="mt-0.5 text-meta text-fg-muted">Queries at position 8–20 with more impressions than your median query{q.data ? ` (${fmtFull(Math.round(q.data.medianImpressions))})` : ''}. A result at #{STRIKING_TARGET} usually gets about {target} of clicks, so a small push pays off.</p>
+                    {q.data ? <p className="mt-2 text-stat-sm text-fg">{fmtFull(q.data.striking.length)} <span className="text-body-sm font-normal text-fg-muted">queries · +{fmtFull(sum(q.data.striking))} clicks a month at #{STRIKING_TARGET}</span></p> : <Skeleton className="mt-2 h-6 w-40" />}
                 </Card>
                 <Card padding="sm">
                     <p className="text-body-sm font-medium text-fg">Low CTR</p>
                     <p className="mt-0.5 text-meta text-fg-muted">Pages and queries on page one with a CTR under 70% of what that position usually gets. Usually a title or snippet problem.</p>
-                    {q.data ? <p className="mt-2 text-stat-sm text-fg">{fmtFull(q.data.lowCtr.length)} <span className="text-body-sm font-normal text-fg-muted">rows · +{fmtFull(q.data.lowCtr.reduce((a, r) => a + r.potentialClicks, 0))} clicks at the usual CTR</span></p> : <Skeleton className="mt-2 h-6 w-40" />}
+                    {q.data ? <p className="mt-2 text-stat-sm text-fg">{fmtFull(q.data.lowCtr.length)} <span className="text-body-sm font-normal text-fg-muted">{lowCtrSplit(q.data.lowCtr)} · +{fmtFull(sum(q.data.lowCtr))} clicks a month at the usual CTR</span></p> : <Skeleton className="mt-2 h-6 w-40" />}
                 </Card>
             </div>
             <BreakdownTable<OpportunityRow>
@@ -64,6 +83,7 @@ export function OpportunitiesTab() {
                     ),
                 }}
                 heat={{ metric: 'impressions', value: (r) => r.impressions }}
+                twoLine
                 defaultSort="gain"
                 exportName={kind === 'striking' ? 'striking-distance' : 'low-ctr'}
                 searchPlaceholder="Search"
@@ -74,8 +94,9 @@ export function OpportunitiesTab() {
                     { key: 'pos', header: 'Position', format: 'position', better: 'down', value: (r) => r.position },
                     { key: 'impr', header: 'Impr.', value: (r) => r.impressions, hideOnMobile: true },
                     { key: 'ctr', header: 'CTR', format: 'percent', value: (r) => r.ctr, hideOnMobile: true },
-                    { key: 'exp', header: kind === 'striking' ? 'CTR at #5' : 'Usual CTR', format: 'percent', value: (r) => r.expectedCtr, hideOnMobile: true },
-                    { key: 'gain', header: 'Potential clicks', value: (r) => r.potentialClicks },
+                    // Striking: the target CTR is the same on every row (the #5 rate), so it is in the card text, not a column.
+                    ...(kind === 'low_ctr' ? [{ key: 'exp', header: 'Usual CTR', format: 'percent' as const, value: (r: OpportunityRow) => r.expectedCtr, hideOnMobile: true }] : []),
+                    { key: 'gain', header: kind === 'striking' ? `Extra clicks/mo at #${STRIKING_TARGET}` : 'Extra clicks/mo', value: monthly },
                 ]}
             />
             <SearchDetailDrawer kind={detail?.startsWith('p:') ? 'page' : 'query'} value={detail ? detail.slice(2) : null} onClose={() => void setDetail(null)} />
@@ -154,26 +175,14 @@ const MOVERS: { kind: MoverKind; title: string; sub: string }[] = [
     { kind: 'lost', title: 'Lost', sub: '5+ clicks before, none now' },
 ];
 
-/** Search > Winners & losers: biggest movers vs the comparison period. */
+/** Search > Winners & losers: biggest movers vs the comparison period. Empty groups fold into one quiet line. */
 export function MoversTab() {
     const site = useSite();
     const dr = useDateRange();
     const [dim, setDim] = useState<'queries' | 'pages'>('queries');
     const q = useGsc<GscRowsResponse>(dr.value.compare === 'none' ? null : dim);
     const [detail, setDetail] = useStringParam('detail', 'push');
-    const groups = useMemo(() => {
-        const out: Record<MoverKind, GscRow[]> = { winner: [], loser: [], new: [], lost: [] };
-        for (const r of [...(q.data?.rows ?? []), ...(q.data?.lost ?? [])]) {
-            const k = moverKind(r);
-            if (k) out[k].push(r);
-        }
-        const d = (r: GscRow) => r.clicks - (r.prev?.clicks ?? 0);
-        out.winner.sort((a, b) => d(b) - d(a));
-        out.loser.sort((a, b) => d(a) - d(b));
-        out.new.sort((a, b) => b.clicks - a.clicks);
-        out.lost.sort((a, b) => (b.prev?.clicks ?? 0) - (a.prev?.clicks ?? 0));
-        return out;
-    }, [q.data]);
+    const groups = useMemo(() => moverGroups([...(q.data?.rows ?? []), ...(q.data?.lost ?? [])]), [q.data]);
     if (dr.value.compare === 'none') {
         return (
             <Card padding="none">
@@ -184,41 +193,57 @@ export function MoversTab() {
     }
     if (q.state === 'error') return <LoadError error={q.error} onRetry={q.mutate} />;
     const label = (r: GscRow) => (dim === 'pages' ? displayPage(pageRef(r.key), site.siteHost) : r.key);
+    const loading = q.state === 'loading';
+    const shown = loading ? MOVERS.slice(0, 2) : MOVERS.filter((m) => groups[m.kind].length > 0);
+    const empty = loading ? [] : MOVERS.filter((m) => groups[m.kind].length === 0);
+    const noun = dim === 'pages' ? 'pages' : 'queries';
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-body-sm text-fg-muted">Clicks now versus {dr.compareLabel.replace(/^vs /, '')}.</p>
                 <SegmentedControl ariaLabel="Movers by" size="sm" variant="neutral" value={dim} onChange={setDim} options={[{ value: 'queries', label: 'Queries' }, { value: 'pages', label: 'Pages' }]} />
             </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {MOVERS.map((m) => (
-                    <Card key={m.kind} padding="none" className="overflow-hidden">
-                        <div className="p-4 pb-0"><CardHeader title={`${m.title}${q.data ? ` · ${fmtFull(groups[m.kind].length)}` : ''}`} description={m.sub} /></div>
-                        <Table<GscRow>
-                            card={false}
-                            density="compact"
-                            caption={`${m.title} ${dim}`}
-                            loading={q.state === 'loading'}
-                            rows={groups[m.kind]}
-                            rowKey={(r) => r.key}
-                            pagination={{ pageSize: 10 }}
-                            onRowClick={(r) => void setDetail(`${dim === 'pages' ? 'p' : 'q'}:${r.key}`)}
-                            empty={<EmptyState variant="inline" title="None in this period" />}
-                            columns={[
-                                { key: 'label', header: dim === 'pages' ? 'Page' : 'Query', width: '50%', cell: (r) => <span title={r.key}>{label(r)}</span> },
-                                { key: 'clicks', header: 'Clicks', align: 'right', cell: (r) => <span className="whitespace-nowrap">{fmtFull(r.prev?.clicks ?? 0)} → {fmtFull(r.clicks)}</span> },
-                                { key: 'delta', header: 'Δ', align: 'right', cell: (r) => <MetricDelta metric="clicks" current={r.clicks} previous={r.prev?.clicks ?? 0} /> },
-                                {
-                                    key: 'pos', header: 'Position', align: 'right', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
-                                    cell: (r) => (r.prev && r.prev.impressions && r.impressions
-                                        ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap">{fmtPosition(r.position)}<MetricDelta metric="position" current={r.position} previous={r.prev.position} /></span>
-                                        : r.impressions ? fmtPosition(r.position) : '–'),
-                                },
-                            ]}
-                        />
-                    </Card>
-                ))}
-            </div>
+            {shown.length === 0 ? (
+                <Card padding="none">
+                    <EmptyState variant="card" icon={CheckCircle2} title={`No big movers among your ${noun}`} description={`No ${noun} gained or lost 5+ clicks and 20%, and none appeared or disappeared, in this period.`} />
+                </Card>
+            ) : (
+                <div className={cn('grid grid-cols-1 gap-4', shown.length > 1 && 'lg:grid-cols-2')}>
+                    {shown.map((m, i) => (
+                        <Card key={m.kind} padding="none" className={cn('overflow-hidden', shown.length === 3 && i === 2 && 'lg:col-span-2')}>
+                            <div className="p-4 pb-0"><CardHeader title={`${m.title}${q.data ? ` · ${fmtFull(groups[m.kind].length)}` : ''}`} description={m.sub} /></div>
+                            <Table<GscRow>
+                                card={false}
+                                density="compact"
+                                caption={`${m.title} ${dim}`}
+                                loading={loading}
+                                rows={groups[m.kind]}
+                                rowKey={(r) => r.key}
+                                pagination={{ pageSize: 10 }}
+                                onRowClick={(r) => void setDetail(`${dim === 'pages' ? 'p' : 'q'}:${r.key}`)}
+                                empty={<EmptyState variant="inline" title="None in this period" />}
+                                columns={[
+                                    { key: 'label', header: dim === 'pages' ? 'Page' : 'Query', width: '50%', cell: (r) => <span title={r.key}>{label(r)}</span> },
+                                    { key: 'clicks', header: 'Clicks', align: 'right', cell: (r) => <span className="whitespace-nowrap">{fmtFull(r.prev?.clicks ?? 0)} → {fmtFull(r.clicks)}</span> },
+                                    { key: 'delta', header: 'Δ', mobileLabel: 'Change', align: 'right', cell: (r) => <MetricDelta metric="clicks" current={r.clicks} previous={r.prev?.clicks ?? 0} /> },
+                                    {
+                                        key: 'pos', header: 'Position', align: 'right', className: 'max-md:hidden', headerClassName: 'max-md:hidden',
+                                        cell: (r) => (r.prev && r.prev.impressions && r.impressions
+                                            ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap">{fmtPosition(r.position)}<MetricDelta metric="position" current={r.position} previous={r.prev.position} /></span>
+                                            : r.impressions ? fmtPosition(r.position) : '–'),
+                                    },
+                                ]}
+                            />
+                        </Card>
+                    ))}
+                </div>
+            )}
+            {shown.length > 0 && empty.length > 0 ? (
+                <p className="flex items-start gap-2 text-body-sm text-fg-muted">
+                    <Info aria-hidden size={16} className="mt-0.5 shrink-0" />
+                    <span title={empty.map((m) => `${m.title}: ${m.sub}`).join('\n')}>{emptyMoversLine(empty.map((m) => m.kind), noun)}</span>
+                </p>
+            ) : null}
             <SearchDetailDrawer kind={detail?.startsWith('p:') ? 'page' : 'query'} value={detail ? detail.slice(2) : null} onClose={() => void setDetail(null)} />
         </div>
     );

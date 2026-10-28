@@ -3,6 +3,7 @@
  * widget source is `default`, so a template applies to whichever site the user picks (portfolio
  * templates use all sites). The gallery draws thumbnails from these layouts.
  */
+import { PLACEHOLDER_COMPANY, PLACEHOLDER_TEXTS } from './placeholders';
 import { tableColumns } from './registry';
 import { applyThemePreset, isThemeId, type ThemeId } from './themes';
 import { BUILDERS_R2, TEMPLATES_R2, type BuildCtx, type BuiltR2 } from './templates.round2';
@@ -196,8 +197,8 @@ const BUILDERS_V1: Record<string, () => Built> = {
                 [[kpi('w_kpis', ['gsc:clicks', 'gsc:impressions', 'ga4:screenPageViews', 'ga4:engagementRate', 'ga4:keyEvents']), 12, 3]],
                 [[table('w_pages', 'Pages', ['page'], ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position', 'ga4:sessions', 'ga4:engagementRate', 'ga4:keyEvents'], { bars: ['gsc:clicks', 'ga4:keyEvents'] }), 12, 10]],
                 [[ts('w_views', 'Pageviews', ['ga4:screenPageViews']), 6, 7], [ts('w_clicks', 'Clicks', ['gsc:clicks']), 6, 7]],
-                [[table('w_rising', 'Rising pages', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'desc' } }), 6, 9],
-                    [table('w_declining', 'Declining pages', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' } }), 6, 9]],
+                [[table('w_rising', 'Rising pages', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'desc' } }), 6, 9],
+                    [table('w_declining', 'Declining pages', ['page'], ['gsc:clicks', 'gsc:impressions'], { sortByChange: true, changeOnly: true, sort: { by: 'm:gsc:clicks', dir: 'asc' } }), 6, 9]],
             ], w)],
         };
     },
@@ -217,18 +218,19 @@ const BUILDERS_V1: Record<string, () => Built> = {
     'client-report': () => {
         const w: Record<string, WidgetDef> = {};
         const theme = defaultTheme('light');
-        theme.header = { show: true, companyName: 'Your company', logoPosition: 'left', showDates: true };
+        theme.header = { show: true, companyName: PLACEHOLDER_COMPANY, logoPosition: 'left', showDates: true };
         return {
             widgets: w,
             theme,
             controls: [{ ...DATE, viewerCanChange: false, viewerCanCompare: false } as ControlDef],
             pages: [
                 page('p_summary', 'Summary', [
-                    [[text('w_intro', '## Monthly report for {{site}}\nResults for {{date_range}}, {{compare_range}}.', 'heading'), 12, 3]],
+                    [[text('w_intro', '## Monthly report for {{site}}\nResults for {{date_range}}, {{compare_range}}.', 'heading'), 12, 2]],
                     [[kpi('w_kpis', ['gsc:clicks', 'gsc:impressions', 'ga4:activeUsers', 'ga4:sessions', 'ga4:keyEvents', 'gsc:position']), 12, 3]],
-                    [[ts('w_traffic', 'Users and sessions', ['ga4:activeUsers', 'ga4:sessions']), 8, 8], [geo('w_geo', 'Users by country', 'ga4:activeUsers'), 4, 8]],
+                    // Round 4: 2 rows taller so the map keeps a readable height above its top-5 list.
+                    [[ts('w_traffic', 'Users and sessions', ['ga4:activeUsers', 'ga4:sessions']), 8, 10], [geo('w_geo', 'Users by country', 'ga4:activeUsers'), 4, 10]],
                     [[table('w_pages', 'Top pages', ['page'], ['gsc:clicks', 'gsc:position', 'ga4:sessions', 'ga4:keyEvents'], { bars: ['gsc:clicks'] }), 12, 8]],
-                    [[text('w_notes', '### Notes and next steps\n- What went well this month\n- What we are fixing next\n- Questions for you'), 12, 4]],
+                    [[text('w_notes', PLACEHOLDER_TEXTS[0]), 12, 4]],
                 ], w),
                 page('p_search', 'Search', [
                     [[ts('w_s_trend', 'Clicks and impressions', ['gsc:clicks', 'gsc:impressions']), 12, 7]],
@@ -282,7 +284,7 @@ export const TEMPLATES: TemplateMeta[] = [
     { id: 'portfolio', name: 'Portfolio', description: 'All sites in one report: totals, ranking and biggest movers.', category: 'Portfolio', needs: [], portfolio: true },
     { id: 'client-report', name: 'Client report', description: 'A three-page, shareable report with your logo and notes.', category: 'Reporting', needs: ['gsc', 'ga4'] },
     { id: 'audience-geography', name: 'Audience and geography', description: 'Who your visitors are and where they are.', category: 'Traffic', needs: ['ga4'] },
-    { id: 'key-events-revenue', name: 'Key events and revenue', description: 'Conversions and ecommerce by channel and product.', category: 'Traffic', needs: ['ga4'] },
+    { id: 'key-events-revenue', name: 'Key events and revenue', description: 'Key events and ecommerce by channel and product.', category: 'Traffic', needs: ['ga4'] },
     // Round 2: sixteen new templates, appended (the eight above keep their ids and order).
     ...TEMPLATES_R2.map((t): TemplateMeta => ({ ...t, isNew: true })),
 ];

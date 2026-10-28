@@ -104,6 +104,15 @@ export function isLowCtr(r: GscMetrics, minImpressions = 100): boolean {
 /** Position used for striking-distance estimates: solidly on page one, not a top-3 promise. */
 export const STRIKING_TARGET = 5;
 
+/**
+ * Striking-distance task title. A query whose average position already rounds onto page one (under
+ * 10.5) is not told to reach "the first page": it is moved up into the top 5 (round 4 polish).
+ */
+export function strikingTitle(query: string, position: number, quote: [string, string] = ['"', '"']): string {
+    const q = `${quote[0]}${query}${quote[1]}`;
+    return position < 10.5 ? `Move ${q} up into the top ${STRIKING_TARGET}` : `Push ${q} onto the first page`;
+}
+
 /** Extra clicks if a query reached position 5 at the usual CTR. */
 export function strikingPotential(r: GscMetrics): number {
     return Math.max(0, Math.round(r.impressions * expectedCtr(STRIKING_TARGET) - r.clicks));
@@ -159,4 +168,31 @@ export const AI_SOURCE_PATTERN = '(chatgpt\\.com|chat\\.openai\\.com|openai\\.co
 const AI_SOURCE_RE = new RegExp(AI_SOURCE_PATTERN, 'i');
 export function isAiSource(source: string): boolean {
     return AI_SOURCE_RE.test(source);
+}
+
+/** Rows split into winners, losers, new and lost, each sorted by the size of its move. */
+export function moverGroups(rows: GscRow[]): Record<MoverKind, GscRow[]> {
+    const out: Record<MoverKind, GscRow[]> = { winner: [], loser: [], new: [], lost: [] };
+    for (const r of rows) {
+        const k = moverKind(r);
+        if (k) out[k].push(r);
+    }
+    const d = (r: GscRow) => r.clicks - (r.prev?.clicks ?? 0);
+    out.winner.sort((a, b) => d(b) - d(a));
+    out.loser.sort((a, b) => d(a) - d(b));
+    out.new.sort((a, b) => b.clicks - a.clicks);
+    out.lost.sort((a, b) => (b.prev?.clicks ?? 0) - (a.prev?.clicks ?? 0));
+    return out;
+}
+
+const MOVER_WORD: Record<MoverKind, string> = { winner: 'winners', loser: 'losers', new: 'new', lost: 'lost' };
+
+/** The one quiet line for empty groups: "No losers, new or lost queries in this period." */
+export function emptyMoversLine(kinds: MoverKind[], noun: 'queries' | 'pages'): string {
+    if (!kinds.length) return '';
+    const words = kinds.map((k) => MOVER_WORD[k]);
+    const list = words.length === 1 ? words[0] : `${words.slice(0, -1).join(', ')} or ${words[words.length - 1]}`;
+    // "No new or lost queries", but "No winners or losers among your queries".
+    const last = kinds[kinds.length - 1];
+    return `No ${list}${last === 'new' || last === 'lost' ? ` ${noun}` : ` among your ${noun}`} in this period.`;
 }

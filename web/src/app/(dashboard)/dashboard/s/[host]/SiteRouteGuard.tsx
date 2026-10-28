@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Globe, RefreshCw } from 'lucide-react';
 import { signIn } from 'next-auth/react';
@@ -11,6 +12,7 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageSkeleton } from '@/components/shell/PageSkeleton';
 import { useShell } from '@/components/shell/ShellContext';
+import { siteHref } from '@/components/shell/nav';
 import { useCurrentSite } from '@/components/shell/useCurrentSite';
 import { useWorkspace } from '@/components/shell/workspaceContext';
 
@@ -28,7 +30,8 @@ function reconnectGoogle() {
  * portfolio store already knows the host.
  */
 export function SiteRouteGuard({ children }: { children: ReactNode }) {
-    const { site, host, loading, unknownHost, selectSite } = useCurrentSite();
+    const { site, host, loading, unknownHost, aliasHost, selectSite } = useCurrentSite();
+    const router = useRouter();
     const ws = useWorkspace();
     const { setSwitcherOpen } = useShell();
     const synced = useRef<string | null>(null);
@@ -45,10 +48,18 @@ export function SiteRouteGuard({ children }: { children: ReactNode }) {
         selectSite(site, { navigate: false });
     }, [site, matches, wantSite, wantProp, selectSite]);
 
+    // /dashboard/s/creativeprints.example for a GA4-only site (or www.acme.com): go to the canonical key, same
+    // section and query, so links, bookmarks and the switcher all name one URL.
+    useEffect(() => {
+        if (!site || !aliasHost) return;
+        const rest = window.location.pathname.replace(/^\/dashboard\/s\/[^/]+/, '');
+        router.replace(`${siteHref(site.host)}${rest}${window.location.search}`);
+    }, [site, aliasHost, router]);
+
     // A site found in the directory is enough to start: the fast directory (the portfolio store) answers in
     // milliseconds, while the live Google inventory can take seconds. Only a host nobody knows yet has to wait
     // for the live answer before "We couldn't find ..." is allowed.
-    if ((loading && !site) || (site && !matches)) return <PageSkeleton />;
+    if ((loading && !site) || (site && !matches) || aliasHost) return <PageSkeleton />;
     if (unknownHost || !site) {
         // Google refused our token: the list of sites is empty because we cannot read it, not because the host is
         // wrong. Never call that "not found".

@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
 
-import { fmtDuration, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
+import { fmtCurrency, fmtDuration, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
 import type { MetricKey } from '@/lib/metrics';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -12,7 +12,8 @@ import { SearchInput, useDebouncedValue } from '@/components/ui/SearchInput';
 import { Table, type TableColumn } from '@/components/ui/Table';
 import { downloadCsv } from './useSiteData';
 
-export type ValueFormat = 'count' | 'percent' | 'duration' | 'position';
+/** `decimal`: a small rate with 2 significant digits (3.4, 0.012), e.g. events per session. */
+export type ValueFormat = 'count' | 'percent' | 'duration' | 'position' | 'decimal' | 'currency';
 
 export interface BreakdownColumn<T> {
     key: string;
@@ -43,19 +44,25 @@ export interface BreakdownTableProps<T> {
     toolbarExtra?: ReactNode;
     empty?: ReactNode;
     caption?: string;
+    /** ISO 4217 code for 'currency' columns (GA4 revenue), from the report metadata. */
+    currency?: string;
+    /** Labels on two lines (page title over path): rows get room and the heat bar goes under the label. */
+    twoLine?: boolean;
 }
 
-export function fmtCell(v: number | null | undefined, format: ValueFormat = 'count'): string {
+export function fmtCell(v: number | null | undefined, format: ValueFormat = 'count', currency?: string): string {
     if (v === null || v === undefined || !Number.isFinite(v)) return '–';
+    if (format === 'currency') return fmtCurrency(v, currency);
     if (format === 'percent') return fmtPercent(v);
     if (format === 'duration') return fmtDuration(v);
     if (format === 'position') return fmtPosition(v);
+    if (format === 'decimal') return v >= 100 ? fmtFull(Math.round(v)) : v === 0 ? '0' : v.toPrecision(2);
     return fmtFull(v);
 }
 
 /** Sortable, searchable, exportable table for a breakdown (sources, pages, countries ...). */
 export function BreakdownTable<T>({
-    rows, rowKey, label, columns, heat, defaultSort, loading, pageSize = 25, searchPlaceholder = 'Search', exportName, onRowClick, toolbarExtra, empty, caption,
+    rows, rowKey, label, columns, heat, defaultSort, loading, pageSize = 25, searchPlaceholder = 'Search', exportName, onRowClick, toolbarExtra, empty, caption, currency, twoLine,
 }: BreakdownTableProps<T>) {
     const [query, setQuery] = useState('');
     const q = useDebouncedValue(query, 120).trim().toLowerCase();
@@ -68,7 +75,7 @@ export function BreakdownTable<T>({
             sortable: true,
             sortValue: (r) => label.text(r),
             firstSortDir: 'asc',
-            heat,
+            heat: heat && twoLine ? { ...heat, style: 'underline' } : heat,
             width: '40%',
         },
         ...columns.map((c): TableColumn<T> => ({
@@ -82,9 +89,9 @@ export function BreakdownTable<T>({
             className: c.hideOnMobile ? 'max-md:hidden' : undefined,
             cell: (r) => (
                 <span className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
-                    <span>{fmtCell(c.value(r), c.format)}</span>
+                    <span>{fmtCell(c.value(r), c.format, currency)}</span>
                     {c.previous ? (
-                        <MetricDelta current={c.value(r)} previous={c.previous(r)} format={c.format === 'position' ? 'position' : c.format === 'duration' ? 'duration' : c.format === 'percent' ? 'percent' : 'count'} better={c.better ?? 'up'} />
+                        <MetricDelta current={c.value(r)} previous={c.previous(r)} format={c.format === 'decimal' ? 'count' : c.format ?? 'count'} better={c.better ?? 'up'} />
                     ) : null}
                 </span>
             ),
@@ -92,7 +99,10 @@ export function BreakdownTable<T>({
     ];
     const exportCsv = exportName ? () => downloadCsv(
         `${exportName}.csv`,
-        [label.header, ...columns.flatMap((c) => (c.previous ? [c.header, `${c.header} (previous)`] : [c.header]))],
+        [label.header, ...columns.flatMap((c) => {
+            const h = c.format === 'currency' && currency ? `${c.header} (${currency})` : c.header;
+            return c.previous ? [h, `${h} (previous)`] : [h];
+        })],
         filtered.map((r) => [label.text(r), ...columns.flatMap((c) => (c.previous ? [c.value(r) ?? '', c.previous(r) ?? ''] : [c.value(r) ?? '']))]),
     ) : undefined;
     return (

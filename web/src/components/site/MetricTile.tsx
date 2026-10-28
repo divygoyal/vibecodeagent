@@ -15,6 +15,9 @@ export interface TileSpec {
     label?: string;
     format?: MetricFormat;
     better?: 'up' | 'down';
+    /** Money tiles: the property's currency (ISO 4217) and whether to show cents (per-session values). */
+    currency?: string;
+    cents?: boolean;
 }
 
 export interface MetricTileProps extends TileSpec {
@@ -37,7 +40,7 @@ export interface MetricTileProps extends TileSpec {
  * its metric colour.
  */
 export function MetricTile({
-    metric, label, format, better, value, previous, spark, sparkDates, loading, selected, onSelect, comparisonLabel, footer, className,
+    metric, label, format, better, currency, cents, value, previous, spark, sparkDates, loading, selected, onSelect, comparisonLabel, footer, className,
 }: MetricTileProps) {
     const m = METRICS[metric];
     const fmt = format ?? m.format;
@@ -56,7 +59,7 @@ export function MetricTile({
             ) : (
                 <>
                     <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="text-stat text-fg">{fmtValue(fmt, value, { compact: true, tile: true })}</span>
+                        <span className="text-stat text-fg">{fmtValue(fmt, value, { compact: true, tile: true, currency, cents })}</span>
                         {previous !== undefined ? (
                             <MetricDelta
                                 current={value}
