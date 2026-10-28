@@ -11,7 +11,7 @@ import { Bookmark, Check, Link2, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/cn';
-import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
+import { Button, Popover, PopoverContent, PopoverTrigger, Tooltip } from '@/components/ui';
 import { MAX_VIEW_NAME } from '@/lib/builder/savedViews';
 import type { SavedView } from '@/lib/builder/types';
 
@@ -86,13 +86,17 @@ export function ViewsMenu({ handlers, size = 'md' }: { handlers: ViewsHandlers; 
                                     {owner.currentId === v.id ? <Check aria-hidden size={14} className="shrink-0 text-brand-text" /> : null}
                                     {owner.defaultId === v.id ? <span className="shrink-0 rounded-badge bg-brand-soft px-1.5 text-caption text-brand-soft-fg">Default</span> : null}
                                 </button>
-                                <button type="button" aria-label={owner.defaultId === v.id ? `Stop opening on ${v.name}` : `Open on ${v.name} by default`} aria-pressed={owner.defaultId === v.id} title={owner.defaultId === v.id ? 'Default view (click to clear)' : 'Make this the default view'}
-                                    onClick={() => owner.onDefault(owner.defaultId === v.id ? null : v.id)} className="tap-area rounded p-1 text-fg-muted hover:text-fg">
-                                    <Star aria-hidden size={14} className={owner.defaultId === v.id ? 'fill-current text-brand-text' : undefined} />
-                                </button>
-                                <button type="button" aria-label={`Delete view ${v.name}`} onClick={() => owner.onDelete(v.id)} className="tap-area mr-1 rounded p-1 text-fg-muted hover:text-down">
-                                    <Trash2 aria-hidden size={14} />
-                                </button>
+                                <Tooltip content={owner.defaultId === v.id ? 'Default view. Click to clear' : 'Make default'}>
+                                    <button type="button" aria-label={owner.defaultId === v.id ? `Stop opening on ${v.name}` : `Open on ${v.name} by default`} aria-pressed={owner.defaultId === v.id}
+                                        onClick={() => owner.onDefault(owner.defaultId === v.id ? null : v.id)} className="tap-area rounded p-1 text-fg-muted hover:text-fg">
+                                        <Star aria-hidden size={14} className={owner.defaultId === v.id ? 'fill-current text-brand-text' : undefined} />
+                                    </button>
+                                </Tooltip>
+                                <Tooltip content="Delete view">
+                                    <button type="button" aria-label={`Delete view ${v.name}`} onClick={() => owner.onDelete(v.id)} className="tap-area mr-1 rounded p-1 text-fg-muted hover:text-down">
+                                        <Trash2 aria-hidden size={14} />
+                                    </button>
+                                </Tooltip>
                             </div>
                         ))}
                         {!owner.views.length ? <p className="px-2.5 py-2 text-body-sm text-fg-muted">No saved views yet. Set dates and filters, then save them here.</p> : null}
