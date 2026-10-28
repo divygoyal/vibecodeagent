@@ -292,7 +292,8 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                             key={s.metric} yAxisId={s.metric} hide={!visible} width={visible ? 44 : 0} orientation={s.axis === 'right' ? 'right' : 'left'}
                             reversed={isPos} domain={yAxes[s.metric].domain} ticks={yAxes[s.metric].ticks} interval={0}
                             tickFormatter={axisFmt(s.metric, currency)}
-                            tick={AXIS_TICK} tickLine={false} axisLine={false}
+                            // Two scales: each axis's numbers in its series colour, so it is clear which line they measure.
+                            tick={series.some((x) => x.axis === 'right') ? { ...AXIS_TICK, fill: metricColor(s.metric) } : AXIS_TICK} tickLine={false} axisLine={false}
                         />
                     );
                 })}

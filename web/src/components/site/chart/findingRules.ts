@@ -48,6 +48,10 @@ export function trafficFindingOf(metric: MetricKey, summary: Ga4Summary | undefi
     } else if (metric === 'revenue') {
         unit = '';
         list = rows.map((r) => ({ label: r.dims.sessionDefaultChannelGroup, cur: r.cur.totalRevenue ?? 0, prev: r.prev?.totalRevenue ?? 0 }));
+    } else if (metric === 'users') {
+        // Users are led by the channel that gained the most users (not sessions: one unit per finding).
+        unit = 'users';
+        list = rows.map((r) => ({ label: r.dims.sessionDefaultChannelGroup, cur: r.cur.activeUsers ?? 0, prev: r.prev?.activeUsers ?? 0 }));
     } else {
         list = rows.map((r) => ({ label: r.dims.sessionDefaultChannelGroup, cur: r.cur.sessions ?? 0, prev: r.prev?.sessions ?? 0 }));
     }

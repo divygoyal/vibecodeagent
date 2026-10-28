@@ -307,6 +307,9 @@ export async function sampleGoogleFetch(input: RequestInfo | URL, init?: Request
         throw new Error('sample data: network disabled');
     }
     const req = await readRequest(input, init);
+    // Yield before the (synchronous) generator answers: the home page's hourly rebuild makes dozens of these calls,
+    // and without a turn of the event loop between them it would hold the server for the whole build (review L1).
+    await new Promise<void>((resolve) => setImmediate(resolve));
     return answer(req, url.hostname, req.url.pathname);
 }
 

@@ -90,10 +90,10 @@ function Shot({ row }: { row: FeatureRow }) {
  * widths (390, 768, 1024+), so the swap never leaves a gap and grows a row by at most a few pixels.
  */
 const RESERVE: Record<FeatureKey, string> = {
-    site: 'min-h-[850px] sm:min-h-[800px] md:min-h-[890px]',
-    traffic: 'min-h-[670px] sm:min-h-[575px] md:min-h-[640px] lg:min-h-[628px]',
-    fixes: 'min-h-[800px] sm:min-h-[625px] md:min-h-[640px] lg:min-h-[630px] xl:min-h-[615px]',
-    dashboards: 'min-h-[825px] sm:min-h-[800px] md:min-h-[660px]',
+    site: 'min-h-[712px] sm:min-h-[690px] md:min-h-[700px]',
+    traffic: 'min-h-[674px] sm:min-h-[586px] md:min-h-[617px]',
+    fixes: 'min-h-[834px] sm:min-h-[620px] md:min-h-[621px] xl:min-h-[603px]',
+    dashboards: 'min-h-[865px] sm:min-h-[819px] md:min-h-[651px]',
 };
 
 function Product({ row, live }: { row: FeatureRow; live?: HomeLive }) {

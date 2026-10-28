@@ -12,7 +12,13 @@ import { buildHomeLive } from '@/components/marketing/home/homeLive';
 import { buildHomeData } from '@/components/marketing/home/homeData';
 
 const NOW = Date.UTC(2026, 9, 28, 12);
-globalThis.fetch = (async () => { throw new Error('network must not be used'); }) as typeof fetch;
+/** Every call that reached the global fetch during the builds: must stay empty (a row that failed and fell back to its
+ * picture must not hide a real network call either). */
+const calls: string[] = [];
+globalThis.fetch = (async (input: RequestInfo | URL) => {
+    calls.push(String(input instanceof Request ? input.url : input));
+    throw new Error('network must not be used');
+}) as typeof fetch;
 
 test('every row builds from the app code on sample data, without the network', async () => {
     const home = buildHomeData(NOW);
@@ -58,6 +64,7 @@ test('every row builds from the app code on sample data, without the network', a
     };
     assert.ok(days('7d') === 7 && days('28d') === 28 && days('3m') > 80);
 
+    assert.deepEqual(calls, [], 'no call left the sample scope');
     // Deterministic for the same day.
     assert.deepEqual(JSON.parse(JSON.stringify((await buildHomeLive(home.tour.slug, NOW)).fixes)), JSON.parse(JSON.stringify(live.fixes)));
 });
@@ -70,4 +77,26 @@ test('props stay small (they ride in the page HTML)', async () => {
     assert.ok(kb(live.fixes) < 10, `fixes ${kb(live.fixes)}`);
     assert.ok(kb(live.dashboards) < 50, `dashboards ${kb(live.dashboards)}`);
     assert.ok(kb(live) < 90, `all ${kb(live)}`);
+    assert.deepEqual(calls, []);
+});
+
+test('the build yields to the event loop (review L1): a 1 ms timer keeps ticking during it', async () => {
+    let ticks = 0;
+    let worst = 0;
+    let last = performance.now();
+    const timer = setInterval(() => {
+        const now = performance.now();
+        worst = Math.max(worst, now - last);
+        last = now;
+        ticks++;
+    }, 1);
+    const t0 = performance.now();
+    // A fresh day (cold caches), so the generator really runs.
+    await buildHomeLive('acmeanalytics.example', NOW + 3 * 86_400_000);
+    const ms = performance.now() - t0;
+    clearInterval(timer);
+    console.log(`build ${Math.round(ms)} ms, ${ticks} ticks, longest gap ${Math.round(worst)} ms`);
+    // Without the yield the timer is starved for the whole build (one gap = the build); with it, gaps stay short.
+    assert.ok(ticks >= 3, `timer ran ${ticks} times`);
+    assert.ok(worst < 150, `longest gap ${Math.round(worst)} ms of ${Math.round(ms)} ms`);
 });

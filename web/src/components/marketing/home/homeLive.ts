@@ -164,7 +164,11 @@ async function buildDashboard(token: string, host: string, ga4: string, gsc: str
     if (!site) throw new Error(`no sample site ${host}`);
     const name = `${getDemoSites().find((s) => s.key === TOUR_SITE_KEY)?.name ?? host} – weekly overview`;
     const doc = buildFromTemplate('site-overview', { name, defaultSource: { type: 'site', siteId: site.siteId, ga4: site.ga4, gsc: site.gsc } });
-    const widgets = DASH_WIDGETS.map((id) => doc.widgets[id]).filter(Boolean);
+    // Impressions run ~30x clicks: on the clicks scale their line would read as ~1K a day. Give them their own (right)
+    // axis, as the site page's Search chart does with two metrics.
+    const widgets = DASH_WIDGETS.map((id) => doc.widgets[id]).filter(Boolean).map((w): WidgetDef => (w.type === 'timeseries'
+        ? { ...w, config: { ...w.config, series: w.config.series.map((x, i) => (i > 0 ? { ...x, axis: 'right' as const } : x)) } }
+        : w));
     const deps = { userId: SAMPLE_USER, mode: 'owner' as const, getToken: async () => token, loadDirectory: async () => directory, now };
     const entries = await Promise.all(DASH_RANGES.map(async (id) => {
         const controls: ControlState = { date: { range: { kind: 'preset', id: id as DatePresetId }, compare: { mode: 'previous_period' } }, filters: {} };
@@ -195,7 +199,9 @@ export async function buildHomeLive(slug: string, now: number = Date.now()): Pro
     const homeUrl = gsc.startsWith('sc-domain:') ? `https://${gsc.slice('sc-domain:'.length)}/` : new URL(gsc).origin + '/';
     const token = demoAccessToken();
     const today = new Date(now);
-    const dr = resolveDateRange(RANGE, { now: today });
+    // One window for the whole page: the hero's and the sample dashboard's 28 days (GA4 through yesterday, Search
+    // Console through 2 days ago, as Google reports it), so a number reads the same in every row; each row shows it.
+    const dr = resolveDateRange(RANGE, { now: today, lagDays: 1 });
     const drs = resolveDateRange(RANGE, { now: today, lagDays: 2 });
     const traffic = rangeParams(dr);
     const search = rangeParams(drs);

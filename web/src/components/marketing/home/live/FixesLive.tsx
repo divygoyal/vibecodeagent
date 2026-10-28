@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { ArrowRight, RotateCcw } from 'lucide-react';
 
 import { fmtFull } from '@/lib/format';
+import { useIsMobile } from '@/lib/useIsMobile';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { ActionList, ActionRow } from '@/components/site/ActionCard';
@@ -12,9 +13,11 @@ import type { ActionStatus } from '@/components/site/lib/types';
 import type { SiteActionWithStatus } from '@/components/site/useSiteActions';
 import { demoHref } from '../demoLinks';
 import type { LiveFixesRow } from '../homeLive';
-import { LiveFrame } from './parts';
+import { LiveFrame, useCoarsePointer } from './parts';
 
+/** Rows shown: five, four on phones (each row is taller there). The header counts what is shown. */
 const SHOWN = 5;
+const SHOWN_PHONE = 4;
 
 /**
  * The site's fix list on sample data (round 6): the app's compact ActionRow, ranked like the Actions page. Rows open
@@ -30,15 +33,17 @@ export function FixesLive({ data }: { data: LiveFixesRow }) {
     const open = all.filter((a) => a.status === 'open');
     const closed = data.actions.length - open.length;
     const remaining = data.total - closed;
-    const top = open.slice(0, SHOWN);
+    const phone = useIsMobile();
+    const touch = useCoarsePointer();
+    const top = open.slice(0, phone ? SHOWN_PHONE : SHOWN);
     return (
-        <LiveFrame hint="Open a task, then try Mark done." href={data.links.actions} linkLabel="See every task in the live demo">
+        <LiveFrame hint={touch ? 'Tap a task, then try Mark done.' : 'Open a task, then try Mark done.'} href={data.links.actions} linkLabel="See every task in the live demo">
             <Card as="section" aria-label="What to fix next" className="flex min-w-0 flex-col">
                 <CardHeader
                     title="What to fix next"
                     description={`Top ${top.length} of ${fmtFull(remaining)} open tasks, ranked by expected impact`}
                     actions={(
-                        <Button asChild size="sm" variant="ghost" trailingIcon={ArrowRight} className="max-sm:hidden">
+                        <Button asChild size="sm" variant="ghost" trailingIcon={ArrowRight}>
                             <Link href={data.links.actions}>All {fmtFull(remaining)} actions</Link>
                         </Button>
                     )}
@@ -52,7 +57,7 @@ export function FixesLive({ data }: { data: LiveFixesRow }) {
                     </p>
                 ) : null}
                 {top.length ? (
-                    <ActionList className="-mx-5 -mb-5 border-t border-border-subtle max-md:[&>li:nth-child(n+5)]:hidden">
+                    <ActionList className="-mx-5 -mb-5 border-t border-border-subtle">
                         {top.map((a, i) => (
                             <ActionRow
                                 key={a.id}

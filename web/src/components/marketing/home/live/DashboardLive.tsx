@@ -5,7 +5,7 @@ import { Lock } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { fmtDateRange } from '@/lib/format';
-import { applyThemePreset, type Mode, type ThemeId } from '@/lib/builder/themes';
+import { applyThemePreset, densityPx, themeOptions, type Mode, type ThemeId } from '@/lib/builder/themes';
 import type { BarWidget, KpiStripWidget, ThemeV2, TimeSeriesWidget, WidgetDef } from '@/lib/builder/types';
 import { useIsMobile } from '@/lib/useIsMobile';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -14,7 +14,7 @@ import { BarView, TimeSeriesView } from '@/components/dashboard-builder/widgets/
 import { KpiStripView } from '@/components/dashboard-builder/widgets/Scorecard';
 import type { WidgetViewProps } from '@/components/dashboard-builder/widgets/WidgetFrame';
 import type { LiveDashboardRow, LiveDashRange } from '../homeLive';
-import { LiveFrame } from './parts';
+import { LiveFrame, useCoarsePointer } from './parts';
 
 const RANGES: { value: LiveDashRange; label: string; aria: string }[] = [
     { value: '7d', label: '7d', aria: 'Last 7 days' },
@@ -27,8 +27,11 @@ const THEME_CHOICES: { value: ThemeId; label: string }[] = [
     { value: 'midnight', label: 'Midnight' },
 ];
 
-/** The builder's grid (DashboardCanvas): 32 px rows, 16 px gaps. */
-const px = (rows: number) => rows * 48 - 16;
+/** Cell height of `rows` grid rows, with the theme's density (DashboardCanvas gridMetrics: 32/16 px by default). */
+function cellPx(rows: number, theme: ThemeV2): number {
+    const d = densityPx(themeOptions(theme).density);
+    return rows * (d.row + d.gap) - d.gap;
+}
 
 /** The home page's current theme (the html data-theme the home theme script and switch maintain). */
 function subscribe(cb: () => void) {
@@ -57,7 +60,9 @@ export function DashboardLive({ data }: { data: LiveDashboardRow }) {
     const pageMode = usePageMode();
     const page = data.byRange[range];
     const resolved = page.resolved;
-    const root = useMemo(() => dashRootProps(themeOf(themeId, pageMode), pageMode), [themeId, pageMode]);
+    const theme = useMemo(() => themeOf(themeId, pageMode), [themeId, pageMode]);
+    const root = useMemo(() => dashRootProps(theme, pageMode), [theme, pageMode]);
+    const touch = useCoarsePointer();
     const byId = useMemo(() => Object.fromEntries(data.widgets.map((w) => [w.id, w])) as Record<string, WidgetDef>, [data.widgets]);
     const bp = phone ? 'sm' : 'lg';
     const props = (w: WidgetDef, height: number): WidgetViewProps => ({
@@ -75,9 +80,12 @@ export function DashboardLive({ data }: { data: LiveDashboardRow }) {
     const kpis = byId.w_kpis as KpiStripWidget | undefined;
     const search = byId.w_search as TimeSeriesWidget | undefined;
     const queries = byId.w_queries as BarWidget | undefined;
-    const chartH = px(7);
+    // The KPI strip's cell (3 rows, in the theme's density) sets what the widget shows; its box grows with its content,
+    // so the preview themes' larger numbers (Executive) and the "vs … previous period" line are never cut off.
+    const kpiH = cellPx(3, theme);
+    const chartH = cellPx(7, theme);
     return (
-        <LiveFrame hint={<>Change the date range<span className="max-sm:hidden"> or the theme</span>.</>} href={data.links.dashboards} linkLabel="Open in the live demo">
+        <LiveFrame hint={<>{touch ? 'Tap another' : 'Change the'} date range<span className="max-sm:hidden"> or the theme</span>.</>} href={data.links.dashboards} linkLabel="Open in the live demo">
             <div {...root?.attrs} {...(root ? { 'data-dash-panel': '' } : {})} style={root?.style} className={cn('flex flex-col gap-4', root?.className)}>
                 <div data-dash-header="" className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
                     <div className="min-w-0">
@@ -104,9 +112,10 @@ export function DashboardLive({ data }: { data: LiveDashboardRow }) {
                         {resolved.compare ? ` · vs ${fmtDateRange(resolved.compare.start, resolved.compare.end)}` : ''}
                     </p>
                 </div>
-                {kpis ? <div style={{ height: phone ? undefined : px(3) }}><KpiStripView {...(props(kpis, px(3)) as WidgetViewProps<KpiStripWidget>)} /></div> : null}
+                {kpis ? <div className="min-w-0" style={{ minHeight: phone ? undefined : kpiH }}><KpiStripView {...(props(kpis, kpiH) as WidgetViewProps<KpiStripWidget>)} /></div> : null}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {search ? <div className="min-w-0 md:col-span-2" style={{ height: chartH }}><TimeSeriesView {...(props(search, chartH) as WidgetViewProps<TimeSeriesWidget>)} /></div> : null}
+                    {/* Phones: the widget's footnote wraps (it was cut mid-sentence), with room for its second line. */}
+                    {search ? <div className="min-w-0 md:col-span-2 max-md:[&_p.text-caption]:whitespace-normal" style={{ height: phone ? chartH + 18 : chartH }}><TimeSeriesView {...(props(search, chartH) as WidgetViewProps<TimeSeriesWidget>)} /></div> : null}
                     {queries ? <div className="min-w-0 max-md:hidden" style={{ height: chartH }}><BarView {...(props(queries, chartH) as WidgetViewProps<BarWidget>)} /></div> : null}
                 </div>
             </div>

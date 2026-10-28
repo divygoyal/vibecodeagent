@@ -7,159 +7,145 @@ import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { fmtDateRange } from '@/lib/format';
 import { METRICS, type MetricKey } from '@/lib/metrics';
-import { ChartCard } from '@/components/charts/ChartCard';
+import { useIsMobile } from '@/lib/useIsMobile';
 import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
+import { Card } from '@/components/ui/Card';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { FindingLine } from '@/components/site/Finding';
 import { MetricTile } from '@/components/site/MetricTile';
-import type { Finding } from '@/components/site/lib/findings';
-import type { LiveMarker, LiveSiteRow } from '../homeLive';
-import { LiveFrame, MarkerChips, toAnnotations } from './parts';
+import type { LiveSiteRow } from '../homeLive';
+import { LiveFrame, MarkerChips, toAnnotations, useCoarsePointer } from './parts';
 
-const TRAFFIC_TILES: MetricKey[] = ['users', 'sessions', 'pageviews', 'conversions'];
-const SEARCH_TILES: MetricKey[] = ['clicks', 'impressions', 'ctr', 'position'];
-
+type Side = 'traffic' | 'search';
 type Row = Record<string, number | string | null>;
 
-/** The section heading of the site page (SummaryPanels SectionTitle): title, source line, "Open" link. */
-function SectionTitle({ title, source, href, linkLabel }: { title: string; source: string; href: string; linkLabel: string }) {
+const TILES: Record<Side, MetricKey[]> = {
+    traffic: ['users', 'sessions', 'pageviews', 'conversions'],
+    search: ['clicks', 'impressions', 'ctr', 'position'],
+};
+
+/** One line over a tile group: the source (as on the site page's section headings) and its "Open" link. */
+function GroupLine({ title, source, href }: { title: string; source: string; href: string }) {
     return (
-        <div className="flex items-end justify-between gap-3">
-            <div className="min-w-0">
-                <h4 className="text-title text-fg">{title}</h4>
-                <p className="truncate text-meta text-fg-muted">{source}</p>
-            </div>
+        <div className="mb-1.5 flex min-w-0 items-baseline justify-between gap-3">
+            <p className="min-w-0 truncate text-meta text-fg-muted">
+                <span className="mr-1.5 text-body-sm font-semibold text-fg">{title}</span>
+                {source}
+            </p>
             <Link href={href} className="tap-area inline-flex shrink-0 items-center gap-1 text-body-sm font-medium text-brand-text hover:underline">
-                {linkLabel} <ArrowRight aria-hidden size={14} />
+                Open {title} <ArrowRight aria-hidden size={14} />
             </Link>
         </div>
     );
 }
 
-interface PanelProps {
-    label: 'Traffic' | 'Search';
-    source: string;
-    href: string;
-    tiles: MetricKey[];
-    totals: Record<string, number>;
-    previous: Record<string, number> | null;
-    series: Row[];
-    findings: Partial<Record<MetricKey, Finding | null>>;
-    markers: LiveMarker[];
-    compareText: string;
-    compareLabel: string;
-    range: { start: string; end: string };
-    partial?: boolean;
-    footer?: string;
-}
+/**
+ * The site page's overview on sample data (round 6): the app's MetricTile toggles for Traffic and Search, and ONE
+ * chart under them for the selected tile (finding line, previous period dashed, y axis, markers listed once, tooltips).
+ * Phones show one group at a time (Traffic / Search switch) over a ~200 px chart whose readout sits above the plot.
+ */
+export function SiteLive({ data }: { data: LiveSiteRow }) {
+    const { meta, traffic, search } = data;
+    const phone = useIsMobile();
+    const touch = useCoarsePointer();
+    const [sel, setSel] = useState<{ side: Side; metric: MetricKey }>({ side: 'traffic', metric: 'users' });
+    const src = {
+        traffic: {
+            totals: traffic.totals as unknown as Record<string, number>,
+            previous: traffic.previous as unknown as Record<string, number> | null,
+            series: traffic.series as unknown as Row[],
+            findings: data.trafficFindings,
+            markers: data.markers.traffic,
+            range: { start: meta.window.start, end: meta.window.end },
+        },
+        search: {
+            totals: search.totals as unknown as Record<string, number>,
+            previous: search.previous as unknown as Record<string, number> | null,
+            series: search.series as unknown as Row[],
+            findings: data.searchFindings,
+            markers: data.markers.search,
+            range: { start: meta.window.searchStart, end: search.lastDate ?? meta.window.searchEnd },
+        },
+    };
+    const cur = src[sel.side];
+    const dates = useMemo(() => ({
+        traffic: src.traffic.series.map((r) => String(r.date)),
+        search: src.search.series.map((r) => String(r.date)),
+    }), [src.traffic.series, src.search.series]);
+    const annotations = useMemo(() => toAnnotations(cur.markers), [cur.markers]);
+    const prevRange = cur.series.length ? { start: String(cur.series[0].prevDate ?? ''), end: String(cur.series[cur.series.length - 1].prevDate ?? '') } : null;
+    const title = `${METRICS[sel.metric].label} per day`;
+    const lastDate = search.lastDate;
 
-/** One side of the site overview: four KPI tiles (toggles) over one chart, as on the site page. */
-function Panel(p: PanelProps) {
-    const [metric, setMetric] = useState<MetricKey>(p.tiles[0]);
-    const dates = useMemo(() => p.series.map((r) => String(r.date)), [p.series]);
-    const spark = (k: MetricKey) => p.series.map((r) => {
-        const v = Number(r[k] ?? 0);
-        return k === 'position' && !Number(r.impressions) ? null : v;
-    });
-    const annotations = useMemo(() => toAnnotations(p.markers), [p.markers]);
-    const title = `${METRICS[metric].label} per day`;
-    return (
-        <section aria-label={p.label} className="flex min-w-0 flex-col gap-3">
-            <SectionTitle title={p.label} source={p.source} href={p.href} linkLabel={`Open ${p.label}`} />
-            <div className="grid grid-cols-2 gap-3">
-                {p.tiles.map((k) => (
+    const group = (side: Side) => (
+        <div className={cn('min-w-0', side !== sel.side && 'max-md:hidden')}>
+            <div className="max-md:hidden">
+                {side === 'traffic'
+                    ? <GroupLine title="Traffic" source={`Google Analytics 4 · ${meta.ga4.replace('properties/', 'property ')}`} href={meta.links.traffic} />
+                    : <GroupLine title="Search" source={`Search Console · ${meta.gsc.startsWith('sc-domain:') ? 'Domain property' : 'URL-prefix property'}${lastDate ? ` · data through ${fmtDateRange(lastDate, lastDate)}` : ''}`} href={meta.links.search} />}
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {TILES[side].map((k) => (
                     <MetricTile
                         key={k}
                         metric={k}
-                        value={p.totals[k] ?? null}
-                        previous={p.previous ? p.previous[k] ?? null : null}
-                        spark={spark(k)}
-                        sparkDates={dates}
-                        selected={metric === k}
-                        onSelect={() => setMetric(k)}
-                        comparisonLabel={p.compareText}
+                        value={src[side].totals[k] ?? null}
+                        previous={src[side].previous ? src[side].previous![k] ?? null : null}
+                        spark={src[side].series.map((r) => (k === 'position' && !Number(r.impressions) ? null : Number(r[k] ?? 0)))}
+                        sparkDates={dates[side]}
+                        selected={sel.metric === k}
+                        onSelect={() => setSel({ side, metric: k })}
+                        comparisonLabel={meta.compareText}
                     />
                 ))}
             </div>
-            <ChartCard
-                title={<span data-live-chart-title="">{title}</span>}
-                subtitle={metric === 'position' ? 'Lower is better' : p.compareLabel}
-                height={200}
-                footer={p.footer}
-            >
-                <FindingLine finding={p.findings[metric] ?? null} />
-                <TimeSeriesChart
-                    data={p.series}
-                    series={[{ metric, key: metric, compareKey: `prev_${metric}` }]}
-                    compareDateKey="prevDate"
-                    partialFrom={p.partial && p.series.length > 1 ? p.series.length - 1 : undefined}
-                    annotations={annotations}
-                    height={200}
-                    ariaLabel={`${title}, ${fmtDateRange(p.range.start, p.range.end)}`}
-                />
-                {/* Phones: the dashed marker lines stay on the chart; their key would add three rows of chips. */}
-                <MarkerChips markers={p.markers} className="max-md:hidden" />
-            </ChartCard>
-        </section>
+        </div>
     );
-}
 
-/**
- * The site page's overview on sample data (round 6): Traffic and Search side by side, each with the app's MetricTile
- * toggles and its chart (finding line, previous period dashed, markers, hover tooltips). Phones switch between the
- * two sides instead of stacking eight tiles and two charts.
- */
-export function SiteLive({ data }: { data: LiveSiteRow }) {
-    const [side, setSide] = useState<'traffic' | 'search'>('traffic');
-    const { meta, traffic, search } = data;
-    const lastDate = search.lastDate;
-    const common = { compareText: meta.compareText, compareLabel: meta.compareLabel };
     return (
-        <LiveFrame hint="Click a tile to chart it, hover the chart for each day." href={meta.links.site} linkLabel="Open this site in the live demo">
+        <LiveFrame
+            hint={touch ? 'Tap a tile, then the chart.' : 'Click any tile to chart it, hover the chart for each day.'}
+            href={meta.links.site}
+            linkLabel="Open this site in the live demo"
+        >
             <SegmentedControl
                 ariaLabel="Show"
                 size="sm"
                 variant="neutral"
-                className="mb-4 md:hidden"
-                value={side}
-                onChange={setSide}
+                className="mb-3 md:hidden"
+                value={sel.side}
+                onChange={(side) => setSel({ side, metric: TILES[side][0] })}
                 options={[{ value: 'traffic', label: 'Traffic' }, { value: 'search', label: 'Search' }]}
             />
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div className={cn('min-w-0', side !== 'traffic' && 'max-md:hidden')}>
-                    <Panel
-                        label="Traffic"
-                        source={`Google Analytics 4 · ${meta.ga4.replace('properties/', 'property ')}`}
-                        href={meta.links.traffic}
-                        tiles={TRAFFIC_TILES}
-                        totals={traffic.totals as unknown as Record<string, number>}
-                        previous={traffic.previous as unknown as Record<string, number> | null}
-                        series={traffic.series as unknown as Row[]}
-                        findings={data.trafficFindings}
-                        markers={data.markers.traffic}
-                        range={{ start: meta.window.start, end: meta.window.end }}
-                        partial
-                        footer="Today is partial."
-                        {...common}
-                    />
-                </div>
-                <div className={cn('min-w-0', side !== 'search' && 'max-md:hidden')}>
-                    <Panel
-                        label="Search"
-                        source={`Google Search Console · ${meta.gsc.startsWith('sc-domain:') ? 'Domain property' : 'URL-prefix property'}${lastDate ? ` · data through ${fmtDateRange(lastDate, lastDate)}` : ''}`}
-                        href={meta.links.search}
-                        tiles={SEARCH_TILES}
-                        totals={search.totals as unknown as Record<string, number>}
-                        previous={search.previous as unknown as Record<string, number> | null}
-                        series={search.series as unknown as Row[]}
-                        findings={data.searchFindings}
-                        markers={data.markers.search}
-                        range={{ start: meta.window.searchStart, end: lastDate ?? meta.window.searchEnd }}
-                        footer="Search Console data is about 2 days behind."
-                        {...common}
-                    />
-                </div>
+            <div className="flex flex-col gap-3">
+                {group('traffic')}
+                {group('search')}
             </div>
+            <Card as="section" aria-label={title} padding="sm" className="mt-3 flex min-w-0 flex-col">
+                {/* Title and finding share a line on wide screens; the dates sit with the markers under the chart. */}
+                <div className="mb-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                    <h4 data-live-chart-title="" className="shrink-0 text-title-sm text-fg">{title}</h4>
+                    <div className="min-w-0 max-md:hidden [&>p]:mb-0">
+                        <FindingLine finding={cur.findings[sel.metric] ?? null} />
+                    </div>
+                </div>
+                <TimeSeriesChart
+                    data={cur.series}
+                    series={[{ metric: sel.metric, key: sel.metric, compareKey: `prev_${sel.metric}` }]}
+                    compareDateKey="prevDate"
+                    annotations={annotations}
+                    height={204}
+                    tooltipAbove={phone || touch}
+                    ariaLabel={`${title}, ${fmtDateRange(cur.range.start, cur.range.end)}`}
+                />
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-border-subtle pt-2">
+                    <MarkerChips markers={cur.markers} oneLine bare className="w-full min-w-0 md:w-auto md:flex-1" />
+                    <p className="text-meta text-fg-muted tabular-nums">
+                        {fmtDateRange(cur.range.start, cur.range.end)}
+                        {sel.metric === 'position' ? ' · lower is better' : prevRange?.start ? ` · dashed: ${fmtDateRange(prevRange.start, prevRange.end)}` : ''}
+                    </p>
+                </div>
+            </Card>
         </LiveFrame>
     );
 }

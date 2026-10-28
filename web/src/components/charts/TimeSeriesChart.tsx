@@ -62,6 +62,11 @@ export interface TimeSeriesChartProps {
     compareDateKey?: string;
     /** Screen-reader summary, e.g. "Clicks per day, Jul 28 – Oct 24, 1,282 in total". */
     ariaLabel?: string;
+    /**
+     * Pin the readout above the plot (it still follows the day sideways) instead of over the line: for touch and
+     * narrow screens, where a card next to the finger covers most of the chart.
+     */
+    tooltipAbove?: boolean;
     className?: string;
 }
 
@@ -118,7 +123,7 @@ export function TimeSeriesChart({ mode = 'single', series, height = 280, classNa
     return <ChartInner {...rest} mode={mode} series={series} height={height} className={className} />;
 }
 
-function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, height, dateKey = 'date', compareDateKey, ariaLabel, className }: TimeSeriesChartProps & { height: number }) {
+function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, height, dateKey = 'date', compareDateKey, ariaLabel, tooltipAbove, className }: TimeSeriesChartProps & { height: number }) {
     const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
     const reduce = useReducedMotion();
     const [animate, setAnimate] = useState(true);
@@ -190,6 +195,8 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
                 subtitle={cd ? `vs ${fmtDayLong(String(cd))}` : undefined}
                 rows={tRows}
                 partial={hasPartial && idx >= (partialFrom as number)}
+                // Pinned: the card's bottom edge sits just above the plot.
+                className={tooltipAbove ? '-translate-y-[calc(100%+6px)]' : undefined}
             />
         );
     };
@@ -253,6 +260,7 @@ function ChartInner({ data, series: allSeries, mode, partialFrom, annotations, h
                     cursor={CURSOR}
                     isAnimationActive={false}
                     offset={12}
+                    {...(tooltipAbove ? { position: { y: 0 }, allowEscapeViewBox: { x: false, y: true }, wrapperStyle: { zIndex: 20 } } : {})}
                 />
                 {annotations?.slice(0, MAX_ANNOTATIONS).map((a) => (
                     <ReferenceLine
