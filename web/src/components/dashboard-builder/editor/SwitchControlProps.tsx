@@ -176,7 +176,7 @@ export function GrainControlProps({ control, doc }: { control: GrainControl; doc
 
 export function SearchTypeControlProps({ control, doc }: { control: SearchTypeControl; doc: DashboardDocV2 }) {
     const { set, remove } = useControlEdit(control);
-    const following = scopedWidgets(doc, control).filter((x) => searchTypeEligible(x.w)).length;
+    const following = scopedWidgets(doc, control).filter((x) => searchTypeEligible(x.w) && (!x.w.searchType || x.w.searchType === 'web')).length;
     const toggle = (t: SearchTypeControl['default'], on: boolean) => {
         const next = SEARCH_TYPES.map((x) => x.id).filter((v) => (v === t ? on : control.options.includes(v)));
         if (next.length < 2) return;
@@ -190,11 +190,11 @@ export function SearchTypeControlProps({ control, doc }: { control: SearchTypeCo
                     {SEARCH_TYPES.map((t) => <Checkbox key={t.id} checked={control.options.includes(t.id)} onCheckedChange={(c) => toggle(t.id, c)} label={t.label} />)}
                 </div>
             </Field>
-            <Field label="Starts on" hint="Web search leaves each widget on its own search type until a viewer picks one.">
+            <Field label="Starts on" hint="Web search leaves widgets as they are until a viewer picks one. A widget set to its own search type always keeps it.">
                 <Choice ariaLabel="Starts on" value={control.default} onChange={(v) => set({ default: v })} options={SEARCH_TYPES.filter((t) => control.options.includes(t.id)).map((t) => ({ value: t.id, label: t.label }))} />
             </Field>
             <ScopeField scope={control.scope} doc={doc} onChange={(scope) => set({ scope })} />
-            <p className="text-meta text-fg-muted">{following} widget{following === 1 ? '' : 's'} read only Search Console and follow this control. Widgets that also show Analytics numbers stay as they are. Discover and Google News have no search queries and no position: a widget that needs them says so.</p>
+            <p className="text-meta text-fg-muted">{following} widget{following === 1 ? '' : 's'} read only Search Console and follow this control. Widgets pinned to their own search type, and widgets that also show Analytics numbers, stay as they are. Discover and Google News have no search queries and no position: a widget that needs them says so.</p>
         </Shell>
     );
 }

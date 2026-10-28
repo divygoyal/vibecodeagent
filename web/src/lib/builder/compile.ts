@@ -259,8 +259,10 @@ export function applyViewerControls(widget: WidgetDef, ctx: CompileCtx, opts: { 
         if (g !== 'auto' && w.config.granularity !== g) w = { ...w, config: { ...w.config, granularity: g } };
     }
     // Round 8: the search type switcher moves Search Console widgets (every metric from Search Console).
-    // A control left on Web with no pick keeps each widget's own search type.
-    const tc = searchTypeEligible(w) ? controlsFor('searchType', w, ctx)[0] : undefined;
+    // A widget with its own non-web search type keeps it (its title says so); the control moves only the
+    // widgets left on Web. A control left on Web with no pick changes nothing.
+    const own = w.searchType && w.searchType !== 'web';
+    const tc = !own && searchTypeEligible(w) ? controlsFor('searchType', w, ctx)[0] : undefined;
     if (tc) {
         const { type, picked } = selectedSearchType(tc, ctx.controls);
         if ((picked || type !== 'web') && (w.searchType ?? 'web') !== type) w = { ...w, searchType: type === 'web' ? undefined : type };
