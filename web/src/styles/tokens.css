@@ -117,6 +117,7 @@
   --tc-m-sessions:    #0b8fb8;
   --tc-m-pageviews:   #db3f8a;
   --tc-m-conversions: #c2410c;
+  --tc-m-revenue:     #16884f;
   --tc-m-ai:          #c98500;
 
   /* Categorical 8 (dimension breakdowns), fixed order, never cycled */
@@ -188,6 +189,7 @@
   --tc-m-sessions:    #149ac4;
   --tc-m-pageviews:   #d14186;
   --tc-m-conversions: #e25500;
+  --tc-m-revenue:     #22a463;
   --tc-m-ai:          #b98c07;
 
   --tc-cat-1: #3987e5;  --tc-cat-2: #d95926;  --tc-cat-3: #199e70;  --tc-cat-4: #c98500;
@@ -252,6 +254,7 @@
   --color-m-sessions: var(--tc-m-sessions);
   --color-m-pageviews: var(--tc-m-pageviews);
   --color-m-conversions: var(--tc-m-conversions);
+  --color-m-revenue: var(--tc-m-revenue);
   --color-m-ai: var(--tc-m-ai);
 
   --color-cat-1: var(--tc-cat-1);  --color-cat-2: var(--tc-cat-2);
@@ -383,5 +386,6 @@
 @utility heatbar-sessions { background: color-mix(in oklab, var(--tc-m-sessions) var(--tc-heatbar), transparent); }
 @utility heatbar-pageviews { background: color-mix(in oklab, var(--tc-m-pageviews) var(--tc-heatbar), transparent); }
 @utility heatbar-conversions { background: color-mix(in oklab, var(--tc-m-conversions) var(--tc-heatbar), transparent); }
+@utility heatbar-revenue { background: color-mix(in oklab, var(--tc-m-revenue) var(--tc-heatbar), transparent); }
 @utility heatbar-ai { background: color-mix(in oklab, var(--tc-m-ai) var(--tc-heatbar), transparent); }
 @utility heatbar-neutral { background: color-mix(in oklab, var(--tc-fg-muted) var(--tc-heatbar), transparent); }

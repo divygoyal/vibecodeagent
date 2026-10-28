@@ -20,7 +20,9 @@
  *  - lowercase host without www ('acme.com');
  *  - a second property on the same host gets '--2', a third '--3' (paired
  *    first, then domain, then https: the portfolio's card slugs use the same order);
- *  - a GA4 property with no Search Console site gets 'ga4-<number>'.
+ *  - a GA4 property with no Search Console site gets 'ga4-<number>'. Its web stream host
+ *    (`streamHost`, from the portfolio store) is an alias: /dashboard/s/<stream host> resolves to it
+ *    (resolveSite) and the site route redirects to the canonical 'ga4-<number>' key.
  */
 import { normalizeHost, siteKind } from './pairing';
 
@@ -34,11 +36,14 @@ export interface SiteEntry {
     /** 'properties/123' */
     ga4PropertyId: string | null;
     ga4Name: string | null;
+    /** GA4-only sites: the web stream host the portfolio stored ('creativeprints.example'), an alias of `host`. */
+    streamHost?: string | null;
 }
 
 export interface DirectoryInput {
     sites: { siteUrl: string }[];
-    properties: { property?: string; propertyId?: string; displayName?: string }[];
+    /** `host`: the property's web stream host, when the portfolio store knows it. */
+    properties: { property?: string; propertyId?: string; displayName?: string; host?: string }[];
     /**
      * Stored pairing (GA4 property -> GSC site URL, or null for GA4-only) from
      * the portfolio store. Properties listed here never use the heuristic.
@@ -99,8 +104,8 @@ export function buildSiteDirectory({ sites, properties, pairs }: DirectoryInput)
         .filter((x) => x.host);
 
     const props = properties
-        .map((p) => ({ id: propId(p), name: p.displayName || '' }))
-        .filter((p): p is { id: string; name: string } => Boolean(p.id));
+        .map((p) => ({ id: propId(p), name: p.displayName || '', host: p.host ? normalizeHost(p.host) : '' }))
+        .filter((p): p is { id: string; name: string; host: string } => Boolean(p.id));
     const paired = new Set<string>();
 
     // 1. The stored pairing (portfolio store). A property stored as GA4-only stays GA4-only.
@@ -176,6 +181,7 @@ export function buildSiteDirectory({ sites, properties, pairs }: DirectoryInput)
             gscKind: null,
             ga4PropertyId: p.id,
             ga4Name: p.name || null,
+            ...(p.host ? { streamHost: p.host } : {}),
         });
     }
 
@@ -186,6 +192,24 @@ export function findSite(dir: SiteEntry[], host: string | null | undefined): Sit
     if (!host) return null;
     const h = host.toLowerCase();
     return dir.find((e) => e.host === h) ?? null;
+}
+
+/**
+ * The site a /dashboard/s/[host] URL means: its route key, else a hostname the user typed or followed
+ * ('www.acme.com' -> 'acme.com'; a GA4-only site's web stream host -> 'ga4-<number>'). `alias` is true
+ * when the URL is not the canonical key, so the route can redirect to it.
+ */
+export function resolveSite(dir: SiteEntry[], host: string | null | undefined): { site: SiteEntry; alias: boolean } | null {
+    const exact = findSite(dir, host);
+    if (exact) return { site: exact, alias: false };
+    if (!host || /^ga4-/.test(host)) return null;
+    const h = normalizeHost(host);
+    if (!h) return null;
+    const byKey = findSite(dir, h);
+    if (byKey) return { site: byKey, alias: true };
+    // A GA4-only site by its stream host. Several GA4-only properties on one host: the first by label.
+    const byStream = dir.find((e) => !e.gscSiteUrl && e.streamHost === h);
+    return byStream ? { site: byStream, alias: true } : null;
 }
 
 /** The entry matching a saved workspace selection (site first, then property). */

@@ -26,6 +26,7 @@ export type MetricKey =
     | 'sessions'
     | 'pageviews'
     | 'conversions'
+    | 'revenue'
     | 'ai';
 
 export interface MetricDef {
@@ -82,10 +83,17 @@ export const METRICS: Record<MetricKey, MetricDef> = {
         color: 'var(--color-m-pageviews)', heatbar: 'heatbar-pageviews',
         description: 'Pages and screens viewed (GA4 views).',
     },
+    // GA4 renamed "conversions" to "key events" in 2024; the key stays 'conversions' (saved URLs, CSVs, dashboards),
+    // the label follows GA4. TrafficClaw goals say "Goal completions", never "conversions".
     conversions: {
-        key: 'conversions', label: 'Conversions', short: 'conv.', source: 'ga4', group: 'traffic', better: 'up', format: 'count',
+        key: 'conversions', label: 'Key events', short: 'key events', source: 'ga4', group: 'traffic', better: 'up', format: 'count',
         color: 'var(--color-m-conversions)', heatbar: 'heatbar-conversions',
-        description: 'Key events (GA4 conversions).',
+        description: 'GA4 key events (what GA4 called conversions before 2024): sign-ups, purchases and other events you marked as key.',
+    },
+    revenue: {
+        key: 'revenue', label: 'Revenue', short: 'revenue', source: 'ga4', group: 'traffic', better: 'up', format: 'currency',
+        color: 'var(--color-m-revenue)', heatbar: 'heatbar-revenue',
+        description: 'GA4 total revenue (purchases, subscriptions and ads), in the property currency. Shown only when it is above 0.',
     },
     ai: {
         key: 'ai', label: 'AI traffic', short: 'AI', source: 'ga4', group: 'traffic', better: 'up', format: 'count',
@@ -107,8 +115,8 @@ export function publicLabel(key: MetricKey): string {
     return key === 'users' ? 'Visitors' : METRICS[key].label;
 }
 
-/** Format a metric value. Counts are full unless `compact` (cards, tiles, axes). */
-export function fmtMetric(key: MetricKey, value: number | null | undefined, opts: { compact?: boolean; tile?: boolean } = {}): string {
+/** Format a metric value. Counts are full unless `compact` (cards, tiles, axes). Revenue uses `currency` (default USD). */
+export function fmtMetric(key: MetricKey, value: number | null | undefined, opts: { compact?: boolean; tile?: boolean; currency?: string | null; cents?: boolean } = {}): string {
     return fmtValue(METRICS[key].format, value, opts);
 }
 

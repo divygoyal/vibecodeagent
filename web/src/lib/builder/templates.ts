@@ -284,7 +284,7 @@ export const TEMPLATES: TemplateMeta[] = [
     { id: 'portfolio', name: 'Portfolio', description: 'All sites in one report: totals, ranking and biggest movers.', category: 'Portfolio', needs: [], portfolio: true },
     { id: 'client-report', name: 'Client report', description: 'A three-page, shareable report with your logo and notes.', category: 'Reporting', needs: ['gsc', 'ga4'] },
     { id: 'audience-geography', name: 'Audience and geography', description: 'Who your visitors are and where they are.', category: 'Traffic', needs: ['ga4'] },
-    { id: 'key-events-revenue', name: 'Key events and revenue', description: 'Conversions and ecommerce by channel and product.', category: 'Traffic', needs: ['ga4'] },
+    { id: 'key-events-revenue', name: 'Key events and revenue', description: 'Key events and ecommerce by channel and product.', category: 'Traffic', needs: ['ga4'] },
     // Round 2: sixteen new templates, appended (the eight above keep their ids and order).
     ...TEMPLATES_R2.map((t): TemplateMeta => ({ ...t, isNew: true })),
 ];

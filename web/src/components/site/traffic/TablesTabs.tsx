@@ -7,14 +7,14 @@ import { fmtFull } from '@/lib/format';
 import { channelColor } from '@/lib/metrics';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { siteHref } from '@/components/shell/nav';
-import { BreakdownTable } from '../BreakdownTable';
+import { BreakdownTable, type BreakdownColumn } from '../BreakdownTable';
 import { GeoCard } from '../breakdown/GeoCard';
 import { useFilterClick } from '../filters/SiteFilters';
 import { flagForName } from '../lib/geo';
 import { sourceMediumInfo } from '../lib/sources';
 import { sourceMediumParts } from '../SourceIcon';
 import { displayPage, isAiSource, pageRef } from '../lib/rules';
-import type { Ga4BreakdownResponse, Ga4PageTrends, Ga4Row } from '../lib/types';
+import type { Ga4BreakdownResponse, Ga4Row } from '../lib/types';
 import { LoadError } from '../SiteStates';
 import { PagePath } from '../PagePath';
 import { useGa4, useSite, useSiteRange } from '../useSiteData';
@@ -23,8 +23,18 @@ import { ChannelsDonut, DevicesDonut, Flag, SimpleList } from './OverviewTab';
 const v = (r: Ga4Row, k: string) => r.cur[k] ?? 0;
 const p = (r: Ga4Row, k: string) => (r.prev === undefined ? undefined : r.prev === null ? null : r.prev[k] ?? 0);
 
-function useBreakdown(report: string) {
+function useBreakdown(report: string | null) {
     return useGa4<Ga4BreakdownResponse>(report);
+}
+
+/** GA4 revenue in a breakdown: shown as a column only when some row has revenue (a shop), else hidden. */
+export function hasRevenue(res: Ga4BreakdownResponse | undefined): boolean {
+    return Boolean(res?.rows.some((r) => (r.cur.totalRevenue ?? 0) > 0));
+}
+
+/** The Revenue column (and "Key events" before it) for GA4 breakdown tables. */
+function revenueColumn<T>(row: (x: T) => Ga4Row, compareOn: boolean, hideOnMobile = true): BreakdownColumn<T> {
+    return { key: 'revenue', header: 'Revenue', format: 'currency', value: (x) => v(row(x), 'totalRevenue'), previous: compareOn ? (x) => p(row(x), 'totalRevenue') : undefined, hideOnMobile };
 }
 
 /** Traffic > Pages: every page (GA4 views) or landing pages. Row opens the merged page drawer. */
@@ -39,8 +49,14 @@ export function TrafficPagesTab() {
         return { r, ref, label: displayPage(ref, site.siteHost) };
     }).filter((x) => x.label && !x.label.includes('(not set)')), [pages.data, view, site.siteHost]);
     const open = (key: string) => router.push(`${siteHref(site.host, 'pages')}?page=${encodeURIComponent(key)}`);
-    const trends = useGa4<Ga4PageTrends>(view === 'pages' ? 'pageTrends' : null, { extra: { limit: '25' } });
-    const titleBy = useMemo(() => new Map((trends.data?.titles ?? []).map((t) => [pageRef(t.path, t.host || site.siteHost).key, t.title])), [trends.data, site.siteHost]);
+    const money = hasRevenue(pages.data);
+    const currency = pages.data?.currency;
+    // Title over path (GA4 pageTitle, brand removed); search matches either.
+    const pageLabelCol = (header: string) => ({
+        header,
+        text: (x: (typeof rows)[number]) => `${x.r.dims.pageTitle ?? ''} ${x.label}`.trim(),
+        cell: (x: (typeof rows)[number]) => <PagePath path={x.label} title={x.r.dims.pageTitle} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto md:max-w-none" />,
+    });
     const toggle = (
         <SegmentedControl
             ariaLabel="Page report"
@@ -57,11 +73,8 @@ export function TrafficPagesTab() {
             <BreakdownTable
                 rows={rows}
                 rowKey={(x) => x.r.key}
-                label={{
-                    header: 'Page',
-                    text: (x) => `${titleBy.get(x.ref.key) ?? ''} ${x.label}`,
-                    cell: (x) => <PagePath path={x.label} title={titleBy.get(x.ref.key)} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto" />,
-                }}
+                label={pageLabelCol('Page')}
+                currency={currency}
                 heat={{ metric: 'pageviews', value: (x) => v(x.r, 'screenPageViews') }}
                 loading={pages.state === 'loading'}
                 defaultSort="views"
@@ -74,7 +87,8 @@ export function TrafficPagesTab() {
                     { key: 'users', header: 'Users', value: (x) => v(x.r, 'activeUsers'), hideOnMobile: true },
                     { key: 'eng', header: 'Avg. engagement', format: 'duration', value: (x) => (v(x.r, 'activeUsers') ? v(x.r, 'userEngagementDuration') / v(x.r, 'activeUsers') : 0), hideOnMobile: true },
                     { key: 'rate', header: 'Engagement rate', format: 'percent', value: (x) => v(x.r, 'engagementRate'), hideOnMobile: true },
-                    { key: 'conv', header: 'Conversions', value: (x) => v(x.r, 'keyEvents'), hideOnMobile: true },
+                    { key: 'conv', header: 'Key events', value: (x) => v(x.r, 'keyEvents'), hideOnMobile: true },
+                    ...(money ? [revenueColumn<(typeof rows)[number]>((x) => x.r, compareOn)] : []),
                 ]}
             />
         );
@@ -83,7 +97,8 @@ export function TrafficPagesTab() {
         <BreakdownTable
             rows={rows}
             rowKey={(x) => x.r.key}
-            label={{ header: 'Landing page', text: (x) => x.label, cell: (x) => <PagePath path={x.label} className="w-[46vw] max-w-[30rem] md:w-auto" /> }}
+            label={pageLabelCol('Landing page')}
+            currency={currency}
             heat={{ metric: 'sessions', value: (x) => v(x.r, 'sessions') }}
             loading={pages.state === 'loading'}
             defaultSort="sessions"
@@ -96,7 +111,8 @@ export function TrafficPagesTab() {
                 { key: 'users', header: 'Users', value: (x) => v(x.r, 'activeUsers'), hideOnMobile: true },
                 { key: 'rate', header: 'Engagement rate', format: 'percent', value: (x) => v(x.r, 'engagementRate'), hideOnMobile: true },
                 { key: 'bounce', header: 'Bounce rate', format: 'percent', better: 'down', value: (x) => v(x.r, 'bounceRate'), hideOnMobile: true },
-                { key: 'conv', header: 'Conversions', value: (x) => v(x.r, 'keyEvents'), hideOnMobile: true },
+                { key: 'conv', header: 'Key events', value: (x) => v(x.r, 'keyEvents'), hideOnMobile: true },
+                ...(money ? [revenueColumn<(typeof rows)[number]>((x) => x.r, compareOn)] : []),
             ]}
         />
     );
@@ -124,8 +140,14 @@ export function TrafficSourcesTab() {
         { key: 'users', header: 'Users', value: (r: Ga4Row) => v(r, 'activeUsers'), hideOnMobile: true },
         { key: 'rate', header: 'Engagement rate', format: 'percent' as const, value: (r: Ga4Row) => v(r, 'engagementRate'), hideOnMobile: true },
         { key: 'dur', header: 'Avg. duration', format: 'duration' as const, value: (r: Ga4Row) => v(r, 'averageSessionDuration'), hideOnMobile: true },
-        { key: 'conv', header: 'Conversions', value: (r: Ga4Row) => v(r, 'keyEvents'), previous: compareOn ? (r: Ga4Row) => p(r, 'keyEvents') : undefined, hideOnMobile: true },
+        { key: 'conv', header: 'Key events', value: (r: Ga4Row) => v(r, 'keyEvents'), previous: compareOn ? (r: Ga4Row) => p(r, 'keyEvents') : undefined, hideOnMobile: true },
     ];
+    const withRevenue = (res: Ga4BreakdownResponse | undefined) => (hasRevenue(res) ? [...trafficCols, revenueColumn<Ga4Row>((r) => r, compareOn)] : trafficCols);
+    // The Channels table sits in two thirds of the row: with revenue it drops Avg. duration and the key events
+    // change, so Revenue fits without a sideways scroll (the Source / medium table below keeps every column).
+    const channelCols = hasRevenue(channels.data)
+        ? [...trafficCols.filter((c) => c.key !== 'dur').map((c) => (c.key === 'conv' ? { ...c, previous: undefined } : c)), revenueColumn<Ga4Row>((r) => r, compareOn)]
+        : trafficCols;
     return (
         <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -144,7 +166,8 @@ export function TrafficSourcesTab() {
                             pageSize={12}
                             searchPlaceholder="Search channels"
                             onRowClick={(r) => click('channel', r.dims.sessionDefaultChannelGroup)}
-                            columns={trafficCols}
+                            columns={channelCols}
+                            currency={channels.data?.currency}
                         />
                     )}
                 </div>
@@ -172,7 +195,8 @@ export function TrafficSourcesTab() {
                         <SegmentedControl ariaLabel="Sources shown" size="sm" variant="neutral" value={onlyAi} onChange={setOnlyAi}
                             options={[{ value: 'all', label: 'All sources' }, { value: 'ai', label: 'AI assistants' }]} />
                     )}
-                    columns={trafficCols}
+                    columns={withRevenue(sources.data)}
+                    currency={sources.data?.currency}
                 />
             )}
         </div>
@@ -213,8 +237,10 @@ export function TrafficAudienceTab() {
                         { key: 'users', header: 'Users', value: (r) => v(r, 'activeUsers'), previous: compareOn ? (r) => p(r, 'activeUsers') : undefined },
                         { key: 'sessions', header: 'Sessions', value: (r) => v(r, 'sessions'), hideOnMobile: true },
                         { key: 'rate', header: 'Engagement rate', format: 'percent', value: (r) => v(r, 'engagementRate'), hideOnMobile: true },
-                        ...(geo === 'countries' ? [{ key: 'conv', header: 'Conversions', value: (r: Ga4Row) => v(r, 'keyEvents'), hideOnMobile: true }] : []),
+                        ...(geo === 'countries' ? [{ key: 'conv', header: 'Key events', value: (r: Ga4Row) => v(r, 'keyEvents'), hideOnMobile: true }] : []),
+                        ...(geo === 'countries' && hasRevenue(countries.data) ? [revenueColumn<Ga4Row>((r) => r, compareOn)] : []),
                     ]}
+                    currency={countries.data?.currency}
                 />
             )}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -238,7 +264,7 @@ export function TrafficAudienceTab() {
                         { key: 'users', header: 'Users', value: (r) => v(r, 'activeUsers'), previous: compareOn ? (r) => p(r, 'activeUsers') : undefined },
                         { key: 'share', header: 'Share', format: 'percent', value: (r) => (totalUsers ? v(r, 'activeUsers') / totalUsers : 0), hideOnMobile: true },
                         { key: 'rate', header: 'Engagement rate', format: 'percent', value: (r) => v(r, 'engagementRate'), hideOnMobile: true },
-                        { key: 'conv', header: 'Conversions', value: (r) => v(r, 'keyEvents'), hideOnMobile: true },
+                        { key: 'conv', header: 'Key events', value: (r) => v(r, 'keyEvents'), hideOnMobile: true },
                     ]}
                 />
             )}

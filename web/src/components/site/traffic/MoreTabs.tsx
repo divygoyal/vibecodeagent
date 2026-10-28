@@ -14,6 +14,7 @@ import { BreakdownTable } from '../BreakdownTable';
 import { displayPage, pageRef } from '../lib/rules';
 import type { Ga4BreakdownResponse, Ga4Row, Ga4Summary, RetentionResponse } from '../lib/types';
 import { MetricTile } from '../MetricTile';
+import { PagePath } from '../PagePath';
 import { LoadError } from '../SiteStates';
 import { useGa4, useSite, useSiteRange } from '../useSiteData';
 import { GoalsPanel } from './GoalsFunnels';
@@ -119,7 +120,11 @@ export function JourneysTab() {
                     rows={rows}
                     rowKey={(x) => x.r.key}
                     loading={landing.state === 'loading'}
-                    label={{ header: 'Entry page', text: (x) => x.label }}
+                    label={{
+                        header: 'Entry page',
+                        text: (x) => `${x.r.dims.pageTitle ?? ''} ${x.label}`.trim(),
+                        cell: (x) => <PagePath path={x.label} title={x.r.dims.pageTitle} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto md:max-w-none" />,
+                    }}
                     heat={{ metric: 'sessions', value: (x) => v(x.r, 'sessions') }}
                     defaultSort="sessions"
                     exportName="entry-pages"
@@ -130,7 +135,7 @@ export function JourneysTab() {
                         { key: 'rate', header: 'Went deeper', format: 'percent', value: (x) => v(x.r, 'engagementRate'), hideOnMobile: true },
                         { key: 'bounce', header: 'Left at once', format: 'percent', better: 'down', value: (x) => v(x.r, 'bounceRate'), hideOnMobile: true },
                         { key: 'dur', header: 'Avg. duration', format: 'duration', value: (x) => v(x.r, 'averageSessionDuration'), hideOnMobile: true },
-                        { key: 'conv', header: 'Conversions', value: (x) => v(x.r, 'keyEvents'), hideOnMobile: true },
+                        { key: 'conv', header: 'Key events', value: (x) => v(x.r, 'keyEvents'), hideOnMobile: true },
                     ]}
                 />
             )}

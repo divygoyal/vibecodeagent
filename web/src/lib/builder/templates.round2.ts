@@ -409,7 +409,7 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                     [[table('w_pg', 'Top pages', ['page'], ['gsc:clicks', 'gsc:position', 'ga4:sessions', 'ga4:keyEvents'], { bars: ['gsc:clicks'] }), 12, 9]],
                     [[breakdownTs('w_ch', 'Sessions by channel', 'ga4:sessions', 'channel'), 8, 8], [pie('w_chp', 'Channels', 'channel', 'ga4:sessions'), 4, 8]],
                 ], w),
-                page('p_conv', 'Conversions', [
+                page('p_conv', 'Key events', [
                     [[kpi('w_cv', ['ga4:keyEvents', 'ga4:sessionKeyEventRate', 'ga4:engagementRate']), 12, 3]],
                     [[ts('w_ke', 'Key events', ['ga4:keyEvents']), 8, 7], [table('w_kech', 'Key events by channel', ['channel'], ['ga4:keyEvents', 'ga4:sessionKeyEventRate'], { bars: ['ga4:keyEvents'] }), 4, 7]],
                     [[table('w_ken', 'Key events by name', ['eventName'], ['ga4:keyEvents', 'ga4:eventCount'], { rowFilters: [{ metric: 'ga4:keyEvents', op: 'gt', value: 0 }], bars: ['ga4:keyEvents'] }), 12, 8]],

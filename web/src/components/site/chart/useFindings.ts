@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 
+import { fmtCurrency } from '@/lib/format';
 import { METRICS, type MetricKey } from '@/lib/metrics';
 import { rateFinding, trendFinding, updateImpactFinding, type Driver, type Finding } from '../lib/findings';
 import { googleUpdatesIn } from '../lib/googleUpdates';
@@ -29,8 +30,11 @@ export function useTrafficFinding(metric: MetricKey, summary: Ga4Summary | undef
         } else if (metric === 'ai') {
             list = rows.filter((r) => isAiSource(r.dims.sessionSource)).map((r) => ({ label: sourceLabel(r.dims.sessionSource), cur: r.cur.sessions ?? 0, prev: r.prev?.sessions ?? 0 }));
         } else if (metric === 'conversions') {
-            unit = 'conversions';
+            unit = 'key events';
             list = rows.map((r) => ({ label: r.dims.sessionDefaultChannelGroup, cur: r.cur.keyEvents ?? 0, prev: r.prev?.keyEvents ?? 0 }));
+        } else if (metric === 'revenue') {
+            unit = '';
+            list = rows.map((r) => ({ label: r.dims.sessionDefaultChannelGroup, cur: r.cur.totalRevenue ?? 0, prev: r.prev?.totalRevenue ?? 0 }));
         } else {
             list = rows.map((r) => ({ label: r.dims.sessionDefaultChannelGroup, cur: r.cur.sessions ?? 0, prev: r.prev?.sessions ?? 0 }));
         }
@@ -45,6 +49,7 @@ export function useTrafficFinding(metric: MetricKey, summary: Ga4Summary | undef
             driverUnit: unit,
             series: opts.daily === false ? undefined : summary.series.map((s) => ({ date: s.date, value: (s as unknown as Record<string, number>)[metric] ?? 0 })),
             partialLast: true,
+            ...(metric === 'revenue' ? { fmt: (n: number) => fmtCurrency(n, summary.currency, { compact: true }) } : {}),
         });
     }, [summary, drivers.data, metric, compareOn, compareText, siteHost, opts.daily]);
 }

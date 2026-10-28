@@ -151,7 +151,7 @@ const GEO_TABS: Array<{ value: ShareOverviewGeoTab; label: string }> = [
 ];
 const EVENT_TABS: Array<{ value: ShareOverviewEventTab; label: string }> = [
     { value: 'events', label: 'Events' },
-    { value: 'conversions', label: 'Conversions' },
+    { value: 'conversions', label: 'Key events' },
     { value: 'link_out', label: 'Outbound links' },
 ];
 const FILTER_LABELS: Record<string, string> = {
@@ -1262,7 +1262,7 @@ function TopEventsWidget({ token }: { token: string }) {
                 <BreakdownTable<EventRow>
                     rows={rows}
                     rowKey={(r) => r.id}
-                    labelHeader={eventTab === 'events' ? 'Event' : eventTab === 'conversions' ? 'Conversion' : 'Link'}
+                    labelHeader={eventTab === 'events' ? 'Event' : eventTab === 'conversions' ? 'Key event' : 'Link'}
                     label={(r) => (
                         <RowLabel
                             icon={<OverviewValueIcon column={eventTab === 'link_out' ? 'link_out' : eventTab === 'conversions' ? 'conversions' : 'event'} value={r.name} />}

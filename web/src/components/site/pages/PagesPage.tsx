@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Download, ExternalLink } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { fmtDuration, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
+import { fmtCurrency, fmtDuration, fmtFull, fmtPercent, fmtPosition } from '@/lib/format';
 import { METRICS } from '@/lib/metrics';
 import { BarList } from '@/components/charts/BarList';
 import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
@@ -89,17 +89,22 @@ export function PagesPage() {
     const counts = useMemo(() => Object.fromEntries(SEGMENTS.map((s) => [s.value, rows.filter((r) => segFilter(r, s.value)).length])) as Record<Segment, number>,
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [rows, site.hasGa4]);
-    const shown = useMemo(() => rows.filter((r) => segFilter(r, segment) && (!q || r.label.toLowerCase().includes(q))),
+    const shown = useMemo(() => rows.filter((r) => segFilter(r, segment) && (!q || r.label.toLowerCase().includes(q) || (r.title ?? titleBy.get(r.key) ?? '').toLowerCase().includes(q))),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [rows, segment, q, site.hasGa4]);
+        [rows, segment, q, site.hasGa4, titleBy]);
     const loading = (site.hasGa4 && ga.state === 'loading') || (site.hasGsc && sc.state === 'loading');
     const err = ga.state === 'error' ? ga : sc.state === 'error' ? sc : null;
     const selected = pageKey ? rows.find((r) => r.key === pageKey) ?? null : null;
+    // The page's title: from the pages report (every GA4 page), else the top-pages report (GSC-only rows match by path).
+    const titleOf = (r: Row) => r.title ?? titleBy.get(r.key) ?? null;
+    // Revenue shows only for properties that report some (purchases land on the page where they happened).
+    const money = rows.some((r) => (r.revenue ?? 0) > 0);
+    const currency = ga.data?.currency;
 
     const columns: TableColumn<Row>[] = [
         {
-            key: 'page', header: 'Page', width: '34%', sortable: true, firstSortDir: 'asc', sortValue: (r) => r.label,
-            cell: (r) => <PagePath path={r.label} title={titleBy.get(r.key)} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto" />,
+            key: 'page', header: 'Page', width: '38%', sortable: true, firstSortDir: 'asc', sortValue: (r) => r.label,
+            cell: (r) => <PagePath path={r.label} title={titleOf(r)} className="w-[46vw] max-w-[30rem] font-medium text-fg md:w-auto md:max-w-none" />,
             // Rows with trend bars read better without a heat bar; keep it for GSC-only sites.
             heat: site.hasGa4 ? undefined : { metric: 'clicks', value: (r) => r.clicks },
         },
@@ -114,6 +119,9 @@ export function PagesPage() {
             { key: 'views', header: 'Views', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.views ?? -1, cell: (r: Row) => fmtFull(r.views) },
             { key: 'users', header: 'Users', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.users ?? -1, cell: (r: Row) => fmtFull(r.users) },
             { key: 'eng', header: 'Eng. time', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.engagement ?? -1, cell: (r: Row) => (r.engagement === null ? '–' : fmtDuration(r.engagement)), className: 'max-md:hidden', headerClassName: 'max-md:hidden' },
+        ] : []),
+        ...(money ? [
+            { key: 'revenue', header: 'Revenue', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.revenue ?? -1, cell: (r: Row) => (r.revenue ? fmtCurrency(r.revenue, currency) : '–'), className: 'max-md:hidden', headerClassName: 'max-md:hidden' },
         ] : []),
         ...(site.hasGsc ? [
             { key: 'clicks', header: 'Clicks', align: 'right' as const, sortable: true, sortValue: (r: Row) => r.clicks ?? -1, cell: (r: Row) => fmtFull(r.clicks) },
@@ -131,8 +139,8 @@ export function PagesPage() {
     ];
 
     const exportCsv = () => downloadCsv('pages.csv',
-        ['Page', 'URL', 'Views', 'Users', 'Avg engagement (s)', 'Conversions', 'Clicks', 'Impressions', 'CTR', 'Position'],
-        shown.map((r) => [r.label, r.url ?? '', r.views ?? '', r.users ?? '', r.engagement === null ? '' : Math.round(r.engagement), r.conversions ?? '', r.clicks ?? '', r.impressions ?? '', r.ctr === null ? '' : r.ctr.toFixed(4), r.position === null ? '' : r.position.toFixed(2)]));
+        ['Page', 'Title', 'URL', 'Views', 'Users', 'Avg engagement (s)', 'Key events', ...(money ? [`Revenue (${currency ?? 'USD'})`] : []), 'Clicks', 'Impressions', 'CTR', 'Position'],
+        shown.map((r) => [r.label, titleOf(r) ?? '', r.url ?? '', r.views ?? '', r.users ?? '', r.engagement === null ? '' : Math.round(r.engagement), r.conversions ?? '', ...(money ? [r.revenue ?? ''] : []), r.clicks ?? '', r.impressions ?? '', r.ctr === null ? '' : r.ctr.toFixed(4), r.position === null ? '' : r.position.toFixed(2)]));
 
     return (
         <div className="flex flex-col">
@@ -177,13 +185,13 @@ export function PagesPage() {
                 )}
             />
             {(ga.data?.truncated || sc.data?.truncated) ? <p className="mt-2 text-meta text-fg-muted">Showing the top pages Google returned for this range.</p> : null}
-            <PageDrawer row={selected} pageKey={pageKey} knownTitle={pageKey ? titleBy.get(pageKey) ?? null : null} loading={loading} onClose={() => void setPageKey(null)} />
+            <PageDrawer row={selected} pageKey={pageKey} knownTitle={selected ? titleOf(selected) : pageKey ? titleBy.get(pageKey) ?? null : null} currency={currency} loading={loading} onClose={() => void setPageKey(null)} />
         </div>
     );
 }
 
 /** Page drawer: KPIs, views chart, queries for this page, sources, Ask. */
-function PageDrawer({ row, pageKey, knownTitle, loading, onClose }: { row: Row | null; pageKey: string | null; knownTitle: string | null; loading: boolean; onClose: () => void }) {
+function PageDrawer({ row, pageKey, knownTitle, currency, loading, onClose }: { row: Row | null; pageKey: string | null; knownTitle: string | null; currency?: string; loading: boolean; onClose: () => void }) {
     const site = useSite();
     const { compareOn } = useSiteRange();
     const open = Boolean(pageKey);
@@ -226,7 +234,8 @@ function PageDrawer({ row, pageKey, knownTitle, loading, onClose }: { row: Row |
                         {row.impressions !== null ? <Kpi label="Impressions" color={METRICS.impressions.color} value={fmtFull(row.impressions)} /> : null}
                         {row.position !== null && row.impressions ? <Kpi label="Avg. position" color={METRICS.position.color} value={fmtPosition(row.position)} /> : null}
                         {row.ctr !== null && row.impressions ? <Kpi label="CTR" color={METRICS.ctr.color} value={fmtPercent(row.ctr)} /> : null}
-                        {row.conversions !== null ? <Kpi label="Conversions" color={METRICS.conversions.color} value={fmtFull(row.conversions)} /> : null}
+                        {row.conversions !== null ? <Kpi label="Key events" color={METRICS.conversions.color} value={fmtFull(row.conversions)} /> : null}
+                        {row.revenue ? <Kpi label="Revenue" color={METRICS.revenue.color} value={fmtCurrency(row.revenue, currency)} /> : null}
                     </dl>
                     {row.decay && isDecaying(row.decay) ? (
                         <Banner variant="warn" title="This page is decaying">Search clicks fell three 28-day periods in a row: {row.decay.map(fmtFull).join(' → ')}.</Banner>
