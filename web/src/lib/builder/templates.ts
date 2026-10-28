@@ -93,9 +93,9 @@ const text = (id: string, markdown: string, role: TextWidget['config']['role'] =
     id, type: 'text', showTitle: false, source: D, config: { markdown, role, align: 'left', variables: true },
 });
 
-const grid = (id: string): PortfolioGridWidget => ({
-    id, type: 'portfolio-grid', title: 'Sites', source: { type: 'portfolio', include: 'all' },
-    config: { metrics: [{ id: 'gsc:clicks' }, { id: 'gsc:impressions' }, { id: 'ga4:activeUsers' }, { id: 'ga4:sessions' }], sort: { by: 'change', dir: 'asc' }, show: 'cards', limit: 12, columns: 'auto', sparkline: true, alerts: true, onClick: 'open-site' },
+const grid = (id: string, title: string, limit: number): PortfolioGridWidget => ({
+    id, type: 'portfolio-grid', title, source: { type: 'portfolio', include: 'all' },
+    config: { metrics: [{ id: 'gsc:clicks' }, { id: 'gsc:impressions' }, { id: 'ga4:activeUsers' }, { id: 'ga4:sessions' }], sort: { by: 'change', dir: 'asc' }, show: 'cards', limit, columns: 'auto', sparkline: true, alerts: true, onClick: 'open-site' },
 });
 
 // ── layout helper: rows of [widget, w, h] packed left to right ───────────
@@ -210,8 +210,10 @@ const BUILDERS_V1: Record<string, () => Built> = {
             pages: [page('p_main', 'Portfolio', [
                 [[kpi('w_kpis', ['gsc:clicks', 'gsc:impressions', 'ga4:activeUsers', 'ga4:sessions', 'ga4:keyEvents']), 12, 3]],
                 [[breakdownTs('w_bysite', 'Clicks by site', 'gsc:clicks', 'site'), 8, 8], [barList('w_topsites', 'Top sites by users', 'site', 'ga4:activeUsers'), 4, 8]],
-                [[grid('w_grid'), 12, 10]],
-                [[table('w_sites', 'Sites', ['site'], ['gsc:clicks', 'gsc:impressions', 'gsc:position', 'ga4:activeUsers', 'ga4:sessions'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, maxRows: 500 }), 12, 9]],
+                // Round 5 (audit #14): the cards show the 6 biggest movers (2 full rows, "Show all" for the rest);
+                // the table below lists every site by clicks, high to low, with the sort marker on Clicks.
+                [[grid('w_grid', 'Sites, biggest drops first', 6), 12, 11]],
+                [[table('w_sites', 'All sites', ['site'], ['gsc:clicks', 'gsc:impressions', 'gsc:position', 'ga4:activeUsers', 'ga4:sessions'], { sort: { by: 'm:gsc:clicks', dir: 'desc' }, maxRows: 500 }), 12, 9]],
             ], w)],
         };
     },

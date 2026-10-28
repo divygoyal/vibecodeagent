@@ -43,7 +43,7 @@ import {
     policyFor,
     singleFlight,
 } from './cache';
-import { loadSiteDirectory, resolvePortfolio, resolveSiteRef, sourceLabel, type ResolvedSite, type SiteDirectory } from './sources';
+import { loadSiteDirectory, resolvePortfolio, resolveSiteRef, siteSubLabel, sourceLabel, type ResolvedSite, type SiteDirectory } from './sources';
 
 // ── Public types ─────────────────────────────────────────────────────────
 
@@ -831,7 +831,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             continue;
         }
         try {
-            results[plan.widget.id] = assemble(plan, leafToCalls, shapeOf, outcomes, today);
+            results[plan.widget.id] = assemble(plan, leafToCalls, shapeOf, outcomes, today, deps.mode === 'owner');
         } catch (err) {
             results[plan.widget.id] = errResult('INVALID', err instanceof Error ? err.message.slice(0, 200) : undefined, { sourceLabel: plan.sourceLabel });
         }
@@ -841,12 +841,15 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
 
 // ── Assembly ─────────────────────────────────────────────────────────────
 
+
 function assemble(
     plan: WidgetPlan,
     leafToCalls: Map<string, Array<PhysicalLeaf & { logical: LogicalLeaf }>>,
     shapeOf: (l: LogicalLeaf) => string,
     outcomes: Map<string, LeafOutcome>,
     today: Iso,
+    /** Owner views get GA4 property names as subtitles; public views never see them. */
+    owner = false,
 ): WidgetResult {
     const flags: ResultFlags = { ...plan.flags };
     const parts: Record<string, DataFrame> = {};
@@ -948,7 +951,11 @@ function assemble(
         }
 
         const frame = shapeFrame(q, e, cur, prev, bySite, plan, flags);
-        if (bySite) frame.labels = Object.fromEntries(e.targets.map((t) => [t.site.siteId, t.site.label]));
+        if (bySite) {
+            frame.labels = Object.fromEntries(e.targets.map((t) => [t.site.siteId, t.site.label]));
+            const subs = owner ? e.targets.filter((t) => siteSubLabel(t.site)).map((t) => [t.site.siteId, siteSubLabel(t.site)!]) : [];
+            if (subs.length) frame.sublabels = Object.fromEntries(subs);
+        }
         parts[q.part] = frame;
     }
 

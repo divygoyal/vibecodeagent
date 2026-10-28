@@ -437,11 +437,11 @@ export const BUILDERS_R2: Record<string, (ctx: BuildCtx) => BuiltR2> = {
                 ], w),
                 page('p_search', 'Search', [
                     [[breakdownTs('w_bysite', 'Clicks by site', 'gsc:clicks', 'site'), 8, 8], [barList('w_share', 'Share of clicks', 'site', 'gsc:clicks', { showShare: true }), 4, 8]],
-                    [[table('w_stable', 'Search by site', ['site'], ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position'], { sortByChange: true, sort: { by: 'm:gsc:clicks', dir: 'asc' }, maxRows: 500, bars: ['gsc:clicks'] }), 12, 10]],
+                    [[table('w_stable', 'Search by site', ['site'], ['gsc:clicks', 'gsc:impressions', 'gsc:ctr', 'gsc:position'], { sort: { by: 'm:gsc:clicks', dir: 'desc' }, maxRows: 500, bars: ['gsc:clicks'] }), 12, 10]],
                 ], w),
                 page('p_traffic', 'Traffic', [
                     [[breakdownTs('w_sessions', 'Sessions by site', 'ga4:sessions', 'site'), 8, 8], [barList('w_ke', 'Key events by site', 'site', 'ga4:keyEvents'), 4, 8]],
-                    [[table('w_ttable', 'Traffic by site', ['site'], ['ga4:activeUsers', 'ga4:sessions', 'ga4:screenPageViews', 'ga4:keyEvents'], { sortByChange: true, sort: { by: 'm:ga4:sessions', dir: 'asc' }, maxRows: 500, bars: ['ga4:sessions'] }), 12, 10]],
+                    [[table('w_ttable', 'Traffic by site', ['site'], ['ga4:activeUsers', 'ga4:sessions', 'ga4:screenPageViews', 'ga4:keyEvents'], { sort: { by: 'm:ga4:sessions', dir: 'desc' }, maxRows: 500, bars: ['ga4:sessions'] }), 12, 10]],
                 ], w),
             ],
         };

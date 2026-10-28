@@ -241,6 +241,25 @@ test('mover lists (changeOnly) keep only rows that moved their way: "Declining p
     }
 });
 
+test('portfolio "All sites" table: by clicks high to low, hosts as names, GA4 names only for the owner', async () => {
+    reset();
+    const doc = buildFromTemplate('portfolio', { name: 'P', defaultSource: { type: 'portfolio', include: 'all' } });
+    const widgets = [{ widget: doc.widgets.w_sites, pageId: doc.pages[0].id }];
+    const run = (mode: 'owner' | 'public') => evaluateWidgets({ widgets, defaultSource: doc.defaultSource, controlDefs: doc.controls, controls: controls() }, { ...deps(), mode });
+    const owner = (await run('owner')).results.w_sites;
+    assert.equal(owner.status, 'ok', JSON.stringify(owner));
+    if (owner.status !== 'ok') return;
+    const frame = Object.values(owner.parts)[0];
+    const clicks = frame.rows.map((r) => r['m:gsc:clicks']).filter((v): v is number => typeof v === 'number');
+    assert.deepEqual(clicks, [...clicks].sort((a, b) => b - a), 'clicks high to low');
+    const labels = Object.values(frame.labels ?? {});
+    assert.ok(labels.includes('creativeprints.example'), `GA4-only site named by its host: ${labels.join(', ')}`);
+    assert.ok(!labels.some((l) => /Shop|\(\d+\)$/.test(l)), `no GA4 names or bare numbers as names: ${labels.join(', ')}`);
+    assert.equal(frame.sublabels?.['creativeprints.example'], 'Creative Prints Shop');
+    const pub = (await run('public')).results.w_sites;
+    if (pub.status === 'ok') assert.equal(Object.values(pub.parts)[0].sublabels, undefined, 'public views never get GA4 names');
+});
+
 // ── migration ──
 test('v1 dashboards migrate to valid v2 docs (layout doubled, metrics fixed, ids pinned)', () => {
     const v1 = {
