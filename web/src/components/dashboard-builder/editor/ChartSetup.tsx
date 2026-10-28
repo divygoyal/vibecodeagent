@@ -10,8 +10,9 @@ import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 
 import { METRIC_LIST, metricFamilies } from '@/lib/builder/catalog';
 import { FUNNEL_MAX_STEPS, FUNNEL_MIN_STEPS, FUNNEL_NOTE } from '@/lib/builder/charts/funnel';
-import type { ChartWidgetDef, FunnelStep, FunnelWidget, HeatmapWidget, ScatterWidget, TreemapWidget } from '@/lib/builder/charts/types';
+import type { ChartWidgetDef, FunnelStep, FunnelWidget, HeatmapWidget, PivotWidget, ScatterWidget, TreemapWidget } from '@/lib/builder/charts/types';
 import type { WidgetDef } from '@/lib/builder/types';
+import { pivotTotalsAvailable } from '@/lib/builder/charts/pivot';
 import { quadrantText, scatterMetrics } from '@/lib/builder/charts/scatter';
 import type { Quadrant } from '@/lib/builder/charts/types';
 import { Button } from '@/components/ui';
@@ -33,6 +34,7 @@ export function ChartSetup(props: Props<ChartWidgetDef>) {
         case 'scatter': return <ScatterSetup {...props} widget={widget} />;
         case 'funnel': return <FunnelSetup {...props} widget={widget} />;
         case 'treemap': return <TreemapSetup {...props} widget={widget} />;
+        case 'pivot': return <PivotSetup {...props} widget={widget} />;
         default: return null;
     }
 }
@@ -147,6 +149,25 @@ function TreemapSetup({ widget, edit, source, portfolio }: Props<TreemapWidget>)
             <Field label="Boxes" hint="The biggest ones are drawn."><NumberInput value={c.top} min={5} max={60} onChange={(n) => set({ top: n }, 'top')} /></Field>
             <Field label="Colour"><Choice ariaLabel="Colour" value={c.colorBy ?? 'group'} onChange={(v) => set({ colorBy: v })} options={[{ value: 'group', label: c.parent ? 'One colour per group' : 'One colour per box' }, { value: 'value', label: 'Darker for bigger' }]} /></Field>
             <Toggle label="Show values in boxes" checked={c.showValues !== false} onChange={(v) => set({ showValues: v })} />
+        </>
+    );
+}
+
+function PivotSetup({ widget, edit, source, portfolio }: Props<PivotWidget>) {
+    const c = widget.config;
+    const set = (p: Partial<PivotWidget['config']>, key?: string) => edit((w) => patch(w as PivotWidget, p), key);
+    const counts = pivotTotalsAvailable(c.metric.id);
+    return (
+        <>
+            {source}
+            <Field label="Metric" hint="A count, or a calculated metric such as a ratio of two counts."><MetricPicker value={c.metric.id} exclude={NOT_ADDITIVE} noShare onChange={(id) => set({ metric: { id } })} /></Field>
+            <Field label="Rows"><DimensionPicker value={c.rows} metrics={[c.metric.id]} allowSite={portfolio} ariaLabel="Rows" onChange={(d) => d && set({ rows: d, columns: d === c.columns ? (d === 'device' ? 'channel' : 'device') : c.columns })} /></Field>
+            <Field label="Columns"><DimensionPicker value={c.columns} metrics={[c.metric.id]} allowSite={portfolio} ariaLabel="Columns" onChange={(d) => d && set({ columns: d, rows: d === c.rows ? (d === 'channel' ? 'page' : 'channel') : c.rows })} /></Field>
+            <Field label="Rows shown" hint="The biggest rows by the metric."><NumberInput value={c.topRows} min={3} max={25} onChange={(n) => set({ topRows: n }, 'topRows')} /></Field>
+            <Field label="Columns shown"><NumberInput value={c.topColumns} min={2} max={8} onChange={(n) => set({ topColumns: n }, 'topColumns')} /></Field>
+            <Toggle label="Group the other columns" description={counts ? 'One Other column holds the rest.' : 'Not for ratios: they cannot be added up.'} disabled={!counts} checked={c.other && counts} onChange={(v) => set({ other: v })} />
+            <Toggle label="Totals" description={counts ? 'A total column and a total row, adding up the cells shown.' : 'Totals need a count: a ratio of totals is not the sum of its cells.'} disabled={!counts} checked={c.totals !== false && counts} onChange={(v) => set({ totals: v })} />
+            <Field label="Heat colour"><Choice ariaLabel="Heat colour" value={c.heat ?? 'cell'} onChange={(v) => set({ heat: v })} options={[{ value: 'none', label: 'None' }, { value: 'cell', label: 'Against all cells' }, { value: 'row', label: 'Within each row' }, { value: 'column', label: 'Within each column' }]} /></Field>
         </>
     );
 }

@@ -1,4 +1,4 @@
-import { Filter, Grid3x3, LayoutDashboard, ScatterChart, type LucideIcon } from 'lucide-react';
+import { Filter, Grid3x3, LayoutDashboard, ScatterChart, TableProperties, type LucideIcon } from 'lucide-react';
 
 import type { ChartType } from '@/lib/builder/charts/types';
 
@@ -8,4 +8,5 @@ export const CHART_ICONS: Record<ChartType, LucideIcon> = {
     scatter: ScatterChart,
     funnel: Filter,
     treemap: LayoutDashboard,
+    pivot: TableProperties,
 };

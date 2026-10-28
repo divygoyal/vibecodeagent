@@ -160,7 +160,7 @@ test('treemap engine: channel and source from one Analytics report, the boxes ad
     assert.ok(model.leafCount >= 5 && model.leafCount <= 30);
     for (const g of model.groups) assert.ok(Math.abs(g.leaves.reduce((s, l) => s + l.amount, 0) - g.amount) < 1e-6);
     assert.equal(calls.filter((c) => c.url.includes('analyticsdata')).length, 1);
-    const dims = (calls[0].body.requests?.[0] ?? calls[0].body).dimensions.map((d: { name: string }) => d.name); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const dims = (calls[0].body.requests?.[0] ?? calls[0].body).dimensions.map((d: { name: string }) => d.name); 
     assert.deepEqual(dims, ['sessionDefaultChannelGroup', 'sessionSource']);
     // Flat, with the rest folded into Other, the total stays whole.
     const flatW = tm({ parent: undefined, dimension: 'channel', top: 5 }, 'w_flat');

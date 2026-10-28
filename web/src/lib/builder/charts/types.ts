@@ -97,10 +97,34 @@ export interface TreemapConfig {
 }
 export type TreemapWidget = WidgetBase<'treemap', TreemapConfig>;
 
+// ── Pivot table ──────────────────────────────────────────────────────────
+
+/**
+ * Pivot table (round 9): one metric across two dimensions, rows by columns (channel by device), with
+ * row and column totals and an optional heat colour. Counts (and calculated metrics) only: cells of a
+ * rate or an average cannot be ranked or added up.
+ */
+export interface PivotConfig {
+    rows: DimId;
+    columns: DimId;
+    metric: MetricRef;
+    /** Rows shown (the biggest by the metric). */
+    topRows: number;
+    /** Columns shown (the biggest by the metric). */
+    topColumns: number;
+    /** Fold the columns beyond the top ones into one "Other" column (counts only). */
+    other: boolean;
+    /** A total column and a total row (counts only; they add up the cells shown). */
+    totals: boolean;
+    /** Shade cells: against all cells, within their row, or within their column. */
+    heat: 'none' | 'cell' | 'row' | 'column';
+}
+export type PivotWidget = WidgetBase<'pivot', PivotConfig>;
+
 // ── union ────────────────────────────────────────────────────────────────
 
-export type ChartWidgetDef = HeatmapWidget | ScatterWidget | FunnelWidget | TreemapWidget;
+export type ChartWidgetDef = HeatmapWidget | ScatterWidget | FunnelWidget | TreemapWidget | PivotWidget;
 export type ChartType = ChartWidgetDef['type'];
-export const CHART_TYPES: ChartType[] = ['heatmap', 'scatter', 'funnel', 'treemap'];
+export const CHART_TYPES: ChartType[] = ['heatmap', 'scatter', 'funnel', 'treemap', 'pivot'];
 
 export type { DimId };

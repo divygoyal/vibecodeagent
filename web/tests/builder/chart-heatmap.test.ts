@@ -40,7 +40,7 @@ test('heatmap schema: accepts both layouts, refuses unknown layouts and Search C
     assert.equal(gsc.ok, false);
     if (!gsc.ok) assert.match(gsc.error, /Analytics metric/);
     // A calculated metric made of Analytics metrics is fine by hour.
-    assert.equal(validateWidgets([heat('weekday-hour', 'calc:ratio_pct_up:ga4:engagedSessions:ga4:sessions:t1')]).ok, true);
+    assert.equal(validateWidgets([heat('weekday-hour', 'calc:ratio_pct_up:ga4:engagedSessions:ga4:sessions:k3f9a2')]).ok, true);
 });
 
 test('heatmap compile: weekday-hour is one report by day of week and hour; calendar is one daily series', () => {

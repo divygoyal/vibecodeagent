@@ -7,7 +7,7 @@
  * Saved layouts store only {i,x,y,w,h}; constraints come from here at render time.
  */
 import { getMetric, metricFamilies, metricFamily, metricLabel, dimLabel, type Family } from './catalog';
-import { CHART_META, CHART_PALETTE_ORDER, chartDefaultWidget, chartMetrics, chartTitle, isChartType } from './charts';
+import { CHART_META, CHART_PALETTE_ORDER, CHART_TABLE_ORDER, chartDefaultWidget, chartMetrics, chartTitle, isChartType } from './charts';
 import type {
     MetricRef,
     SourceRef,
@@ -51,7 +51,7 @@ export const WIDGET_META: Record<WidgetType, WidgetMeta> = {
     'portfolio-grid': { type: 'portfolio-grid', label: 'Portfolio grid', description: 'Every site as a card with deltas', icon: 'LayoutGrid', group: 'Portfolio', defaultSize: { w: 12, h: 9 }, minSize: { w: 4, h: 6 }, maxSize: { w: 12, h: 20 }, phoneH: 12, static: false, keywords: ['portfolio', 'sites', 'all sites', 'cards'] },
 };
 
-export const PALETTE_ORDER: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', ...CHART_PALETTE_ORDER, 'table', 'geo', 'portfolio-grid', 'section', 'text', 'image'];
+export const PALETTE_ORDER: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', ...CHART_PALETTE_ORDER, 'table', ...CHART_TABLE_ORDER, 'geo', 'portfolio-grid', 'section', 'text', 'image'];
 export const PALETTE_GROUPS: PaletteGroup[] = ['Metrics', 'Charts', 'Tables and maps', 'Portfolio', 'Content'];
 
 export function widgetMeta(type: WidgetType): WidgetMeta {

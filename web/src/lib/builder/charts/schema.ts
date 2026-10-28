@@ -40,5 +40,12 @@ export function chartWidgetSchemas({ base, metricRef, dimId }: SchemaShared) {
             ...base, type: z.literal('treemap'),
             config: z.looseObject({ dimension: dimId, parent: dimId.optional(), metric: metricRef, top: z.number().int().min(5).max(60), colorBy: z.enum(['group', 'value']).optional(), showValues: z.boolean().optional() }),
         }),
+        z.object({
+            ...base, type: z.literal('pivot'),
+            config: z.looseObject({
+                rows: dimId, columns: dimId, metric: metricRef, topRows: z.number().int().min(3).max(25), topColumns: z.number().int().min(2).max(8),
+                other: z.boolean().optional(), totals: z.boolean().optional(), heat: z.enum(['none', 'cell', 'row', 'column']).optional(),
+            }),
+        }),
     ] as const;
 }

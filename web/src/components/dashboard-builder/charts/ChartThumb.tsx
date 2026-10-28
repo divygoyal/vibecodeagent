@@ -39,6 +39,18 @@ export function chartThumb(type: string, x: number, y: number, w: number, h: num
             const cells = [[0, 0, 0.55, 0.6], [0.55, 0, 0.45, 0.35], [0.55, 0.35, 0.25, 0.25], [0.8, 0.35, 0.2, 0.25], [0, 0.6, 0.3, 0.4], [0.3, 0.6, 0.4, 0.4], [0.7, 0.6, 0.3, 0.4]];
             return cells.map(([cx, cy, cw, ch], i) => <rect key={i} x={x + 2 + cx * (w - 4)} y={y + 2 + cy * (h - 4)} width={Math.max(1, cw * (w - 4) - 0.8)} height={Math.max(1, ch * (h - 4) - 0.8)} rx={0.6} fill={color} opacity={0.3 + (i % 3) * 0.15} />);
         }
+        case 'pivot': {
+            const cols = 4;
+            const rows = Math.max(3, Math.min(6, Math.floor((h - 4) / 3.4)));
+            const cw = (w - 4) / (cols + 1);
+            const ch = (h - 4) / (rows + 1);
+            return Array.from({ length: (rows + 1) * (cols + 1) }, (_, i) => {
+                const r = Math.floor(i / (cols + 1));
+                const c = i % (cols + 1);
+                const head = r === 0 || c === 0;
+                return <rect key={i} x={x + 2 + c * cw} y={y + 2 + r * ch} width={Math.max(1, cw - 0.8)} height={Math.max(1, ch - 0.8)} rx={0.4} fill={head ? 'var(--color-border-strong)' : color} opacity={head ? 0.5 : 0.15 + (((r * 7 + c * 3) % 5) / 5) * 0.6} />;
+            });
+        }
         default: return null;
     }
 }
