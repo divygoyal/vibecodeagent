@@ -579,9 +579,11 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     for (const w of input.widgets) {
         if (widgetMeta(w.widget.type).static) results[w.widget.id] = { status: 'ok', fetchedAt: now.toISOString(), cache: 'hit', parts: {}, flags: {} };
     }
+    // The header names Search Console's days only when a widget reads Search Console (a GA4-only dashboard has one window).
+    let readsSearch = false;
     const response = (): DashboardQueryResponse => ({
         results,
-        resolved: { range: baseRange, compare: baseCompare, ...(baseSearch.end !== baseRange.end ? { search: baseSearch } : {}), timezone: tz, today },
+        resolved: { range: baseRange, compare: baseCompare, ...(readsSearch && baseSearch.end !== baseRange.end ? { search: baseSearch } : {}), timezone: tz, today },
         meta: { durationMs: Date.now() - t0, google: { ga4Calls: stats.ga4Calls, gscCalls: stats.gscCalls, ga4Reports: stats.ga4Reports }, cache: { hit: stats.hit, stale: stats.stale, miss: stats.miss } },
     });
     if (!dataWidgets.length) return response();
@@ -658,6 +660,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
                 break;
             }
             const families = [...new Set(metricDefs.map((m) => m.family))];
+            if (families.includes('gsc')) readsSearch = true;
             const canonDims = q.dimensions.filter((d) => d !== 'site');
             // Static compatibility (BUILDER.md 9.4)
             const badDim = canonDims.find((d) => !TIME_DIMS.has(d) && families.some((f) => !dimInFamily(d, f)));

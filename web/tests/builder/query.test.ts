@@ -153,6 +153,10 @@ test('GSC widgets honour the date range and compare (v1 bug: always 30 days)', a
     assert.ok(bodies.some((b) => b.startDate === '2026-10-11' && b.endDate === '2026-10-17'));
     assert.ok(bodies.every((b) => b.dataState === 'all'));
     assert.deepEqual(res.resolved.search, { start: '2026-10-18', end: '2026-10-24' }, 'the header can name the Search Console days');
+    // A dashboard without Search Console widgets has one window: no Search Console days in the header.
+    const ga = await evaluateWidgets(input([defaultWidget('scorecard', { families: { ga4: true, gsc: false } })], controls('7d')), deps());
+    assert.equal(ga.resolved.search, undefined, 'GA4-only: no Search Console window');
+    assert.equal((await evaluateWidgets(input([], controls('7d')), deps())).resolved.search, undefined, 'empty dashboard: none either');
     const r = res.results[w.id];
     assert.equal(r.status, 'ok');
     if (r.status === 'ok') {
