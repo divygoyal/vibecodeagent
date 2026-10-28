@@ -42,8 +42,13 @@ export function EmbedSource({ host }: { host: string }) {
     );
 }
 
-/** How a framed page is doing: loading, or why we gave up on it. */
-function useFrameState(key: string) {
+/**
+ * How a framed page is doing: loading, or why we gave up on it. A browser fires the frame's load event for its own
+ * error page too, so load alone proves nothing: while the page is loading, the viewer's own browser also asks for the
+ * address (a no-cors request: any answer counts, a refused connection, missing host or bad certificate rejects), and a
+ * timer ends a page that never finishes.
+ */
+function useFrameState(key: string, href: string | null) {
     const [st, setSt] = useState<{ key: string; state: 'loading' | 'loaded' | EmbedFailure }>({ key, state: 'loading' });
     const state = st.key === key ? st.state : 'loading';
     const [onScreen, setOnScreen] = useState(() => typeof IntersectionObserver === 'undefined');
@@ -61,6 +66,15 @@ function useFrameState(key: string) {
         const t = setTimeout(() => setSt({ key, state: 'timeout' }), EMBED_LOAD_TIMEOUT_MS);
         return () => clearTimeout(t);
     }, [state, onScreen, key]);
+    useEffect(() => {
+        if (state !== 'loading' || !onScreen || !href || typeof fetch === 'undefined') return;
+        const ctl = new AbortController();
+        // GET (some servers reset a HEAD), dropped as soon as the headers are in: the frame loads the body.
+        fetch(href, { method: 'GET', mode: 'no-cors', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', signal: ctl.signal })
+            .then(() => ctl.abort())
+            .catch((e: unknown) => { if (!ctl.signal.aborted && (e as { name?: string } | null)?.name !== 'AbortError') setSt({ key, state: 'unreachable' }); });
+        return () => ctl.abort();
+    }, [state, onScreen, key, href]);
     return { state, setBox, loaded: () => setSt({ key, state: 'loaded' }), failed: () => setSt({ key, state: 'error' }) } as const;
 }
 
@@ -75,15 +89,15 @@ export function EmbedView(props: WidgetViewProps<EmbedWidget>) {
     const probe = useEmbedProbe(widget.id, c.url, Boolean(href));
     const host = embedHost(c.url);
     const [attempt, setAttempt] = useState(0);
-    const { state: frameState, setBox, loaded, failed } = useFrameState(`${href}|${attempt}`);
+    const { state: frameState, setBox, loaded, failed } = useFrameState(`${href}|${attempt}`, href);
     const known = probeFailure(probe);
     // The server says the page refuses framing or does not answer; or the frame never loaded (timer) or reported an error.
-    const failure: EmbedFailure | null = known ? known.kind : frameState === 'timeout' || frameState === 'error' ? frameState : null;
+    const failure: EmbedFailure | null = known ? known.kind : frameState === 'timeout' || frameState === 'error' || frameState === 'unreachable' ? frameState : null;
     const editing = mode === 'edit';
     const open = href ? (
         <Button asChild size="sm" variant="secondary" icon={ExternalLink}><a href={href} target="_blank" rel="noopener noreferrer">Open {host}</a></Button>
     ) : undefined;
-    const retry = failure === 'timeout' || failure === 'error' ? (
+    const retry = (failure === 'timeout' || failure === 'error' || failure === 'unreachable') && !known ? (
         <Button size="sm" variant="ghost" icon={RotateCw} onClick={() => setAttempt((n) => n + 1)}>Try again</Button>
     ) : undefined;
     const frameProps = { ...props, loading: false, result: undefined };
