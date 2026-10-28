@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import NumberFlow from '@number-flow/react';
-import { Monitor, Smartphone, Tablet, Tv } from 'lucide-react';
 
 import { fmtFull } from '@/lib/format';
 import { METRICS } from '@/lib/metrics';
@@ -19,6 +18,7 @@ import { deviceLabel, geoLabel } from '../lib/sources';
 import type { RealtimeLiveRow, RealtimeResponse } from '../lib/types';
 import { LoadError } from '../SiteStates';
 import { FlagIcon } from '../SourceIcon';
+import { DeviceIcon } from '../TechIcon';
 import { useGa4, useSite } from '../useSiteData';
 
 const GeoChoropleth = dynamic(() => import('@/components/charts/GeoChoropleth'), {
@@ -47,12 +47,6 @@ export function LiveCount() {
             </span>
         </Link>
     );
-}
-
-function DeviceIcon({ device }: { device: string }) {
-    const d = device.toLowerCase();
-    const Icon = d === 'mobile' ? Smartphone : d === 'tablet' ? Tablet : d === 'smart tv' ? Tv : Monitor;
-    return <Icon aria-hidden size={14} strokeWidth={1.75} className="shrink-0 text-fg-muted" />;
 }
 
 function ago(m: number): string {
@@ -158,8 +152,14 @@ export function TrafficRealtimeTab() {
                     tabs={[
                         {
                             value: 'pages', label: 'Pages',
-                            content: <BarList items={(d?.pages ?? []).map((r) => ({ key: r.name, label: r.name, text: r.name, value: r.users }))} metric="users" valueHeader="Active users" limit={8} loading={!d} labelHeader="Page" viewAllTitle="Live pages"
-                                empty={<EmptyState variant="inline" title="Nobody on the site right now" />} />,
+                            content: (
+                                <>
+                                    <BarList items={(d?.pages ?? []).map((r) => ({ key: r.name, label: r.name, text: r.name, value: r.users }))} metric="users" valueHeader="Active users" limit={8} loading={!d} labelHeader="Page" viewAllTitle="Live pages"
+                                        empty={<EmptyState variant="inline" title="Nobody on the site right now" />} />
+                                    {/* Users per page are not a split of the total: one visitor can open several pages in 30 minutes. */}
+                                    {d && d.pages.length > 1 ? <p className="mt-2 text-meta text-fg-muted">Active users per page. One visitor can view several pages, so these can add up to more than the {fmtFull(d.activeUsers)} on the site.</p> : null}
+                                </>
+                            ),
                         },
                         {
                             value: 'countries', label: 'Countries',

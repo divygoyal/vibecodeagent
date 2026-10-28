@@ -98,7 +98,8 @@ export function WeekHourHeatmap({ grid, color, format, unit, highlight, classNam
                         <span className="font-medium text-fg">{format(hv)}</span> {unit}
                     </>
                 ) : (
-                    <>Hover a cell for its {unit}.</>
+                    // Touch screens tap (the cell's pointer handlers fire on a tap); "hover" is for mice.
+                    <><span className="pointer-coarse:hidden">Hover</span><span className="hidden pointer-coarse:inline">Tap</span> a cell for its {unit}.</>
                 )}
             </p>
         </div>

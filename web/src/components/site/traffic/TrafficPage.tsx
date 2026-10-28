@@ -5,10 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { Activity, BarChart3, FileText, GitBranch, Globe2, Radio, Route, Share2, Target } from 'lucide-react';
 
+import { fmtDateRange } from '@/lib/format';
 import { Tabs } from '@/components/ui/Tabs';
 import { siteHref } from '@/components/shell/nav';
 import { PageSkeleton } from '@/components/shell/PageSkeleton';
 import { FilterBar, SiteFilterProvider } from '../filters/SiteFilters';
+import { COHORT_MODES, cohortSpan, cohortUnit, type CohortMode } from '../lib/cohorts';
 import { SiteHeader } from '../SiteHeader';
 import { AskButton, SourceMissing } from '../SiteStates';
 import { useSite } from '../useSiteData';
@@ -23,7 +25,7 @@ const AudienceTab = dynamic(() => import('./TablesTabs').then((m) => m.TrafficAu
 const RealtimeTab = dynamic(() => import('./RealtimeTab').then((m) => m.TrafficRealtimeTab), { loading });
 const EventsTab = dynamic(() => import('./MoreTabs').then((m) => m.EventsTab), { loading });
 const FunnelsTab = dynamic(() => import('./GoalsFunnels').then((m) => m.FunnelsTab), { loading });
-const JourneysTab = dynamic(() => import('./MoreTabs').then((m) => m.JourneysTab), { loading });
+const JourneysTab = dynamic(() => import('./JourneysTab').then((m) => m.JourneysTab), { loading });
 const RetentionTab = dynamic(() => import('./MoreTabs').then((m) => m.RetentionTab), { loading });
 
 export const TRAFFIC_TABS = ['overview', 'pages', 'sources', 'audience', 'realtime', 'events', 'funnels', 'journeys', 'retention'] as const;
@@ -47,6 +49,11 @@ const ITEMS: { value: TrafficTab; label: string; icon: typeof BarChart3 }[] = [
     { value: 'retention', label: 'Retention', icon: Activity },
 ];
 
+function retentionNote(mode: CohortMode): string {
+    const span = cohortSpan(mode);
+    return `Cohorts of new users, ${span.count} ${cohortUnit(mode, span.count)}: ${fmtDateRange(span.start, span.end)}`;
+}
+
 /** Traffic (GA4), DESIGN 5.6. `?tab=` keeps the old analytics sub-page names working. */
 export function TrafficPage() {
     const site = useSite();
@@ -59,6 +66,12 @@ export function TrafficPage() {
     useEffect(() => {
         if (legacyPerformance && site.host) router.replace(`${siteHref(site.host, 'actions')}/audit`);
     }, [legacyPerformance, site.host, router]);
+
+    // Realtime and Retention have their own windows: no date controls there, the subtitle names the window
+    // instead (round 5, audit item 17).
+    const [cohort] = useTabParam(COHORT_MODES, { name: 'cohort' });
+    const ownWindow = tab === 'realtime' || tab === 'retention';
+    const rangeNote = tab === 'realtime' ? 'Last 30 minutes · updates every 30 s' : tab === 'retention' ? retentionNote(cohort) : undefined;
 
     const content: Record<TrafficTab, React.ReactNode> = {
         overview: <TrafficOverviewTab />,
@@ -78,9 +91,11 @@ export function TrafficPage() {
                 <SiteHeader
                     section="Traffic"
                     source={site.site?.ga4Name ? `Google Analytics 4 · ${site.site.ga4Name}` : 'Google Analytics 4'}
+                    noRange={ownWindow}
+                    rangeNote={rangeNote}
                     actions={site.hasGa4 ? (
                         <>
-                            <LiveCount />
+                            {tab === 'realtime' ? null : <LiveCount />}
                             <AskButton prompt={`How is traffic on ${site.siteHost ?? site.label} doing? Which channels and pages changed most?`} site={{ ga4: site.ga4, gsc: site.gsc }} label="Ask AI" from="site:traffic" />
                         </>
                     ) : undefined}

@@ -310,11 +310,12 @@ async function walk(browser, { mobile, dark, full, dashboards }) {
         await page.screenshot({ path: path.join(opts.shots, `${tag}-${name}.png`), fullPage: !mobile });
     };
     const inspect = async (name) => {
-        const s = await page.evaluate(() => ({
+        // Against the screen width, not innerWidth: a phone widens innerWidth to fit content that is too wide.
+        const s = await page.evaluate((vw) => ({
             text: document.body.innerText,
-            overflow: document.documentElement.scrollWidth - window.innerWidth,
+            overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - Math.min(window.innerWidth, vw),
             bar: Boolean(document.querySelector('[role="region"][aria-label="Live demo"]')),
-        }));
+        }), mobile ? 390 : 1440);
         const err = ERROR_TEXT.exec(s.text);
         check(`[${tag}] ${name}: no error screen`, !err, err?.[0]);
         check(`[${tag}] ${name}: no horizontal overflow`, s.overflow <= 1, `${s.overflow}px`);
@@ -357,6 +358,14 @@ async function walk(browser, { mobile, dark, full, dashboards }) {
         const answered = await page.getByText('Sample answer · demo data').count();
         check(`[${tag}] Ask shows a sample answer`, answered > 0);
         await shot('ask-answer');
+        // Every sample answer (their tables are the widest content in the app) must fit the screen width.
+        for (let i = 0; i < 4; i++) {
+            const next = page.locator('main ul button').first();
+            if (!(await next.count())) break;
+            await next.evaluate((b) => b.click());
+            await page.waitForTimeout(1200);
+        }
+        await inspect('ask, all sample answers');
     } else {
         check(`[${tag}] Ask shows sample questions`, false, 'no sample question button');
     }

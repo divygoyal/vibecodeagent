@@ -46,6 +46,9 @@ export interface ChoroplethMapProps {
     onSelect?: (code: string) => void;
 }
 
+/** Height the scale legend takes under the map (margins included). */
+export const MAP_LEGEND_H = 30;
+
 export function ChoroplethMap({ values, color, width, height, projection, steps, format, label, showLegend, onSelect }: ChoroplethMapProps) {
     const [features, setFeatures] = useState<CountryFeature[] | null>(null);
     const [failed, setFailed] = useState(false);
@@ -58,7 +61,8 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
         return () => { live = false; };
     }, []);
 
-    const legendH = showLegend ? 22 : 0;
+    // Legend: 4px above, 18px tall, 8px below so it never touches the country list under the map (round 4 #8, round 5).
+    const legendH = showLegend ? MAP_LEGEND_H : 0;
     const mapH = height - legendH;
 
     const { path, thresholds, max } = useMemo(() => {
@@ -80,7 +84,8 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
     // Guard: a world map squeezed under ~70 px tall draws as an empty band (round 4 audit #3).
     if (mapH < 72 || width < 100) return null;
     if (failed) return <p className="py-6 text-center text-body-sm text-fg-muted">The map could not load. The list shows the same numbers.</p>;
-    if (!features) return <div className="skeleton" style={{ width, height: mapH }} />;
+    // Loading: the same box as the drawn map (legend room included), so the list under it does not jump.
+    if (!features) return <div className="relative shrink-0" style={{ width, height }}><div className="skeleton" style={{ width, height: mapH }} /></div>;
 
     return (
         // shrink-0: in a column with the country list, the map box (legend included) never gives up height, so
@@ -116,7 +121,7 @@ export function ChoroplethMap({ values, color, width, height, projection, steps,
                 </div>
             ) : null}
             {showLegend ? (
-                <div className="mt-1 flex h-[18px] items-center gap-2 overflow-hidden whitespace-nowrap text-caption leading-none text-fg-muted">
+                <div className="mt-1 mb-2 flex h-[18px] items-center gap-2 overflow-hidden whitespace-nowrap text-caption leading-none text-fg-muted">
                     <span className="tabular-nums">{format(0)}</span>
                     <span className="flex h-2 w-28 overflow-hidden rounded-full">
                         {Array.from({ length: steps }, (_, i) => (

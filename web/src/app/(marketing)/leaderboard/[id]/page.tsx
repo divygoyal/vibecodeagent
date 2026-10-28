@@ -8,7 +8,8 @@ import { Banner } from '@/components/ui/Banner';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Favicon } from '@/components/ui/Favicon';
-import { CategoryBadge, Ga4Badge, VerificationBadge } from '@/components/leaderboard/shared';
+import { VerificationBadge, VerifiedMark } from '@/components/leaderboard/shared';
+import { CATEGORY_LABELS } from '@/lib/leaderboard/constants';
 import { EmbedCard, LiveNow, OfferSection, ProfileCharts, RangeSwitch, ShareButton } from '@/components/leaderboard/ProfileClient';
 import { AboutCard, Breakdowns, GrowthCard, KpiGrid, OpenToLine, SimilarCard, SiteLine, SlotsCard } from '@/components/leaderboard/ProfileSections';
 import { DEFAULT_RANGE, SITE_ORIGIN } from '@/lib/leaderboard/constants';
@@ -86,9 +87,11 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
     };
 
     const g = p.growth;
-    const rankPills: string[] = [];
-    if (g?.rank_overall) rankPills.push(`#${g.rank_overall} overall`);
-    if (g?.rank_category && p.category) rankPills.push(`#${g.rank_category} in ${p.category}`);
+    const categoryName = p.category ? CATEGORY_LABELS[p.category] ?? p.category : null;
+    const metaLine: string[] = [];
+    if (g?.rank_overall) metaLine.push(`#${g.rank_overall} overall`);
+    if (g?.rank_category && categoryName) metaLine.push(`#${g.rank_category} in ${categoryName}`);
+    else if (categoryName) metaLine.push(categoryName);
 
     return (
         <main className="mx-auto w-full max-w-[1100px] px-4 pb-24 pt-8 sm:px-6">
@@ -122,18 +125,13 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                     <Favicon host={host || p.name} size={64} />
                     <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        {/* Round 5: the name with a verified mark; category and ranks as one muted line, not pills. */}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
                             <h1 className="text-heading-lg text-fg">{p.name}</h1>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                <VerificationBadge v={p.verification} />
-                                {p.verification.level === 'owner' && p.verification.ga4_connected ? <Ga4Badge /> : null}
-                                <CategoryBadge name={p.category} />
-                                {rankPills.map((r) => (
-                                    <span key={r} className="inline-flex h-6 items-center rounded-full bg-subtle px-2.5 text-meta font-medium text-fg-secondary">{r}</span>
-                                ))}
-                                {p.live.enabled ? <LiveNow entryId={p.id} /> : null}
-                            </div>
+                            {pending ? <VerificationBadge v={p.verification} /> : <VerifiedMark v={p.verification} size={22} />}
+                            {p.live.enabled ? <LiveNow entryId={p.id} className="ml-1" /> : null}
                         </div>
+                        {metaLine.length ? <p className="mt-1 text-body text-fg-muted">{metaLine.join(' · ')}</p> : null}
                         {p.description ? <p className="mt-2 max-w-[680px] text-body-lg text-fg-secondary">{p.description}</p> : null}
                         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
                             <SiteLine p={p} />

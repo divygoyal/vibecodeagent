@@ -18,6 +18,7 @@ import { flagForName } from '../lib/geo';
 import { cleanFilters, FILTER_DEFS, FILTER_KEYS, hasFilters, type FilterKey, type SiteFilters } from '../lib/filters';
 import { deviceLabel, sourceInfo } from '../lib/sources';
 import { SourceIcon } from '../SourceIcon';
+import { BrowserIcon, DeviceIcon, OsIcon } from '../TechIcon';
 import { SiteFiltersContext, useSite } from '../useSiteData';
 
 const QUERY = Object.fromEntries(FILTER_KEYS.map((k) => [k, parseAsString])) as Record<FilterKey, typeof parseAsString>;
@@ -84,7 +85,9 @@ function ChipValue({ k, value }: { k: FilterKey; value: string }) {
         return <>{flag ? <span aria-hidden className="text-[13px] leading-none">{flag}</span> : null}{value}</>;
     }
     if (k === 'channel') return <><span aria-hidden className="size-2 rounded-full" style={{ background: channelColor(value) }} />{value}</>;
-    if (k === 'device') return <>{deviceLabel(value)}</>;
+    if (k === 'device') return <><DeviceIcon device={value} />{deviceLabel(value)}</>;
+    if (k === 'browser') return <><BrowserIcon name={value} />{value}</>;
+    if (k === 'os') return <><OsIcon name={value} />{value}</>;
     return <span className="max-w-[16rem] truncate" title={value}>{value}</span>;
 }
 

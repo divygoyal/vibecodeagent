@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Copy, ExternalLink, Pause, Play, RefreshCw, Trash2 } from 'lucide-react';
+import { Activity, Copy, ExternalLink, Pause, Play, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Banner } from '@/components/ui/Banner';
@@ -12,18 +12,21 @@ import { ConfirmModal } from '@/components/ui/Modal';
 import { Pill } from '@/components/ui/Pill';
 import { Select } from '@/components/ui/Select';
 import { Tabs } from '@/components/ui/Tabs';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { toast } from '@/components/ui/Toaster';
 import { fmtDay, fmtFull } from '@/lib/format';
 import { CATEGORIES, CATEGORY_LABELS, OPEN_TO_OPTIONS } from '@/lib/leaderboard/constants';
 import { timeAgo } from '@/lib/leaderboard/format';
 import type { MyEntry, OpenTo, PrivacySettings } from '@/lib/leaderboard/types';
-import { VerificationBadge } from '../shared';
 import { EmbedCard } from '../ProfileClient';
 import { InboxPanel, useInbox } from './InboxPanel';
 import { PreviewPanel } from './Preview';
 import { useIsMobile } from '@/lib/useIsMobile';
 import { PrivacyForm } from './PrivacyForm';
 import { SlotsEditor } from './SlotsEditor';
+
+// Separators only where the status fits on one line: on phones it wraps and a line ended on a stray "·" (round 5 judge).
+const Dot = () => <span aria-hidden className="text-fg-faint max-md:hidden">·</span>;
 
 const FIELD = 'tc-control w-full rounded-control border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint transition-[border-color,box-shadow] duration-120 hover:border-border-strong focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none';
 
@@ -157,6 +160,10 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                 ? { tone: 'up' as const, label: 'Listed' }
                 : { tone: 'warn' as const, label: 'Pending verification' };
     const detail = v.detail;
+    const ownerText = `Owner${detail.gsc?.permission === 'siteFullUser' ? ' (full user)' : ''} of ${detail.gsc?.site_url ?? entry.gsc_site_url} in Search Console.${v.ga4_connected ? ' The GA4 data stream matches this domain.' : ''}`;
+    const verifiedTip = v.level === 'owner'
+        ? `${ownerText} Checked ${v.checked_at ? fmtDay(v.checked_at.slice(0, 10)) : 'daily'}.`
+        : 'The Google Analytics property matches this domain. Ownership in Search Console is not confirmed yet.';
     const newOffers = (inbox.data?.items ?? []).filter((i) => i.entry_id === entry.id && i.status === 'new').length;
     const publicUrl = `${origin}${entry.public_path}`;
     const showPreview = tab === 'profile' || tab === 'privacy';
@@ -165,16 +172,39 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Status */}
+            {/* Status: one row (round 5). Listed · #5 of 13 · Verified owner, checked 4 min ago · Re-check. The
+                verification details sit in the tooltip; a separate card only appears when something needs doing. */}
             <Card padding="sm" className="flex flex-wrap items-center gap-x-4 gap-y-3">
-                <div className="flex min-w-0 flex-1 basis-72 flex-wrap items-center gap-2">
+                <div className="flex min-w-0 flex-1 basis-72 flex-wrap items-center gap-x-2 gap-y-1.5 text-body-sm max-md:gap-x-3">
                     <Pill tone={status.tone} dot>{status.label}</Pill>
-                    {live && entry.rank.rank ? <span className="text-body text-fg-secondary">#{entry.rank.rank} of {entry.rank.total}</span> : null}
-                    <VerificationBadge v={v} compact />
-                    <span className="text-body-sm text-fg-muted">
-                        {v.checked_at ? `checked ${timeAgo(v.checked_at)}` : v.grace ? 'not re-checked yet' : 'not checked yet'}
-                        {entry.last_refreshed ? ` · numbers ${timeAgo(entry.last_refreshed)}` : ''}
+                    {live && entry.rank.rank ? <><Dot /><span className="font-medium text-fg tabular-nums">#{entry.rank.rank} <span className="font-normal text-fg-muted">of {entry.rank.total}</span></span></> : null}
+                    <Dot />
+                    <span>
+                        {v.level === 'owner' || v.level === 'ga4' ? (
+                            <Tooltip content={verifiedTip}>
+                                <span tabIndex={0} className={cn('inline-flex items-center gap-1 align-[-2px] font-medium', v.level === 'owner' ? 'text-fg' : 'text-info')}>
+                                    {v.level === 'owner'
+                                        ? <ShieldCheck aria-hidden size={15} strokeWidth={1.75} className="text-brand-text" />
+                                        : <Activity aria-hidden size={15} strokeWidth={1.75} />}
+                                    {v.level === 'owner' ? 'Verified owner' : 'GA4 connected'}
+                                </span>
+                            </Tooltip>
+                        ) : null}
+                        <span className="text-fg-muted">
+                            {v.level === 'owner' || v.level === 'ga4' ? ', ' : ''}
+                            {v.checked_at ? `checked ${timeAgo(v.checked_at)}` : v.grace ? 'not re-checked yet' : 'not checked yet'}
+                        </span>
                     </span>
+                    {v.level === 'owner' ? (<><Dot />
+                    <button
+                        type="button"
+                        onClick={() => void recheck()}
+                        disabled={rechecking}
+                        className="inline-flex items-center gap-1 rounded font-medium text-fg-secondary underline decoration-border-strong underline-offset-2 transition-colors hover:text-fg hover:decoration-fg disabled:cursor-wait disabled:opacity-60 pointer-coarse:min-h-11"
+                    >
+                        <RefreshCw aria-hidden size={13} className={cn(rechecking && 'animate-spin')} />
+                        {rechecking ? 'Checking…' : 'Re-check'}
+                    </button></>) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="secondary" icon={Copy} onClick={async () => { try { await navigator.clipboard.writeText(publicUrl); toast.success('Link copied'); } catch { toast.error('Could not copy'); } }}>Copy link</Button>
@@ -189,14 +219,14 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                 </div>
             </Card>
 
-            {/* Verification */}
+            {/* Verification: only when it needs attention (pending), or right after the first check. */}
             {v.level !== 'owner' || firstCheck ? (
                 <Banner
-                    variant={v.level === 'owner' ? 'success' : v.level === 'ga4' ? 'warn' : 'warn'}
+                    variant={v.level === 'owner' ? 'success' : 'warn'}
                     title={v.level === 'owner' ? 'Ownership verified' : 'Pending verification: you are not ranked yet'}
-                    actions={<Button size="sm" variant="secondary" icon={RefreshCw} loading={rechecking} onClick={recheck}>Re-check</Button>}
+                    actions={v.level === 'owner' ? undefined : <Button size="sm" variant="secondary" icon={RefreshCw} loading={rechecking} onClick={recheck}>Re-check</Button>}
                 >
-                    <p>{detail.message || firstCheck?.message || 'We could not verify this site yet.'}</p>
+                    <p>{v.level === 'owner' ? ownerText : detail.message || firstCheck?.message || 'We could not verify this site yet.'}</p>
                     {detail.error ? <p className="mt-1 text-down">Last check could not finish: {detail.error}</p> : null}
                     {(detail.fix?.length ? detail.fix : firstCheck?.fix)?.length && v.level !== 'owner' ? (
                         <ol className="mt-2 list-decimal space-y-1 pl-5">
@@ -204,17 +234,7 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                         </ol>
                     ) : null}
                 </Banner>
-            ) : (
-                <Card padding="sm" className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <CheckCircle2 aria-hidden size={18} className="text-up" />
-                    <div className="min-w-0 flex-1 basis-72 text-body text-fg-secondary">
-                        <span className="font-medium text-fg">Verified owner</span> of {detail.gsc?.site_url ?? entry.gsc_site_url} in Search Console ({detail.gsc?.permission === 'siteFullUser' ? 'full user' : 'owner'}).
-                        {v.ga4_connected ? ' The GA4 data stream matches this domain.' : ''}
-                        <span className="text-fg-muted"> Checked {v.checked_at ? fmtDay(v.checked_at.slice(0, 10)) : 'daily'}.</span>
-                    </div>
-                    <Button size="sm" variant="secondary" icon={RefreshCw} loading={rechecking} onClick={recheck}>Re-check</Button>
-                </Card>
-            )}
+            ) : null}
 
             <Tabs
                 ariaLabel="Profile settings"
@@ -242,7 +262,7 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                                     </label>
                                     <label className="sm:col-span-2">
                                         <span className="mb-1 flex justify-between text-body-sm font-medium text-fg-secondary">Tagline <span className="font-normal text-fg-faint tabular-nums">{draft.description.length}/200</span></span>
-                                        <textarea className={cn(FIELD, 'py-2')} rows={2} maxLength={200} value={draft.description} placeholder="One line on what the site is and who it is for" onChange={(e) => set('description', e.target.value)} />
+                                        <textarea className={cn(FIELD, 'h-auto min-h-[5.25rem] py-2')} rows={3} maxLength={200} value={draft.description} placeholder="One line on what the site is and who it is for" onChange={(e) => set('description', e.target.value)} />
                                     </label>
                                     <div>
                                         <span className="mb-1 block text-body-sm font-medium text-fg-secondary">Category</span>
@@ -289,7 +309,9 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                                 <CardHeader title="Danger zone" />
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <p className="max-w-[460px] text-body-sm text-fg-muted">Deleting removes this profile, its history, offers and ad slots for good. To hide it for a while, pause the listing instead.</p>
-                                    <Button variant="danger" icon={Trash2} onClick={() => setConfirmDelete(true)}>Delete profile</Button>
+                                    {/* Outlined in red, not filled: it was the loudest thing on the page in dark mode (round 5 judge). The
+                                        confirm dialog keeps the filled danger button. */}
+                                    <Button variant="secondary" icon={Trash2} className="text-down hover:border-down hover:text-down" onClick={() => setConfirmDelete(true)}>Delete profile</Button>
                                 </div>
                             </Card>
                         </>

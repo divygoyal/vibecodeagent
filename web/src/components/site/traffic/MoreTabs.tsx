@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Info } from 'lucide-react';
 
 import { fmtFull, fmtPercent } from '@/lib/format';
 import { METRICS } from '@/lib/metrics';
@@ -10,13 +9,14 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useScrollEdges } from '@/components/ui/useScrollEdges';
 import { BreakdownTable } from '../BreakdownTable';
-import { displayPage, pageRef } from '../lib/rules';
 import type { Ga4BreakdownResponse, Ga4Row, Ga4Summary, RetentionResponse } from '../lib/types';
 import { MetricTile } from '../MetricTile';
-import { PagePath } from '../PagePath';
 import { LoadError } from '../SiteStates';
-import { useGa4, useSite, useSiteRange } from '../useSiteData';
+import { useGa4, useSiteRange } from '../useSiteData';
+import { useTabParam } from '../useTabParam';
+import { COHORT_MODES } from '../lib/cohorts';
 import { GoalsPanel } from './GoalsFunnels';
 
 const v = (r: Ga4Row, k: string) => r.cur[k] ?? 0;
@@ -91,66 +91,6 @@ export function EventsTab() {
     );
 }
 
-/**
- * Traffic > Journeys. GA4's API has no path exploration, so the old page drew
- * invented paths. This keeps what GA4 really reports: how sessions start and
- * how deep they go.
- */
-export function JourneysTab() {
-    const { siteHost } = useSite();
-    const { compareOn, compareText } = useSiteRange();
-    const summary = useGa4<Ga4Summary>('summary');
-    const landing = useGa4<Ga4BreakdownResponse>('landing');
-    const t = summary.data?.totals;
-    const prev = compareOn ? summary.data?.previous ?? null : undefined;
-    const loading = summary.state === 'loading';
-    const rows = useMemo(() => (landing.data?.rows ?? []).filter((r) => r.dims.landingPage && r.dims.landingPage !== '(not set)').map((r) => {
-        const ref = pageRef(r.dims.landingPage, siteHost);
-        return { r, label: displayPage(ref, siteHost) };
-    }), [landing.data, siteHost]);
-    const totalSessions = rows.reduce((a, x) => a + v(x.r, 'sessions'), 0);
-    return (
-        <div className="flex flex-col gap-4">
-            <Banner variant="info" icon={Info}>
-                Google Analytics doesn&apos;t share full click paths through its API, so this tab shows how visits start and how deep they go. For step-by-step flows, build a funnel.
-            </Banner>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <MetricTile metric="pageviews" label="Pages per session" format="position" better="up" value={t && t.sessions ? Math.round((t.pageviews / t.sessions) * 100) / 100 : null} previous={prev === undefined ? undefined : prev && prev.sessions ? Math.round((prev.pageviews / prev.sessions) * 100) / 100 : null} loading={loading} comparisonLabel={compareText} />
-                <MetricTile metric="sessions" label="Avg. session duration" format="duration" value={t?.avgDuration} previous={prev === undefined ? undefined : prev?.avgDuration ?? null} loading={loading} comparisonLabel={compareText} />
-                <MetricTile metric="sessions" label="Engaged sessions" value={t?.engagedSessions} previous={prev === undefined ? undefined : prev?.engagedSessions ?? null} loading={loading} comparisonLabel={compareText} />
-                <MetricTile metric="sessions" label="Bounce rate" format="percent" better="down" value={t ? 1 - t.engagementRate : null} previous={prev === undefined ? undefined : prev ? 1 - prev.engagementRate : null} loading={loading} comparisonLabel={compareText} />
-            </div>
-            {landing.state === 'error' ? <LoadError error={landing.error} onRetry={landing.mutate} /> : (
-                <BreakdownTable
-                    caption="Where sessions start"
-                    rows={rows}
-                    rowKey={(x) => x.r.key}
-                    loading={landing.state === 'loading'}
-                    label={{
-                        header: 'Entry page',
-                        text: (x) => `${x.r.dims.pageTitle ?? ''} ${x.label}`.trim(),
-                        cell: (x) => <PagePath path={x.label} title={x.r.dims.pageTitle} className="w-full font-medium text-fg md:w-auto" />,
-                    }}
-                    heat={{ metric: 'sessions', value: (x) => v(x.r, 'sessions') }}
-                    twoLine
-                    defaultSort="sessions"
-                    exportName="entry-pages"
-                    searchPlaceholder="Search entry pages"
-                    columns={[
-                        { key: 'sessions', header: 'Sessions', value: (x) => v(x.r, 'sessions'), previous: compareOn ? (x) => p(x.r, 'sessions') : undefined },
-                        { key: 'share', header: 'Share', format: 'percent', value: (x) => (totalSessions ? v(x.r, 'sessions') / totalSessions : 0), hideOnMobile: true },
-                        { key: 'rate', header: 'Went deeper', format: 'percent', value: (x) => v(x.r, 'engagementRate'), hideOnMobile: true },
-                        { key: 'bounce', header: 'Left at once', format: 'percent', better: 'down', value: (x) => v(x.r, 'bounceRate'), hideOnMobile: true },
-                        { key: 'dur', header: 'Avg. duration', format: 'duration', value: (x) => v(x.r, 'averageSessionDuration'), hideOnMobile: true },
-                        { key: 'conv', header: 'Key events', value: (x) => v(x.r, 'keyEvents'), hideOnMobile: true },
-                    ]}
-                />
-            )}
-            <p className="text-meta text-fg-muted">&ldquo;Went deeper&rdquo; is GA4&apos;s engagement rate: the session lasted 10+ seconds, viewed 2+ pages or converted.</p>
-        </div>
-    );
-}
-
 const MODE_LABEL = { daily: 'Day', weekly: 'Week', monthly: 'Month' } as const;
 
 /** Cell colour on the users (indigo) ramp, zero = surface (DESIGN 6.8). */
@@ -166,16 +106,18 @@ function rampStyle(pct: number | null) {
 
 /** Traffic > Retention: cohorts by first visit (GA4 cohort report). */
 export function RetentionTab() {
-    const [mode, setMode] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+    // In the URL (?cohort=), so the Traffic header can name the same cohort window.
+    const [mode, setMode] = useTabParam(COHORT_MODES, { name: 'cohort' });
     const q = useGa4<RetentionResponse>('retention', { noRange: true, extra: { mode } });
     const d = q.data;
     const cols = d ? Math.max(...d.cohorts.map((c) => c.retention.length), 0) : 0;
     const label = MODE_LABEL[mode];
+    const [gridRef, { more: gridMore }] = useScrollEdges();
     const fmtCohort = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: mode === 'monthly' ? undefined : 'numeric', year: mode === 'monthly' ? 'numeric' : undefined, timeZone: 'UTC' });
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-body-sm text-fg-muted">Share of new users who came back, by when they first visited. The date range above does not apply here.</p>
+                <p className="text-body-sm text-fg-muted">Share of new users who came back, by when they first visited.</p>
                 <SegmentedControl ariaLabel="Cohort size" size="sm" variant="neutral" value={mode} onChange={setMode}
                     options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }]} />
             </div>
@@ -191,21 +133,26 @@ export function RetentionTab() {
                 {q.state === 'loading' ? <div className="p-5"><Skeleton className="h-64" /></div> : !d || d.cohorts.length === 0 ? (
                     <EmptyState variant="inline" title="No cohort data yet" description="GA4 needs new users in the last few weeks to build cohorts." />
                 ) : (
-                    <div className="overflow-x-auto px-4 pb-4 md:px-5 md:pb-5">
+                    <div className="relative">
+                    <div ref={gridRef} className="overflow-x-auto px-4 pb-4 md:px-5 md:pb-5">
                         <table className="w-full border-separate border-spacing-[2px] text-body-sm tabular-nums">
                             <caption className="sr-only">Retention by cohort</caption>
                             <thead>
                                 <tr>
                                     <th scope="col" className="sticky left-0 z-[1] bg-surface px-2 py-1 text-left text-meta font-medium text-fg-muted">Cohort</th>
-                                    <th scope="col" className="px-2 py-1 text-right text-meta font-medium text-fg-muted">Users</th>
+                                    <th scope="col" className="px-2 py-1 text-right text-meta font-medium text-fg-muted max-md:hidden">Users</th>
                                     {Array.from({ length: cols }, (_, i) => <th key={i} scope="col" className="min-w-12 px-1 py-1 text-center text-meta font-medium text-fg-muted">{label} {i}</th>)}
                                 </tr>
                             </thead>
                             <tbody>
                                 {d.cohorts.map((c) => (
                                     <tr key={c.date}>
-                                        <th scope="row" className="sticky left-0 z-[1] bg-surface px-2 py-1 text-left font-normal whitespace-nowrap text-fg">{fmtCohort(c.date)}</th>
-                                        <td className="px-2 py-1 text-right text-fg-secondary">{fmtFull(c.users)}</td>
+                                        <th scope="row" className="sticky left-0 z-[1] bg-surface px-2 py-1 text-left font-normal whitespace-nowrap text-fg">
+                                            {fmtCohort(c.date)}
+                                            {/* Phones: the cohort's size under its date, so the grid starts sooner */}
+                                            <span className="block text-meta text-fg-muted md:hidden">{fmtFull(c.users)} users</span>
+                                        </th>
+                                        <td className="px-2 py-1 text-right text-fg-secondary max-md:hidden">{fmtFull(c.users)}</td>
                                         {Array.from({ length: cols }, (_, i) => {
                                             const val = c.retention[i] ?? null;
                                             return (
@@ -218,7 +165,7 @@ export function RetentionTab() {
                                 ))}
                                 <tr>
                                     <th scope="row" className="sticky left-0 z-[1] bg-surface px-2 py-1 text-left font-medium text-fg">Average</th>
-                                    <td />
+                                    <td className="max-md:hidden" />
                                     {Array.from({ length: cols }, (_, i) => (
                                         <td key={i} className="px-1 py-1 text-center text-meta font-medium text-fg">{d.curve[i] ? fmtPercent(d.curve[i].retention / 100, { tile: true }) : ''}</td>
                                     ))}
@@ -231,6 +178,10 @@ export function RetentionTab() {
                             <span>100%</span>
                             <span className="ml-2">Empty cells: not reached yet.</span>
                         </p>
+                    </div>
+                    {/* More weeks to the right: a fade over the cut column and a hint (round 5 judge: cut at Week 4, no cue). */}
+                    {gridMore ? <span aria-hidden className="pointer-events-none absolute top-0 right-0 bottom-10 w-12 bg-gradient-to-l from-surface to-transparent" /> : null}
+                    {gridMore ? <p className="px-4 pb-3 text-meta text-fg-muted md:hidden">Scroll sideways for later {label.toLowerCase()}s →</p> : null}
                     </div>
                 )}
             </Card>

@@ -4,14 +4,14 @@ import { ga4DimensionFilter, parseFilterParams } from '@/components/site/lib/fil
 import { isInterval } from '@/components/site/lib/intervals';
 import { getSiteContext, googleErrorResponse, jsonError, NO_STORE, PRIVATE_CACHE } from '../_lib/context';
 import {
-    ga4Breakdown, ga4Heatmap, ga4OrganicSeries, ga4PageDetail, ga4PageTrends, ga4RealtimeSnapshot, ga4Retention, ga4Summary, isBreakdown,
+    ga4Breakdown, ga4Heatmap, ga4Journeys, ga4OrganicSeries, ga4PageDetail, ga4PageTrends, ga4RealtimeSnapshot, ga4Retention, ga4Summary, isBreakdown,
 } from '../_lib/ga4Reports';
 import { parseProperty, parseRange } from '../_lib/params';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/site/ga4?property=properties/123&report=summary|<breakdown>|page|realtime|retention|heatmap|pageTrends|organic
+ * GET /api/site/ga4?property=properties/123&report=summary|<breakdown>|page|realtime|retention|heatmap|pageTrends|organic|journeys
  *   &start=YYYY-MM-DD&end=YYYY-MM-DD[&cmpStart=&cmpEnd=][&mode=daily|weekly|monthly]
  *   [&f=<key>:<value> ...]  click-to-filter (components/site/lib/filters.ts): summary, breakdowns, heatmap, pageTrends
  *   [&interval=day|week|month]  summary buckets
@@ -49,6 +49,9 @@ export async function GET(req: Request) {
         if (report === 'pageTrends') {
             const limit = Number(sp.get('limit')) || 10;
             return NextResponse.json(await ga4PageTrends(ctx.userId, ctx.token, property, range, filter, limit), { headers: PRIVATE_CACHE });
+        }
+        if (report === 'journeys') {
+            return NextResponse.json(await ga4Journeys(ctx.userId, ctx.token, property, range), { headers: PRIVATE_CACHE });
         }
         if (report === 'organic') {
             return NextResponse.json(await ga4OrganicSeries(ctx.userId, ctx.token, property, range), { headers: PRIVATE_CACHE });

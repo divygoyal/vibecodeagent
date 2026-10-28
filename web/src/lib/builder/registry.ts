@@ -203,3 +203,14 @@ export function widgetTitle(w: WidgetDef): string {
 export function isKnownMetric(id: string): boolean {
     return Boolean(getMetric(id));
 }
+
+/**
+ * Phones (view mode) size these cards to their content instead of a fixed box: text (a heading that
+ * wraps was cut), the KPI strip (a 2-column grid there, round 4 polish), and lists (round 5 audit #28:
+ * tables showed 2 rows a page above a blank half card, a 3-row bar list sat in a 6-row box and the
+ * portfolio grid scrolled inside the page). Tables show 5 rows a page there, lists their top rows.
+ */
+export function growsOnPhone(w: WidgetDef): boolean {
+    if (w.type === 'text' || w.type === 'kpi-strip' || w.type === 'table' || w.type === 'portfolio-grid') return true;
+    return w.type === 'bar' && w.config.variant === 'list' && !w.config.stackBy && w.config.metrics.length === 1;
+}

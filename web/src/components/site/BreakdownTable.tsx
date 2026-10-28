@@ -25,6 +25,13 @@ export interface BreakdownColumn<T> {
     better?: 'up' | 'down';
     /** Hide below md (keeps phone tables short). */
     hideOnMobile?: boolean;
+    /** Custom cell (sorting still uses `value`); with `csv`, the CSV text instead of the value. */
+    cell?: (row: T) => ReactNode;
+    csv?: (row: T) => string;
+    /** Column width (default: shared). */
+    width?: string;
+    /** Part in the phone list (see TableColumn.mobile): 'hidden' keeps a wide cell off phones. */
+    mobile?: TableColumn<T>['mobile'];
 }
 
 export interface BreakdownTableProps<T> {
@@ -87,7 +94,9 @@ export function BreakdownTable<T>({
             firstSortDir: c.better === 'down' ? 'asc' : 'desc',
             headerClassName: c.hideOnMobile ? 'max-md:hidden' : undefined,
             className: c.hideOnMobile ? 'max-md:hidden' : undefined,
-            cell: (r) => (
+            width: c.width,
+            mobile: c.mobile,
+            cell: (r) => c.cell ? c.cell(r) : (
                 <span className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
                     <span>{fmtCell(c.value(r), c.format, currency)}</span>
                     {c.previous ? (
@@ -103,7 +112,7 @@ export function BreakdownTable<T>({
             const h = c.format === 'currency' && currency ? `${c.header} (${currency})` : c.header;
             return c.previous ? [h, `${h} (previous)`] : [h];
         })],
-        filtered.map((r) => [label.text(r), ...columns.flatMap((c) => (c.previous ? [c.value(r) ?? '', c.previous(r) ?? ''] : [c.value(r) ?? '']))]),
+        filtered.map((r) => [label.text(r), ...columns.flatMap((c) => (c.previous ? [c.value(r) ?? '', c.previous(r) ?? ''] : [c.csv ? c.csv(r) : c.value(r) ?? '']))]),
     ) : undefined;
     return (
         <Table

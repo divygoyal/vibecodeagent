@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { getSiteContext, googleErrorResponse, jsonError, PRIVATE_CACHE } from '../_lib/context';
 import {
-    gscCannibalization, gscDecay, gscDetail, gscInspectUrl, gscOpportunities, gscRows, gscSitemapRows, gscSummary, isGscDimension,
+    gscCannibalization, gscDecay, gscDetail, gscIndexStatus, gscSearchFlow, gscInspectUrl, gscOpportunities, gscRows, gscSitemapRows, gscSummary, isGscDimension,
 } from '../_lib/gscReports';
 import { parseRange, parseSiteUrl } from '../_lib/params';
 
@@ -13,7 +13,8 @@ export const dynamic = 'force-dynamic';
  *
  * report: summary | queries | pages | countries | devices | appearance
  *       | opportunities | cannibalization | decay | detail (&query= or &page=)
- *       | sitemaps | inspect (&url=)
+ *       | sitemaps | inspect (&url=) | indexStatus (top pages by clicks, inspected once a day)
+ *       | searchFlow (query -> page clicks)
  *
  * Small cached Search Console reports, one per card or tab. Read-only.
  */
@@ -46,6 +47,10 @@ export async function GET(req: Request) {
             }
             case 'sitemaps':
                 return ok({ sitemaps: await gscSitemapRows(ctx.userId, ctx.token, site) });
+            case 'searchFlow':
+                return ok(await gscSearchFlow(ctx.userId, ctx.token, site, range.cur));
+            case 'indexStatus':
+                return ok(await gscIndexStatus(ctx.userId, ctx.token, site, range));
             case 'inspect': {
                 const url = sp.get('url') ?? '';
                 if (!/^https?:\/\/\S+$/i.test(url) || url.length > 2000) return jsonError('Enter a full URL on this site, like https://example.com/page.', 400);

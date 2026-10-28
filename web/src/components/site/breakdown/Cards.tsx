@@ -5,7 +5,9 @@ import { useMemo } from 'react';
 import { ArrowRight } from 'lucide-react';
 
 import { fmtFull } from '@/lib/format';
-import { channelColor } from '@/lib/metrics';
+import { channelColor, deviceColor } from '@/lib/metrics';
+import { fmtShare } from '@/components/charts/style';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { BarList } from '@/components/charts/BarList';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -19,7 +21,9 @@ import { LoadError } from '../SiteStates';
 import { PagePath } from '../PagePath';
 import { pageLabel } from '../lib/pagePath';
 import { FlagIcon, sourceParts } from '../SourceIcon';
-import { useGa4, useGsc, useSite } from '../useSiteData';
+import { useActiveFilters, useGa4, useGsc, useSite } from '../useSiteData';
+import { useFilterClick } from '../filters/SiteFilters';
+import { BrowserIcon, DeviceIcon, OsIcon } from '../TechIcon';
 import { gscToAlpha2 } from '@/lib/builder/countries';
 import { Ga4List, listMeta } from './Ga4List';
 import { TabbedCard } from './TabbedCard';
@@ -110,20 +114,83 @@ export function PagesCard({ className, action = 'filter', withSearch = false }: 
     );
 }
 
-const deviceRender = (r: Ga4Row) => ({ label: deviceLabel(r.dims.deviceCategory), text: deviceLabel(r.dims.deviceCategory) });
+const browserRender = (r: Ga4Row) => ({ label: r.dims.browser, text: r.dims.browser, icon: <BrowserIcon name={r.dims.browser} /> });
+const osRender = (r: Ga4Row) => ({ label: r.dims.operatingSystem, text: r.dims.operatingSystem, icon: <OsIcon name={r.dims.operatingSystem} /> });
 
-/** Devices / Browsers / OS / Languages (users). */
+/** Rows of the Browsers / OS / Languages lists under the device split: the card then matches Peak hours beside it. */
+const TECH_ROWS = 5;
+
+/**
+ * Devices as one 100% bar (Desktop / Mobile / Tablet) with icons, shares and users (round 5, audit item 24):
+ * three rows no longer fill a card as tall as the Peak hours heatmap. A segment or legend entry filters the page.
+ */
+export function DeviceSplit() {
+    const q = useGa4<Ga4BreakdownResponse>('devices');
+    const click = useFilterClick();
+    const active = useActiveFilters().device;
+    const rows = useMemo(() => (q.data?.rows ?? [])
+        .map((r) => ({ key: r.key, raw: r.dims.deviceCategory, label: deviceLabel(r.dims.deviceCategory), users: r.cur.activeUsers ?? 0 }))
+        .filter((r) => r.users > 0)
+        .sort((a, b) => b.users - a.users), [q.data]);
+    const total = rows.reduce((a, r) => a + r.users, 0);
+    if (q.state === 'error') return <LoadError error={q.error} onRetry={q.mutate} />;
+    if (q.state === 'loading') {
+        return <div aria-busy className="flex flex-col gap-3"><Skeleton className="h-3 w-full rounded-full" /><div className="flex gap-4"><Skeleton className="h-9 w-24" /><Skeleton className="h-9 w-24" /><Skeleton className="h-9 w-20" /></div></div>;
+    }
+    if (!total) return <EmptyState variant="inline" title="No users in this period" />;
+    const pick = active ? undefined : (raw: string) => click('device', raw);
+    return (
+        <div className="flex flex-col gap-3">
+            <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-full" role="img"
+                aria-label={`Users by device: ${rows.map((r) => `${r.label} ${fmtShare(r.users / total)}`).join(', ')}`}>
+                {rows.map((r) => (
+                    <span key={r.key} className="h-full first:rounded-l-full last:rounded-r-full" title={`${r.label}: ${fmtFull(r.users)} users (${fmtShare(r.users / total)})`}
+                        style={{ width: `${(r.users / total) * 100}%`, minWidth: 3, background: deviceColor(r.raw) }} />
+                ))}
+            </div>
+            <ul className="grid grid-cols-3 gap-2">
+                {rows.slice(0, 3).map((r) => {
+                    const body = (
+                        <>
+                            <span className="flex items-center gap-1.5 text-meta text-fg-muted">
+                                <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: deviceColor(r.raw) }} />
+                                <DeviceIcon device={r.raw} />
+                                <span className="truncate">{r.label}</span>
+                            </span>
+                            <span className="text-title-sm text-fg tabular-nums">{fmtShare(r.users / total)}</span>
+                            <span className="text-meta text-fg-muted tabular-nums">{fmtFull(r.users)} users</span>
+                        </>
+                    );
+                    return (
+                        <li key={r.key} className="min-w-0">
+                            {pick ? (
+                                <button type="button" onClick={() => pick(r.raw)} title={`Filter by ${r.label}`}
+                                    className="-m-1.5 flex w-[calc(100%+12px)] min-w-0 flex-col items-start rounded-control p-1.5 text-left hover:bg-subtle focus-visible:outline-2 focus-visible:outline-focus">
+                                    {body}
+                                </button>
+                            ) : <div className="flex min-w-0 flex-col">{body}</div>}
+                        </li>
+                    );
+                })}
+            </ul>
+            {rows.length > 3 ? <p className="text-meta text-fg-muted">Also: {rows.slice(3).map((r) => `${r.label} ${fmtShare(r.users / total)}`).join(', ')}</p> : null}
+        </div>
+    );
+}
+
+/** Devices (split bar) over Browsers / OS / Languages (users). */
 export function TechCard({ className }: { className?: string }) {
     return (
         <TabbedCard
             id="tech"
             title="Devices"
+            description="Users"
             className={className}
+            lead={<DeviceSplit />}
             tabs={[
-                { value: 'devices', label: 'Devices', meta: listMeta('users', true), content: <Ga4List report="devices" limit={SIDE_ROWS} fill dim="deviceCategory" metric="users" filterKey="device" render={deviceRender} showShare labelHeader="Device" viewAllTitle="Devices" /> },
-                { value: 'browsers', label: 'Browsers', meta: listMeta('users', true), content: <Ga4List report="browsers" limit={SIDE_ROWS} fill dim="browser" metric="users" filterKey="browser" showShare labelHeader="Browser" viewAllTitle="Browsers" /> },
-                { value: 'os', label: 'OS', meta: listMeta('users', true), content: <Ga4List report="os" limit={SIDE_ROWS} fill dim="operatingSystem" metric="users" filterKey="os" showShare labelHeader="Operating system" viewAllTitle="Operating systems" /> },
-                { value: 'languages', label: 'Languages', meta: listMeta('users', true), content: <Ga4List report="languages" limit={SIDE_ROWS} fill dim="language" metric="users" filterKey="language" showShare labelHeader="Language" viewAllTitle="Languages" /> },
+                { value: 'browsers', label: 'Browsers', meta: listMeta('users', true), content: <Ga4List report="browsers" limit={TECH_ROWS} fill dim="browser" metric="users" filterKey="browser" render={browserRender} showShare labelHeader="Browser" viewAllTitle="Browsers" /> },
+                { value: 'os', label: 'OS', meta: listMeta('users', true), content: <Ga4List report="os" limit={TECH_ROWS} fill dim="operatingSystem" metric="users" filterKey="os" render={osRender} showShare labelHeader="Operating system" viewAllTitle="Operating systems" /> },
+                { value: 'languages', label: 'Languages', meta: listMeta('users', true), content: <Ga4List report="languages" limit={TECH_ROWS} fill dim="language" metric="users" filterKey="language" showShare labelHeader="Language" viewAllTitle="Languages" /> },
             ]}
         />
     );
@@ -139,7 +206,7 @@ function GscList({ report, header }: { report: 'queries' | 'countries' | 'device
             const c = countryFromIso3(r.key);
             return { key: r.key, label: c.name, text: c.name, value: r.clicks, icon: <FlagIcon code={gscToAlpha2(r.key)} /> };
         }
-        if (report === 'devices') return { key: r.key, label: deviceLabel(r.key), text: deviceLabel(r.key), value: r.clicks };
+        if (report === 'devices') return { key: r.key, label: deviceLabel(r.key), text: deviceLabel(r.key), value: r.clicks, icon: <DeviceIcon device={r.key} /> };
         return { key: r.key, label: r.key, text: r.key, value: r.clicks, href: `${siteHref(site.host, 'search')}?detail=${encodeURIComponent(`q:${r.key}`)}` };
     }), [q.data, report, site.host]);
     if (q.state === 'error') return <LoadError error={q.error} onRetry={q.mutate} />;

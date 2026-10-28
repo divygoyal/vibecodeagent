@@ -31,6 +31,14 @@ function useLegacyRangeKey() {
 
 const inputCls = 'h-9 w-full rounded-control border border-border bg-surface px-3 text-body text-fg placeholder:text-fg-faint focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-focus';
 
+/** Today is still filling in: draw its point dotted, like the other charts (round 5). */
+function partialFrom(trend: { date: string }[]): number | undefined {
+    const last = trend[trend.length - 1]?.date;
+    const d = new Date();
+    const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return trend.length > 1 && (last === local || last === d.toISOString().slice(0, 10)) ? trend.length - 1 : undefined;
+}
+
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
     return (
         <label className="flex flex-col gap-1.5">
@@ -189,9 +197,10 @@ export function GoalsPanel() {
                                     <div><dt className="text-meta text-fg-muted">Sessions</dt><dd className="text-stat text-fg">{fmtFull(g.summary.totalSessions)}</dd></div>
                                 </dl>
                                 {g.explanation ? <p className="text-body-sm text-fg-secondary">{g.explanation}</p> : null}
-                                <ChartCard title="Completions per day" height="compact" state={g.trend.length ? 'ready' : 'empty'} bare>
-                                    <TimeSeriesChart data={g.trend as unknown as Record<string, number | string>[]} series={[{ metric: 'conversions', key: 'conversions', label: 'Goal completions' }]} height={220} ariaLabel={`${current.item.name} completions per day`} />
+                                <ChartCard title="Completions per day" height={220} state={g.trend.length ? 'ready' : 'empty'} bare>
+                                    <TimeSeriesChart data={g.trend as unknown as Record<string, number | string>[]} series={[{ metric: 'conversions', key: 'conversions', label: 'Goal completions' }]} height={220} partialFrom={partialFrom(g.trend)} ariaLabel={`${current.item.name} completions per day`} />
                                 </ChartCard>
+                                {partialFrom(g.trend) !== undefined ? <p className="-mt-2 text-meta text-fg-muted">Dotted: today, still coming in.</p> : null}
                                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                     <div>
                                         <p className="mb-2 text-body-sm font-medium text-fg">By source</p>
@@ -362,13 +371,17 @@ export function FunnelsTab() {
                                                         <ArrowDown aria-hidden size={12} /> {s.dropFromPrevious.toFixed(1)}% dropped off
                                                     </p>
                                                 ) : null}
-                                                <div className="flex items-center gap-3">
-                                                    <span className="w-6 shrink-0 text-right text-meta text-fg-muted tabular-nums">{i + 1}</span>
-                                                    <div className="relative min-w-0 flex-1 rounded-md bg-surface-sunken">
-                                                        <span aria-hidden className="absolute inset-y-0 left-0 rounded-md" style={{ width: `${Math.max(pct, 0.8)}%`, background: METRICS.conversions.color, opacity: 0.18 }} />
-                                                        <span className="relative flex items-center justify-between gap-3 px-3 py-2">
-                                                            <span className="min-w-0 truncate text-body-sm text-fg" title={s.name}>{s.name}</span>
+                                                {/* Round 5 (audit item 21): a solid bar in the key-events colour under the step name,
+                                                    not a pale wash behind it, so the steps read as one funnel with the chart below. */}
+                                                <div className="flex items-start gap-3">
+                                                    <span className="w-6 shrink-0 pt-0.5 text-right text-meta text-fg-muted tabular-nums">{i + 1}</span>
+                                                    <div className="min-w-0 flex-1">
+                                                        <span className="flex items-baseline justify-between gap-3">
+                                                            <span className="min-w-0 truncate text-body-sm font-medium text-fg" title={s.name}>{s.name}</span>
                                                             <span className="shrink-0 text-body-sm text-fg tabular-nums">{fmtFull(s.count)} <span className="text-fg-muted">· {pct.toFixed(1)}%</span></span>
+                                                        </span>
+                                                        <span aria-hidden className="mt-1.5 block h-2.5 w-full overflow-hidden rounded-full bg-surface-sunken">
+                                                            <span className="block h-full rounded-full" style={{ width: `${Math.max(pct, 0.8)}%`, background: METRICS.conversions.color }} />
                                                         </span>
                                                     </div>
                                                 </div>
@@ -379,9 +392,10 @@ export function FunnelsTab() {
                                 {f.biggestDrop?.from ? (
                                     <p className="text-body-sm text-fg-secondary">Biggest drop: <span className="font-medium text-fg">{f.biggestDrop.from} → {f.biggestDrop.to}</span> ({f.biggestDrop.rate.toFixed(1)}% leave here).</p>
                                 ) : null}
-                                <ChartCard title="Completions per day" height="compact" state={f.trend.length ? 'ready' : 'empty'} bare>
-                                    <TimeSeriesChart data={f.trend as unknown as Record<string, number | string>[]} series={[{ metric: 'conversions', key: 'completions', label: 'Completions' }]} height={220} ariaLabel="Funnel completions per day" />
+                                <ChartCard title="Completions per day" height={220} state={f.trend.length ? 'ready' : 'empty'} bare>
+                                    <TimeSeriesChart data={f.trend as unknown as Record<string, number | string>[]} series={[{ metric: 'conversions', key: 'completions', label: 'Completions' }]} height={220} partialFrom={partialFrom(f.trend)} ariaLabel="Funnel completions per day" />
                                 </ChartCard>
+                                {partialFrom(f.trend) !== undefined ? <p className="-mt-2 text-meta text-fg-muted">Dotted: today, still coming in.</p> : null}
                             </div>
                         )}
                     </div>

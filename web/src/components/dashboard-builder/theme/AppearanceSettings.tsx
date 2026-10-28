@@ -56,12 +56,13 @@ export function ThemeGallery({ value, mode, onPick, brand, compact }: { value: T
         <div role="radiogroup" aria-label="Theme" className={cn('grid gap-2', compact ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2')}>
             {THEMES.map((t) => {
                 const on = t.id === value;
-                const m: Mode = t.modes.includes(mode) ? mode : t.modes[0];
+                // Each card shows the theme's signature look: Midnight is dark first (as in the New dashboard gallery).
+                const m: Mode = t.preferredMode ?? (t.modes.includes(mode) ? mode : t.modes[0]);
                 return (
                     <button key={t.id} type="button" role="radio" aria-checked={on} onClick={() => onPick(t.id)} title={`${t.name}: ${t.blurb}`}
                         className={cn('group relative flex flex-col overflow-hidden rounded-control border text-left transition-[border-color,box-shadow] duration-120',
                             on ? 'border-brand ring-2 ring-brand/30' : 'border-border-subtle hover:border-border-strong')}>
-                        <div className="h-[68px] w-full"><ThemeSwatch id={t.id} mode={m} brand={t.id === 'studio' ? brand : undefined} /></div>
+                        <div className="h-[76px] w-full"><ThemeSwatch id={t.id} mode={m} brand={t.id === 'studio' ? brand : undefined} /></div>
                         <div className="flex items-center gap-1 border-t border-border-subtle bg-surface px-2 py-1.5">
                             <span className="min-w-0 flex-1 truncate text-body-sm font-medium text-fg">{t.name}</span>
                             {on ? <Check aria-hidden size={14} className="shrink-0 text-brand-text" /> : null}
@@ -113,7 +114,7 @@ export function AppearanceSettings({ theme, mode, onChange, pages }: { theme: Th
     const setCover = (patch: Partial<NonNullable<ThemeV2['cover']>>) => set({ cover: { enabled: false, layout: 'left', ...(cover ?? {}), ...patch } });
     return (
         <div className="space-y-4">
-            <Row label="Theme" hint={`${preset.name}: ${preset.blurb} Best for ${preset.bestFor.toLowerCase()}.`}>
+            <Row label="Theme" hint={`${preset.name}: ${preset.blurb} Best for ${preset.bestFor.toLowerCase()}.${preset.preferredMode && preset.preferredMode !== mode && preset.modes.includes(mode) ? ` In ${mode} mode it switches to its ${mode} colours.` : ''}`}>
                 <ThemeGallery value={o.id} mode={mode} brand={brand.color} onPick={(id) => onChange(applyThemePreset(theme, id))} />
             </Row>
             <details className="group rounded-control border border-border-subtle">

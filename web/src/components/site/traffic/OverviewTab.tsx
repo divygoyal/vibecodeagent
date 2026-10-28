@@ -23,6 +23,7 @@ import { LoadError } from '../SiteStates';
 import { revenuePerSession, SectionCard } from '../SummaryPanels';
 import { downloadCsv, useGa4, useSiteRange } from '../useSiteData';
 import { PeakHoursCard } from './PeakHours';
+import { BrowserIcon, OsIcon } from '../TechIcon';
 
 const STRIP: MetricKey[] = ['users', 'sessions', 'pageviews', 'conversions', 'ai'];
 /** A property with GA4 revenue above 0 (a shop, subscriptions, ads) adds a Revenue tile after Key events. */
@@ -155,7 +156,11 @@ export function DevicesDonut() {
 
 export function SimpleList({ report, dim, title, metric = 'users' }: { report: 'browsers' | 'os' | 'languages'; dim: string; title: string; metric?: 'users' | 'sessions' }) {
     const q = useGa4<Ga4BreakdownResponse>(report);
-    const items = useMemo(() => (q.data?.rows ?? []).map((r) => ({ key: r.key, label: r.dims[dim], text: r.dims[dim], value: (metric === 'users' ? r.cur.activeUsers : r.cur.sessions) ?? 0 })), [q.data, dim, metric]);
+    // Browsers and systems get their product icon, as on the public share page (round 5, audit item 25).
+    const items = useMemo(() => (q.data?.rows ?? []).map((r) => ({
+        key: r.key, label: r.dims[dim], text: r.dims[dim], value: (metric === 'users' ? r.cur.activeUsers : r.cur.sessions) ?? 0,
+        icon: report === 'browsers' ? <BrowserIcon name={r.dims[dim]} /> : report === 'os' ? <OsIcon name={r.dims[dim]} /> : undefined,
+    })), [q.data, dim, metric, report]);
     return (
         <SectionCard title={title} description={metric === 'users' ? 'Users' : 'Sessions'}>
             {q.state === 'error' ? <LoadError error={q.error} onRetry={q.mutate} /> : (

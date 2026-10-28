@@ -471,7 +471,7 @@ function AskConversation() {
             />
 
             {/* Conversation */}
-            <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col">
+            <div className="mx-auto flex w-full min-w-0 max-w-[760px] flex-1 flex-col">
                 {showEmpty ? (
                     <AskEmpty
                         siteLabel={siteLabel}
@@ -480,7 +480,7 @@ function AskConversation() {
                         onPick={(q) => void sendMessage(q)}
                     />
                 ) : (
-                    <div role="log" aria-label="Conversation" aria-live="polite" className="flex-1 pb-6">
+                    <div role="log" aria-label="Conversation" aria-live="polite" className="min-w-0 flex-1 pb-6">
                         {messages.map((msg, i) => {
                             if (msg.role === 'assistant' && !msg.content && !(msg.tools && msg.tools.length > 0)) return null;
                             const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1;
