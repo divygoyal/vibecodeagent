@@ -363,3 +363,56 @@ test('chart specs are cleaned: bad colour, huge arrays, control characters, non-
     assert.equal(cleanSpec({ g: 'pie', v: [1] }), null);
     assert.equal(cleanSpec({ g: 'line', v: [1] }), null);
 });
+
+// ── round 9 polish: one number format, metric caption, gaps in the previous period ──
+
+function specsOf(m: DigestModel) {
+    return m.pages.flatMap((p) => p.charts).map((c) => specFromToken(new URL(c.imageUrl).searchParams.get('t'), SECRET)!);
+}
+
+test('chart pictures show whole numbers (never 31.6K next to 8,421) and a bar chart names its metric', () => {
+    const doc = buildFromTemplate('site-overview', { name: 'Acme', defaultSource: { type: 'site', siteId: 'acme.test' } });
+    const page = doc.pages[0];
+    const res = cannedResults(doc);
+    const bar = Object.entries(doc.widgets).find(([, w]) => w.type === 'bar')!;
+    const metric = (bar[1] as Extract<typeof bar[1], { type: 'bar' }>).config.metrics[0].id;
+    const dim = (bar[1] as Extract<typeof bar[1], { type: 'bar' }>).config.dimension;
+    const rows = [31616, 18000, 8421, 6092].map((v, i) => ({ [`d:${dim}`]: ['A', 'B', 'C', 'D'][i], [`m:${metric}`]: v }));
+    (res.results[bar[0]] as { parts: Record<string, DataFrame> }).parts = { rows: { columns: [], rows } };
+    const m = buildDigestModel({ doc, pages: [{ page, res }], config: config({ range: '7d' }), origin: ORIGIN, dashboardId: 'd', siteLabel: 's', compare: { mode: 'previous_period' } as CompareSpec, shareToken: null, secret: SECRET });
+    const spec = specsOf(m).find((s) => s.g === 'bar' && s.v.includes(31616))!;
+    assert.deepEqual(spec.f, ['31,616', '18,000', '8,421', '6,092']);
+    assert.ok(spec.m && spec.m.length > 0, 'metric caption');
+    // line pictures too
+    for (const s of specsOf(m).filter((x) => x.g === 'line')) assert.ok(s.f.every((t) => !/K$/.test(t)));
+    // the KPI tiles stay compact
+    assert.ok(m.pages[0].kpis.some((k) => k.value.endsWith('K') || /^\d[\d,]*$/.test(k.value)));
+});
+
+test('a previous period with no data is a gap in the dashed line, not a drop to 0', () => {
+    const doc = buildFromTemplate('site-overview', { name: 'Acme', defaultSource: { type: 'site', siteId: 'acme.test' } });
+    const page = doc.pages[0];
+    const res = cannedResults(doc);
+    const ts = Object.entries(doc.widgets).find(([, w]) => w.type === 'timeseries')!;
+    const id = (ts[1] as Extract<typeof ts[1], { type: 'timeseries' }>).config.series[0].metric.id;
+    const frame = (res.results[ts[0]] as { parts: Record<string, DataFrame> }).parts.series;
+    frame.rows.forEach((r, i) => { if (i < 5) delete r[`m:${id}:prev`]; else r[`m:${id}:prev`] = 50 + i; });
+    const m = buildDigestModel({ doc, pages: [{ page, res }], config: config({ range: '7d' }), origin: ORIGIN, dashboardId: 'd', siteLabel: 's', compare: { mode: 'previous_year' } as CompareSpec, shareToken: null, secret: SECRET });
+    const line = specsOf(m).find((s) => s.g === 'line' && s.p)!;
+    assert.deepEqual(line.p!.slice(0, 5), [null, null, null, null, null]);
+    assert.equal(line.p![5], 55);
+    // all of it missing: no dashed line at all
+    for (const [wid, w] of Object.entries(doc.widgets)) {
+        if (w.type !== 'timeseries') continue;
+        for (const r of (res.results[wid] as { parts: Record<string, DataFrame> }).parts.series.rows) delete r[`m:${w.config.series[0].metric.id}:prev`];
+    }
+    const none = buildDigestModel({ doc, pages: [{ page, res }], config: config({ range: '7d' }), origin: ORIGIN, dashboardId: 'd', siteLabel: 's', compare: { mode: 'previous_year' } as CompareSpec, shareToken: null, secret: SECRET });
+    assert.ok(specsOf(none).filter((s) => s.g === 'line').every((s) => !s.p));
+});
+
+test('chart spec keeps gaps (null) in the previous series and the bar caption', () => {
+    const s = cleanSpec({ g: 'line', t: 'x', c: '#112233', v: [1, 2, 3], p: [null, 2, 'x'], l: [], f: [] });
+    assert.deepEqual(s!.p, [null, 2, 0]);
+    const b = cleanSpec({ g: 'bar', t: 'x', c: '#112233', v: [1], l: ['a'], f: ['1'], m: 'Sessions\n' });
+    assert.equal(b!.m, 'Sessions ');
+});

@@ -13,8 +13,10 @@ export interface ChartSpec {
     c: string;
     /** Values: line points in date order, or one value per bar. */
     v: number[];
-    /** Line only: the previous period, same length (drawn dashed). */
-    p?: number[];
+    /** Line only: the previous period, same length (drawn dashed). `null` = no data that day: the line breaks there. */
+    p?: Array<number | null>;
+    /** Bar only: what the bars measure ("Sessions"), shown muted next to the title. */
+    m?: string;
     /** Bar: a label per bar. Line: [first date, last date]. */
     l: string[];
     /** Bar: the formatted value per bar. Line: [highest, latest]. */
@@ -30,16 +32,18 @@ const HEX = /^#[0-9a-f]{6}$/i;
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Number(v.toPrecision(5)) : 0);
 const str = (v: unknown, n: number): string => (typeof v === 'string' ? v.replace(/[\u0000-\u001f]/g, ' ').slice(0, n) : '');
 
-/** Keeps at most `max` points by averaging neighbours (the shape matters, not each day). */
-export function downsample(values: number[], max = MAX_POINTS): number[] {
+/** Keeps at most `max` points by averaging neighbours (the shape matters, not each day). A gap (`null`) stays a gap unless a neighbour has data. */
+export function downsample(values: number[], max?: number): number[];
+export function downsample(values: Array<number | null>, max?: number): Array<number | null>;
+export function downsample(values: Array<number | null>, max = MAX_POINTS): Array<number | null> {
     if (values.length <= max) return values;
-    const out: number[] = [];
+    const out: Array<number | null> = [];
     const step = values.length / max;
     for (let i = 0; i < max; i++) {
         const a = Math.floor(i * step);
         const b = Math.max(a + 1, Math.floor((i + 1) * step));
-        const slice = values.slice(a, b);
-        out.push(slice.reduce((s, x) => s + x, 0) / slice.length);
+        const slice = values.slice(a, b).filter((x): x is number => x !== null);
+        out.push(slice.length ? slice.reduce((s, x) => s + x, 0) / slice.length : null);
     }
     return out;
 }
@@ -52,13 +56,15 @@ export function cleanSpec(raw: unknown): ChartSpec | null {
     const max = r.g === 'line' ? MAX_POINTS : MAX_BARS;
     const v = (Array.isArray(r.v) ? r.v : []).slice(0, max).map(num);
     if (v.length < (r.g === 'line' ? 2 : 1)) return null;
-    const p = r.g === 'line' && Array.isArray(r.p) && r.p.length ? (r.p as unknown[]).slice(0, max).map(num) : undefined;
+    const p = r.g === 'line' && Array.isArray(r.p) && r.p.length ? (r.p as unknown[]).slice(0, max).map((x) => (x === null ? null : num(x))) : undefined;
+    const m = r.g === 'bar' ? str(r.m, 40) : '';
     return {
         g: r.g,
         t: str(r.t, 60),
         c: typeof r.c === 'string' && HEX.test(r.c) ? r.c : '#1f5bd6',
         v,
         ...(p ? { p } : {}),
+        ...(m ? { m } : {}),
         l: (Array.isArray(r.l) ? r.l : []).slice(0, max).map((x) => str(x, 32)),
         f: (Array.isArray(r.f) ? r.f : []).slice(0, max).map((x) => str(x, 24)),
     };

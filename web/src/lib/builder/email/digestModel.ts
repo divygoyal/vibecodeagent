@@ -78,11 +78,14 @@ function lineChart(w: Extract<WidgetDef, { type: 'timeseries' }>, ok: WidgetResu
     const id = s.metric.id;
     const rows = frame.rows;
     const vals = rows.map((r) => (typeof r[`m:${id}`] === 'number' ? (r[`m:${id}`] as number) : 0));
-    const prev = compare && !w.config.breakdown && rows.some((r) => `m:${id}:prev` in r) ? rows.map((r) => (typeof r[`m:${id}:prev`] === 'number' ? (r[`m:${id}:prev`] as number) : 0)) : undefined;
+    // No data in the comparison window (last year before the property existed) is a gap in the dashed line, not a drop to 0.
+    const prevAll = compare && !w.config.breakdown && rows.some((r) => `m:${id}:prev` in r) ? rows.map((r) => (typeof r[`m:${id}:prev`] === 'number' ? (r[`m:${id}:prev`] as number) : null)) : undefined;
+    const prev = prevAll?.some((x) => x !== null) ? prevAll : undefined;
     const dates = rows.map((r) => String(r['d:date'] ?? ''));
     const hi = Math.max(...vals);
     const last = vals[vals.length - 1];
-    const fmt = (v: number) => fmtMetricValue(id, v, { compact: true, currency: ok.flags.currency });
+    // Pictures show whole numbers (31,616), never a mix of 31.6K and 8,421; the KPI tiles above are the compact ones.
+    const fmt = (v: number) => fmtMetricValue(id, v, { currency: ok.flags.currency });
     return {
         g: 'line',
         t: (w.title || metricLabel(id)).slice(0, 60),
@@ -106,7 +109,8 @@ function barChart(w: Extract<WidgetDef, { type: 'bar' | 'pie' }>, ok: WidgetResu
         c: metricHex(metric),
         v: rows.map((r) => (typeof r[`m:${metric}`] === 'number' ? (r[`m:${metric}`] as number) : 0)),
         l: rows.map((r) => dimText(dim, r[`d:${dim}`], frame.labels)),
-        f: rows.map((r) => fmtMetricValue(metric, typeof r[`m:${metric}`] === 'number' ? (r[`m:${metric}`] as number) : null, { compact: true, currency: ok.flags.currency })),
+        f: rows.map((r) => fmtMetricValue(metric, typeof r[`m:${metric}`] === 'number' ? (r[`m:${metric}`] as number) : null, { currency: ok.flags.currency })),
+        m: metricLabel(metric),
     };
 }
 
