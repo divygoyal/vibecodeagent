@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import {
     ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, LayoutTemplate, Loader2, Monitor, MoreHorizontal, Pencil,
     Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson, ClipboardCopy, ClipboardPaste, MonitorPlay, Palette,
-    Globe, ArrowLeftRight, CalendarRange, Search,
+    Globe, ArrowLeftRight, CalendarRange, Search, Mail,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -36,6 +36,7 @@ import { DateControl, FilterControlView, GrainSwitch, MetricSwitch, SearchTypeSw
 import { applyViewerControls, selectedSite } from '@/lib/builder/compile';
 import { newGrainControl, newMetricControl, newSearchTypeControl, newSiteControl } from './SwitchControlProps';
 import { ShareDialog } from '../ShareDialog';
+import { EmailScheduleDialog } from '../EmailScheduleDialog';
 import { textVars } from '../DashboardView';
 import { useElementHeight, useElementWidth } from '../useElementWidth';
 import { fetchJson, useInlineResult, type InlineCtx } from '../useWidgetData';
@@ -110,6 +111,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     // Calculated metric names for the panels, pickers and canvas (idempotent; ids are unique per dashboard).
     registerCalcs(doc?.calcs);
     const [shareOpen, setShareOpen] = useState(false);
+    const [emailOpen, setEmailOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [versionsOpen, setVersionsOpen] = useState(false);
     const [renaming, setRenaming] = useState<string | null>(null);
@@ -389,6 +391,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                             <DropdownMenuItem icon={Settings2} onSelect={() => { s.select(null); s.selectControl(null); }}>Dashboard settings</DropdownMenuItem>
                             <DropdownMenuItem icon={ClipboardPaste} shortcut="⌘V" onSelect={async () => { const c = await readClip(); if (c) doPaste(c); else toast('Nothing to paste', { description: 'Copy a widget (⌘C) or a page first, in any dashboard.' }); }}>Paste widgets</DropdownMenuItem>
                             <DropdownMenuItem icon={MonitorPlay} onSelect={async () => { await save(); window.open(`/dashboard/dashboards/${s.id}?tv=1`, '_blank', 'noopener'); }}>Present (TV mode)</DropdownMenuItem>
+                            <DropdownMenuItem icon={Mail} onSelect={async () => { await save(); setEmailOpen(true); }}>Schedule email</DropdownMenuItem>
                             <DropdownMenuItem icon={History} onSelect={() => setVersionsOpen(true)}>Version history</DropdownMenuItem>
                             <DropdownMenuItem icon={FileJson} onSelect={() => {
                                 const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
@@ -563,6 +566,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                 <ShareDialog open={shareOpen} onOpenChange={setShareOpen} dashboardId={s.id} doc={doc} share={s.share} views={s.views} onShareChange={s.setShare}
                     onDocChange={(next: DashboardDocV2) => s.apply(() => next)} />
             ) : null}
+            {s.id ? <EmailScheduleDialog open={emailOpen} onOpenChange={setEmailOpen} dashboardId={s.id} doc={doc} shared={Boolean(s.share?.enabled && s.share.token)} /> : null}
             {s.id ? <VersionsDialog open={versionsOpen} onOpenChange={setVersionsOpen} dashboardId={s.id} /> : null}
             <ConfirmModal open={confirmDelete} onOpenChange={setConfirmDelete} title="Delete this dashboard?" description="Its public link stops working. This cannot be undone." confirmLabel="Delete"
                 onConfirm={async () => { await fetchJson(`/api/dashboards/${s.id}`, { method: 'DELETE' }); router.push('/dashboard/dashboards'); }} />

@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
-import { ArrowLeft, Copy, FileDown, Globe, LayoutTemplate, Lock, MonitorPlay, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, FileDown, Globe, LayoutTemplate, Lock, Mail, MonitorPlay, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Skeleton } from '@/components/ui';
@@ -12,6 +12,7 @@ import { DashboardView, pickedSiteLabel, useUrlControls, viewerSelection } from 
 import { DashboardBrandHeader } from '@/components/dashboard-builder/DashboardBrandHeader';
 import { brandCompanyName } from '@/lib/builder/placeholders';
 import { ShareDialog } from '@/components/dashboard-builder/ShareDialog';
+import { EmailScheduleDialog } from '@/components/dashboard-builder/EmailScheduleDialog';
 import { TvFrame, tvRefreshMs } from '@/components/dashboard-builder/TvMode';
 import { dashRootProps } from '@/components/dashboard-builder/theme/DashTheme';
 import { fetchJson, ownerPageLoader, usePageResults } from '@/components/dashboard-builder/useWidgetData';
@@ -76,6 +77,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
     const key = `owner:${rec.id}:${rec.rev}:${canonicalJson(ctl.state)}`;
     const page = usePageResults(key, ownerPageLoader(rec.id, ctl.state.pageId ?? doc.pages[0].id, ctl.state, fresh), tv ? tvRefreshMs(doc) : doc.settings.autoRefreshSec * 1000);
     const [share, setShare] = useState(openShare);
+    const [emailOpen, setEmailOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [wide, setWide] = useState(true);
     // Phones and small tablets: the "editing needs a larger screen" note only after a tap on Edit (round 5 audit #28).
@@ -173,6 +175,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
                             <DropdownMenuItem icon={Copy} onSelect={() => duplicate(false)}>Duplicate</DropdownMenuItem>
                             <DropdownMenuItem icon={LayoutTemplate} onSelect={() => duplicate(true)}>Save as my template</DropdownMenuItem>
                             <DropdownMenuItem icon={FileDown} onSelect={exportPdf}>Export PDF</DropdownMenuItem>
+                            <DropdownMenuItem icon={Mail} onSelect={() => setEmailOpen(true)}>Schedule email</DropdownMenuItem>
                             <DropdownMenuItem icon={MonitorPlay} onSelect={() => { void document.documentElement.requestFullscreen?.().catch(() => undefined); ctl.setTv(true); }}>Present (TV mode)</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem icon={Trash2} destructive onSelect={() => setConfirmDelete(true)}>Delete</DropdownMenuItem>
@@ -245,6 +248,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
                 onShareChange={(s: ShareState) => onRecord({ ...rec, share: s })}
                 onDocChange={saveDoc}
             />
+            <EmailScheduleDialog open={emailOpen} onOpenChange={setEmailOpen} dashboardId={rec.id} doc={doc} shared={rec.share.enabled && Boolean(rec.share.token)} />
             <ConfirmModal open={confirmDelete} onOpenChange={setConfirmDelete} title="Delete this dashboard?" description="Its public link stops working. This cannot be undone." confirmLabel="Delete" onConfirm={del} />
         </>
     );
