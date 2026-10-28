@@ -16,7 +16,7 @@ const MCP_TOOLS = 13;
  * "Ask ChatGPT or Claude": the connector URL to copy, the clients, and a sample conversation whose answer
  * is computed from the demo portfolio (the same numbers the hero shows), with the real MCP tool name.
  */
-export function McpSection({ portfolio }: { portfolio: PortfolioResponse }) {
+export function McpSection({ portfolio, askHref }: { portfolio: PortfolioResponse; askHref: string }) {
     const losers = portfolio.sites
         .filter((s) => s.search && s.search.prev && s.search.cur.clicks < s.search.prev.clicks && s.search.prev.clicks >= 100)
         .map((s) => ({ site: s, diff: s.search!.cur.clicks - s.search!.prev!.clicks }))
@@ -44,10 +44,13 @@ export function McpSection({ portfolio }: { portfolio: PortfolioResponse }) {
                     </div>
                     <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                         {/* No Google button here: the tour's call to action sits right above (one per ~2 phone screens). */}
-                        <Button asChild variant="secondary" size="lg" trailingIcon={<ArrowRight aria-hidden size={18} strokeWidth={1.75} />}>
+                        <Button asChild variant="secondary" size="xl" trailingIcon={<ArrowRight aria-hidden size={18} strokeWidth={1.75} />}>
                             <Link href="/ai">Set it up in ChatGPT or Claude</Link>
                         </Button>
                     </div>
+                    <p className="mt-5 text-body-sm text-fg-secondary">
+                        No AI account? <Link href={askHref} className="font-medium text-brand-text underline-offset-4 hover:underline">Ask works inside TrafficClaw too</Link>.
+                    </p>
                 </div>
 
                 {top ? (
@@ -85,7 +88,7 @@ export function McpSection({ portfolio }: { portfolio: PortfolioResponse }) {
                                 </div>
                             </div>
                         </div>
-                        <figcaption className="mt-3 text-meta text-fg-muted">
+                        <figcaption className="mt-3 text-meta text-fg-secondary">
                             Example answer from sample data · {MCP_TOOLS} read-only tools
                         </figcaption>
                     </figure>

@@ -95,19 +95,11 @@ export default function HomePage() {
             cta: 'Open a dashboard',
             alt: 'A sample dashboard: scorecards for clicks, impressions, position, users and sessions, and two charts',
         },
-        {
-            key: 'ask',
-            label: 'Ask AI',
-            title: 'Ask in plain English, get numbers',
-            bullets: ['Answers with tables you can check', 'Suggested questions to start', 'Or ask from ChatGPT and Claude'],
-            href: tour.ask,
-            cta: 'Try Ask in the demo',
-            alt: 'Ask: "Which of my sites grew the most this month?" answered with growing and falling sites',
-        },
     ];
 
     return (
-        <>
+        // Dark mode: stronger sparkline fills on this page (the app's 8% reads as flat on the marketing cards).
+        <div className="contents dark:[--tc-spark-fill-top:24%]">
             <script dangerouslySetInnerHTML={{ __html: HOME_THEME_SCRIPT }} />
             <HomeThemeSync />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(appSchema) }} />
@@ -150,7 +142,7 @@ export default function HomePage() {
                 <CtaRow note="All of it, free, on your own sites." />
             </Section>
 
-            <McpSection portfolio={p28} />
+            <McpSection portfolio={p28} askHref={tour.ask} />
 
             <span id="tour-leaderboard" aria-hidden className="block scroll-mt-20" />
             <LeaderboardPreview sampleRows={boardSample} />
@@ -178,7 +170,7 @@ export default function HomePage() {
                 secondary={{ href: tour.portfolio, label: SECONDARY_CTA }}
                 className="pt-0 md:pt-0"
             />
-        </>
+        </div>
     );
 }
 
@@ -187,9 +179,9 @@ function CtaRow({ note, demoHref }: { note: string; demoHref?: string }) {
     return (
         <div className="mt-10 flex flex-col items-center gap-3 text-center md:mt-12">
             <div className="flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
-                <ConnectGoogleButton size="lg" mark />
+                <ConnectGoogleButton size="xl" mark />
                 {demoHref ? (
-                    <Link href={demoHref} className="tap-area inline-flex h-11 items-center justify-center gap-1.5 px-4 text-body font-medium text-fg-secondary hover:text-fg">
+                    <Link href={demoHref} className="tap-area inline-flex h-12 items-center justify-center gap-1.5 px-4 text-body font-medium text-fg-secondary hover:text-fg">
                         {SECONDARY_CTA}
                         <ArrowRight aria-hidden size={16} strokeWidth={1.75} />
                     </Link>

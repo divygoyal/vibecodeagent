@@ -113,7 +113,7 @@ export function JobStory({ totalSites, sites, drop, fix, fixHref }: StoryProps) 
                             </li>
                         ))}
                     </ul>
-                    <p className="mt-auto pt-3 text-meta text-fg-muted">{totalSites} sites · clicks, last 28 days · sample data</p>
+                    <p className="mt-auto pt-3 text-meta text-fg-secondary">{totalSites} sites · clicks, last 28 days · sample data</p>
                 </li>
 
                 <li className={beat(3)}>
