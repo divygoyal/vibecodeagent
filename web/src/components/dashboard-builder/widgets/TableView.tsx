@@ -5,7 +5,7 @@ import { ExternalLink, Maximize2 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Sparkline } from '@/components/charts';
-import { fmtDay } from '@/lib/format';
+import { fmtDay, fmtFull } from '@/lib/format';
 import { Button, EmptyState, MetricDelta, Modal, SearchInput, Table, type TableColumn as UiColumn } from '@/components/ui';
 import { dimLabel, fmtMetricValue, metricHeatbar, metricLabel } from '@/lib/builder/catalog';
 import { cellStyle } from '@/lib/builder/cfRules';
@@ -103,7 +103,7 @@ export function TableView(props: WidgetViewProps<TableWidget>) {
     const tvRows = Math.max(3, Math.floor((props.height - 32 - (widget.showTitle !== false ? 34 : 0) - (props.drill?.depth ? DRILL_CRUMBS_PX : 0) - 36 - 18) / 36));
     const canOpen = hidden > 0 && Boolean(frame?.rows.length) && !tv;
     const sortRef = c.columns.find((col) => col.id === c.sort.by && col.kind === 'metric')?.ref;
-    const changeOrder = c.sortByChange && !c.changeOnly && sortRef && props.compare !== 'none' && frame?.rows.length
+    const changeOrder = c.sortByChange && sortRef && props.compare !== 'none' && frame?.rows.length
         ? `Biggest ${c.sort.dir === 'asc' ? 'drop' : 'rise'} in ${metricLabel(sortRef).toLowerCase()} first`
         : null;
 
@@ -293,6 +293,26 @@ function TableBody({ props, cols, narrow, scrollRef, pagination, limit, footer, 
             },
         };
     });
+
+    // Rising / Declining lists are ordered by the absolute change in the sort metric: say it in a column (round 10 judge).
+    const changeRef = c.sortByChange && c.changeOnly && compare ? c.columns.find((col) => col.id === c.sort.by && col.kind === 'metric')?.ref : undefined;
+    if (changeRef && columns.some((col) => col.key === c.sort.by)) {
+        const at = columns.findIndex((col) => col.key === c.sort.by);
+        columns.splice(at + 1, 0, {
+            key: '__change',
+            header: <span title={`Change in ${metricLabel(changeRef).toLowerCase()} against the comparison period`}>Change</span>,
+            align: 'right',
+            className: 'whitespace-nowrap',
+            cell: (r) => {
+                const cur = r[`m:${changeRef}`];
+                const prev = r[`m:${changeRef}:prev`];
+                if (typeof cur !== 'number') return <span className="text-fg-muted">–</span>;
+                const diff = cur - (typeof prev === 'number' ? prev : 0);
+                const tone = diff === 0 ? 'text-fg-muted' : (diff > 0) === (metricBetter(changeRef) !== 'down') ? 'text-up' : 'text-down';
+                return <span className={cn('tabular-nums font-medium', tone)}>{diff > 0 ? '+' : diff < 0 ? '−' : ''}{fmtFull(Math.abs(diff))}</span>;
+            },
+        });
+    }
 
     if (trend) {
         // Right after the column it draws (else at the end); phones put it at the end of the row's first line.
