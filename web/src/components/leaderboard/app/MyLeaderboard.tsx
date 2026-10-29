@@ -29,7 +29,7 @@ function JoinHero({ onStart }: { onStart: () => void }) {
             </div>
             <ul className="grid w-full gap-3 grid-cols-1 sm:grid-cols-3">
                 {[
-                    [ShieldCheck, 'Verified owner', 'We check Search Console ownership daily, so the numbers can be trusted.'],
+                    [ShieldCheck, 'Verified owner', 'We check Search Console ownership daily, so only the real owner can be ranked.'],
                     [SlidersHorizontal, 'You choose what is public', 'Exact, a range, or hidden for every number. Countries and queries stay off until you turn them on.'],
                     [Link2, 'Free backlink and badge', 'A live badge and widget for your own site, plus offers from sponsors and buyers.'],
                 ].map(([Icon, title, sub]) => {

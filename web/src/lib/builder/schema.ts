@@ -5,6 +5,12 @@
  */
 import { z } from 'zod';
 import { parseCalcId } from './calc';
+import { chartProblem } from './charts';
+import { chartWidgetSchemas } from './charts/schema';
+import { drillProblem } from './drill';
+import { MAX_VIEW_NAME, MAX_VIEW_QUERY, MAX_VIEWS, savedViewProblem } from './savedViews';
+import { EMBED_HEIGHT_MAX, EMBED_HEIGHT_MIN, EMBED_MAX_PER_DASHBOARD, embedUrlProblem } from './embed';
+import { widgetSearchTypeProblem } from './searchType';
 import type { DashboardDocV2, WidgetDef } from './types';
 
 const id = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
@@ -14,6 +20,8 @@ const metricId = z.string().regex(/^(ga4|gsc|calc):[A-Za-z0-9_:]{1,80}$/);
 /** Round 7: a named calculated metric; the id must describe a valid calculation (calc.ts). */
 const calculatedMetric = z.object({ id: metricId.refine((v) => Boolean(parseCalcId(v)), 'not a calculated metric'), label: z.string().trim().min(1).max(60) });
 const dimId = z.string().regex(/^[A-Za-z0-9_:]{1,80}$/);
+/** Round 9: a web embed address: '' while new, else https, public host, never this app (embed.ts). */
+const embedUrl = z.string().max(2000).refine((v) => v === '' || embedUrlProblem(v) === null, 'not an embeddable https address');
 const httpsUrl = z.string().max(2000).refine((v) => v === '' || /^https:\/\/[^\s]+$/i.test(v), 'https URL only');
 
 const siteRef = z.object({ siteId: z.string().min(1).max(253), ga4: z.string().max(40).optional(), gsc: z.string().max(300).optional() });
@@ -31,7 +39,7 @@ export const dateRangeSchema = z.union([
 ]);
 export const compareSchema = z.union([
     z.object({ mode: z.literal('none') }),
-    z.object({ mode: z.literal('previous_period') }),
+    z.object({ mode: z.literal('previous_period'), align: z.literal('weekday').optional() }),
     z.object({ mode: z.literal('previous_year'), align: z.enum(['date', 'weekday']).optional() }),
     z.object({ mode: z.literal('custom'), start: iso, end: iso }),
 ]);
@@ -43,6 +51,7 @@ const scope = z.union([
 ]);
 
 const grainValue = z.enum(['auto', 'day', 'week', 'month']);
+const searchTypeValue = z.enum(['web', 'image', 'video', 'news', 'discover', 'googleNews']);
 
 const filterOp = z.enum(['eq', 'neq', 'in', 'not_in', 'contains', 'not_contains', 'starts', 'ends', 'regex', 'not_regex']);
 const filterClause = z.object({ dimension: dimId, op: filterOp, value: z.union([z.string().max(500), z.array(z.string().max(500)).max(100)]) });
@@ -55,6 +64,8 @@ const controlSchema = z.union([
     z.object({ id, type: z.literal('site'), label: shortText, options: z.union([z.literal('all'), z.array(z.string().max(253)).max(500)]), default: z.string().max(253), scope, viewerCanChange: z.boolean().optional() }),
     z.object({ id, type: z.literal('metric'), label: shortText, options: z.array(metricId).max(30), default: metricId, scope }),
     z.object({ id, type: z.literal('grain'), label: shortText, options: z.array(grainValue).min(1).max(4), default: grainValue, scope }),
+    // Round 8: Search Console search type switcher.
+    z.object({ id, type: z.literal('searchType'), label: shortText, options: z.array(searchTypeValue).min(2).max(6), default: searchTypeValue, scope }),
     z.object({ id: z.string().min(1).max(32).regex(/^[a-z0-9_]+$/), type: z.literal('variable'), label: z.string().min(1).max(60), kind: z.enum(['text', 'regex', 'number']), default: z.string().max(300), viewerCanChange: z.boolean() }),
 ]);
 
@@ -70,10 +81,11 @@ const base = {
     showTitle: z.boolean().optional(),
     source: sourceRefSchema,
     style: z.looseObject({}).optional(),
-    dateOverride: z.object({ range: dateRangeSchema.optional(), compare: compareSchema.optional() }).optional(),
+    dateOverride: z.object({ range: dateRangeSchema.optional(), compare: compareSchema.optional(), shift: z.object({ unit: z.enum(['day', 'week', 'month', 'year']), amount: z.number().int().min(1).max(60) }).optional() }).optional(),
     filters: z.array(filterClause).max(20).optional(),
     ignoreControls: z.array(z.string().max(64)).max(50).optional(),
-    interactions: z.object({ clickToFilter: z.boolean().optional() }).optional(),
+    interactions: z.object({ clickToFilter: z.boolean().optional(), drill: z.array(dimId).min(1).max(3).optional() }).optional(),
+    searchType: searchTypeValue.optional(),
     mobile: z.object({ hidden: z.boolean().optional(), minHeight: z.number().optional() }).optional(),
 };
 
@@ -94,11 +106,15 @@ export const widgetSchema = z.discriminatedUnion('type', [
     z.object({ ...base, type: z.literal('bar'), config: z.looseObject({ dimension: dimId, metrics: z.array(metricRef).min(1).max(3), stackBy: dimId.optional(), top: z.number().int().min(1).max(25) }) }),
     z.object({ ...base, type: z.literal('pie'), config: z.looseObject({ dimension: dimId, metric: metricRef, top: z.number().int().min(1).max(5) }) }),
     z.object({ ...base, type: z.literal('table'), config: z.looseObject({ dimensions: z.array(dimId).min(1).max(3), columns: z.array(tableColumn).min(1).max(14), maxRows: z.number().int().min(1).max(5000), rowFilters: z.array(metricClause).max(10).optional() }) }),
-    z.object({ ...base, type: z.literal('geo'), config: z.looseObject({ level: z.literal('country'), metric: metricRef }) }),
+    z.object({ ...base, type: z.literal('geo'), config: z.looseObject({ level: z.enum(['country', 'region', 'city']), country: z.string().regex(/^[A-Z]{2}$/).optional(), metric: metricRef }) }),
     z.object({ ...base, type: z.literal('text'), config: z.looseObject({ markdown: z.string().max(20_000), role: z.enum(['heading', 'subheading', 'body', 'note', 'callout']) }) }),
     z.object({ ...base, type: z.literal('image'), config: z.looseObject({ src: httpsUrl, alt: z.string().max(300), fit: z.enum(['contain', 'cover']), href: httpsUrl.optional() }) }),
     z.object({ ...base, type: z.literal('section'), config: z.looseObject({ title: z.string().max(200), subtitle: z.string().max(300).optional(), divider: z.boolean() }) }),
+    z.object({ ...base, type: z.literal('embed'), config: z.looseObject({ url: embedUrl, title: z.string().max(200), heightPx: z.number().int().min(EMBED_HEIGHT_MIN).max(EMBED_HEIGHT_MAX).optional(), scroll: z.boolean(), showOnPublic: z.boolean().optional() }) }),
+    z.object({ ...base, type: z.literal('realtime'), config: z.looseObject({ breakdown: z.enum(['none', 'country', 'city', 'page', 'device']), top: z.union([z.literal(3), z.literal(5), z.literal(8)]), bars: z.boolean() }) }),
     z.object({ ...base, type: z.literal('portfolio-grid'), config: z.looseObject({ metrics: z.array(metricRef).min(1).max(4), limit: z.number().int().min(1).max(500) }) }),
+    // Round 9 charts (heatmap, scatter, funnel, treemap, pivot): charts/schema.ts
+    ...chartWidgetSchemas({ base, metricRef, dimId }),
 ]);
 
 const layoutItem = z.object({ i: id, x: z.number().int().min(0).max(24), y: z.number().int().min(0).max(5000), w: z.number().int().min(1).max(12), h: z.number().int().min(1).max(100) });
@@ -109,6 +125,9 @@ const page = z.object({
     hidden: z.boolean().optional(),
     layouts: z.object({ lg: z.array(layoutItem).max(200), md: z.array(layoutItem).max(200).optional(), sm: z.array(layoutItem).max(200).optional() }),
 });
+
+/** Round 9: a saved view is a name and the URL query of the state (savedViews.ts checks the query keys). */
+export const savedViewSchema = z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/), name: z.string().trim().min(1).max(MAX_VIEW_NAME), query: z.string().min(1).max(MAX_VIEW_QUERY) });
 
 export const docSchema = z.object({
     schemaVersion: z.literal(2),
@@ -155,6 +174,9 @@ export const docSchema = z.object({
     }),
     meta: z.object({ createdFrom: z.string().max(64).optional(), migratedFromV1: z.object({ at: z.string(), propertyId: z.string(), siteUrl: z.string().optional() }).optional() }),
     calcs: z.array(calculatedMetric).max(30).optional(),
+    // Round 9: saved views (validated further by validateDoc: unique ids, a known default).
+    views: z.array(savedViewSchema).max(MAX_VIEWS).optional(),
+    defaultViewId: z.string().max(64).optional(),
 });
 
 export const controlStateSchema = z.object({
@@ -164,6 +186,8 @@ export const controlStateSchema = z.object({
     site: z.record(z.string().max(64), z.string().max(253)).optional(),
     metric: z.record(z.string().max(64), metricId).optional(),
     grain: z.record(z.string().max(64), grainValue).optional(),
+    searchType: z.record(z.string().max(64), searchTypeValue).optional(),
+    drill: z.record(z.string().max(64), z.array(z.string().min(1).max(200)).max(3)).optional(),
     pageId: z.string().max(64).optional(),
 });
 
@@ -171,6 +195,12 @@ export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: s
 
 function fmtIssues(err: z.ZodError): string {
     return err.issues.slice(0, 5).map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
+}
+
+/** Settings a widget cannot honour as saved (a drill list its metrics cannot show, a search type it cannot read). */
+function widgetProblem(w: WidgetDef): string | null {
+    const p = drillProblem(w) ?? widgetSearchTypeProblem(w) ?? chartProblem(w);
+    return p ? `widget ${w.id}: ${p}` : null;
 }
 
 export function validateDoc(doc: unknown): ValidationResult<DashboardDocV2> {
@@ -189,13 +219,24 @@ export function validateDoc(doc: unknown): ValidationResult<DashboardDocV2> {
     for (const [k, w] of Object.entries(d.widgets)) {
         if (w.id !== k) return { ok: false, error: `widget key ${k} does not match its id` };
     }
+    for (const w of Object.values(d.widgets)) {
+        const problem = widgetProblem(w);
+        if (problem) return { ok: false, error: problem };
+    }
+    const viewProblem = savedViewProblem(d);
+    if (viewProblem) return { ok: false, error: viewProblem };
     const images = Object.values(d.widgets).filter((w) => w.type === 'image').length;
     if (images > 20) return { ok: false, error: 'At most 20 images per dashboard' };
+    if (Object.values(d.widgets).filter((w) => w.type === 'embed').length > EMBED_MAX_PER_DASHBOARD) return { ok: false, error: `At most ${EMBED_MAX_PER_DASHBOARD} web embeds per dashboard` };
     return { ok: true, value: d };
 }
 
 export function validateWidgets(widgets: unknown): ValidationResult<WidgetDef[]> {
     const r = z.array(widgetSchema).max(40).safeParse(widgets);
     if (!r.success) return { ok: false, error: fmtIssues(r.error) };
+    for (const w of r.data as unknown as WidgetDef[]) {
+        const problem = widgetProblem(w);
+        if (problem) return { ok: false, error: problem };
+    }
     return { ok: true, value: r.data as unknown as WidgetDef[] };
 }

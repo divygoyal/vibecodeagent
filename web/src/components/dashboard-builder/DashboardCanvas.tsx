@@ -15,13 +15,15 @@ import { ClipboardCopy, Copy, GripVertical, MoreHorizontal, MoveRight, Trash2, S
 import 'react-grid-layout/css/styles.css';
 
 import { cn } from '@/lib/cn';
+import { Skeleton } from '@/components/ui';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui';
 import { registerCalcs } from '@/lib/builder/calc';
 import { layoutFor } from '@/lib/builder/docOps';
 import { hiddenForViewers } from '@/lib/builder/placeholders';
+import { viewerRows } from '@/lib/builder/compactKpi';
 import { growsOnPhone, widgetMeta, widgetTitle } from '@/lib/builder/registry';
 import { densityPx, isDefaultLook, themeOptions } from '@/lib/builder/themes';
-import type { DashboardDocV2, LayoutItem, PageDef, WidgetDef, WidgetType } from '@/lib/builder/types';
+import type { CompareSpec, DashboardDocV2, LayoutItem, PageDef, WidgetDef, WidgetType } from '@/lib/builder/types';
 import { TV_MAX_ROW, tvScreens, useTvScreen } from './TvMode';
 
 export const ROW_H = 32;
@@ -85,6 +87,11 @@ export interface DashboardCanvasProps {
      * CSS `scale(zoom)` box; drag, resize and drop positions are corrected for it.
      */
     zoom?: number;
+    /**
+     * The dashboard's comparison mode. With it, viewers get KPI cards that show no comparison and no sparkline at a
+     * compact height (compactKpi.ts). The editor never compacts: it draws the author's layout.
+     */
+    compareMode?: CompareSpec['mode'];
 }
 
 function toRgl(items: LayoutItem[], doc: DashboardDocV2, bp: Bp, editing: boolean): RglItem[] {
@@ -99,15 +106,16 @@ function toRgl(items: LayoutItem[], doc: DashboardDocV2, bp: Bp, editing: boolea
     });
 }
 
-export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit, empty, fitHeight, zoom = 1 }: DashboardCanvasProps) {
+export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit, empty, fitHeight, zoom = 1, compareMode }: DashboardCanvasProps) {
     const editing = mode === 'edit' && Boolean(edit);
     registerCalcs(doc.calcs);
     const metrics = gridMetrics(doc);
     // Viewers never see unchanged template prompts or empty text/image widgets: the grid closes the gap (round 4).
     const pageItems = useMemo(() => {
         const all = layoutFor(doc, page, bp);
-        return editing ? all : all.filter((l) => !hiddenForViewers(doc.widgets[l.i]));
-    }, [doc, page, bp, editing]);
+        const shown = editing ? all : all.filter((l) => !hiddenForViewers(doc.widgets[l.i]));
+        return editing || !compareMode ? shown : shown.map((l) => { const h = viewerRows(doc.widgets[l.i], l.h, compareMode); return h === l.h ? l : { ...l, h }; });
+    }, [doc, page, bp, editing, compareMode]);
     const gap = metrics.gap;
     // TV: a page that cannot fit at a readable row height is shown as several screens (TvMode.tsx).
     const tv = useTvScreen();
@@ -136,6 +144,22 @@ export function DashboardCanvas({ doc, page, bp, width, mode, renderWidget, edit
     }, [edit, bp]);
 
     if (!items.length && !editing) return <>{empty}</>;
+
+    // Before the first width is known (server render, first paint) a viewer sees the page's own layout as skeleton blocks,
+    // not a blank page with the footer pill right under the toolbar.
+    if (width === 0 && !editing) {
+        return (
+            <div
+                aria-hidden
+                className="grid"
+                style={{ gridTemplateColumns: `repeat(${COLS[bp]}, minmax(0, 1fr))`, gridAutoRows: `${rowH}px`, gap }}
+            >
+                {items.map((l) => (
+                    <Skeleton key={l.i} delay={0} rounded="card" className="block h-full w-full" style={{ gridColumn: `${Math.min(l.x, COLS[bp] - 1) + 1} / span ${Math.min(l.w, COLS[bp])}`, gridRow: `${l.y + 1} / span ${l.h}` }} />
+                ))}
+            </div>
+        );
+    }
 
     // Phones in view mode: plain stacked list (no drag library, no transforms).
     if (bp === 'sm' && !editing) {

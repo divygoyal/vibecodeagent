@@ -6,7 +6,7 @@
  * eye toggles "hide on phones").
  */
 import { forwardRef, useMemo, useState } from 'react';
-import { BarChart3, Eye, EyeOff, Globe2, Hash, Heading, Image as ImageIcon, LayoutGrid, LineChart, PieChart, Plus, Rows3, Table2, Type, type LucideIcon } from 'lucide-react';
+import { AppWindow, BarChart3, Eye, EyeOff, Globe2, Hash, Heading, Image as ImageIcon, LayoutGrid, LineChart, PieChart, Plus, Radio, Rows3, Table2, Type, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { SearchInput, Tabs, Tooltip } from '@/components/ui';
@@ -16,10 +16,13 @@ import { searchMetrics } from '@/lib/builder/catalog';
 import type { DashboardDocV2, WidgetType } from '@/lib/builder/types';
 import { useEditorStore } from '@/stores/dashboardEditorStore';
 import { setPaletteDrag } from '../DashboardCanvas';
+import { CHART_ICONS } from '../charts/icons';
 
 const ICONS: Record<WidgetType, LucideIcon> = {
     scorecard: Hash, 'kpi-strip': Rows3, timeseries: LineChart, bar: BarChart3, pie: PieChart, table: Table2,
     geo: Globe2, text: Type, section: Heading, image: ImageIcon, 'portfolio-grid': LayoutGrid,
+    ...CHART_ICONS, // round 9
+    realtime: Radio, embed: AppWindow,
 };
 
 export function WidgetIcon({ type, size = 16 }: { type: WidgetType; size?: number }) {

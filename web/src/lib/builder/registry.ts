@@ -7,6 +7,7 @@
  * Saved layouts store only {i,x,y,w,h}; constraints come from here at render time.
  */
 import { getMetric, metricFamilies, metricFamily, metricLabel, dimLabel, type Family } from './catalog';
+import { CHART_META, CHART_PALETTE_ORDER, CHART_TABLE_ORDER, chartDefaultWidget, chartMetrics, chartTitle, isChartType } from './charts';
 import type {
     MetricRef,
     SourceRef,
@@ -32,6 +33,8 @@ export interface WidgetMeta {
     phoneH: number;
     /** No data query (text, image, section). */
     static: boolean;
+    /** Round 9: not part of the page query either: the widget fetches its own live data (realtime). */
+    selfFetch?: boolean;
     keywords: string[];
 }
 
@@ -42,18 +45,27 @@ export const WIDGET_META: Record<WidgetType, WidgetMeta> = {
     bar: { type: 'bar', label: 'Bar chart', description: 'Top values of a dimension, grouped or stacked', icon: 'BarChart3', group: 'Charts', defaultSize: { w: 4, h: 7 }, minSize: { w: 3, h: 5 }, maxSize: { w: 12, h: 14 }, phoneH: 6, static: false, keywords: ['bar', 'column', 'stacked', 'top', 'ranking', 'list'] },
     pie: { type: 'pie', label: 'Donut', description: 'Parts of a whole, up to 6 slices', icon: 'PieChart', group: 'Charts', defaultSize: { w: 4, h: 7 }, minSize: { w: 3, h: 5 }, maxSize: { w: 6, h: 10 }, phoneH: 6, static: false, keywords: ['pie', 'donut', 'share', 'split'] },
     table: { type: 'table', label: 'Table', description: 'Rows with heat bars, deltas and pages', icon: 'Table2', group: 'Tables and maps', defaultSize: { w: 6, h: 9 }, minSize: { w: 4, h: 6 }, maxSize: { w: 12, h: 18 }, phoneH: 8, static: false, keywords: ['table', 'grid', 'rows', 'pages', 'queries', 'keywords'] },
-    geo: { type: 'geo', label: 'Geo map', description: 'Countries shaded by a metric', icon: 'Globe2', group: 'Tables and maps', defaultSize: { w: 6, h: 9 }, minSize: { w: 4, h: 7 }, maxSize: { w: 12, h: 14 }, phoneH: 11, static: false, keywords: ['map', 'country', 'geo', 'world', 'location'] },
+    geo: { type: 'geo', label: 'Geo map', description: 'Countries shaded by a metric, or regions and cities of one country', icon: 'Globe2', group: 'Tables and maps', defaultSize: { w: 6, h: 9 }, minSize: { w: 4, h: 7 }, maxSize: { w: 12, h: 14 }, phoneH: 11, static: false, keywords: ['map', 'country', 'geo', 'world', 'location'] },
     text: { type: 'text', label: 'Text', description: 'Notes and headings in Markdown', icon: 'Type', group: 'Content', defaultSize: { w: 12, h: 2 }, minSize: { w: 2, h: 1 }, maxSize: { w: 12, h: 10 }, phoneH: 2, static: true, keywords: ['text', 'markdown', 'note', 'heading', 'paragraph'] },
     section: { type: 'section', label: 'Section header', description: 'A title and divider between groups', icon: 'Heading', group: 'Content', defaultSize: { w: 12, h: 2 }, minSize: { w: 12, h: 2 }, maxSize: { w: 12, h: 2 }, phoneH: 2, static: true, keywords: ['section', 'divider', 'header', 'title'] },
     image: { type: 'image', label: 'Image', description: 'A logo or picture from an https URL', icon: 'Image', group: 'Content', defaultSize: { w: 3, h: 5 }, minSize: { w: 1, h: 2 }, maxSize: { w: 12, h: 14 }, phoneH: 4, static: true, keywords: ['image', 'logo', 'picture', 'photo'] },
+    ...CHART_META, // round 9: heatmap, scatter, funnel, treemap, pivot (charts/index.ts)
+    realtime: { type: 'realtime', label: 'Realtime', description: 'Who is online now: active users in the last 30 minutes, refreshed every minute', icon: 'Radio', group: 'Metrics', defaultSize: { w: 4, h: 9 }, minSize: { w: 3, h: 4 }, maxSize: { w: 8, h: 12 }, phoneH: 9, static: false, selfFetch: true, keywords: ['realtime', 'real-time', 'live', 'online now', 'active users', 'now'] },
+    embed: { type: 'embed', label: 'Web embed', description: 'Any https page in a sandboxed frame: a status page, a Looker Studio report, a video', icon: 'AppWindow', group: 'Content', defaultSize: { w: 6, h: 9 }, minSize: { w: 2, h: 3 }, maxSize: { w: 12, h: 40 }, phoneH: 9, static: true, keywords: ['embed', 'iframe', 'web page', 'website', 'url', 'frame', 'video', 'report'] },
     'portfolio-grid': { type: 'portfolio-grid', label: 'Portfolio grid', description: 'Every site as a card with deltas', icon: 'LayoutGrid', group: 'Portfolio', defaultSize: { w: 12, h: 9 }, minSize: { w: 4, h: 6 }, maxSize: { w: 12, h: 20 }, phoneH: 12, static: false, keywords: ['portfolio', 'sites', 'all sites', 'cards'] },
 };
 
-export const PALETTE_ORDER: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', 'table', 'geo', 'portfolio-grid', 'section', 'text', 'image'];
+export const PALETTE_ORDER: WidgetType[] = ['scorecard', 'kpi-strip', 'realtime', 'timeseries', 'bar', 'pie', ...CHART_PALETTE_ORDER, 'table', ...CHART_TABLE_ORDER, 'geo', 'portfolio-grid', 'section', 'text', 'image', 'embed'];
 export const PALETTE_GROUPS: PaletteGroup[] = ['Metrics', 'Charts', 'Tables and maps', 'Portfolio', 'Content'];
 
 export function widgetMeta(type: WidgetType): WidgetMeta {
     return WIDGET_META[type] ?? WIDGET_META.text;
+}
+
+/** True when the page query never asks Google for this widget (static content, or a widget that fetches its own live data). */
+export function skipsPageQuery(type: WidgetType): boolean {
+    const m = widgetMeta(type);
+    return m.static || Boolean(m.selfFetch);
 }
 
 // ── ids ──────────────────────────────────────────────────────────────────
@@ -104,6 +116,7 @@ export function defaultWidget(type: WidgetType, ctx: DefaultCtx, id: WidgetId = 
     const metric = primaryMetric(ctx);
     const gsc = metricFamily(metric) === 'gsc';
     const base = { id, source };
+    if (isChartType(type)) return chartDefaultWidget(type, ctx, base);
     switch (type) {
         case 'scorecard':
             return { ...base, type, config: { metric: m(metric), comparison: { show: true, display: 'percent' }, sparkline: { show: true, kind: 'area' } } };
@@ -148,6 +161,10 @@ export function defaultWidget(type: WidgetType, ctx: DefaultCtx, id: WidgetId = 
             return { ...base, type, showTitle: false, config: { title: 'Section', divider: true, align: 'left' } };
         case 'image':
             return { ...base, type, showTitle: false, config: { src: '', alt: '', fit: 'contain', radius: 'md' } };
+        case 'embed':
+            return { ...base, type, title: 'Web page', showTitle: false, style: { padding: 'none' }, config: { url: '', title: 'Embedded page', scroll: true } };
+        case 'realtime':
+            return { ...base, type, title: 'Online now', config: { breakdown: 'country', top: 5, bars: true } };
         case 'portfolio-grid':
             return {
                 ...base, type, title: 'All sites',
@@ -169,7 +186,7 @@ export function widgetMetrics(w: WidgetDef): string[] {
         case 'table': return w.config.columns.filter((c) => c.kind === 'metric' && !c.hidden).map((c) => c.ref);
         case 'geo': return [w.config.metric.id];
         case 'portfolio-grid': return w.config.metrics.map((x) => x.id);
-        default: return [];
+        default: return chartMetrics(w);
     }
 }
 
@@ -189,11 +206,14 @@ export function widgetTitle(w: WidgetDef): string {
         case 'bar': return `${metricLabel(w.config.metrics[0]?.id ?? '')} by ${dimLabel(w.config.dimension).toLowerCase()}`;
         case 'pie': return `${metricLabel(w.config.metric.id)} by ${dimLabel(w.config.dimension).toLowerCase()}`;
         case 'table': return `Top ${w.config.dimensions.map((d) => dimLabel(d).toLowerCase()).join(' and ')}`;
-        case 'geo': return `${metricLabel(w.config.metric.id)} by country`;
+        case 'geo': return `${metricLabel(w.config.metric.id)} by ${w.config.level === 'region' ? 'region' : w.config.level === 'city' ? 'city' : 'country'}`;
         case 'text': return 'Text';
         case 'section': return w.config.title;
         case 'image': return w.config.alt || 'Image';
         case 'portfolio-grid': return 'All sites';
+        case 'realtime': return 'Online now';
+        case 'embed': return w.config.title || 'Web page';
+        default: return chartTitle(w);
     }
 }
 

@@ -27,6 +27,8 @@ export interface TotalsStripProps {
     metric: TotalsMetric;
     onMetricChange: (m: TotalsMetric) => void;
     comparisonLabel: string;
+    /** Exact users are still loading and within the wait (default: the response's own flag). Past the wait the tile shows a labelled estimate. */
+    usersLoading?: boolean;
     /** Refetching: keep the frame at 60% opacity (DESIGN 2.7). */
     dimmed?: boolean;
     compact?: boolean;
@@ -40,7 +42,7 @@ export interface TotalsStripProps {
  * delta vs the previous period) and, behind "Show trend", one combined chart.
  * Picking a tile while the chart is hidden opens it on that metric.
  */
-export function TotalsStrip({ data, metric, onMetricChange, comparisonLabel, dimmed, compact, trendOpen, onTrendOpenChange }: TotalsStripProps) {
+export function TotalsStrip({ data, metric, onMetricChange, comparisonLabel, usersLoading, dimmed, compact, trendOpen, onTrendOpenChange }: TotalsStripProps) {
     const metrics = totalsMetrics(data);
     const total = data.totals.sites.total;
     const s = data.totals.search;
@@ -51,9 +53,9 @@ export function TotalsStrip({ data, metric, onMetricChange, comparisonLabel, dim
         if (m === 'position') return { metric: m, value: s?.cur.position, previous: s?.prev?.position ?? null };
         if (m === 'users') {
             // Each site's users are exact; across sites they add up (a visitor of two sites counts twice).
-            // Until every site has its exact count the tile shows the summed daily users with "≈", never a skeleton.
-            const tile = usersTotalTile(t, { usersPending: data.usersPending, siteCount: total });
-            return { metric: m, value: t?.cur.users, previous: t?.prev?.users ?? null, label: tile.label, hint: tile.hint, approx: tile.approx };
+            // Until every site has its exact count the tile is a skeleton; past the wait it is a labelled estimate (usersTotalTile).
+            const tile = usersTotalTile(t, { usersPending: data.usersPending, siteCount: total, waitedOut: usersLoading === false });
+            return { metric: m, value: t?.cur.users, previous: t?.prev?.users ?? null, label: tile.label, hint: tile.hint, approx: tile.approx, loading: tile.loading };
         }
         return { metric: m, value: t?.cur.sessions, previous: t?.prev?.sessions ?? null };
     });

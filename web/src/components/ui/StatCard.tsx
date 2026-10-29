@@ -4,7 +4,7 @@ import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { Info } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { fmtMetric, METRICS, type MetricKey } from '@/lib/metrics';
+import { fmtMetric, fmtMetricPair, METRICS, type MetricKey } from '@/lib/metrics';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { Card } from './Card';
 import { MetricDelta } from './MetricDelta';
@@ -33,6 +33,7 @@ export interface StatCardProps {
 /** Standalone KPI tile (DESIGN 3.5). */
 export function StatCard({ metric, value, previous, label, comparisonLabel, info, sparkline, sparklineDates, size = 'md', loading, className, footer }: StatCardProps) {
     const m = METRICS[metric];
+    const pair = fmtMetricPair(metric, value, typeof previous === 'number' ? previous : null, { compact: true, tile: true });
     const tip = info === true ? m.description : typeof info === 'string' ? info : null;
     return (
         <Card padding="sm" className={cn('flex flex-col gap-1', className)}>
@@ -56,17 +57,17 @@ export function StatCard({ metric, value, previous, label, comparisonLabel, info
                 <>
                     <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
                         <span className={cn('text-fg tabular-nums', size === 'lg' ? 'text-stat-lg' : 'text-stat')}>
-                            {fmtMetric(metric, value, { compact: true, tile: true })}
+                            {pair.value}
                         </span>
                         {previous !== undefined ? (
-                            <MetricDelta metric={metric} current={value} previous={previous} size={size === 'lg' ? 'md' : 'sm'} comparisonLabel={comparisonLabel ? `versus ${comparisonLabel}` : undefined} />
+                            <MetricDelta metric={metric} current={value} previous={previous} decimals={pair.deltaDecimals} size={size === 'lg' ? 'md' : 'sm'} comparisonLabel={comparisonLabel ? `versus ${comparisonLabel}` : undefined} />
                         ) : null}
                     </div>
                     {comparisonLabel && previous !== undefined ? (
                         <p className="text-meta text-fg-muted">
                             {previous === null || (previous === 0 && m.format === 'count')
                                 ? `None in the ${comparisonLabel}`
-                                : `vs ${fmtMetric(metric, previous, { compact: true, tile: true })} ${comparisonLabel}`}
+                                : `vs ${pair.previous} ${comparisonLabel}`}
                         </p>
                     ) : null}
                 </>
@@ -164,8 +165,8 @@ export function KpiStrip({ items, selected, onSelect, comparisonLabel = 'previou
                                 </span>
                                 {it.loading ? (
                                     <span className={cn('flex items-center gap-2', slim ? 'mt-1' : 'mt-1.5')}>
-                                        <Skeleton className={slim ? 'h-5 w-16' : 'h-7 w-20'} />
-                                        <Skeleton className="h-3.5 w-10" />
+                                        <Skeleton delay={0} className={slim ? 'h-5 w-16' : 'h-7 w-20'} />
+                                        <Skeleton delay={0} className="h-3.5 w-10" />
                                     </span>
                                 ) : (
                                     // Two lines per tile (critique #11): label, then the value with its delta inline.

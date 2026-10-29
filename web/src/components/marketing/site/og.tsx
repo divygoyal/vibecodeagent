@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
 
 import { BRAND_NAME, SITE_HOST } from '@/lib/brand';
+import { ellipsize, fitText, fontMeasurer, type FittedText, type Measure } from '@/lib/ogFit';
 
 /** Shared Open Graph card for marketing pages: light, pine mark, big title, a quiet sparkline card. */
 export const OG_SIZE = { width: 1200, height: 630 };
@@ -37,9 +38,9 @@ function path(values: number[], w: number, h: number): string {
         .join(' ');
 }
 
-function Mark() {
+export function OgMark({ size = 56 }: { size?: number }) {
     return (
-        <svg width="56" height="56" viewBox="0 0 36 36">
+        <svg width={size} height={size} viewBox="0 0 36 36">
             <defs>
                 <linearGradient id="g" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
                     <stop offset="0" stopColor="#43b28e" />
@@ -77,9 +78,27 @@ function ogFonts(): Promise<OgFont[]> {
     return fontsPromise;
 }
 
-async function render(node: React.ReactElement): Promise<ImageResponse> {
+/** Rough width when the font files are missing (the renderer then uses its own font): about 0.58 em per character. */
+const approxMeasure: Measure = (text, size, letterSpacing = 0) => [...text].length * (size * 0.58 + letterSpacing);
+
+/** Width measurers for the bold and regular Geist files, so cards can fit text before drawing it. */
+export async function ogMeasure(): Promise<{ bold: Measure; regular: Measure }> {
     const fonts = await ogFonts();
-    return new ImageResponse(node, { ...OG_SIZE, ...(fonts.length ? { fonts } : {}) });
+    const of = (weight: number): Measure => {
+        const f = fonts.find((x) => x.weight === weight);
+        return f ? fontMeasurer(f.data) : approxMeasure;
+    };
+    return { bold: of(700), regular: of(400) };
+}
+
+/** Fits `text` into `maxWidth` using the bold face: the size steps down, long text wraps, then ends in an ellipsis. */
+export async function ogFitBold(text: string, opts: { maxWidth: number; sizes: number[]; maxLines?: number; letterSpacing?: number; maxLinesAt?: (size: number) => number }): Promise<FittedText> {
+    return fitText(text, (await ogMeasure()).bold, opts);
+}
+
+export async function ogRender(node: React.ReactElement, headers?: Record<string, string>): Promise<ImageResponse> {
+    const fonts = await ogFonts();
+    return new ImageResponse(node, { ...OG_SIZE, ...(fonts.length ? { fonts } : {}), ...(headers ? { headers } : {}) });
 }
 
 export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }): Promise<ImageResponse> {
@@ -88,16 +107,16 @@ export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: strin
     const W = 360;
     const H = 120;
     const titleSize = title.length > 46 ? 56 : title.length > 30 ? 64 : 72;
-    return render(
+    return ogRender(
         (
             <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: C.canvas, padding: 72, color: C.fg, fontFamily: 'Geist' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                    <Mark />
+                    <OgMark />
                     <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: -0.5, color: C.fg }}>{BRAND_NAME}</div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 48 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 660 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 600 }}>
                         {eyebrow ? (
                             <div style={{ display: 'flex', alignSelf: 'flex-start', marginBottom: 24, padding: '8px 18px', borderRadius: 999, background: C.brandSoft, color: C.brandSoftFg, fontSize: 24 }}>
                                 {eyebrow}
@@ -124,6 +143,108 @@ export function marketingOgImage({ eyebrow, title, subtitle }: { eyebrow?: strin
                 </div>
             </div>
         ),
+    );
+}
+
+/** A check mark drawn as SVG (Geist has no tick glyph). */
+export function OgTick({ size = 20, color = '#157459' }: { size?: number; color?: string }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 18 18"><path d="M3.5 9.5 L7.5 13 L14.5 5" stroke={color} strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+    );
+}
+
+/** A change figure ("18.4%") with its arrow drawn as SVG (Geist has no triangle glyphs). `label` is deltaText(): "▲ 18.4%". */
+export function OgDelta({ label, size = 24, up = '#157f3c', down = '#c92a2a' }: { label: string; size?: number; up?: string; down?: string }) {
+    const isUp = !label.includes('▼') && !label.trim().startsWith('-');
+    const color = isUp ? up : down;
+    const text = label.replace(/[▲▼+\-−\s]/g, '');
+    // No change: no arrow, muted.
+    if (/^0(\.0+)?%?$/.test(text)) return <div style={{ display: 'flex', fontSize: size, fontWeight: 700, color: '#636b78' }}>{text}</div>;
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: size, fontWeight: 700, color }}>
+            <svg width={size * 0.7} height={size * 0.7} viewBox="0 0 12 12">{isUp ? <path d="M6 1.5 L11 10.5 L1 10.5 Z" fill={color} /> : <path d="M6 10.5 L11 1.5 L1 1.5 Z" fill={color} />}</svg>
+            <div style={{ display: 'flex' }}>{text}</div>
+        </div>
+    );
+}
+
+/** Left text column of the share cards, and the numbers card beside it: 72 px margins each side, a 44 px gap. */
+const SHARE_TEXT_W = 600;
+const SHARE_CARD_W = 412;
+/** Without numbers the title has the whole width. */
+const SHARE_WIDE_W = 1056;
+
+/** A change figure with its arrow drawn as SVG, coloured by what the change means (a falling bounce rate is good). */
+function OgChange({ text, dir, tone, size = 22 }: { text: string; dir: 'up' | 'down' | 'flat'; tone: 'good' | 'bad' | 'neutral'; size?: number }) {
+    const color = tone === 'good' ? '#157f3c' : tone === 'bad' ? '#c92a2a' : C.muted;
+    if (dir === 'flat') return <div style={{ display: 'flex', fontSize: size, fontWeight: 700, color }}>{text}</div>;
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: size, fontWeight: 700, color }}>
+            <svg width={size * 0.7} height={size * 0.7} viewBox="0 0 12 12">{dir === 'up' ? <path d="M6 1.5 L11 10.5 L1 10.5 Z" fill={color} /> : <path d="M6 10.5 L11 1.5 L1 1.5 Z" fill={color} />}</svg>
+            <div style={{ display: 'flex' }}>{text}</div>
+        </div>
+    );
+}
+
+/** The real figures of a shared dashboard or share page, as the card shows them (lib/builder/shareCard.ts). */
+export interface SharedCardNumbers {
+    site?: string;
+    range: string;
+    kpis: Array<{ label: string; value: string; delta?: { text: string; dir: 'up' | 'down' | 'flat'; tone: 'good' | 'bad' | 'neutral' } }>;
+}
+
+/**
+ * Share card for a public dashboard or share page: the same light look as the marketing cards. With `numbers` a white card
+ * on the right lists the date range and two or three real KPIs with their change; without (protected, slow, failed, no
+ * KPI widget) the title takes the whole width and nothing is drawn that looks like data. The title is fitted to its
+ * column (smaller type, two lines, then an ellipsis), so it never runs under the card.
+ */
+export async function sharedOgImage({ eyebrow, title, subtitle, lock, numbers }: { eyebrow: string; title: string; subtitle?: string; lock?: boolean; numbers?: SharedCardNumbers | null }): Promise<ImageResponse> {
+    const kpis = numbers?.kpis.slice(0, 3) ?? [];
+    const withNumbers = kpis.length > 0 && numbers !== null && numbers !== undefined;
+    const textW = withNumbers ? SHARE_TEXT_W : SHARE_WIDE_W;
+    const { bold, regular } = await ogMeasure();
+    const fit = fitText(title, bold, { maxWidth: textW, sizes: withNumbers ? [76, 64, 54, 46] : [88, 76, 64, 54, 46], letterSpacing: -2.5, maxLinesAt: (size) => (size <= 54 ? 2 : 1) });
+    const sub = subtitle ? (subtitle.length > 120 ? `${subtitle.slice(0, 117)}...` : subtitle) : undefined;
+    const labelW = SHARE_CARD_W - 40 - 150;
+    return ogRender(
+        (
+            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: C.canvas, padding: 72, color: C.fg, fontFamily: 'Geist' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+                    <OgMark />
+                    <div style={{ display: 'flex', fontSize: 34, fontWeight: 700, letterSpacing: -0.5, color: C.fg }}>{BRAND_NAME}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', width: textW }}>
+                        <div style={{ display: 'flex', alignSelf: 'flex-start', alignItems: 'center', gap: 10, marginBottom: 24, padding: '8px 18px', borderRadius: 999, background: C.brandSoft, color: C.brandSoftFg, fontSize: 24 }}>
+                            {lock ? <svg width="20" height="20" viewBox="0 0 20 20"><rect x="4" y="9" width="12" height="8" rx="2" fill={C.brandSoftFg} /><path d="M7 9 V6.5 a3 3 0 0 1 6 0 V9" stroke={C.brandSoftFg} strokeWidth="2" fill="none" /></svg> : null}
+                            <div style={{ display: 'flex' }}>{eyebrow}</div>
+                        </div>
+                        {fit.lines.map((line, i) => (
+                            <div key={i} style={{ display: 'flex', fontSize: fit.size, fontWeight: 700, lineHeight: 1.06, letterSpacing: -2.5, color: C.fg }}>{line}</div>
+                        ))}
+                        {sub ? <div style={{ display: 'flex', marginTop: 24, fontSize: 28, lineHeight: 1.35, color: C.fg2 }}>{ellipsize(sub, regular, 28, textW * 2.2)}</div> : null}
+                    </div>
+                    {withNumbers && numbers ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', width: SHARE_CARD_W, padding: 20, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: '0 1px 3px rgba(16,19,26,0.06)' }}>
+                            <div style={{ display: 'flex', fontSize: 20, color: C.muted, paddingBottom: 12 }}>{ellipsize(numbers.range, regular, 20, SHARE_CARD_W - 40)}</div>
+                            {kpis.map((k, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderTop: `1px solid ${C.border}` }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <div style={{ display: 'flex', fontSize: 20, color: C.fg2 }}>{ellipsize(k.label, regular, 20, labelW)}</div>
+                                        <div style={{ display: 'flex', fontSize: 46, fontWeight: 700, letterSpacing: -1.5, lineHeight: 1.1, color: C.fg }}>{k.value}</div>
+                                    </div>
+                                    {k.delta ? <OgChange text={k.delta.text} dir={k.delta.dir} tone={k.delta.tone} /> : <div style={{ display: 'flex' }} />}
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+        ),
+        // ImageResponse's default is a year, immutable: right for fixed cards, wrong for one that carries live numbers
+        // (or that was drawn without them because Google was slow). Minutes, so edits and the numbers catch up.
+        { 'Cache-Control': withNumbers ? 'public, max-age=600, s-maxage=900, stale-while-revalidate=3600' : 'public, max-age=60, s-maxage=120' },
     );
 }
 
@@ -181,13 +302,13 @@ export function homeOgImage(theme: 'dark' | 'light' = 'dark'): Promise<ImageResp
     const D = theme === 'light' ? L : DARK;
     const W = 112;
     const H = 38;
-    return render(
+    return ogRender(
         <div style={{ width: '100%', height: '100%', display: 'flex', position: 'relative', background: D.canvas, color: D.fg, fontFamily: 'Geist', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: -260, right: -180, width: 760, height: 760, borderRadius: 999, display: 'flex', background: `radial-gradient(circle, ${theme === 'light' ? 'rgba(22,130,93,0.10)' : 'rgba(67,209,158,0.20)'} 0%, rgba(67,209,158,0) 65%)` }} />
 
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: 600, padding: '64px 0 60px 64px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <Mark />
+                    <OgMark />
                     <div style={{ display: 'flex', fontSize: 32, fontWeight: 700, letterSpacing: -0.5 }}>{BRAND_NAME}</div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>

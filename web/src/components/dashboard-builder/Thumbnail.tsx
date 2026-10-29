@@ -7,6 +7,7 @@
  */
 import { metricColor } from '@/lib/builder/catalog';
 import type { WidgetType } from '@/lib/builder/types';
+import { chartThumb } from './charts/ChartThumb';
 
 export interface ThumbItem { x: number; y: number; w: number; h: number; type: WidgetType | string; metric?: string; values?: number[] }
 
@@ -80,7 +81,7 @@ export function Thumbnail({ items, className }: { items: ThumbItem[]; className?
                                 <rect x={x + 2} y={y + h * 0.3} width={Math.min(w * 0.4, 14)} height={Math.max(1.5, h * 0.22)} rx={0.8} fill="var(--color-fg-faint)" opacity={0.6} />
                                 <rect x={x + 2} y={y + h - 3} width={w - 4} height={1} rx={0.5} fill={color} />
                             </>
-                        ) : null}
+                        ) : chartThumb(type, x, y, w, h, color)}
                     </g>
                 );
             })}

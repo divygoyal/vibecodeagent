@@ -10,7 +10,7 @@ import { BRAND_NAME } from '@/lib/brand';
 // Sample data changes once a day; regenerate hourly. Built from lib/demo, never from Google.
 export const revalidate = 3600;
 
-const TITLE = 'Live demo: a portfolio of sample sites';
+const TITLE = 'Live demo: 11 sample sites, no sign-in';
 const DESCRIPTION = `Try ${BRAND_NAME} without signing in: a read-only portfolio of 11 sample sites with Search Console and Google Analytics numbers, deltas, sparklines and a sample dashboard for each site.`;
 
 export const metadata: Metadata = {

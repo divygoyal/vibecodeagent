@@ -49,6 +49,8 @@ export interface BuilderTimeSeriesProps {
     /** Breakdown frame: series keys 'b:<value>' (one metric). */
     breakdown?: { metric: string; dimension: string; keys: string[]; stacked: boolean; labels?: Record<string, string> };
     compare: boolean;
+    /** Round 9: what the dashed line is called in tooltips and legends ("Last year"); default "Previous period". */
+    compareName?: string;
     granularity: 'day' | 'week' | 'month';
     /** Rows from this index are partial (Search Console lag): dotted. */
     partialFrom?: number;
@@ -240,7 +242,7 @@ export function BuilderTimeSeries(props: BuilderTimeSeriesProps) {
     return <Plot {...props} />;
 }
 
-function Plot({ rows, series, breakdown, compare, granularity, partialFrom, height, currency, showLegend, className, marks, refLines }: BuilderTimeSeriesProps) {
+function Plot({ rows, series, breakdown, compare, compareName = 'Previous period', granularity, partialFrom, height, currency, showLegend, className, marks, refLines }: BuilderTimeSeriesProps) {
     const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
     const reduce = useReducedMotion();
     // TV screens keep the y axis down to a 120 px plot (round 4): numbers read from across the room.
@@ -291,7 +293,7 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     value: fmtMetricValue(s.metric, typeof v === 'number' ? v : null, { currency }),
                     delta: pv !== undefined ? <MetricDelta current={typeof v === 'number' ? v : null} previous={typeof pv === 'number' ? pv : null} format={dsFormat(s.metric)} better={metricBetter(s.metric)} /> : undefined,
                 });
-                if (pv !== undefined) out.push({ key: `${s.metric}-prev`, label: 'Previous period', color: metricColor(s.metric), dashed: true, value: fmtMetricValue(s.metric, typeof pv === 'number' ? pv : null, { currency }) });
+                if (pv !== undefined) out.push({ key: `${s.metric}-prev`, label: compareName, color: metricColor(s.metric), dashed: true, value: fmtMetricValue(s.metric, typeof pv === 'number' ? pv : null, { currency }) });
             }
         }
         const pd = row['d:date:prev'];
@@ -370,6 +372,8 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
     }, [refLines, yAxes, breakdown, height]);
 
     const allZero = !breakdown && first ? rows.every((r) => !r[`m:${first.metric}`]) : false;
+    // Round 10: an all-zero chart draws no $0 to $4 axis and no markers or goal lines through its "No revenue" message.
+    const empty = allZero && rows.length > 0 && Boolean(first);
     const anim = !reduce;
     const legend = showLegend && (breakdown || series.length > 1);
     const legendItems: LegendItem[] = breakdown
@@ -400,10 +404,10 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                 <CartesianGrid vertical={false} stroke={GRID_STROKE} />
                 <XAxis dataKey="d:date" ticks={xTicks} interval={0} tick={xTick} tickLine={false} axisLine={AXIS_LINE} tickMargin={8} />
                 {breakdown ? (
-                    <YAxis yAxisId="b" hide={!showY} width={showY ? 44 : 0} domain={yAxes.b.domain} ticks={yAxes.b.ticks} interval={0} tickFormatter={axisFmt(breakdown.metric, currency)} tick={AXIS_TICK} tickLine={false} axisLine={false} />
+                    <YAxis yAxisId="b" hide={!showY || empty} width={showY ? 44 : 0} domain={yAxes.b.domain} ticks={yAxes.b.ticks} interval={0} tickFormatter={axisFmt(breakdown.metric, currency)} tick={AXIS_TICK} tickLine={false} axisLine={false} />
                 ) : series.map((s, i) => {
                     const isPos = getMetric(s.metric)?.format === 'position';
-                    const visible = showY && (i === 0 || s.axis === 'right');
+                    const visible = showY && !empty && (i === 0 || s.axis === 'right');
                     return (
                         <YAxis
                             key={s.metric} yAxisId={s.metric} hide={!visible} width={visible ? 44 : 0} orientation={s.axis === 'right' ? 'right' : 'left'}
@@ -416,13 +420,13 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                 })}
                 <RTooltip content={renderTooltip} cursor={CURSOR} isAnimationActive={false} offset={12} />
 
-                {(marks ?? []).filter((m) => m.kind === 'google' && m.endAt).map((m) => (
+                {(empty ? [] : marks ?? []).filter((m) => m.kind === 'google' && m.endAt).map((m) => (
                     <ReferenceArea key={`area-${m.key}`} x1={m.at} x2={m.endAt} yAxisId={markAxis} fill={MARK_COLOR.google} fillOpacity={0.07} stroke="none" ifOverflow="hidden" />
                 ))}
-                {markGroups.map(({ at, group, drop }) => (
+                {(empty ? [] : markGroups).map(({ at, group, drop }) => (
                     <ReferenceLine key={`mark-${at}`} x={at} yAxisId={markAxis} stroke={MARK_COLOR[group.some((m) => m.kind === 'note') ? 'note' : 'google']} strokeOpacity={0.7} strokeDasharray="3 3" label={markGlyph(group, drop)} />
                 ))}
-                {(refLines ?? []).map((l) => (
+                {(empty ? [] : refLines ?? []).map((l) => (
                     <ReferenceLine key={l.key} y={l.y} yAxisId={breakdown ? 'b' : l.metric} stroke={REF_STYLE[l.kind].stroke} strokeWidth={REF_STYLE[l.kind].width} strokeDasharray={REF_STYLE[l.kind].dash} label={refLabel(l.label, REF_STYLE[l.kind].stroke, refSides.get(l.key) ?? 'right')} />
                 ))}
 
@@ -438,7 +442,7 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     : null}
 
                 {!breakdown && compare ? series.slice(0, 2).map((s) => (
-                    <Line key={`${s.metric}-prev`} yAxisId={s.metric} dataKey={`m:${s.metric}:prev`} type="monotone" stroke={metricColor(s.metric)} strokeWidth={1.5} strokeDasharray="4 4" strokeOpacity={0.5} dot={false} activeDot={false} connectNulls={false} isAnimationActive={anim} animationDuration={400} name="Previous period" />
+                    <Line key={`${s.metric}-prev`} yAxisId={s.metric} dataKey={`m:${s.metric}:prev`} type="monotone" stroke={metricColor(s.metric)} strokeWidth={1.5} strokeDasharray="4 4" strokeOpacity={0.5} dot={false} activeDot={false} connectNulls={false} isAnimationActive={anim} animationDuration={400} name={compareName} />
                 )) : null}
 
                 {!breakdown && first && first.kind !== 'bar' && (first.kind === 'area' || series.length === 1) ? (
@@ -463,8 +467,8 @@ function Plot({ rows, series, breakdown, compare, granularity, partialFrom, heig
                     ];
                 }) : null}
             </ComposedChart>}
-            {allZero && rows.length > 0 && first ? (
-                <p className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-body-sm text-fg-muted">No {metricLabel(first.metric).toLowerCase()} in this period</p>
+            {empty ? (
+                <p className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-body-sm text-fg-muted">No {metricLabel(first!.metric).toLowerCase()} in this period</p>
             ) : null}
         </figure>
     );

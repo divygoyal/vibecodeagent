@@ -59,7 +59,7 @@ function trackClarity(name: string, payload?: Record<string, unknown>): void {
 }
 
 export default function ShareConversionBar({
-    ctaUrl = 'https://trafficclaw.com/?utm_source=share-bar&utm_medium=embed&utm_campaign=viewer-conversion',
+    ctaUrl = 'https://trafficclaw.com/?ref=share&utm_source=share-bar&utm_medium=embed&utm_campaign=viewer-conversion',
 }: ShareConversionBarProps) {
     // The server renders the bar; the browser hides it when the viewer already
     // dismissed it this session (read from sessionStorage, no effect needed).

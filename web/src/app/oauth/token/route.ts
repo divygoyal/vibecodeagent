@@ -4,7 +4,7 @@ import {
     ACCESS_TOKEN_PREFIX, accessTokenTtlS, mcpEnabled, notFoundResponse, REFRESH_FAMILY_TTL_S, REFRESH_TOKEN_PREFIX,
     REFRESH_TTL_S, resourceUrl, SCOPE_OFFLINE, SUPPORTED_SCOPES,
 } from '@/lib/mcp/config';
-import { clientIp, hitLimit } from '@/lib/mcp/rateLimit';
+import { clientIp, hitLimit, perIpLimit } from '@/lib/mcp/rateLimit';
 import { authenticateClient } from '@/lib/oauth/clientAuth';
 import { oauthError, oauthJson, publicPreflight, readFormOrJson } from '@/lib/oauth/metadata';
 import { normalizeResource, parseScope, randomToken, sha256Hex, verifyPkce } from '@/lib/oauth/primitives';
@@ -16,7 +16,7 @@ export const runtime = 'nodejs';
 export async function POST(req: Request) {
     if (!mcpEnabled()) return notFoundResponse();
     const ip = clientIp(req);
-    const perIp = hitLimit(`token:${ip}`, 120, 60_000);
+    const perIp = hitLimit(`token:${ip}`, perIpLimit(ip, 120), 60_000);
     if (!perIp.ok) return oauthError('slow_down', 'Too many token requests.', 429, { 'retry-after': String(perIp.retryAfterS) });
 
     const form = await readFormOrJson(req);

@@ -5,9 +5,15 @@ import { AlertTriangle, Download, Info, Link2, PlugZap, RefreshCw } from 'lucide
 
 import { cn } from '@/lib/cn';
 import { Button, Skeleton, Tooltip } from '@/components/ui';
-import { fmtDay } from '@/lib/format';
+import { fmtDay, fmtDayYear } from '@/lib/format';
 import { metricLabel } from '@/lib/builder/catalog';
+import { chartCsvFrame } from '@/lib/builder/charts';
 import { widgetTitle } from '@/lib/builder/registry';
+import { drillTitleSuffix, ignoredFiltersNote } from '@/lib/builder/levelLabels';
+import { searchTypeLabel, widgetSearchType } from '@/lib/builder/searchType';
+import { DrillCrumbs, type DrillView } from './DrillCrumbs';
+import type { WidgetDates } from '@/lib/builder/widgetDates';
+import { DateChip } from './DateChip';
 import type { CompareSpec, ResolvedDates, WidgetDef, WidgetResult, WidgetResultOk } from '@/lib/builder/types';
 
 export interface WidgetViewProps<W extends WidgetDef = WidgetDef> {
@@ -19,6 +25,10 @@ export interface WidgetViewProps<W extends WidgetDef = WidgetDef> {
     refetching: boolean;
     resolved?: ResolvedDates;
     compare: CompareSpec['mode'];
+    /** The dashboard's comparison rule (round 9); WidgetRenderer derives `dates` from it. */
+    compareSpec?: CompareSpec;
+    /** Round 9: the days this widget reads (own dates or the dashboard's) and its comparison; set by WidgetRenderer. */
+    dates?: WidgetDates;
     /** Pixel height of the grid cell. */
     height: number;
     bp: 'lg' | 'md' | 'sm';
@@ -31,6 +41,8 @@ export interface WidgetViewProps<W extends WidgetDef = WidgetDef> {
     onFilterClick?: (value: string) => void;
     /** The value currently selected by click to filter on this widget's dimension. */
     selectedValue?: string;
+    /** Drill down (round 8): the path above the chart and the levels, when the widget has a drill list. */
+    drill?: DrillView;
 }
 
 /** The ok result when there is one (also the stale copy inside an error). */
@@ -40,7 +52,8 @@ export function okResult(r?: WidgetResult): WidgetResultOk | undefined {
     return r.stale;
 }
 
-const ERROR_ICON = { NOT_CONNECTED: PlugZap, NO_ACCESS: Link2, NO_GA4_SOURCE: Link2, NO_GSC_SOURCE: Link2 } as const;
+// INCOMPATIBLE is an expected state (a search type or source that cannot answer this widget), so it gets the info icon, not a warning triangle.
+const ERROR_ICON = { INCOMPATIBLE: Info, NOT_CONNECTED: PlugZap, NO_ACCESS: Link2, NO_GA4_SOURCE: Link2, NO_GSC_SOURCE: Link2 } as const;
 
 export function WidgetError({ result, onRetry, onChooseSource, compact }: { result: Extract<WidgetResult, { status: 'error' }>; onRetry?: () => void; onChooseSource?: () => void; compact?: boolean }) {
     const Icon = (ERROR_ICON as Record<string, typeof AlertTriangle>)[result.code] ?? AlertTriangle;
@@ -60,7 +73,7 @@ export function WidgetError({ result, onRetry, onChooseSource, compact }: { resu
 
 /** CSV of the widget's main frame (P1 "Download CSV"). */
 export function downloadCsv(widget: WidgetDef, r: WidgetResultOk) {
-    const frame = r.parts.rows ?? r.parts.series ?? r.parts.sites ?? r.parts.total;
+    const frame = chartCsvFrame(widget, r) ?? r.parts.rows ?? r.parts.series ?? r.parts.sites ?? r.parts.total;
     if (!frame) return;
     const keys = frame.seriesKeys?.length ? [frame.columns[0]?.id, ...frame.seriesKeys].filter(Boolean) as string[] : frame.columns.map((c) => c.id);
     // Calculated metrics (round 7): the dashboard's name, which the editor's inline queries do not send.
@@ -83,16 +96,22 @@ export function flagNotes(r: WidgetResultOk | undefined, widget: WidgetDef): str
     if (!r) return [];
     const f = r.flags;
     const out: string[] = [];
+    // Round 8: the title row names a non-web search type; a widget without a title says it here.
+    if (widget.showTitle === false && widgetSearchType(widget) !== 'web') out.push(`Search type: ${searchTypeLabel(widgetSearchType(widget))}`);
     if (f.stale) out.push(`Showing data from ${new Date(r.fetchedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`);
     if (f.sampled) out.push(`Sampled (${f.sampled.pct}% of events)`);
     if (f.thresholded) out.push('Google hides small groups (privacy thresholds)');
     if (f.otherRow) out.push('Some values are grouped as (other)');
     if (f.preliminaryFrom && (widget.type === 'timeseries' || widget.type === 'scorecard' || widget.type === 'kpi-strip')) out.push(`Search Console data after ${fmtDay(f.preliminaryFrom)} is still being processed`);
-    if (f.filtersIgnored?.length) out.push(`${f.filtersIgnored.length === 1 ? 'A filter does' : 'Some filters do'} not apply to this widget`);
+    // Round 9: the comparison line has a gap where Google has no data (a younger property, history too old).
+    if (f.compareNone) out.push('No data in the comparison period');
+    else if (f.compareFrom) out.push(`No comparison data before ${fmtDayYear(f.compareFrom)}`);
+    const ignored = ignoredFiltersNote(f.filtersIgnoredDims, f.filtersIgnored?.length ?? 0);
+    if (ignored) out.push(ignored);
     if (f.usersSummed) out.push('Users are summed across sites');
     if (f.sitesFailed?.length) out.push(`${f.sitesFailed.length} site${f.sitesFailed.length === 1 ? '' : 's'} could not load`);
     if (f.missingFamilies?.length) out.push(f.missingFamilies.includes('ga4') ? 'No Analytics property linked: those numbers show –' : 'No Search Console site linked: those numbers show –');
-    if (f.sortedWithinTop) out.push(`Sorted within the top ${f.sortedWithinTop.toLocaleString('en-US')} rows by clicks`);
+    if (f.sortedWithinTop) out.push(`Sorted among the ${f.sortedWithinTop.toLocaleString('en-US')} rows with the most clicks`);
     return out;
 }
 
@@ -133,12 +152,17 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                 <div className={cn('mb-3 flex min-w-0 items-start gap-2', widget.style?.titleAlign === 'center' && 'justify-center text-center')}>
                     <h3 className={cn('min-w-0 truncate text-fg', widget.style?.titleSize === 'lg' ? 'text-title' : widget.style?.titleSize === 'sm' ? 'text-body-sm font-medium' : 'text-title-sm')}>
                         {widgetTitle(widget)}
+                        {drillTitleSuffix(widget) ? <span className="font-normal text-fg-muted"> › {drillTitleSuffix(widget)}</span> : null}
                     </h3>
                     {widget.description ? (
                         <Tooltip content={widget.description}>
                             <button type="button" aria-label="About this widget" className="mt-0.5 shrink-0 text-fg-muted hover:text-fg"><Info aria-hidden size={14} strokeWidth={1.75} /></button>
                         </Tooltip>
                     ) : null}
+                    {widgetSearchType(widget) !== 'web' ? (
+                        <span title="Search Console search type" className="mt-0.5 shrink-0 truncate rounded-badge bg-brand-soft px-1.5 text-caption text-brand-soft-fg">{searchTypeLabel(widgetSearchType(widget))}</span>
+                    ) : null}
+                    <DateChip widget={widget} dates={props.dates} className="mt-0.5" />
                     {ok?.sourceLabel && props.mode !== 'public' && widget.source?.type && widget.source.type !== 'default' ? (
                         <span className="mt-0.5 truncate rounded-badge bg-subtle px-1.5 text-caption text-fg-muted">{ok.sourceLabel}</span>
                     ) : null}
@@ -156,6 +180,9 @@ export function WidgetFrame({ props, children, actions, bodyClassName, skeleton 
                     ) : null}
                 </div>
             ) : null}
+            {/* A widget without a title row still tells the viewer its days. */}
+            {!showTitle && props.dates?.own ? <DateChip widget={widget} dates={props.dates} className="absolute right-2 top-2 z-10 bg-surface/90" /> : null}
+            {props.drill && props.drill.depth > 0 ? <DrillCrumbs drill={props.drill} /> : null}
             <div className={cn('relative min-h-0 flex-1', refetching && 'opacity-60 transition-opacity', bodyClassName)}>
                 {loading && !ok ? (
                     skeleton === 'none' ? null : skeleton === 'table' ? (

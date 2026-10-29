@@ -224,6 +224,21 @@ const SEARCH_TYPE_SCALE: Record<string, { impr: number; ctr: number }> = {
     discover: { impr: 0.06, ctr: 0.9 },
 };
 
+/**
+ * What kind of site gets how much of each non-web type (round 8): recipe and blog sites live on Images and
+ * Discover, a docs site hardly shows up there. Multiplies SEARCH_TYPE_SCALE; web is untouched.
+ */
+const SEARCH_TYPE_KIND_MIX: Record<string, Record<DemoSite['kind'], number>> = {
+    image: { saas: 0.4, docs: 0.25, blog: 1.2, games: 1.4, shop: 2, recipes: 3, agency: 0.5 },
+    video: { saas: 1.5, docs: 0.5, blog: 0.8, games: 2, shop: 0.8, recipes: 2, agency: 0.8 },
+    news: { saas: 0.3, docs: 0.1, blog: 2, games: 0.6, shop: 0.2, recipes: 0.3, agency: 0.3 },
+    googleNews: { saas: 0.2, docs: 0.1, blog: 2.5, games: 0.5, shop: 0.1, recipes: 0.2, agency: 0.2 },
+    discover: { saas: 0.3, docs: 0.1, blog: 3, games: 1, shop: 0.5, recipes: 2.5, agency: 0.3 },
+};
+
+/** Discover and Google News report pages, countries and devices, never queries (nobody searched). */
+const FEED_TYPES = new Set(['discover', 'googleNews']);
+
 const APPEARANCES: Record<DemoSite['kind'], Array<[string, number]>> = {
     saas: [['REVIEW_SNIPPET', 0.03], ['VIDEO', 0.02], ['SITELINKS', 0.08]],
     docs: [['SITELINKS', 0.12]],
@@ -275,7 +290,15 @@ export function demoSearchAnalytics(siteUrl: string, request: GscQueryRequest, o
     const dims = (request.dimensions || []).map(d => String(d));
     const filters = (request.dimensionFilterGroups || []).flatMap(g => g.filters || []);
     const filterDims = new Set(filters.map(f => f.dimension));
-    const searchType = SEARCH_TYPE_SCALE[request.type || request.searchType || 'web'] || SEARCH_TYPE_SCALE.web;
+    const typeName = SEARCH_TYPE_SCALE[request.type || request.searchType || 'web'] ? (request.type || request.searchType || 'web') : 'web';
+    const searchType = SEARCH_TYPE_SCALE[typeName];
+    const feed = FEED_TYPES.has(typeName);
+    if (feed && (dims.includes('query') || filterDims.has('query'))) {
+        throw new DemoApiError(400, 'INVALID_ARGUMENT', `The query dimension is not available for ${typeName} data.`);
+    }
+    // Non-web types differ from web in the daily noise and the rounding too, not only in size (web keeps its seeds).
+    const typeSalt = typeName === 'web' ? 0 : hashString(`type:${typeName}`);
+    const kindMix = typeName === 'web' ? 1 : SEARCH_TYPE_KIND_MIX[typeName]?.[site.kind] ?? 1;
     const fresh = request.dataState === 'all' || request.dataState === 'hourly_all';
     const lastDay = today - (fresh ? 1 : 2);
     const windowStart = today - DEMO_HISTORY_DAYS + 1;
@@ -285,7 +308,7 @@ export function demoSearchAnalytics(siteUrl: string, request: GscQueryRequest, o
     const model = siteModel(site);
     const { start: seriesStart, values } = dailySeries(site, today);
     const clickScale = site.ga ? site.organicShare * 1.05 : 1;
-    const siteSeed = hashString(site.key);
+    const siteSeed = (hashString(site.key) + typeSalt) >>> 0;
 
     const useCountry = dims.includes('country') || filterDims.has('country');
     const countries = useCountry
@@ -349,11 +372,11 @@ export function demoSearchAnalytics(siteUrl: string, request: GscQueryRequest, o
                     if (k === undefined) {
                         k = keyAccs.length;
                         keyIndex.set(nonDateKey, k);
-                        keyAccs.push({ keys: dims.map(d => (d === 'date' ? '' : keyVals[d])), seed: hashString(`${site.key}\u0003${fixedDims.map(d => `${d}=${keyVals[d] ?? ''}`).join('\u0001')}`), clicks: 0, impressions: 0, rawImpr: 0, posW: 0 });
+                        keyAccs.push({ keys: dims.map(d => (d === 'date' ? '' : keyVals[d])), seed: hashString(`${site.key}\u0003${typeName === 'web' ? '' : `${typeName}\u0004`}${fixedDims.map(d => `${d}=${keyVals[d] ?? ''}`).join('\u0001')}`), clicks: 0, impressions: 0, rawImpr: 0, posW: 0 });
                     }
                     combos.push({
                         pair, k, last,
-                        share: pair.w * (dev.share / devNorm) * ctry.share * app.share * searchType.impr,
+                        share: pair.w * (dev.share / devNorm) * ctry.share * app.share * searchType.impr * kindMix,
                         posOff: dev.off + (dev.name === 'MOBILE' ? pair.mobileGap : 0) + ctry.off,
                         ctrMul: pair.ctrMul * dev.ctr * searchType.ctr,
                     });

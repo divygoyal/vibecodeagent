@@ -8,6 +8,7 @@
  * site; an explicit site stays that site). Nothing here talks to the network.
  */
 import { parseCalcId, usesMetric } from './calc';
+import { CHART_TYPES } from './charts';
 import { addPage, clampItem, updatePage } from './docOps';
 import { newWidgetId, widgetMeta } from './registry';
 import type { CalculatedMetric, DashboardDocV2, LayoutItem, PageDef, WidgetDef, WidgetType } from './types';
@@ -17,7 +18,7 @@ export const CLIP_PAGE = 'trafficclaw/page';
 const MAX_ITEMS = 40;
 const MAX_BYTES = 400_000;
 
-const TYPES: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', 'table', 'geo', 'text', 'image', 'section', 'portfolio-grid'];
+const TYPES: WidgetType[] = ['scorecard', 'kpi-strip', 'timeseries', 'bar', 'pie', 'table', 'geo', 'text', 'image', 'section', 'portfolio-grid', 'realtime', 'embed', ...CHART_TYPES];
 
 export interface ClipItem { widget: WidgetDef; layout: { x: number; y: number; w: number; h: number } }
 /** `calcs` (round 7): names of the calculated metrics the items use, so a paste keeps them. */

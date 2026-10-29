@@ -233,6 +233,10 @@ cmd_up() {
         [ $((first + n - 1)) -le "$MAX_N" ] || die "no $n free instance slot(s) among ports $((PORT_BASE_WEB + 1))-$((PORT_BASE_WEB + MAX_N)) on worker1 (not ours); refusing to start"
     done
     local last=$((first + n - 1))
+    # Every instance is seeded fresh (new random profile slugs), but next start keeps its data cache in .next/cache/fetch-cache,
+    # keyed by URL (admin port + path). A stale entry from an earlier seed serves a profile page whose slug no longer exists
+    # (the badge on /leaderboard/1 then answers 404). Drop it whenever instances are (re)started.
+    rm -rf "$src/web/.next/cache/fetch-cache"
     t0="$(now)"
     for i in $(seq "$first" "$last"); do
         local d; d="$(inst_dir "$name" "$i")"

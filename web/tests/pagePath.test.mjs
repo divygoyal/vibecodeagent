@@ -19,3 +19,13 @@ test('a path splits before its last segment, so the end stays visible', () => {
     assert.deepEqual(splitPagePath('/'), ['/ (home)', '']);
     assert.deepEqual(splitPagePath('/blog/'), ['/blog/', '']);
 });
+
+test('a page named in a sentence: "/" is the homepage, long paths are shortened', async () => {
+    const { sentencePage } = await import('../src/components/site/lib/pagePath.ts');
+    assert.equal(sentencePage('/'), 'the homepage');
+    assert.equal(sentencePage(''), 'the homepage');
+    assert.equal(sentencePage('/pricing'), '/pricing');
+    assert.equal(sentencePage('/es/tools/ai/image/generator'), '/es/tools/ai/image/generator');
+    assert.equal(sentencePage('/es/tools/ai/image/background/remover-for-products'), '/es/…/remover-for-products');
+    assert.ok(sentencePage('/a/b/c/' + 'x'.repeat(60)).length <= 36);
+});

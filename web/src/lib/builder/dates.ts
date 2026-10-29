@@ -178,19 +178,42 @@ export function resolveRange(spec: DateRangeSpec, today: Iso): { start: Iso; end
     }
 }
 
-export function resolveCompare(range: { start: Iso; end: Iso }, spec: CompareSpec): { start: Iso; end: Iso } | undefined {
+/**
+ * The comparison window of a resolved range. Always complete days: a custom comparison range is clamped to
+ * yesterday (`today` given) and to Google's history, and the shifted windows follow the base range, which
+ * already ends on a complete day (lib/dateRange).
+ * - previous_period: the same number of days right before; `align: 'weekday'` shifts back by whole weeks
+ *   (30 days -> 35) so every weekday faces the same weekday.
+ * - previous_year: the same calendar days a year earlier (Feb 29 -> Feb 28); `align: 'weekday'` shifts 52 weeks.
+ * - custom: the owner's or viewer's own days.
+ */
+export function resolveCompare(range: { start: Iso; end: Iso }, spec: CompareSpec, today?: Iso): { start: Iso; end: Iso } | undefined {
     switch (spec.mode) {
         case 'previous_period': {
             const len = daysBetween(range.start, range.end);
+            if (spec.align === 'weekday') {
+                const shift = Math.ceil(len / 7) * 7;
+                return { start: addDays(range.start, -shift), end: addDays(range.end, -shift) };
+            }
             const end = addDays(range.start, -1);
             return { start: addDays(end, -(len - 1)), end };
         }
         case 'previous_year':
             if (spec.align === 'weekday') return { start: addDays(range.start, -364), end: addDays(range.end, -364) };
             return { start: addMonths(range.start, -12), end: addMonths(range.end, -12) };
-        case 'custom':
-            if (isIso(spec.start) && isIso(spec.end)) return spec.start <= spec.end ? { start: spec.start, end: spec.end } : { start: spec.end, end: spec.start };
-            return undefined;
+        case 'custom': {
+            if (!isIso(spec.start) || !isIso(spec.end)) return undefined;
+            let start = spec.start <= spec.end ? spec.start : spec.end;
+            let end = spec.start <= spec.end ? spec.end : spec.start;
+            if (today) {
+                const yesterday = addDays(today, -1);
+                if (end > yesterday) end = yesterday;
+                const min = minHistoryDay(today);
+                if (start < min) start = min;
+                if (end < start) return undefined;
+            }
+            return { start, end };
+        }
         default:
             return undefined;
     }
@@ -240,16 +263,25 @@ export function rangeFromParam(v: string | null | undefined, from?: string | nul
     return null;
 }
 
-export function compareToParam(spec: CompareSpec): 'prev' | 'yoy' | 'none' {
-    if (spec.mode === 'previous_period') return 'prev';
-    if (spec.mode === 'previous_year') return 'yoy';
+/**
+ * `compare` URL value: prev (previous period), prevw (previous period, whole weeks back), yoy (same period last
+ * year), yoyw (last year, same weekdays), none, or 'YYYY-MM-DD_YYYY-MM-DD' for a custom comparison range.
+ */
+export function compareToParam(spec: CompareSpec): string {
+    if (spec.mode === 'previous_period') return spec.align === 'weekday' ? 'prevw' : 'prev';
+    if (spec.mode === 'previous_year') return spec.align === 'weekday' ? 'yoyw' : 'yoy';
+    if (spec.mode === 'custom' && isIso(spec.start) && isIso(spec.end)) return `${spec.start}_${spec.end}`;
     return 'none';
 }
 
 export function compareFromParam(v: string | null | undefined): CompareSpec | null {
     if (v === 'prev') return { mode: 'previous_period' };
+    if (v === 'prevw') return { mode: 'previous_period', align: 'weekday' };
     if (v === 'yoy') return { mode: 'previous_year' };
+    if (v === 'yoyw') return { mode: 'previous_year', align: 'weekday' };
     if (v === 'none') return { mode: 'none' };
+    const m = v ? /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(v) : null;
+    if (m && isIso(m[1]) && isIso(m[2])) return m[1] <= m[2] ? { mode: 'custom', start: m[1], end: m[2] } : { mode: 'custom', start: m[2], end: m[1] };
     return null;
 }
 
@@ -260,8 +292,8 @@ export function presetLabel(spec: DateRangeSpec): string {
 }
 
 export function compareLabel(spec: CompareSpec): string {
-    if (spec.mode === 'previous_period') return 'vs previous period';
-    if (spec.mode === 'previous_year') return 'vs same period last year';
+    if (spec.mode === 'previous_period') return spec.align === 'weekday' ? 'vs previous period (same weekdays)' : 'vs previous period';
+    if (spec.mode === 'previous_year') return spec.align === 'weekday' ? 'vs last year (same weekdays)' : 'vs same period last year';
     if (spec.mode === 'custom') return 'vs custom period';
     return '';
 }

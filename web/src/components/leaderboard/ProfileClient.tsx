@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { badgeSnippets } from '@/lib/leaderboard/badgeSnippets';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Check, Copy, ExternalLink, Linkedin, Send, Share2, Download, Link2 } from 'lucide-react';
 
@@ -295,6 +296,17 @@ export function RequestSlotButton({ slotId }: { slotId: number }) {
 
 function CopyField({ label, value }: { label: string; value: string }) {
     const [done, setDone] = useState(false);
+    // The box grows to its whole lines (the text wraps at the box width), so no line is cut in half at the bottom.
+    const boxRef = useRef<HTMLTextAreaElement>(null);
+    useEffect(() => {
+        const el = boxRef.current;
+        if (!el) return;
+        const fit = () => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`; };
+        fit();
+        const ro = new ResizeObserver(fit);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [value]);
     return (
         <div>
             <div className="mb-1 flex items-center justify-between">
@@ -310,28 +322,30 @@ function CopyField({ label, value }: { label: string; value: string }) {
                     {done ? 'Copied' : 'Copy'}
                 </Button>
             </div>
-            <textarea readOnly value={value} rows={3} onFocus={(e) => e.currentTarget.select()} className="w-full resize-none rounded-control border border-border bg-surface-sunken p-2.5 font-mono text-meta text-fg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-focus/30" />
+            <textarea ref={boxRef} readOnly value={value} rows={1} onFocus={(e) => e.currentTarget.select()} className="block w-full resize-none overflow-hidden rounded-control border border-border bg-surface-sunken p-2.5 font-mono text-meta text-fg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-focus/30" />
         </div>
     );
 }
 
-export function EmbedCard({ origin, slug, id, name, liveEnabled }: { origin: string; slug: string; id: number; name: string; liveEnabled: boolean }) {
+type BadgeVariantChoice = 'traffic' | 'minimal' | 'stats' | 'live';
+const BADGE_HEIGHT: Record<BadgeVariantChoice, number> = { traffic: 32, minimal: 48, stats: 76, live: 76 };
+
+export function EmbedCard({ origin, slug, id, name, liveEnabled, trafficBadge = true }: { origin: string; slug: string; id: number; name: string; liveEnabled: boolean; trafficBadge?: boolean }) {
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [variant, setVariant] = useState<'minimal' | 'stats' | 'live'>(liveEnabled ? 'live' : 'stats');
-    const profile = `${origin}/leaderboard/${slug}`;
+    // The verified-traffic badge only exists for profiles verified in Search Console and ranked (badgeEligible).
+    const [variant, setVariant] = useState<BadgeVariantChoice>(trafficBadge ? 'traffic' : 'minimal');
     // Snippets use the absolute public origin (they are pasted on other sites); the preview
     // loads the same image from this page's own origin so it renders wherever the page is served.
-    const imgPath = `/api/badges/${id}?variant=${variant}&theme=${theme}`;
+    const imgPath = variant === 'traffic' ? `/badge/${slug}.svg?theme=${theme}` : `/api/badges/${id}?variant=${variant}&theme=${theme}`;
     const img = `${origin}${imgPath}`;
-    const alt = `${name} on TrafficClaw`;
-    const html = `<a href="${profile}" target="_blank" rel="noopener"><img src="${img}" alt="${alt}" height="${variant === 'minimal' ? 48 : 76}" /></a>`;
-    const md = `[![${alt}](${img})](${profile})`;
-    const iframe = `<iframe src="${origin}/embed/leaderboard/${slug}?theme=${theme}" width="340" height="168" style="border:0;border-radius:12px" loading="lazy" title="${alt}"></iframe>`;
+    const alt = variant === 'traffic' ? 'Verified traffic on TrafficClaw' : `${name} on TrafficClaw`;
+    const { html, md } = badgeSnippets({ origin, slug, imgUrl: img, alt, height: BADGE_HEIGHT[variant] });
+    const iframe = `<iframe src="${origin}/embed/leaderboard/${slug}?theme=${theme}" width="340" height="168" style="border:0;border-radius:12px" loading="lazy" title="${name} on TrafficClaw"></iframe>`;
     return (
         <Card>
             <CardHeader
-                title="Embed this profile"
-                description="A live verified badge or a small widget for your own site."
+                title="Get your badge"
+                description="Show your verified traffic on your own site. It updates by itself and links back to this profile."
                 actions={<SegmentedControl ariaLabel="Badge theme" size="sm" variant="neutral" value={theme} onChange={setTheme} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />}
             />
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -341,12 +355,12 @@ export function EmbedCard({ origin, slug, id, name, liveEnabled }: { origin: str
                     variant="neutral"
                     value={variant}
                     onChange={setVariant}
-                    options={[{ value: 'minimal', label: 'Minimal' }, { value: 'stats', label: 'Stats' }, ...(liveEnabled ? [{ value: 'live' as const, label: 'Live' }] : [])]}
+                    options={[...(trafficBadge ? [{ value: 'traffic' as const, label: 'Verified traffic' }] : []), { value: 'minimal' as const, label: 'Minimal' }, { value: 'stats', label: 'Stats' }, ...(liveEnabled ? [{ value: 'live' as const, label: 'Live' }] : [])]}
                 />
             </div>
-            <div className={cn('mb-4 flex min-h-24 items-center justify-center rounded-control border border-border-subtle p-4', theme === 'dark' ? 'bg-[#0e1014]' : 'bg-surface-sunken')}>
+            <div className={cn('mb-4 flex min-h-24 items-center justify-center rounded-control border border-border-subtle p-4', theme === 'dark' ? 'bg-[#0e1014]' : 'bg-[#f6f7f9]')}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img key={imgPath} src={imgPath} alt={alt} height={variant === 'minimal' ? 48 : 76} className="max-w-full" />
+                <img key={imgPath} src={imgPath} alt={alt} height={BADGE_HEIGHT[variant]} className="max-w-full" />
             </div>
             <div className="grid gap-3">
                 <CopyField label="Badge (HTML)" value={html} />

@@ -6,13 +6,16 @@ import { getSessionUser } from '@/lib/mcp/session';
 import { errorPage, issueCodeRedirect } from '@/lib/oauth/authorize';
 import { ClientError, getClient, verifiedClientName } from '@/lib/oauth/clients';
 import { matchRedirectUri, redirectHostLabel, safeEqual } from '@/lib/oauth/primitives';
+import { mcpEventSetCookie } from '@/lib/growth/events';
 import { clientRedirect, csrfBinding, csrfCookieName, decodeTxn, readCookie } from '@/lib/oauth/txn';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-function seeOther(location: string): Response {
-    return new Response(null, { status: 303, headers: { location, 'cache-control': 'no-store' } });
+function seeOther(location: string, setCookie?: string): Response {
+    const headers = new Headers({ location, 'cache-control': 'no-store' });
+    if (setCookie) headers.append('set-cookie', setCookie);
+    return new Response(null, { status: 303, headers });
 }
 
 function sameOrigin(req: Request): boolean {
@@ -67,6 +70,8 @@ export async function POST(req: Request) {
     };
 
     let grant: { id: number; user_id: number };
+    // First approval of an AI app for this account: the browser sends GA4 mcp_connected on its next app load (lib/growth/events.ts).
+    let firstConnection = false;
     try {
         if (action === 'demo') {
             if (!demoGrantsEnabled()) return errorPage('Demo data is off', 'Demo connections are disabled on this server.');
@@ -83,6 +88,7 @@ export async function POST(req: Request) {
                 exclude_queries: form.get('exclude_queries') === '1',
                 demo: false,
             };
+            firstConnection = await adminStore.listGrants(String(signedIn.user.id)).then((r) => r.grants.length === 0, () => true);
             try {
                 grant = await adminStore.upsertGrant(payload);
             } catch (err) {
@@ -96,7 +102,7 @@ export async function POST(req: Request) {
             grantId: grant.id, userId: grant.user_id, clientId: client.client_id, redirectUri: txn.r,
             codeChallenge: txn.ch, scope: txn.s, resource: txn.res, state: txn.st,
         });
-        return seeOther(location);
+        return seeOther(location, firstConnection ? mcpEventSetCookie(requestOrigin(req).startsWith('https://')) : undefined);
     } catch (err) {
         console.error('[mcp] consent failed:', err instanceof Error ? err.message : err);
         return seeOther(clientRedirect(txn.r, { error: 'server_error', error_description: 'TrafficClaw could not save the approval', state: txn.st }));

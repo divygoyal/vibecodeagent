@@ -10,20 +10,27 @@ import { Copy, Lock, Trash2 } from 'lucide-react';
 
 import { Banner, Button, Tabs } from '@/components/ui';
 import { dimLabel, getMetric, metricLabel } from '@/lib/builder/catalog';
+import { isChartWidget } from '@/lib/builder/charts';
 import { tableColumns, widgetMeta, widgetMetrics } from '@/lib/builder/registry';
 import { removeWidget, duplicateWidget, updateWidget } from '@/lib/builder/docOps';
 import { MENU_PRESETS, PRESETS } from '@/lib/builder/dates';
+import { COMPARE_OPTIONS, compareOptionId, type CompareOption } from '@/lib/builder/compare';
 import type { ControlDef, DashboardDocV2, FilterControl, MetricRef, SourceRef, TableColumn, WidgetDef } from '@/lib/builder/types';
 import { useEditorStore } from '@/stores/dashboardEditorStore';
 import { useResolvedTheme } from '@/lib/theme';
 import { AppearanceSettings } from '../theme/AppearanceSettings';
 import { Choice, DimensionPicker, Field, MetricList, MetricPicker, NumberInput, SourcePicker, TextInput, Toggle, type SiteOption } from './Fields';
 import { ChartMarksEditor } from './ChartMarksEditor';
+import { ChartSetup } from './ChartSetup';
+import { EmbedSetup } from './EmbedProps';
+import { GeoSetup } from './GeoProps';
+import { RealtimeSetup } from './RealtimeProps';
 import { RulesEditor } from './RulesEditor';
-import { GrainControlProps, MetricControlProps, SiteControlProps } from './SwitchControlProps';
+import { GrainControlProps, MetricControlProps, SearchTypeControlProps, SiteControlProps } from './SwitchControlProps';
 import { VariablesEditor } from './VariablesEditor';
 import { CalcList } from './CalcEditor';
 import { TABLE_TREND_ROWS, TREND_DAILY_MAX_DAYS, trendMetric, trendUnsupported } from '@/lib/builder/trend';
+import { WidgetDatesField } from './WidgetDatesField';
 import { WidgetFilters } from './WidgetFilters';
 
 type Patch = (w: WidgetDef) => WidgetDef;
@@ -66,7 +73,8 @@ export function PropertiesPanel({ doc, sites, defaultLabel }: { doc: DashboardDo
                     : control && control.type === 'site' ? <SiteControlProps key={control.id} control={control} doc={doc} sites={sites} defaultLabel={defaultLabel} />
                         : control && control.type === 'metric' ? <MetricControlProps key={control.id} control={control} doc={doc} />
                             : control && control.type === 'grain' ? <GrainControlProps key={control.id} control={control} doc={doc} />
-                                : <DashboardSettings doc={doc} sites={sites} />}
+                                : control && control.type === 'searchType' ? <SearchTypeControlProps key={control.id} control={control} doc={doc} />
+                                    : <DashboardSettings doc={doc} sites={sites} />}
         </aside>
     );
 }
@@ -89,6 +97,7 @@ function WidgetProps({ widget, doc, sites, defaultLabel }: { widget: WidgetDef; 
                 {tab === 'setup' ? (
                     <>
                         <Setup widget={widget} edit={edit} sites={sites} defaultLabel={defaultLabel} doc={doc} />
+                        {!meta.static && !meta.selfFetch ? <div className="border-t border-border-subtle pt-4"><WidgetDatesField widget={widget} edit={edit} /></div> : null}
                         {!meta.static ? <div className="border-t border-border-subtle pt-4"><WidgetFilters widget={widget} doc={doc} edit={edit} /></div> : null}
                     </>
                 ) : <Style widget={widget} edit={edit} />}
@@ -109,6 +118,8 @@ function Setup({ widget, edit, sites, defaultLabel, doc }: { widget: WidgetDef; 
             <SourcePicker value={widget.source ?? { type: 'default' }} onChange={(s: SourceRef) => edit((w) => ({ ...w, source: s }) as WidgetDef)} sites={sites} defaultLabel={defaultLabel} portfolioOnly={widget.type === 'portfolio-grid'} />
         </Field>
     );
+    // Round 9 charts (heatmap, scatter, funnel, treemap, pivot): editor/ChartSetup.tsx
+    if (isChartWidget(widget)) return <ChartSetup widget={widget} edit={edit} source={source} portfolio={portfolio} />;
     switch (widget.type) {
         case 'scorecard':
             return (
@@ -181,18 +192,7 @@ function Setup({ widget, edit, sites, defaultLabel, doc }: { widget: WidgetDef; 
             );
         }
         case 'table': return <TableSetup widget={widget} edit={edit} source={source} portfolio={portfolio} />;
-        case 'geo': {
-            const c = widget.config;
-            return (
-                <>
-                    {source}
-                    <Field label="Metric"><MetricPicker value={c.metric.id} onChange={(id) => edit((w) => cfg(w as typeof widget, { metric: { id } }))} /></Field>
-                    <Field label="Ranked list"><Choice ariaLabel="Ranked list" value={String(c.topList) as '0' | '5' | '10'} onChange={(v) => edit((w) => cfg(w as typeof widget, { topList: Number(v) as 0 | 5 | 10 }))} options={[{ value: '0', label: 'Hide' }, { value: '5', label: 'Top 5' }, { value: '10', label: 'Top 10' }]} /></Field>
-                    <Field label="Projection"><Choice ariaLabel="Projection" value={c.projection} onChange={(v) => edit((w) => cfg(w as typeof widget, { projection: v }))} options={[{ value: 'naturalEarth', label: 'Natural Earth' }, { value: 'mercator', label: 'Mercator' }]} /></Field>
-                    <Toggle label="Legend" checked={c.showLegend} onChange={(v) => edit((w) => cfg(w as typeof widget, { showLegend: v }))} />
-                </>
-            );
-        }
+        case 'geo': return <GeoSetup widget={widget} edit={edit} source={source} />;
         case 'text': {
             const c = widget.config;
             return (
@@ -229,6 +229,8 @@ function Setup({ widget, edit, sites, defaultLabel, doc }: { widget: WidgetDef; 
                 </>
             );
         }
+        case 'realtime': return <RealtimeSetup widget={widget} edit={edit} source={source} />;
+        case 'embed': return <EmbedSetup widget={widget} edit={edit} />;
         case 'portfolio-grid': {
             const c = widget.config;
             return (
@@ -422,7 +424,7 @@ function DashboardSettings({ doc, sites }: { doc: DashboardDocV2; sites: SiteOpt
                             <Choice ariaLabel="Default date range" value={dc.default.kind === 'preset' ? dc.default.id : '28d'} onChange={(v) => setDate({ default: { kind: 'preset', id: v } })} options={presetOptions(dc.default.kind === 'preset' ? dc.default.id : null)} />
                         </Field>
                         <Field label="Compare to">
-                            <Choice ariaLabel="Default comparison" value={dc.defaultCompare.mode === 'custom' ? 'none' : dc.defaultCompare.mode} onChange={(v) => setDate({ defaultCompare: { mode: v } })} options={[{ value: 'previous_period', label: 'Previous period' }, { value: 'previous_year', label: 'Same period last year' }, { value: 'none', label: 'No comparison' }]} />
+                            <Choice ariaLabel="Default comparison" value={compareOptionId(dc.defaultCompare) === 'custom' ? 'none' : (compareOptionId(dc.defaultCompare) as Exclude<CompareOption['id'], 'custom'>)} onChange={(v) => setDate({ defaultCompare: COMPARE_OPTIONS.find((o) => o.id === v)?.spec ?? { mode: 'none' } })} options={COMPARE_OPTIONS.filter((o) => o.spec).map((o) => ({ value: o.id as Exclude<CompareOption['id'], 'custom'>, label: o.label }))} />
                         </Field>
                         <Toggle label="Viewers can change dates" checked={dc.viewerCanChange} onChange={(v) => setDate({ viewerCanChange: v })} />
                     </>

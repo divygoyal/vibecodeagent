@@ -5,8 +5,11 @@
  */
 import { expandCalcs, isCalcId, parseCalcId } from './calc';
 import { getMetric, metricLabel } from './catalog';
+import { applyDrill, drillFilters } from './drill';
+import { chartMetrics, compileChart, swapChartMetric } from './charts';
 import { clickDimension } from './interaction';
 import { widgetMetrics } from './registry';
+import { isSearchType, searchTypeEligible } from './searchType';
 import { substituteFilters, variableValues } from './variables';
 import type {
     ControlDef,
@@ -20,6 +23,8 @@ import type {
     MetricRef,
     PageId,
     RefLine,
+    SearchType,
+    SearchTypeControl,
     SiteControl,
     SourceRef,
     WidgetDef,
@@ -67,6 +72,9 @@ export function widgetFilters(widget: WidgetDef, ctx: CompileCtx): Array<{ claus
     // Widget filters, with dashboard variables ({{var:name}}) filled in.
     const widgetOwn = widget.filters?.length ? substituteFilters(widget.filters, variableValues(ctx.controlDefs, ctx.controls)) : widget.filters;
     for (const clause of widgetOwn ?? []) out.push({ clause });
+    // Drill down (round 8): the values clicked on the levels above the one shown. After variable
+    // substitution on purpose: a clicked value is data, never a {{var}} to fill in.
+    for (const clause of drillFilters(widget, ctx.controls.drill)) out.push({ clause, controlId: 'drill' });
     return out;
 }
 
@@ -104,6 +112,14 @@ export function selectedGrain(control: GrainControl, controls: ControlState): 'a
     return control.default === 'day' || control.default === 'week' || control.default === 'month' ? control.default : 'auto';
 }
 
+/** The search type a search type control shows: the viewer's pick when it is an option, else the control's default. */
+export function selectedSearchType(control: SearchTypeControl, controls: ControlState): { type: SearchType; picked: boolean } {
+    const pick = controls.searchType?.[control.id];
+    const options = Array.isArray(control.options) ? control.options : [];
+    if (isSearchType(pick) && options.includes(pick)) return { type: pick, picked: true };
+    return { type: isSearchType(control.default) ? control.default : 'web', picked: false };
+}
+
 /** Metric ids a widget shows (for "which widgets follow this metric control"). */
 export function widgetMetricIds(widget: WidgetDef): MetricId[] {
     switch (widget.type) {
@@ -115,7 +131,7 @@ export function widgetMetricIds(widget: WidgetDef): MetricId[] {
         case 'geo': return [widget.config.metric.id];
         case 'table': return widget.config.columns.filter((c) => c.kind === 'metric').map((c) => c.ref);
         case 'portfolio-grid': return widget.config.metrics.map((m) => m.id);
-        default: return [];
+        default: return chartMetrics(widget);
     }
 }
 
@@ -215,7 +231,7 @@ function swapMetric(widget: WidgetDef, from: MetricId, to: MetricId): WidgetDef 
                 },
             };
         }
-        default: return widget;
+        default: return swapChartMetric(base, from, to);
     }
 }
 
@@ -243,7 +259,17 @@ export function applyViewerControls(widget: WidgetDef, ctx: CompileCtx, opts: { 
         const g = gc ? selectedGrain(gc, ctx.controls) : 'auto';
         if (g !== 'auto' && w.config.granularity !== g) w = { ...w, config: { ...w.config, granularity: g } };
     }
-    return w;
+    // Round 8: the search type switcher moves Search Console widgets (every metric from Search Console).
+    // A widget with its own non-web search type keeps it (its title says so); the control moves only the
+    // widgets left on Web. A control left on Web with no pick changes nothing.
+    const own = w.searchType && w.searchType !== 'web';
+    const tc = !own && searchTypeEligible(w) ? controlsFor('searchType', w, ctx)[0] : undefined;
+    if (tc) {
+        const { type, picked } = selectedSearchType(tc, ctx.controls);
+        if ((picked || type !== 'web') && (w.searchType ?? 'web') !== type) w = { ...w, searchType: type === 'web' ? undefined : type };
+    }
+    // Round 8: drill down (the dimension of the level the viewer is on, and the clicked values as filters).
+    return applyDrill(w, ctx.controls.drill);
 }
 
 const timeDim = (g: 'day' | 'week' | 'month'): string => (g === 'day' ? 'date' : g);
@@ -253,8 +279,11 @@ export function compileWidget(rawWidget: WidgetDef, ctx: CompileCtx): CompiledWi
     const filterOrigins = widgetFilters(widget, ctx);
     const filters = filterOrigins.map((f) => f.clause);
     const source: SourceRef = widget.source ?? { type: 'default' };
-    const compareOn = ctx.controls.date.compare.mode !== 'none' && !(widget.ignoreControls ?? []).includes('compare');
-    const base = { source, filters };
+    // A widget with its own comparison (round 9) asks for it whatever the dashboard shows; "none" there turns it off.
+    const compareOn = (widget.dateOverride?.compare ? widget.dateOverride.compare.mode !== 'none' : ctx.controls.date.compare.mode !== 'none') && !(widget.ignoreControls ?? []).includes('compare');
+    // Search Console search type (round 8): only for widgets that read Search Console alone; web is the API default.
+    const searchType = searchTypeEligible(widget) && isSearchType(widget.searchType) && widget.searchType !== 'web' ? widget.searchType : undefined;
+    const base = { source, filters, ...(searchType ? { searchType } : {}) };
     const queries: WidgetQuery[] = [];
 
     switch (widget.type) {
@@ -329,7 +358,10 @@ export function compileWidget(rawWidget: WidgetDef, ctx: CompileCtx): CompiledWi
             break;
         }
         case 'geo': {
-            queries.push({ ...base, part: 'rows', metrics: [widget.config.metric.id], dimensions: ['country'], sort: { by: widget.config.metric.id, dir: 'desc' }, limit: 300, compare: compareOn });
+            // Round 9: region and city views read country + region / city rows (the country picks the region list).
+            const level = widget.config.level;
+            const dimensions = level === 'region' ? ['country', 'region'] : level === 'city' ? ['country', 'city'] : ['country'];
+            queries.push({ ...base, part: 'rows', metrics: [widget.config.metric.id], dimensions, sort: { by: widget.config.metric.id, dir: 'desc' }, limit: level === 'country' || !level ? 300 : 1000, compare: compareOn && (level === 'country' || !level) });
             break;
         }
         case 'portfolio-grid': {
@@ -341,6 +373,8 @@ export function compileWidget(rawWidget: WidgetDef, ctx: CompileCtx): CompiledWi
             break;
         }
         default:
+            // Round 9 charts (heatmap, scatter, funnel, treemap, pivot): charts/index.ts
+            queries.push(...compileChart(widget, base));
             break;
     }
     return { queries, filterOrigins };

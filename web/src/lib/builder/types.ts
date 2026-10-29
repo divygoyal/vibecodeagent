@@ -4,6 +4,8 @@
  * migration and the tests all import from here.
  */
 
+import type { ChartWidgetDef } from './charts/types';
+
 export type Iso = string; // 'YYYY-MM-DD'
 export type WidgetId = string;
 export type PageId = string;
@@ -47,9 +49,13 @@ export type DateRangeSpec =
 
 export type CompareSpec =
     | { mode: 'none' }
-    | { mode: 'previous_period' }
+    /** `align: 'weekday'` (round 9): shift back by whole weeks, so weekdays face the same weekdays. */
+    | { mode: 'previous_period'; align?: 'weekday' }
     | { mode: 'previous_year'; align?: 'date' | 'weekday' }
     | { mode: 'custom'; start: Iso; end: Iso };
+
+/** "N units earlier" (widgetDates.ts); amount 1-60. */
+export interface DateShift { unit: 'day' | 'week' | 'month' | 'year'; amount: number }
 
 export type ControlScope =
     | { mode: 'all' }
@@ -140,7 +146,23 @@ export interface VariableControl {
     viewerCanChange: boolean;
 }
 
-export type ControlDef = DateControl | FilterControl | SiteControl | MetricControl | GrainControl | VariableControl;
+/** Search Console search types (the API's `type`): web is the default. */
+export type SearchType = 'web' | 'image' | 'video' | 'news' | 'discover' | 'googleNews';
+
+/**
+ * Search type switcher (round 8): Search Console widgets in scope (every metric from Search Console) read the
+ * viewer's pick instead of their own search type. `default` 'web' with no pick leaves each widget's own setting.
+ */
+export interface SearchTypeControl {
+    id: ControlId;
+    type: 'searchType';
+    label: string;
+    options: SearchType[];
+    default: SearchType;
+    scope: ControlScope;
+}
+
+export type ControlDef = DateControl | FilterControl | SiteControl | MetricControl | GrainControl | SearchTypeControl | VariableControl;
 
 export type FilterOp = 'eq' | 'neq' | 'in' | 'not_in' | 'contains' | 'not_contains' | 'starts' | 'ends' | 'regex' | 'not_regex';
 export interface FilterClause { dimension: DimId; op: FilterOp; value: string | string[] }
@@ -157,6 +179,13 @@ export interface ControlState {
     metric?: Record<ControlId, MetricId>;
     /** Day / Week / Month picks (URL g.<id>). */
     grain?: Record<ControlId, 'auto' | Grain>;
+    /** Search type picks (URL t.<id>, round 8). */
+    searchType?: Record<ControlId, SearchType>;
+    /**
+     * Drill down (round 8, URL d.<widgetId>): the values clicked so far per widget, in level order. Owner
+     * views hold the values; public URLs hold signed keys the server issued with the data (drill.ts).
+     */
+    drill?: Record<WidgetId, string[]>;
     pageId?: PageId;
 }
 
@@ -245,6 +274,22 @@ export interface DashboardDocV2 {
      * compute (lib/builder/calc.ts), so widgets use it like any MetricId. Missing = none.
      */
     calcs?: CalculatedMetric[];
+    /**
+     * Saved views (round 9, savedViews.ts): named bookmarks of the viewer state (the URL query), kept in the
+     * doc so they need no table. Owner pages only: a share link never receives this list.
+     */
+    views?: SavedView[];
+    /** The view the dashboard opens on when the URL carries no state (id of one of `views`). */
+    defaultViewId?: string;
+}
+
+/** A named bookmark of the viewer's state: the query string a link to that view would carry (savedViews.ts). */
+export interface SavedView {
+    id: string;
+    /** 1-60 characters. */
+    name: string;
+    /** URL query without the leading '?': range, compare, page, f.*, x, s.*, m.*, g.*, t.*, d.*. */
+    query: string;
 }
 
 /** A named calculated metric: id 'calc:<op>_<format>_<better>:<A>[:<B>]:<token>' (calc.ts). */
@@ -283,11 +328,33 @@ export interface WidgetBase<T extends string, C> {
     source: SourceRef;
     config: C;
     style?: WidgetStyle;
-    dateOverride?: { range?: DateRangeSpec; compare?: CompareSpec };
+    /** Own dates (round 9, widgetDates.ts): a fixed range, or the dashboard's range moved back; missing = the dashboard's. */
+    dateOverride?: { range?: DateRangeSpec; compare?: CompareSpec; shift?: DateShift };
     filters?: FilterClause[];
     ignoreControls?: ControlId[];
-    interactions?: { clickToFilter?: boolean };
+    interactions?: WidgetInteractions;
+    /**
+     * Search Console search type (round 8), only read when every metric of the widget comes from Search
+     * Console. Missing = web.
+     */
+    searchType?: SearchType;
     mobile?: { hidden?: boolean; minHeight?: number };
+}
+
+export interface WidgetInteractions {
+    clickToFilter?: boolean;
+    /**
+     * Drill down (round 8): the levels below the widget's own dimension, in order (for a Channel chart:
+     * Source / medium, Campaign). A click on a bar, row or slice filters the widget to that value and
+     * shows the next level; "Up" goes back. Bar, pie and table widgets.
+     */
+    drill?: DimId[];
+    /**
+     * Runtime only, set by applyDrill on the copy a viewer sees and never saved (the schema drops it):
+     * the whole chain (own dimension first) and the level now shown.
+     */
+    drillChain?: DimId[];
+    drillDepth?: number;
 }
 
 export interface ComparisonDisplay {
@@ -442,7 +509,14 @@ export interface TableConfig {
 export type TableWidget = WidgetBase<'table', TableConfig>;
 
 export interface GeoConfig {
-    level: 'country';
+    /**
+     * 'country' = shaded world map (the original). Round 9: 'region' = the regions of one country (a list with bars
+     * beside that country's outline: GA4 gives no region shapes), 'city' = bubbles on the map at each city's place
+     * (a small public-domain lookup, lib/builder/geo.ts) with the ranked list under it for cities it does not know.
+     */
+    level: 'country' | 'region' | 'city';
+    /** Region view: the country shown (ISO 3166-1 alpha-2); missing = the country with the most of the metric. */
+    country?: string;
     metric: MetricRef;
     scale: { kind: 'sequential'; bins: 'quantile' | 'linear' | 'log'; steps: 5 | 7 };
     projection: 'naturalEarth' | 'mercator';
@@ -484,9 +558,38 @@ export interface PortfolioGridConfig {
 }
 export type PortfolioGridWidget = WidgetBase<'portfolio-grid', PortfolioGridConfig>;
 
+// ── Round 9: live widgets (lib/builder/realtime.ts) ──
+export type RealtimeBreakdown = 'none' | 'country' | 'city' | 'page' | 'device';
+export interface RealtimeConfig {
+    /** The list under the number. GA4's Realtime API has no source dimension, so no "source" option. */
+    breakdown: RealtimeBreakdown;
+    /** Rows of the list. */
+    top: 3 | 5 | 8;
+    /** Mini bars, one per minute of the last 30. */
+    bars: boolean;
+}
+export type RealtimeWidget = WidgetBase<'realtime', RealtimeConfig>;
+
+/** A web page in a sandboxed iframe (lib/builder/embed.ts). */
+export interface EmbedConfig {
+    /** https only; '' while the widget is new. */
+    url: string;
+    /** Accessible title of the frame. */
+    title: string;
+    /** Height of the page inside the card in pixels (120-2000); missing = fill the card. Setting it also resizes the card. */
+    heightPx?: number;
+    /** Let the page scroll inside the card (default on). */
+    scroll: boolean;
+    /** Share links and embeds show this widget only when the owner turns this on (missing = off). */
+    showOnPublic?: boolean;
+}
+export type EmbedWidget = WidgetBase<'embed', EmbedConfig>;
+
 export type WidgetDef =
     | ScorecardWidget | KpiStripWidget | TimeSeriesWidget | BarWidget | PieWidget | TableWidget
-    | GeoWidget | TextWidget | ImageWidget | SectionWidget | PortfolioGridWidget;
+    | GeoWidget | TextWidget | ImageWidget | SectionWidget | PortfolioGridWidget
+    // Round 9 charts (heatmap, scatter, funnel, treemap, pivot): charts/types.ts
+    | ChartWidgetDef | RealtimeWidget | EmbedWidget;
 
 export type WidgetType = WidgetDef['type'];
 
@@ -527,7 +630,9 @@ export interface PublicDashboard {
     share?: Pick<ShareState, 'allowCopy' | 'badge' | 'viewerControls'>;
     rev?: number;
 }
-export type PublicDashboardDoc = Omit<DashboardDocV2, 'defaultSource' | 'widgets' | 'meta'> & {
+export type PublicDashboardDoc = Omit<DashboardDocV2, 'defaultSource' | 'widgets' | 'meta' | 'views' | 'defaultViewId'> & {
+    /** The owner's default view as a query the share allows (savedViews.ts publicDefaultQuery); missing = none. */
+    defaultViewQuery?: string;
     defaultSource: PublicSourceRef;
     widgets: Record<WidgetId, Omit<WidgetDef, 'source'> & { source: PublicSourceRef | { type: 'default' } }>;
     meta: Record<string, never>;
@@ -584,6 +689,11 @@ export interface DataFrame {
     labels?: Record<string, string>;
     /** Owner views only: the GA4 property name under a site's host (siteId -> name), when it says more than the host. */
     sublabels?: Record<string, string>;
+    /**
+     * Public views of a drill widget only (round 8): a signed key per row value (value -> key). The viewer's
+     * browser sends the key back, never the value; the server accepts only keys it signed (server/access.ts).
+     */
+    drillKeys?: Record<string, string>;
 }
 
 export interface ResultFlags {
@@ -593,12 +703,21 @@ export interface ResultFlags {
     otherRow?: boolean;
     preliminaryFrom?: Iso;
     filtersIgnored?: ControlId[];
+    /** Which filters were left out and for which Google product (the footnote names them). */
+    filtersIgnoredDims?: Array<{ dimension: DimId; family: 'ga4' | 'gsc' }>;
     sitesFailed?: string[];
     usersSummed?: boolean;
     /** Families the source lacks for some of the widget's metrics (those show '–'). */
     missingFamilies?: Array<'ga4' | 'gsc'>;
     sortedWithinTop?: number;
     currency?: string;
+    /**
+     * Round 9: the comparison window starts before Google has data (a property that is younger than the window, or
+     * history older than Search Console keeps). The comparison line breaks there instead of dropping to 0;
+     * `compareFrom` is the first comparison day with data, `compareNone` means none of the window has any.
+     */
+    compareFrom?: Iso;
+    compareNone?: boolean;
 }
 
 export interface WidgetResultOk {
@@ -639,11 +758,16 @@ export interface WidgetQuery {
     limit?: number;
     offset?: number;
     top?: { n: number; other: boolean };
+    /**
+     * Extra filters for this query only (round 9: a funnel step), on top of the widget's own. The engine
+     * adds them to the filters it applies; they never come from a control, so no footnote names them.
+     */
+    stepFilters?: FilterClause[];
     totals?: boolean;
     compare: boolean;
     /** Zero-fill the date axis and align the comparison by day index. */
     fillDates?: boolean;
     /** Second dimension pivoted into series columns (time series breakdown, stacked bar). */
     pivot?: { dimension: DimId; top: number; other: boolean };
-    searchType?: 'web' | 'image' | 'video' | 'news' | 'discover' | 'googleNews';
+    searchType?: SearchType;
 }

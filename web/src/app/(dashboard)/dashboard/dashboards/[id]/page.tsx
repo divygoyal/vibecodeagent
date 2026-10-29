@@ -4,14 +4,17 @@ import { use, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
-import { ArrowLeft, Copy, FileDown, Globe, LayoutTemplate, Lock, MonitorPlay, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, FileDown, Globe, LayoutTemplate, Lock, Mail, MonitorPlay, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Banner, Button, ConfirmModal, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Skeleton } from '@/components/ui';
 import { DashboardView, pickedSiteLabel, useUrlControls, viewerSelection } from '@/components/dashboard-builder/DashboardView';
 import { DashboardBrandHeader } from '@/components/dashboard-builder/DashboardBrandHeader';
+import type { ViewsHandlers } from '@/components/dashboard-builder/ViewsMenu';
+import { defaultViewOf, removeView, saveView, setDefaultView, stateQuery, viewIsCurrent } from '@/lib/builder/savedViews';
 import { brandCompanyName } from '@/lib/builder/placeholders';
 import { ShareDialog } from '@/components/dashboard-builder/ShareDialog';
+import { EmailScheduleDialog } from '@/components/dashboard-builder/EmailScheduleDialog';
 import { TvFrame, tvRefreshMs } from '@/components/dashboard-builder/TvMode';
 import { dashRootProps } from '@/components/dashboard-builder/theme/DashTheme';
 import { fetchJson, ownerPageLoader, usePageResults } from '@/components/dashboard-builder/useWidgetData';
@@ -71,11 +74,13 @@ export default function DashboardViewPage({ params }: { params: Promise<{ id: st
 function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: DashboardRecord; onRecord: (r: DashboardRecord) => void; openShare: boolean; tv: boolean; created: boolean; router: ReturnType<typeof useRouter> }) {
     const doc = rec.doc;
     const appMode = useResolvedTheme();
-    const ctl = useUrlControls(doc, { date: true, compare: true, filters: true });
+    // Round 9: the owner's default view stands in when the URL carries no state.
+    const ctl = useUrlControls(doc, { date: true, compare: true, filters: true }, { defaultQuery: defaultViewOf(doc)?.query });
     const [fresh, setFresh] = useState(false);
     const key = `owner:${rec.id}:${rec.rev}:${canonicalJson(ctl.state)}`;
     const page = usePageResults(key, ownerPageLoader(rec.id, ctl.state.pageId ?? doc.pages[0].id, ctl.state, fresh), tv ? tvRefreshMs(doc) : doc.settings.autoRefreshSec * 1000);
     const [share, setShare] = useState(openShare);
+    const [emailOpen, setEmailOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [wide, setWide] = useState(true);
     // Phones and small tablets: the "editing needs a larger screen" note only after a tap on Edit (round 5 audit #28).
@@ -101,7 +106,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
     const siteLabel = (siteCtl ? pickedSiteLabel(siteCtl, ctl.state, siteOptions(siteCtl)) : undefined) ?? defaultSiteLabel;
     const pickedSiteId = siteCtl ? selectedSite(siteCtl, ctl.state) : undefined;
     const filterSiteId = pickedSiteId ?? (doc.defaultSource.type === 'site' ? doc.defaultSource.siteId : undefined);
-    const switches = { onSite: ctl.setSite, onMetric: ctl.setMetric, onGrain: ctl.setGrain, siteOptions };
+    const switches = { onSite: ctl.setSite, onMetric: ctl.setMetric, onGrain: ctl.setGrain, onSearchType: ctl.setSearchType, siteOptions };
     const selection = viewerSelection(doc, ctl.state, siteCtl ? siteOptions : undefined, defaultSiteLabel);
     const dateLabel = [presetLabel(ctl.state.date.range), selection].filter(Boolean).join(' · ');
     const updatedAt = page.data ? Object.values(page.data.results).map((r) => (r.status === 'ok' ? r.fetchedAt : '')).filter(Boolean).sort()[0] : undefined;
@@ -113,6 +118,35 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
         } catch (e) {
             toast.error(e instanceof Error ? e.message : 'Could not save');
         }
+    };
+    /** Saved views live in the doc (no table): each change is a normal save. Returns a problem text, or null when saved. */
+    const persistViews = async (next: DashboardDocV2): Promise<string | null> => {
+        try {
+            const r = await fetchJson<{ dashboard: DashboardRecord }>(`/api/dashboards/${rec.id}`, { method: 'PUT', headers: { 'If-Match': String(rec.rev) }, body: JSON.stringify({ doc: next, versionLabel: 'Views changed' }) });
+            onRecord(r.dashboard);
+            return null;
+        } catch (e) {
+            return e instanceof Error ? e.message : 'Could not save the view';
+        }
+    };
+    const savedViews = doc.views ?? [];
+    const views: ViewsHandlers = {
+        owner: {
+            views: savedViews,
+            defaultId: doc.defaultViewId,
+            currentId: savedViews.find((v) => viewIsCurrent(v, ctl.query))?.id,
+            canSave: true,
+            onSave: async (name) => {
+                const r = saveView(doc, name, stateQuery(ctl.query, { page: false }));
+                return r.ok ? persistViews(r.doc) : r.error;
+            },
+            onDelete: (viewId) => { void persistViews(removeView(doc, viewId)).then((p) => (p ? toast.error(p) : toast.success('View deleted'))); },
+            onDefault: (viewId) => { void persistViews(setDefaultView(doc, viewId)).then((p) => (p ? toast.error(p) : toast.success(viewId ? 'Default view set' : 'Default view cleared'))); },
+        },
+        onApply: ctl.applyView,
+        onReset: ctl.resetView,
+        hasDefault: Boolean(defaultViewOf(doc)),
+        link: ctl.viewLink,
     };
     const duplicate = async (asTemplate: boolean) => {
         try {
@@ -173,6 +207,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
                             <DropdownMenuItem icon={Copy} onSelect={() => duplicate(false)}>Duplicate</DropdownMenuItem>
                             <DropdownMenuItem icon={LayoutTemplate} onSelect={() => duplicate(true)}>Save as my template</DropdownMenuItem>
                             <DropdownMenuItem icon={FileDown} onSelect={exportPdf}>Export PDF</DropdownMenuItem>
+                            <DropdownMenuItem icon={Mail} onSelect={() => setEmailOpen(true)}>Schedule email</DropdownMenuItem>
                             <DropdownMenuItem icon={MonitorPlay} onSelect={() => { void document.documentElement.requestFullscreen?.().catch(() => undefined); ctl.setTv(true); }}>Present (TV mode)</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem icon={Trash2} destructive onSelect={() => setConfirmDelete(true)}>Delete</DropdownMenuItem>
@@ -220,6 +255,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
                 onFilter={ctl.setFilter}
                 onVariable={ctl.setVariable}
                 onInteraction={ctl.setInteraction}
+                onDrill={ctl.setDrill}
                 allow={{ date: true, compare: true, filters: true }}
                 data={page.data}
                 loading={!page.data && !page.error}
@@ -232,6 +268,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
                 shell="panel"
                 appMode={appMode}
                 notes={{ kind: 'owner', defaultSource: doc.defaultSource, canAdd: true }}
+                views={views}
             />
             {page.error ? <Banner variant="danger" className="mt-4">{page.error instanceof Error ? page.error.message : 'Could not load data'}</Banner> : null}
             <ShareDialog
@@ -244,6 +281,7 @@ function Loaded({ rec, onRecord, openShare, tv, created, router }: { rec: Dashbo
                 onShareChange={(s: ShareState) => onRecord({ ...rec, share: s })}
                 onDocChange={saveDoc}
             />
+            <EmailScheduleDialog open={emailOpen} onOpenChange={setEmailOpen} dashboardId={rec.id} doc={doc} shared={rec.share.enabled && Boolean(rec.share.token)} />
             <ConfirmModal open={confirmDelete} onOpenChange={setConfirmDelete} title="Delete this dashboard?" description="Its public link stops working. This cannot be undone." confirmLabel="Delete" onConfirm={del} />
         </>
     );

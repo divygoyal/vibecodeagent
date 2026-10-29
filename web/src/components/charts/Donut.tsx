@@ -15,6 +15,8 @@ export interface DonutItem {
     value: number;
     /** Fixed colour (channelColor / deviceColor). Default: categorical slot by rank. */
     color?: string;
+    /** An "(other)" row from the query: never ranked among the slices, always the last one (merged with the folded rest). */
+    other?: boolean;
 }
 
 export interface DonutProps {
@@ -33,6 +35,11 @@ export interface DonutProps {
     maxSlices?: number;
     /** Legend right (default) or below. Below is forced under 640px. */
     legend?: 'right' | 'bottom';
+    /**
+     * A click on a slice or a legend row (drill down, round 8). The legend rows become buttons, so the keyboard
+     * reaches them; "Other" is never clickable.
+     */
+    onItemClick?: (item: DonutItem) => void;
     className?: string;
 }
 
@@ -40,14 +47,19 @@ export interface DonutProps {
  * Parts of a whole, 6 slices max (top 5 + Other), inner radius 64%, 2px
  * surface gaps, total in the centre, legend with value and % (DESIGN 3.7).
  */
-export function Donut({ items, centerLabel, centerValue, format = 'count', size = 160, maxSlices = 6, legend = 'right', className }: DonutProps) {
+export function Donut({ items, centerLabel, centerValue, format = 'count', size = 160, maxSlices = 6, legend = 'right', onItemClick, className }: DonutProps) {
     const [active, setActive] = useState<string | null>(null);
     const slices = useMemo(() => {
-        const sorted = [...items].filter((i) => i.value > 0).sort((a, b) => b.value - a.value);
-        if (sorted.length <= maxSlices) return sorted.map((s, i) => ({ ...s, color: s.color ?? categoricalColor(i) }));
-        const head = sorted.slice(0, maxSlices - 1).map((s, i) => ({ ...s, color: s.color ?? categoricalColor(i) }));
-        const rest = sorted.slice(maxSlices - 1).reduce((a, b) => a + b.value, 0);
-        return [...head, { key: '__other', label: 'Other', value: rest, color: CATEGORICAL_OTHER }];
+        // "Other" is last whatever its size (round 9 review): a query's own "(other)" row joins the folded rest.
+        const live = items.filter((i) => i.value > 0);
+        const sorted = live.filter((i) => !i.other).sort((a, b) => b.value - a.value);
+        const queryOther = live.filter((i) => i.other).reduce((a, b) => a + b.value, 0);
+        const withOther = (head: DonutItem[], rest: number) => [
+            ...head.map((s, i) => ({ ...s, color: s.color ?? categoricalColor(i) })),
+            ...(rest > 0 ? [{ key: '__other', label: 'Other', value: rest, color: CATEGORICAL_OTHER }] : []),
+        ];
+        if (sorted.length + (queryOther > 0 ? 1 : 0) <= maxSlices) return withOther(sorted, queryOther);
+        return withOther(sorted.slice(0, maxSlices - 1), sorted.slice(maxSlices - 1).reduce((a, b) => a + b.value, queryOther));
     }, [items, maxSlices]);
     const total = slices.reduce((a, b) => a + b.value, 0);
 
@@ -79,6 +91,8 @@ export function Donut({ items, centerLabel, centerValue, format = 'count', size 
                         isAnimationActive={false}
                         onMouseEnter={(_, i) => setActive(slices[i]?.key ?? null)}
                         onMouseLeave={() => setActive(null)}
+                        onClick={onItemClick ? (_, i) => { const s = slices[i]; if (s && s.key !== '__other') onItemClick(s); } : undefined}
+                        style={onItemClick ? { cursor: 'pointer' } : undefined}
                     >
                         {(slices.length ? slices : [{ key: 'empty', color: 'var(--color-subtle)' }]).map((s) => (
                             <Cell key={s.key} fill={s.color} fillOpacity={active && active !== s.key ? 0.55 : 1} />
@@ -87,24 +101,30 @@ export function Donut({ items, centerLabel, centerValue, format = 'count', size 
                     {slices.length ? <RTooltip content={renderTooltip} isAnimationActive={false} /> : null}
                 </PieChart>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className={size < 120 ? 'text-body-sm font-semibold tabular-nums text-fg' : 'text-stat-sm text-fg'}>{format === 'count' ? fmtCompact(centerValue ?? total) : fmtValue(format, centerValue ?? total)}</span>
+                    <span title={centerValue == null ? `${fmtFull(total)}${centerLabel ? ` ${centerLabel.toLowerCase()}` : ''}: the sum of the slices` : undefined} className={cn('pointer-events-auto', size < 120 ? 'text-body-sm font-semibold tabular-nums text-fg' : 'text-stat-sm text-fg')}>{format === 'count' ? fmtCompact(centerValue ?? total) : fmtValue(format, centerValue ?? total)}</span>
                     {centerLabel && size >= 120 ? <span className="text-meta text-fg-muted">{centerLabel}</span> : null}
                 </div>
             </div>
             <ul className="flex w-full min-w-0 flex-col gap-1">
-                {slices.map((s) => (
-                    <li
-                        key={s.key}
-                        onMouseEnter={() => setActive(s.key)}
-                        onMouseLeave={() => setActive(null)}
-                        className={cn('flex h-7 items-center gap-2 rounded-md px-1.5 text-body-sm transition-colors duration-120', active === s.key && 'bg-subtle')}
-                    >
-                        <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: s.color }} />
-                        <span className="min-w-0 flex-1 truncate text-fg-secondary">{s.label}</span>
-                        <span className="text-fg tabular-nums">{format === 'count' ? fmtFull(s.value) : fmtValue(format, s.value)}</span>
-                        <span className="w-10 text-right text-meta text-fg-muted tabular-nums">{total > 0 ? fmtShare(s.value / total) : '–'}</span>
-                    </li>
-                ))}
+                {slices.map((s) => {
+                    const row = (
+                        <>
+                            <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: s.color }} />
+                            <span className="min-w-0 flex-1 truncate text-fg-secondary">{s.label}</span>
+                            <span className="text-fg tabular-nums">{format === 'count' ? fmtFull(s.value) : fmtValue(format, s.value)}</span>
+                            <span className="w-10 text-right text-meta text-fg-muted tabular-nums">{total > 0 ? fmtShare(s.value / total) : '–'}</span>
+                        </>
+                    );
+                    const cls = cn('flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-body-sm transition-colors duration-120', active === s.key && 'bg-subtle');
+                    const hover = { onMouseEnter: () => setActive(s.key), onMouseLeave: () => setActive(null) };
+                    return (
+                        <li key={s.key} {...hover}>
+                            {onItemClick && s.key !== '__other'
+                                ? <button type="button" onClick={() => onItemClick(s)} onFocus={() => setActive(s.key)} onBlur={() => setActive(null)} className={cn(cls, 'cursor-pointer')}>{row}</button>
+                                : <div className={cls}>{row}</div>}
+                        </li>
+                    );
+                })}
             </ul>
         </div>
     );

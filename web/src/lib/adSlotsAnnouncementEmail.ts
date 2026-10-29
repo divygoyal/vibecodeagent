@@ -55,7 +55,7 @@ export function buildAdSlotsAnnouncement(input: AnnouncementInput): RenderedEmai
       : `You can now sell ad slots on your ${input.sites.length} verified sites — at your price`;
 
   const siteLinesText = input.sites
-    .map((s) => `  • ${s.startup_name} — ${fmt(s.monthly_visitors)} verified monthly visitors → ${profileUrl(s)}`)
+    .map((s) => `  • ${s.startup_name} — ${fmt(s.monthly_visitors)} monthly visitors (Google Analytics) → ${profileUrl(s)}`)
     .join('\n');
 
   const text = `${greeting}
@@ -90,7 +90,7 @@ Reply to this email if anything is unclear; a human reads it.
             <a href="${profileUrl(s)}" style="color:#fafafa;text-decoration:none;font-weight:600;">${escapeHtml(s.startup_name)}</a>
           </td>
           <td style="padding:10px 12px;border-top:1px solid #27272a;font-size:13px;color:#a1a1aa;text-align:right;white-space:nowrap;">
-            ${fmt(s.monthly_visitors)} <span style="color:#71717a;">verified visitors / mo</span>
+            ${fmt(s.monthly_visitors)} <span style="color:#71717a;">visitors / mo (Google Analytics)</span>
           </td>
         </tr>`,
     )

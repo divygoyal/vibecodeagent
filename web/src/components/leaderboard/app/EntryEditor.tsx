@@ -22,6 +22,7 @@ import { EmbedCard } from '../ProfileClient';
 import { InboxPanel, useInbox } from './InboxPanel';
 import { PreviewPanel } from './Preview';
 import { useIsMobile } from '@/lib/useIsMobile';
+import { badgeEligible } from '@/lib/leaderboard/trafficBadge';
 import { PrivacyForm } from './PrivacyForm';
 import { SlotsEditor } from './SlotsEditor';
 
@@ -325,7 +326,7 @@ export function EntryEditor({ entry, origin, firstCheck, onChanged, onDeleted }:
                     {tab === 'slots' ? <SlotsEditor key={entry.id} entryId={entry.id} initial={entry.ad_slots} onSaved={() => void onChanged()} /> : null}
                     {tab === 'embed' ? (
                         v.ranked ? (
-                            <EmbedCard origin={origin} slug={entry.slug || String(entry.id)} id={entry.id} name={entry.startup_name} liveEnabled={entry.privacy.live} />
+                            <EmbedCard origin={origin} slug={entry.slug || String(entry.id)} id={entry.id} name={entry.startup_name} liveEnabled={entry.privacy.live} trafficBadge={badgeEligible(entry)} />
                         ) : (
                             <Banner variant="info" title="Available once you are verified">The badge and widget show your verified status, so they switch on when ownership is confirmed.</Banner>
                         )

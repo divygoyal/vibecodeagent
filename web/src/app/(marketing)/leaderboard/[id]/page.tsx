@@ -18,6 +18,7 @@ import { freshness, metricText } from '@/lib/leaderboard/format';
 import { getProfile, parseRange } from '@/lib/leaderboard/server';
 import { jsonLdString } from '@/lib/leaderboard/jsonld';
 import { canonicalRedirect } from '@/lib/leaderboard/canonical';
+import { badgeEligible } from '@/lib/leaderboard/trafficBadge';
 
 // Server rendered per request; the data fetch is cached 60 s.
 export const dynamic = 'force-dynamic';
@@ -33,11 +34,12 @@ export async function generateMetadata({ params, searchParams }: { params: Param
 
     const visitors = metricText(p.kpis?.visitors);
     const title = visitors
-        ? `${p.name}: ${visitors} verified visitors a month | ${BRAND_NAME}`
+        ? `${p.name}: ${visitors} visitors a month | ${BRAND_NAME}`
         : `${p.name} on the ${BRAND_NAME} verified traffic leaderboard`;
     const description = p.description
-        || `${p.name} on the ${BRAND_NAME} verified traffic leaderboard.${visitors ? ` ${visitors} visitors in the last 28 days, confirmed through Google Analytics and Search Console.` : ''}`;
-    const canonical = `${SITE_ORIGIN}/leaderboard/${p.slug || p.id}`;
+        || `${p.name} on the ${BRAND_NAME} verified traffic leaderboard.${visitors ? ` ${visitors} visitors in the last 28 days (Google Analytics). Owner verified in Google Search Console.` : ''}`;
+    // Relative: resolved against metadataBase (the brand's site URL), like every other page's canonical.
+    const canonical = `/leaderboard/${p.slug || p.id}`;
     const indexable = p.status === 'ranked' && !sp.range;
     return {
         // The page title gets "| TrafficClaw" from the root template only when it does not already name it.
@@ -169,7 +171,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pa
                         <SlotsCard p={p} />
                         <OfferSection idOrSlug={slug} siteName={p.name} openTo={p.open_to} slots={p.ad_slots} initialSlotId={Number(Array.isArray(sp.slot) ? sp.slot[0] : sp.slot) || null} />
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                            <EmbedCard origin={SITE_ORIGIN} slug={slug} id={p.id} name={p.name} liveEnabled={p.live.enabled} />
+                            <EmbedCard origin={SITE_ORIGIN} slug={slug} id={p.id} name={p.name} liveEnabled={p.live.enabled} trafficBadge={badgeEligible(p)} />
                             <SimilarCard p={p} />
                         </div>
                     </div>

@@ -25,8 +25,8 @@ const DESCRIPTION = 'Every ad slot listed on the verified traffic leaderboard. V
 export const metadata: Metadata = {
     title: { absolute: TITLE },
     description: DESCRIPTION,
-    alternates: { canonical: `${SITE_ORIGIN}/leaderboard/advertise` },
-    openGraph: { title: TITLE, description: DESCRIPTION, url: `${SITE_ORIGIN}/leaderboard/advertise`, siteName: BRAND_NAME, type: 'website' },
+    alternates: { canonical: '/leaderboard/advertise' },
+    openGraph: { title: TITLE, description: DESCRIPTION, url: '/leaderboard/advertise', siteName: BRAND_NAME, type: 'website' },
     twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION },
 };
 

@@ -17,7 +17,9 @@ import { applyViewerControls, canonicalJson, compileWidget } from '../compile';
 import { alpha2ToGsc, gscToAlpha2 } from '../countries';
 import { lastCompleteDay, searchWindowOf } from '@/lib/dateRange';
 import { addDays, autoGranularity, eachDay, fromDay, monthStart, resolveCompare, resolveRange, toDay, todayIn, weekStart } from '../dates';
-import { widgetMeta } from '../registry';
+import { resolveWidgetDates } from '../widgetDates';
+import { skipsPageQuery, widgetMeta } from '../registry';
+import { searchTypeProblem } from '../searchType';
 import { tableTrendQuery } from '../trend';
 import type {
     CalculatedMetric,
@@ -29,6 +31,7 @@ import type {
     FilterClause,
     Iso,
     ResultFlags,
+    SearchType,
     SourceRef,
     WidgetDef,
     WidgetErrorCode,
@@ -154,6 +157,8 @@ interface LogicalLeaf {
     isPrev?: boolean;
     order?: { kind: 'metric' | 'dim'; field: string; desc: boolean };
     limit: number;
+    /** GSC only (round 8): the Search Console `type`; missing = web. */
+    searchType?: SearchType;
 }
 
 interface PhysicalLeaf {
@@ -285,7 +290,7 @@ function gscBody(l: LogicalLeaf): Record<string, unknown> {
         endDate: l.range.end,
         dimensions: l.apiDims,
         rowLimit: Math.min(25_000, l.limit),
-        type: 'web',
+        type: l.searchType ?? 'web',
         dataState: 'all',
     };
     const f = gscFilters(l.filters);
@@ -461,9 +466,14 @@ function withComponents(metrics: string[]): string[] {
 // ── Planning per widget ──────────────────────────────────────────────────
 
 /** A GSC leaf's window: the GA4 window moved onto Search Console's last complete day; the comparison moves with it. */
-function searchWindows(range: Range, compare: Range | undefined, today: Iso): { range: Range; compare?: Range } {
+function searchWindows(range: Range, compare: Range | undefined, today: Iso, fixedCompare = false): { range: Range; compare?: Range } {
     const r = searchWindowOf(range, today);
     const shift = toDay(range.end) - toDay(r.end);
+    if (fixedCompare && compare) {
+        // A comparison the viewer typed in stays on its days; it only stops at Search Console's last complete day.
+        const last = lastCompleteDay('gsc', today);
+        return { range: r, compare: compare.end > last ? (compare.start > last ? undefined : { start: compare.start, end: last }) : compare };
+    }
     return { range: r, compare: compare && shift ? { start: addDays(compare.start, -shift), end: addDays(compare.end, -shift) } : compare };
 }
 
@@ -570,14 +580,14 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     const tz = input.timezone || 'UTC';
     const today = todayIn(tz, now);
     const baseRange = resolveRange(input.controls.date.range, today);
-    const baseCompare = resolveCompare(baseRange, input.controls.date.compare);
+    const baseCompare = resolveCompare(baseRange, input.controls.date.compare, today);
     const baseSearch = searchWindowOf(baseRange, today);
     const stats: ExecStats = { ga4Calls: 0, ga4Reports: 0, gscCalls: 0, hit: 0, stale: 0, miss: 0 };
     const results: Record<string, WidgetResult> = {};
 
-    const dataWidgets = input.widgets.filter((w) => !widgetMeta(w.widget.type).static);
+    const dataWidgets = input.widgets.filter((w) => !skipsPageQuery(w.widget.type));
     for (const w of input.widgets) {
-        if (widgetMeta(w.widget.type).static) results[w.widget.id] = { status: 'ok', fetchedAt: now.toISOString(), cache: 'hit', parts: {}, flags: {} };
+        if (skipsPageQuery(w.widget.type)) results[w.widget.id] = { status: 'ok', fetchedAt: now.toISOString(), cache: 'hit', parts: {}, flags: {} };
     }
     // The header names Search Console's days only when a widget reads Search Console (a GA4-only dashboard has one window).
     let readsSearch = false;
@@ -619,8 +629,8 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     // 1. Plan (a function: the trend round below plans its extra query the same way).
     const planWidget = (widget: WidgetDef, pageId: string | undefined, extra?: { queries: WidgetQuery[]; filter: FilterClause }): WidgetPlan => {
         const plan: WidgetPlan = { widget, queries: [], flags: {}, sourceLabel: '' };
-        const range = widget.dateOverride?.range ? resolveRange(widget.dateOverride.range, today) : baseRange;
-        const compare = widget.dateOverride?.compare ? resolveCompare(range, widget.dateOverride.compare) : widget.dateOverride?.range ? resolveCompare(range, input.controls.date.compare) : baseCompare;
+        // Own dates (round 9): a fixed range, a time shift or an own comparison; one rule for engine and labels (widgetDates.ts).
+        const { range, compare, compareSpec } = resolveWidgetDates(widget.dateOverride, { range: baseRange, compare: baseCompare, compareSpec: input.controls.date.compare, today });
         const compiled = compileWidget(widget, { controlDefs: input.controlDefs, controls: input.controls, pageId });
         const queries = extra ? extra.queries : compiled.queries;
         const filterOrigins = extra ? [...compiled.filterOrigins, { clause: extra.filter }] : compiled.filterOrigins;
@@ -648,6 +658,8 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
         const portfolio = src.type === 'portfolio';
 
         for (const q of queries) {
+            // Round 9: a funnel step carries its own filter (an event or a page) next to the widget's filters.
+            const qOrigins: typeof filterOrigins = q.stepFilters?.length ? [...filterOrigins, ...q.stepFilters.map((clause) => ({ clause }))] : filterOrigins;
             if (q.dimensions.includes('site') && !portfolio) {
                 plan.error = errResult('INCOMPATIBLE', 'Break down by site needs the "All sites" source.');
                 break;
@@ -661,6 +673,12 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             }
             const families = [...new Set(metricDefs.map((m) => m.family))];
             if (families.includes('gsc')) readsSearch = true;
+            // Round 8: Discover and Google News have no queries and no position; say so instead of asking Google.
+            const stProblem = q.searchType ? searchTypeProblem(q.searchType, { dimensions: q.dimensions, filters: qOrigins.map((f) => f.clause), metrics: q.metrics }) : null;
+            if (stProblem) {
+                plan.error = errResult('INCOMPATIBLE', stProblem);
+                break;
+            }
             const canonDims = q.dimensions.filter((d) => d !== 'site');
             // Static compatibility (BUILDER.md 9.4)
             const badDim = canonDims.find((d) => !TIME_DIMS.has(d) && families.some((f) => !dimInFamily(d, f)));
@@ -689,7 +707,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
             // Search Console reads its own window (lib/dateRange: through 2 days ago), the days the site page and the
             // portfolio count, except on a date axis it shares with GA4 (its newest day is then marked preliminary).
             const gscOnly = families.length === 1 && families[0] === 'gsc';
-            const gscWin = timeDim && !gscOnly ? null : searchWindows(range, qCompare, today);
+            const gscWin = timeDim && !gscOnly ? null : searchWindows(range, qCompare, today, compareSpec.mode === 'custom');
             const gscRange = gscWin?.range ?? range;
             const gscCompare = gscWin ? gscWin.compare : qCompare;
 
@@ -703,10 +721,12 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
                 entry.targets.push({ site, families: fams });
                 for (const family of fams) {
                     const fMetrics = metricDefs.filter((m) => m.family === family).map((m) => m.id);
-                    const applicable = filterOrigins.filter((fo) => dimInFamily(fo.clause.dimension, family));
-                    for (const fo of filterOrigins) {
+                    const applicable = qOrigins.filter((fo) => dimInFamily(fo.clause.dimension, family));
+                    for (const fo of qOrigins) {
                         if (!dimInFamily(fo.clause.dimension, family) && fo.controlId) {
                             plan.flags.filtersIgnored = [...new Set([...(plan.flags.filtersIgnored ?? []), fo.controlId])];
+                            const seen = plan.flags.filtersIgnoredDims ?? [];
+                            if (!seen.some((x) => x.dimension === fo.clause.dimension && x.family === family)) plan.flags.filtersIgnoredDims = [...seen, { dimension: fo.clause.dimension, family }];
                         }
                     }
                     const apiDims = effDims.map((d) => (family === 'ga4' ? ga4ApiDim(d) : gscApiDim(d)));
@@ -727,6 +747,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
                         family, asset: family === 'ga4' ? site.ga4! : site.gsc!, siteId: site.siteId, siteHost: normalizeHost(site.gsc ?? site.label),
                         apiDims, canonDims: effDims, metrics: leafMetrics, filters: applicable.map((a) => a.clause),
                         order, limit: limitFor(q, effDims, Boolean(qCompare) && family === 'ga4'),
+                        ...(family === 'gsc' && q.searchType && q.searchType !== 'web' ? { searchType: q.searchType } : {}),
                     };
                     if (family === 'ga4') {
                         entry.leaves.push({ site, leaf: { ...common, range, compare: qCompare } });
@@ -754,7 +775,7 @@ export async function evaluateWidgets(input: EvalInput, deps: EngineDeps): Promi
     const runPlans = async (plans: WidgetPlan[]): Promise<WidgetResult[]> => {
         // 2. Merge leaves into physical calls (identical shape -> one call, GA4 metrics unioned).
         const physical = new Map<string, PhysicalLeaf & { metricSet: Set<string>; logical: LogicalLeaf }>();
-        const shapeOf = (l: LogicalLeaf) => canonicalJson({ f: l.family, a: l.asset, d: l.apiDims, fl: l.filters, r: l.range, c: l.compare, o: l.order, lim: l.limit });
+        const shapeOf = (l: LogicalLeaf) => canonicalJson({ f: l.family, a: l.asset, d: l.apiDims, fl: l.filters, r: l.range, c: l.compare, o: l.order, lim: l.limit, st: l.searchType });
         for (const plan of plans) {
             if (plan.error) continue;
             for (const e of plan.queries) {
@@ -1108,16 +1129,23 @@ function shapeFrame(
             for (const b of buckets) if (cur.get(kOf(b))) lastWithData = b;
             const curTot = hasCalc ? shareTotals(q.metrics, buckets.map((b) => cur.get(kOf(b))?.cur ?? {})) : {};
             const prevTot = hasCalc && e.compare ? shareTotals(q.metrics, prevBuckets.map((b) => prev.get(kOf(b))?.cur ?? {})) : {};
+            // Round 9: comparison days before the first one Google has data for are "no data", not zero: the line breaks.
+            const firstPrev = e.compare ? prevBuckets.findIndex((pb) => prev.has(kOf(pb))) : -1;
+            if (e.compare && prevBuckets.length) {
+                if (firstPrev === -1) flags.compareNone = true;
+                else if (firstPrev > 0 && (!flags.compareFrom || prevBuckets[firstPrev] < flags.compareFrom)) flags.compareFrom = prevBuckets[firstPrev];
+            }
             buckets.forEach((b, i) => {
                 const c = cur.get(kOf(b));
                 const p = e.compare ? prev.get(kOf(prevBuckets[i] ?? '')) : undefined;
+                const noPrev = e.compare && (firstPrev === -1 || i < firstPrev);
                 const fill: Vals = {};
                 const missingTail = gscOnly && !c && lagStart && b >= lagStart && b > lastWithData;
                 for (const id of fillIds) fill[id] = missingTail ? null : zeroFor(id);
                 const pfill: Vals = {};
                 for (const id of fillIds) pfill[id] = zeroFor(id);
                 const cv = c ? { ...fill, ...c.cur } : fill;
-                const pv = e.compare ? (p ? { ...pfill, ...p.cur } : prevBuckets[i] ? pfill : undefined) : undefined;
+                const pv = e.compare ? (p ? { ...pfill, ...p.cur } : prevBuckets[i] && !noPrev ? pfill : undefined) : undefined;
                 const row = toRow(bySite ? { site: sid, [timeDim]: b } : { [timeDim]: b }, withCalcs(cv, curTot), withCalcs(pv, prevTot));
                 row[`d:date`] = b;
                 if (e.compare && prevBuckets[i]) row['d:date:prev'] = prevBuckets[i];

@@ -11,7 +11,7 @@ import { useElementWidth } from '@/components/charts/useElementWidth';
 import { METRICS, type MetricKey } from '@/lib/metrics';
 import { Favicon } from '@/components/ui/Favicon';
 import { useScrollEdges } from '@/components/ui/useScrollEdges';
-import { analyzeTable, metricForLabel, parseDelta, parseNumber, type TableShape } from '@/lib/chat/answerFormat';
+import { analyzeTable, isRankHeader, metricForLabel, pageFoldColumn, parseDelta, parseNumber, type TableShape } from '@/lib/chat/answerFormat';
 import { AnswerDelta } from './AnswerDelta';
 import { highlightNumbersInChildren } from './HighlightedNumbers';
 
@@ -53,8 +53,16 @@ interface TableInfo {
     header: string[];
     /** Source offset of each th/td -> its column. */
     colAt: Map<number, number>;
+    /** Source offset of each td -> its body row (0 = first row under the header). */
+    rowAt: Map<number, number>;
+    /** The body cells' text, for the change shown under a number on phones. */
+    body: string[][];
     /** The trend above a date table: values in reading order (oldest first). */
     trend: { label: string; values: number[]; labels: string[] } | null;
+    /** A "#" / "Rank" first column: a narrow number, so on phones it is not the name column (no 9.5rem, not sticky). */
+    rank: boolean;
+    /** Phones: the "Page" column that follows the second column is shown under that column's text instead (-1: none). */
+    pageFold: number;
 }
 
 const TableCtx = createContext<TableInfo | null>(null);
@@ -68,12 +76,15 @@ function tableInfo(node: HastNode | undefined): TableInfo | null {
     const header = cellsOf(trs[0]).map((c) => hastText(c).trim());
     const body = trs.slice(1).map((tr) => cellsOf(tr).map((c) => hastText(c).trim()));
     const colAt = new Map<number, number>();
-    for (const tr of trs) {
+    const rowAt = new Map<number, number>();
+    trs.forEach((tr, r) => {
         cellsOf(tr).forEach((c, i) => {
             const off = c.position?.start.offset;
-            if (typeof off === 'number') colAt.set(off, i);
+            if (typeof off !== 'number') return;
+            colAt.set(off, i);
+            rowAt.set(off, r - 1);
         });
-    }
+    });
     const shape = analyzeTable(header, body);
     let trend: TableInfo['trend'] = null;
     if (shape.timeSeries) {
@@ -86,7 +97,8 @@ function tableInfo(node: HastNode | undefined): TableInfo | null {
             trend = { label: header[shape.seriesCol] ?? '', values, labels: pairs.map((p) => p.when) };
         }
     }
-    return { shape, header, colAt, trend };
+    const rank = header.length > 1 && isRankHeader(header[0]);
+    return { shape, header, colAt, rowAt, body, trend, rank, pageFold: pageFoldColumn(header, shape.numeric) };
 }
 
 const metricOr = (label: string): MetricKey => metricForLabel(label) ?? 'sessions';
@@ -244,18 +256,38 @@ export function AnswerTable({ node, children }: { node?: unknown; children?: Rea
 /** Phones: the first column (the row's name) stays put while the numbers scroll under it. */
 const STICKY_FIRST = 'max-md:first:sticky max-md:first:left-0 max-md:first:z-[1] max-md:group-data-[scrolled]/answer-table:first:shadow-[inset_-1px_0_0_var(--tc-border-subtle)]';
 
-function useCell(node: unknown): { info: TableInfo | null; col: number } {
+function useCell(node: unknown): { info: TableInfo | null; col: number; row: number } {
     const info = useContext(TableCtx);
     const off = (node as HastNode | undefined)?.position?.start.offset;
     const col = info && typeof off === 'number' ? info.colAt.get(off) ?? -1 : -1;
-    return { info, col };
+    const row = info && typeof off === 'number' ? info.rowAt.get(off) ?? -1 : -1;
+    return { info, col, row };
+}
+
+/** Phones: the first column is the sticky name column, except in a numbered list, where it is a narrow number. */
+function firstCol(info: TableInfo | null, col: number): string {
+    return info?.rank && col === 0 ? 'max-md:w-8 max-md:min-w-0 max-md:pl-3 max-md:pr-0' : STICKY_FIRST;
+}
+
+/** Phones: a column whose folded change is the table's last column ends the visible row, so it takes the right-hand gutter. */
+function endsRow(info: TableInfo | null, col: number): boolean {
+    return Boolean(info && col >= 0 && info.shape.foldDelta[col + 1] && col + 2 === info.shape.numeric.length);
+}
+
+/** Phones: the change that follows this number column, under the number ("▲ 46%"), when that column is folded in. */
+function FoldedDelta({ info, col, row }: { info: TableInfo; col: number; row: number }) {
+    const { shape } = info;
+    if (!shape.foldDelta[col + 1] || row < 0) return null;
+    const d = parseDelta(info.body[row]?.[col + 1] ?? '', { bare: true, betterDown: shape.betterDown[col + 1], rank: shape.rankDelta[col + 1] });
+    return d ? <span className="mt-0.5 flex justify-end md:hidden"><AnswerDelta delta={d} className="text-meta" /></span> : null;
 }
 
 export function AnswerTh({ node, children }: { node?: unknown; children?: ReactNode }) {
     const { info, col } = useCell(node);
     const numeric = info && col >= 0 ? info.shape.numeric[col] : false;
+    const folded = info && col >= 0 ? info.shape.foldDelta[col] : false;
     return (
-        <th className={cn('whitespace-nowrap px-3 py-2 text-meta font-medium text-fg-muted first:pl-4 last:pr-4 max-md:first:bg-surface-sunken', STICKY_FIRST, numeric ? 'text-right' : 'text-left')}>{children}</th>
+        <th className={cn('whitespace-nowrap px-3 py-2 max-md:whitespace-normal max-md:px-2 max-md:first:pl-4 max-md:align-bottom text-meta font-medium text-fg-muted first:pl-4 last:pr-4', !info?.rank && 'max-md:first:bg-surface-sunken', firstCol(info, col), numeric ? 'text-right' : 'text-left', (folded || (info && col === info.pageFold)) && 'max-md:hidden', endsRow(info, col) && 'max-md:pr-4')}>{children}</th>
     );
 }
 
@@ -263,16 +295,16 @@ export function AnswerTh({ node, children }: { node?: unknown; children?: ReactN
 const UNDERLINE_HEAT = (pct: number) => ({ width: `${Math.max(pct, 1.5)}%`, ['--tc-heatbar' as string]: '45%' }) as CSSProperties;
 
 export function AnswerTd({ node, children }: { node?: unknown; children?: ReactNode }) {
-    const { info, col } = useCell(node);
+    const { info, col, row } = useCell(node);
     // Phones: the name column keeps at least 9.5rem (words wrap whole) so about three columns show; the rest scroll.
-    const base = cn('px-3 py-2 align-top text-fg first:pl-4 last:pr-4 max-md:first:min-w-[9.5rem] max-md:first:bg-surface max-md:first:break-words', STICKY_FIRST);
+    const base = cn('px-3 py-2 max-md:px-2 max-md:first:pl-4 align-top text-fg first:pl-4 last:pr-4', !info?.rank && 'max-md:first:min-w-[9.5rem] max-md:first:bg-surface max-md:first:break-words', firstCol(info, col), endsRow(info, col) && 'max-md:pr-4');
     if (!info || col < 0) return <td className={base}>{highlightNumbersInChildren(children, 'td')}</td>;
     const { shape } = info;
     const text = hastText(node as HastNode).trim();
     const numeric = shape.numeric[col];
     if (shape.delta[col]) {
         const d = parseDelta(text, { bare: true, betterDown: shape.betterDown[col], rank: shape.rankDelta[col] });
-        return <td className={cn(base, 'text-right whitespace-nowrap')}>{d ? <AnswerDelta delta={d} /> : children}</td>;
+        return <td className={cn(base, 'text-right whitespace-nowrap', shape.foldDelta[col] && 'max-md:hidden')}>{d ? <AnswerDelta delta={d} /> : children}</td>;
     }
     if (col === shape.barCol) {
         const v = parseNumber(text);
@@ -283,12 +315,21 @@ export function AnswerTd({ node, children }: { node?: unknown; children?: ReactN
                     {children}
                     {v !== null ? <span aria-hidden className={cn('absolute bottom-0 right-0 h-[3px] rounded-full', heatbarClass(shape.barMetric ?? 'neutral'))} style={UNDERLINE_HEAT(pct)} /> : null}
                 </span>
+                <FoldedDelta info={info} col={col} row={row} />
             </td>
         );
     }
     // Numbers in one weight (the bold-the-big-numbers highlight made "350" bold and "28" not); text cells keep it.
-    if (numeric) return <td className={cn(base, 'text-right whitespace-nowrap')}>{children}</td>;
-    return <td className={base}>{highlightNumbersInChildren(children, 'td', { betterDown: shape.betterDown[col] })}</td>;
+    if (numeric) return <td className={cn(base, 'text-right whitespace-nowrap')}>{children}<FoldedDelta info={info} col={col} row={row} /></td>;
+    // Phones, numbered list (# | Task | Page | ...): the page goes on a second line under the task.
+    if (info.pageFold >= 0 && col === info.pageFold) return <td className={cn(base, 'max-md:hidden')}>{highlightNumbersInChildren(children, 'td')}</td>;
+    const page = info.pageFold >= 0 && col === 1 ? info.body[row]?.[info.pageFold] : '';
+    return (
+        <td className={base}>
+            {highlightNumbersInChildren(children, 'td', { betterDown: shape.betterDown[col] })}
+            {page ? <span className="mt-0.5 block break-all text-meta text-fg-muted md:hidden">{page}</span> : null}
+        </td>
+    );
 }
 
 /* ─── links ─── */

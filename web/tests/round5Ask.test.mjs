@@ -43,9 +43,9 @@ test('parseDelta: signs, unicode minus, polarity, flat and ambiguous', () => {
     assert.equal(parseDelta('12%'), null, 'unsigned is a value, not a change');
     assert.equal(parseDelta('+342'), null, 'bare numbers only in change columns');
     assert.equal(parseDelta('+1.6', { bare: true, neutral: true }).tone, 'neutral');
-    // Position changes (new minus old), the app's MetricDelta convention: ▲ green = better (a lower number).
-    assert.deepEqual(parseDelta('+1.6', { bare: true, rank: true }), { direction: 'down', tone: 'bad', text: '1.6', spoken: 'worse by 1.6' });
-    assert.deepEqual(parseDelta('−0.3', { bare: true, rank: true }), { direction: 'up', tone: 'good', text: '0.3', spoken: 'improved 0.3' });
+    // Position changes (new minus old), the app's MetricDelta convention (r10): the arrow is where the number moved, the colour says better or worse.
+    assert.deepEqual(parseDelta('+1.6', { bare: true, rank: true }), { direction: 'up', tone: 'bad', text: '1.6', spoken: 'worse by 1.6' });
+    assert.deepEqual(parseDelta('−0.3', { bare: true, rank: true }), { direction: 'down', tone: 'good', text: '0.3', spoken: 'improved 0.3' });
     assert.equal(parseDelta('0.0', { bare: true, rank: true }).direction, 'flat');
     assert.equal(parseNumber('1,551'), 1551);
     assert.equal(parseNumber('12.4K'), 12400);
@@ -60,6 +60,7 @@ test('analyzeTable: numbers right, changes coloured, bars on the ranked count, s
     ]);
     assert.deepEqual(movers.numeric, [false, true, true, true, true]);
     assert.deepEqual(movers.delta, [false, false, true, false, true]);
+    assert.deepEqual(movers.foldDelta, [false, false, true, false, true], 'on phones each change sits under its number: no sideways scroll');
     assert.equal(movers.barCol, 1);
     assert.equal(movers.barMetric, 'users');
     const queries = analyzeTable(['Query', 'Clicks', 'Impressions', 'CTR', 'Position'], [
@@ -72,6 +73,8 @@ test('analyzeTable: numbers right, changes coloured, bars on the ranked count, s
     assert.equal(pos.rankDelta[2], true, 'a position change is drawn as a rank move');
     assert.equal(movers.rankDelta.some(Boolean), false);
     const weeks = analyzeTable(['Week', 'Clicks', 'Change'], [['Sep 29', '1,240', '–'], ['Oct 6', '1,310', '+6%'], ['Oct 13', '1,402', '+7%'], ['Oct 20', '1,612', '+15%']]);
+    assert.deepEqual(weeks.foldDelta, [false, false, true]);
+    assert.equal(analyzeTable(['Change', 'Clicks'], [['+5%', '1'], ['+6%', '2']]).foldDelta.some(Boolean), false);
     assert.equal(weeks.timeSeries, true);
     assert.equal(weeks.seriesCol, 1);
     assert.equal(weeks.barCol, -1, 'a time series gets a sparkline, not bars');

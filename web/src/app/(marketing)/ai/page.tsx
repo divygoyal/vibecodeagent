@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, Eye, ListChecks, Lock, Plug, ShieldCheck, Undo2 } from 'lucide-react';
+import { CodeBlock } from '@/components/connect-ai/CopyButton';
 import { SetupTabs } from '@/components/connect-ai/SetupTabs';
 import { TOOL_SUMMARIES } from '@/components/connect-ai/toolSummaries';
 import { Badge, Button, Card } from '@/components/ui';
@@ -21,6 +22,9 @@ const TRY_ASKING: { area: string; prompt: string }[] = [
     { area: 'Search', prompt: 'Which of my sites lost the most clicks this month, and why?' },
     { area: 'Traffic', prompt: 'Where do visitors from ChatGPT land on my site?' },
     { area: 'Growth', prompt: 'What should I fix first on my main site?' },
+    { area: 'SEO', prompt: 'Where are my quick SEO wins on example.com?' },
+    { area: 'Indexing', prompt: 'Is my new blog post indexed?' },
+    { area: 'Right now', prompt: 'How many people are on my site right now?' },
 ];
 
 const FAQ: { q: string; a: string }[] = [
@@ -28,6 +32,7 @@ const FAQ: { q: string; a: string }[] = [
     { q: 'Which apps work?', a: 'ChatGPT, Claude (web, desktop and mobile), Claude Code, Cursor, VS Code and any app that supports remote MCP servers over HTTP. Apps without OAuth can use a personal API key.' },
     { q: 'What can the AI see?', a: 'Aggregate numbers from the GA4 properties and Search Console sites you choose: sessions, users, clicks, impressions, page paths and, unless you turn them off, search queries. No emails, no visitor-level data, nothing outside Analytics and Search Console.' },
     { q: 'Can it change anything?', a: 'No. Every tool is read-only, and TrafficClaw only asks Google for read-only access.' },
+    { q: 'Can I try it without my own data?', a: 'Yes. On the approval screen choose "Use demo data instead". You get synthetic example sites, no Google account needed, so you can see every tool answer before you connect your own.' },
     { q: 'How do I disconnect?', a: 'Open Connect AI in your TrafficClaw dashboard and press Revoke next to the app. It loses access within seconds.' },
 ];
 
@@ -80,7 +85,8 @@ export default function AiConnectorPage() {
                         <Button asChild variant="primary" size="xl"><Link href="/dashboard/connect-ai">Connect your sites<ArrowRight aria-hidden size={18} strokeWidth={1.75} /></Link></Button>
                         <Button asChild variant="secondary" size="xl"><a href="#tools">See the tools</a></Button>
                     </div>
-                    <p className="mt-5 text-body text-fg-muted">Works with ChatGPT, Claude, Claude Code, Cursor, VS Code and other MCP apps.</p>
+                    <CodeBlock className="mt-6 max-w-[600px]" label="Connector URL (Streamable HTTP, OAuth 2.0)" code={url} />
+                    <p className="mt-4 text-body text-fg-muted">Works with ChatGPT, Claude, Claude Code, Cursor, VS Code and other MCP apps.</p>
                 </div>
                 <Card padding="lg" className="min-w-0">
                     <h2 className="text-title-sm text-fg">Try asking</h2>

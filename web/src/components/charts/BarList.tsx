@@ -64,7 +64,7 @@ export function BarList({
 }: BarListProps) {
     const [open, setOpen] = useState(false);
     const fmt = formatValue
-        ?? (valueFormat === 'percent100' ? (v: number) => fmtPercent(v / 100, { tile: true }) : undefined)
+        ?? (valueFormat === 'percent100' ? (v: number) => fmtPercent(v / 100, { axis: true }) : undefined)
         ?? ((v: number) => (metric === 'neutral' ? fmtFull(v) : fmtMetric(metric, v)));
     const total = items.reduce((a, b) => a + (Number.isFinite(b.value) ? b.value : 0), 0);
     const max = Math.max(0, ...items.map((i) => i.value));

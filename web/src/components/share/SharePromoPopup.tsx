@@ -66,7 +66,7 @@ function trackClarity(name: string, payload?: Record<string, unknown>): void {
 export default function SharePromoPopup({
     initialOpen = false,
     autoOpenDelayMs = 0,
-    ctaUrl = 'https://trafficclaw.com/?utm_source=share-popup&utm_medium=embed&utm_campaign=viewer-conversion',
+    ctaUrl = 'https://trafficclaw.com/?ref=share&utm_source=share-popup&utm_medium=embed&utm_campaign=viewer-conversion',
 }: SharePromoPopupProps) {
     const [open, setOpen] = useState(initialOpen);
     // Guard against double-firing the impression event in React StrictMode dev

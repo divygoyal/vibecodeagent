@@ -168,10 +168,10 @@ export function parseDelta(text: string, opts: { betterDown?: boolean; neutral?:
     const value = `${m[2]}${m[3] ? `.${m[3]}` : ''}`;
     if (opts.rank && !m[4]) {
         // A position change written as new minus old ("+1.6" = the number rose = the page fell). Same convention as
-        // the app's MetricDelta for position: the arrow shows where the rank moved (▲ = better), green when better.
+        // the app's MetricDelta: the arrow shows where the number moved (▲ = it rose), red when that is worse.
         if (zero) return { direction: 'flat', tone: 'neutral', text: value, spoken: 'no change' };
         const better = m[1] !== '+';
-        return { direction: better ? 'up' : 'down', tone: better ? 'good' : 'bad', text: value, spoken: better ? `improved ${value}` : `worse by ${value}` };
+        return { direction: m[1] === '+' ? 'up' : 'down', tone: better ? 'good' : 'bad', text: value, spoken: better ? `improved ${value}` : `worse by ${value}` };
     }
     const direction = zero ? 'flat' : m[1] === '+' ? 'up' : 'down';
     const good = direction === 'flat' || opts.neutral ? null : (direction === 'up') !== Boolean(opts.betterDown);
@@ -217,6 +217,11 @@ export interface TableShape {
     betterDown: boolean[];
     /** Per column: position changes (new minus old), drawn as rank moves: ▲ green = better (a lower number). */
     rankDelta: boolean[];
+    /**
+     * Per column: a change column that follows a plain number column. On phones it has no column of its own: the change
+     * is drawn under the number it belongs to, so a table of five columns needs no sideways scroll.
+     */
+    foldDelta: boolean[];
     /** Column that gets heat bars (a ranked count), or -1. */
     barCol: number;
     barMax: number;
@@ -270,9 +275,19 @@ export function analyzeTable(header: string[], rows: string[][]): TableShape {
     if (barMax <= 0) barCol = -1;
     const seriesCol = timeSeries ? candidates[0] ?? numeric.findIndex((n, c) => n && !delta[c]) : -1;
 
+    const foldDelta = delta.map((d, c) => d && c >= 2 && numeric[c - 1] && !delta[c - 1]);
+
     return {
-        numeric, delta, betterDown, rankDelta,
+        numeric, delta, betterDown, rankDelta, foldDelta,
         barCol, barMax, barMetric: barCol >= 0 ? metricForLabel(header[barCol]) : null,
         timeSeries: timeSeries && seriesCol > 0, seriesCol,
     };
+}
+
+/** First column of a numbered list ("#", "Rank", "No."). */
+export const isRankHeader = (h: string): boolean => /^(#|rank|no\.?)$/i.test(h.trim());
+
+/** Index of a "Page" / "URL" column in the third place of a numbered list (# | Task | Page | ...), else -1. */
+export function pageFoldColumn(header: string[], numeric: boolean[]): number {
+    return header.length >= 4 && isRankHeader(header[0]) && /^(page|url|path)$/i.test(header[2].trim()) && !numeric[1] && !numeric[2] ? 2 : -1;
 }

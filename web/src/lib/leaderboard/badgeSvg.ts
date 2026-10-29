@@ -9,14 +9,14 @@ import type { EmbedPayload } from './types';
 export type BadgeVariant = 'minimal' | 'rank' | 'stats' | 'live';
 export type BadgeTheme = 'light' | 'dark';
 
-type Palette = Record<'bg' | 'border' | 'fg' | 'muted' | 'brand' | 'brandBg' | 'up' | 'down' | 'spark' | 'live', string>;
+export type Palette = Record<'bg' | 'border' | 'fg' | 'muted' | 'brand' | 'brandBg' | 'up' | 'down' | 'spark' | 'live', string>;
 
-const PALETTE: Record<'light' | 'dark', Palette> = {
+export const PALETTE: Record<'light' | 'dark', Palette> = {
     light: { bg: '#ffffff', border: '#dde1e7', fg: '#171a20', muted: '#636b78', brand: '#157459', brandBg: '#ebfbf4', up: '#157f3c', down: '#c92a2a', spark: '#5b4fe0', live: '#1f906f' },
     dark: { bg: '#15171c', border: '#2c3139', fg: '#edeff2', muted: '#858d98', brand: '#78d3b1', brandBg: '#0d3a2c', up: '#5fd08a', down: '#ff7b7b', spark: '#8f86ff', live: '#43b28e' },
 };
 
-const FONT = '-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif';
+export const FONT = '-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif';
 
 export function escapeXml(s: string): string {
     return s.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c] || c));

@@ -69,11 +69,11 @@ export default function PricingPage() {
                         description={`Every feature is free for every site you own. Pay only if you want more Ask messages in ${BRAND_NAME}'s built-in AI chat.`}
                         align="center"
                     />
-                    <div className="mx-auto mt-10 max-w-[880px]">
-                        <DiscountBanner />
-                    </div>
-                    <div className="mt-6">
+                    <div className="mt-10">
                         <PricingPlans />
+                    </div>
+                    <div className="mx-auto mt-6 max-w-[880px]">
+                        <DiscountBanner />
                     </div>
                     <p className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-meta text-fg-muted">
                         <span>Every plan:</span>

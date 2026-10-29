@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Suspense, useEffect, type ReactNode } from 'react';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import { Dialog } from 'radix-ui';
@@ -10,6 +11,7 @@ import { X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { useAppTheme } from '@/lib/theme';
+import { trackMcpConnectedWhenReady, trackSignUpWhenReady } from '@/lib/growth/track';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { DemoBar } from '@/components/demo/DemoBar';
 import WorkspaceIncompleteBanner from '@/components/WorkspaceIncompleteBanner';
@@ -79,7 +81,14 @@ function NavDrawer() {
 
 function Welcome() {
     const { isWorkspaceLoaded, welcomeSeen, markWelcomeSeen } = useWorkspace();
-    if (!isWorkspaceLoaded || welcomeSeen) return null;
+    const firstVisit = isWorkspaceLoaded && !welcomeSeen;
+    // The admin's welcome_seen flag is false only until the first welcome: that is the sign-up (GA4 sign_up, with the first touch).
+    const { data: session } = useSession();
+    const provider = (session?.user as { provider?: string } | undefined)?.provider;
+    useEffect(() => (firstVisit && session ? trackSignUpWhenReady(provider) : undefined), [firstVisit, session, provider]);
+    // First approval of an AI app (consent page leaves a one-shot cookie): GA4 mcp_connected on the next app load.
+    useEffect(() => trackMcpConnectedWhenReady(), []);
+    if (!firstVisit) return null;
     return <CreditWelcome credits={5} onDismiss={markWelcomeSeen} />;
 }
 

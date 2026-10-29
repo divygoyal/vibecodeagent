@@ -9,7 +9,7 @@ export function MarketingFooter() {
     return (
         <footer className="border-t border-border-subtle bg-surface">
             <div className="mx-auto max-w-[1200px] px-4 py-12 md:px-6 md:py-16">
-                <div className="grid gap-10 grid-cols-1 md:grid-cols-[1.4fr_repeat(4,1fr)]">
+                <div className="grid gap-10 grid-cols-1 md:grid-cols-[1.2fr_repeat(6,1fr)]">
                     <div className="max-w-[280px]">
                         <BrandMark />
                         <p className="mt-3 text-body-sm text-fg-muted">
@@ -17,7 +17,7 @@ export function MarketingFooter() {
                             with read-only access.
                         </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 md:col-span-4">
+                    <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 md:col-span-6 md:grid-cols-6">
                         {FOOTER_COLUMNS.map((col) => (
                             <div key={col.title}>
                                 <h2 className="text-body-sm font-semibold text-fg">{col.title}</h2>

@@ -12,7 +12,7 @@
  */
 import useSWR from 'swr';
 import { canonicalJson, compileWidget } from '@/lib/builder/compile';
-import { widgetMeta } from '@/lib/builder/registry';
+import { skipsPageQuery } from '@/lib/builder/registry';
 import type {
     ControlDef,
     ControlState,
@@ -115,8 +115,8 @@ export function widgetDataKey(widget: WidgetDef, ctx: InlineCtx): string {
 }
 
 export function useInlineResult(widget: WidgetDef, ctx: InlineCtx, enabled = true) {
-    const isStatic = widgetMeta(widget.type).static;
-    const ctxKey = canonicalJson({ s: ctx.defaultSource, c: ctx.controls, p: ctx.pageId ?? null, tz: ctx.timezone ?? null, f: ctx.controlDefs.filter((c) => c.type === 'filter' || c.type === 'site' || c.type === 'metric' || c.type === 'grain') });
+    const isStatic = skipsPageQuery(widget.type);
+    const ctxKey = canonicalJson({ s: ctx.defaultSource, c: ctx.controls, p: ctx.pageId ?? null, tz: ctx.timezone ?? null, f: ctx.controlDefs.filter((c) => c.type === 'filter' || c.type === 'site' || c.type === 'metric' || c.type === 'grain' || c.type === 'searchType') });
     const key = enabled && !isStatic ? ['wq', widget.id, widgetDataKey(widget, ctx), ctxKey] : null;
     return useSWR(key, () => enqueue(widget, ctx, ctxKey), SWR_OPTS);
 }

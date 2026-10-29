@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import {
     ArrowLeft, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, LayoutTemplate, Loader2, Monitor, MoreHorizontal, Pencil,
     Plus, Redo2, Settings2, Share2, Smartphone, Tablet, Trash2, Undo2, AlertTriangle, Filter, History, FileJson, ClipboardCopy, ClipboardPaste, MonitorPlay, Palette,
-    Globe, ArrowLeftRight, CalendarRange,
+    Globe, ArrowLeftRight, CalendarRange, Search, Mail,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -32,10 +32,11 @@ import { useEditorStore, type Viewport } from '@/stores/dashboardEditorStore';
 import { DashboardCanvas, type Bp } from '../DashboardCanvas';
 import { DashboardCover } from '../DashboardCover';
 import { dashRootProps } from '../theme/DashTheme';
-import { DateControl, FilterControlView, GrainSwitch, MetricSwitch, SiteSwitch } from '../Controls';
+import { DateControl, FilterControlView, GrainSwitch, MetricSwitch, SearchTypeSwitch, SiteSwitch } from '../Controls';
 import { applyViewerControls, selectedSite } from '@/lib/builder/compile';
-import { newGrainControl, newMetricControl, newSiteControl } from './SwitchControlProps';
+import { newGrainControl, newMetricControl, newSearchTypeControl, newSiteControl } from './SwitchControlProps';
 import { ShareDialog } from '../ShareDialog';
+import { EmailScheduleDialog } from '../EmailScheduleDialog';
 import { textVars } from '../DashboardView';
 import { useElementHeight, useElementWidth } from '../useElementWidth';
 import { fetchJson, useInlineResult, type InlineCtx } from '../useWidgetData';
@@ -92,6 +93,7 @@ function EditorWidget({ widget: raw, ctx, height, bp, vars }: { widget: WidgetDe
             refetching={q.isValidating && Boolean(q.data)}
             resolved={q.data?.resolved}
             compare={ctx.controls.date.compare.mode}
+            compareSpec={ctx.controls.date.compare}
             height={height}
             bp={bp}
             mode="edit"
@@ -110,6 +112,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     // Calculated metric names for the panels, pickers and canvas (idempotent; ids are unique per dashboard).
     registerCalcs(doc?.calcs);
     const [shareOpen, setShareOpen] = useState(false);
+    const [emailOpen, setEmailOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [versionsOpen, setVersionsOpen] = useState(false);
     const [renaming, setRenaming] = useState<string | null>(null);
@@ -331,16 +334,16 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
     if (!doc || !page || !controls || !ctx) return <div className="fixed inset-0 z-[45] flex items-center justify-center bg-canvas"><Loader2 className="animate-spin text-fg-muted" aria-label="Loading editor" /></div>;
 
     const filters = doc.controls.filter((c): c is FilterControl => c.type === 'filter');
-    const switchDefs = doc.controls.filter((c) => c.type === 'site' || c.type === 'metric' || c.type === 'grain');
+    const switchDefs = doc.controls.filter((c) => c.type === 'site' || c.type === 'metric' || c.type === 'grain' || c.type === 'searchType');
     /** A switcher pick in the editor preview (never saved; viewers pick their own). */
-    const setPick = (kind: 'site' | 'metric' | 'grain', id: string, value: string | null) => {
+    const setPick = (kind: 'site' | 'metric' | 'grain' | 'searchType', id: string, value: string | null) => {
         const cur = { ...(controls[kind] ?? {}) } as Record<string, string>;
         if (value === null) delete cur[id];
         else cur[id] = value;
         s.setControls({ ...controls, [kind]: Object.keys(cur).length ? cur : undefined });
     };
     const addSwitch = (c: ControlDef) => {
-        s.apply((d) => ({ ...d, controls: [...d.controls, c] }), { announce: `Added ${c.type === 'site' ? 'site switcher' : c.type === 'metric' ? 'metric switcher' : 'Day, Week, Month control'}` });
+        s.apply((d) => ({ ...d, controls: [...d.controls, c] }), { announce: `Added ${c.type === 'site' ? 'site switcher' : c.type === 'metric' ? 'metric switcher' : c.type === 'searchType' ? 'search type switcher' : 'Day, Week, Month control'}` });
         s.selectControl(c.id);
     };
     const customPhone = Boolean(page.layouts.sm?.length);
@@ -389,6 +392,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                             <DropdownMenuItem icon={Settings2} onSelect={() => { s.select(null); s.selectControl(null); }}>Dashboard settings</DropdownMenuItem>
                             <DropdownMenuItem icon={ClipboardPaste} shortcut="⌘V" onSelect={async () => { const c = await readClip(); if (c) doPaste(c); else toast('Nothing to paste', { description: 'Copy a widget (⌘C) or a page first, in any dashboard.' }); }}>Paste widgets</DropdownMenuItem>
                             <DropdownMenuItem icon={MonitorPlay} onSelect={async () => { await save(); window.open(`/dashboard/dashboards/${s.id}?tv=1`, '_blank', 'noopener'); }}>Present (TV mode)</DropdownMenuItem>
+                            <DropdownMenuItem icon={Mail} onSelect={async () => { await save(); setEmailOpen(true); }}>Schedule email</DropdownMenuItem>
                             <DropdownMenuItem icon={History} onSelect={() => setVersionsOpen(true)}>Version history</DropdownMenuItem>
                             <DropdownMenuItem icon={FileJson} onSelect={() => {
                                 const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
@@ -463,6 +467,8 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                         <MetricSwitch control={c} state={controls} onChange={(v) => setPick('metric', c.id, v === c.default ? null : v)} />
                                     ) : c.type === 'grain' ? (
                                         <GrainSwitch control={c} state={controls} size="sm" onChange={(v) => setPick('grain', c.id, v === c.default ? null : v)} />
+                                    ) : c.type === 'searchType' ? (
+                                        <SearchTypeSwitch control={c} state={controls} onChange={(v) => setPick('searchType', c.id, v === c.default ? null : v)} />
                                     ) : null}
                                     {!preview ? <button type="button" aria-label={`Edit ${c.label} control`} onClick={() => s.selectControl(c.id)} className="ml-0.5 rounded p-1 text-fg-muted hover:bg-subtle hover:text-fg"><Settings2 aria-hidden size={14} /></button> : null}
                                 </div>
@@ -481,6 +487,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                                         <DropdownMenuItem icon={Globe} disabled={doc.controls.some((c) => c.type === 'site')} onSelect={() => addSwitch(newSiteControl())}>Site switcher</DropdownMenuItem>
                                         <DropdownMenuItem icon={ArrowLeftRight} onSelect={() => addSwitch(newMetricControl(doc))}>Metric switcher</DropdownMenuItem>
                                         <DropdownMenuItem icon={CalendarRange} disabled={doc.controls.some((c) => c.type === 'grain')} onSelect={() => addSwitch(newGrainControl())}>Day / Week / Month</DropdownMenuItem>
+                                        <DropdownMenuItem icon={Search} disabled={doc.controls.some((c) => c.type === 'searchType')} onSelect={() => addSwitch(newSearchTypeControl())}>Search type</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             ) : null}
@@ -560,6 +567,7 @@ export function Editor({ initial }: { initial: DashboardRecord }) {
                 <ShareDialog open={shareOpen} onOpenChange={setShareOpen} dashboardId={s.id} doc={doc} share={s.share} views={s.views} onShareChange={s.setShare}
                     onDocChange={(next: DashboardDocV2) => s.apply(() => next)} />
             ) : null}
+            {s.id ? <EmailScheduleDialog open={emailOpen} onOpenChange={setEmailOpen} dashboardId={s.id} doc={doc} shared={Boolean(s.share?.enabled && s.share.token)} /> : null}
             {s.id ? <VersionsDialog open={versionsOpen} onOpenChange={setVersionsOpen} dashboardId={s.id} /> : null}
             <ConfirmModal open={confirmDelete} onOpenChange={setConfirmDelete} title="Delete this dashboard?" description="Its public link stops working. This cannot be undone." confirmLabel="Delete"
                 onConfirm={async () => { await fetchJson(`/api/dashboards/${s.id}`, { method: 'DELETE' }); router.push('/dashboard/dashboards'); }} />

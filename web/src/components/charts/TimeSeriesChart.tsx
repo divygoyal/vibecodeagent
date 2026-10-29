@@ -72,7 +72,7 @@ export interface TimeSeriesChartProps {
 
 function axisFormatter(metric: MetricKey): (v: number) => string {
     const f = METRICS[metric].format;
-    if (f === 'percent') return (v) => fmtPercent(v, { tile: true });
+    if (f === 'percent') return (v) => fmtPercent(v, { axis: true });
     if (f === 'position') return (v) => String(Math.round(v));
     if (f === 'duration') return (v) => (v === 0 ? '0' : fmtDuration(v));
     return (v) => fmtAxis(v);

@@ -47,6 +47,12 @@ function load() {
     }
 }
 
+/** Every alpha-2 code we know, in code order (the editor's country list sorts them by name). */
+export function allCountryCodes(): string[] {
+    load();
+    return [...byA2!.keys()];
+}
+
 /** 'US' -> 'usa' (Search Console filter value). */
 export function alpha2ToGsc(a2: string): string | null {
     load();

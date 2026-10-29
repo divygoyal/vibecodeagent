@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { ALTERNATIVES } from '@/components/marketing/alternatives/data';
 import { FREE_TOOLS } from '@/components/marketing/tools/catalog';
 import { BRAND_NAME, SITE_HOST, SITE_URL } from '@/lib/brand';
 import { FREE_START_CREDITS, PAID_PLANS } from '@/lib/plans';
@@ -18,10 +19,13 @@ Everything is free with no site limit: the portfolio, per-site traffic and searc
 - [Live demo](${SITE_URL}/demo): read-only portfolio of sample sites and a sample dashboard per site, no sign-in
 - [Pricing](${SITE_URL}/pricing): free plan and the paid Ask-message plans
 - [ChatGPT and Claude](${SITE_URL}/ai): connect Google Analytics and Search Console to ChatGPT, Claude, Cursor or VS Code through the hosted MCP server at ${SITE_URL}/mcp
-- [Leaderboard](${SITE_URL}/leaderboard): public leaderboard of sites with traffic verified through Google; only verified Search Console owners rank
-- [Sponsor slots](${SITE_URL}/sponsor): labelled sponsor placements on the leaderboard
+- [Leaderboard](${SITE_URL}/leaderboard): public leaderboard of sites whose owners are verified in Google Search Console (visitor numbers come from Google Analytics); only verified owners rank
+- [Sponsor slots](${SITE_URL}/leaderboard/advertise): labelled sponsor placements on the leaderboard
 - [Free SEO tools](${SITE_URL}/tools): no sign-up tools
 ${FREE_TOOLS.map((t) => `  - [${t.title}](${SITE_URL}/tools/${t.slug}): ${t.short}`).join('\n')}
+- [Guide: connect Search Console and GA4 to Claude](${SITE_URL}/guides/connect-search-console-to-claude): step-by-step setup of the free MCP connector in Claude and ChatGPT, with example questions
+- [Alternatives](${SITE_URL}/alternatives): honest comparisons with other tools, including where they are better
+${ALTERNATIVES.map((a) => `  - [${a.title}](${SITE_URL}/alternatives/${a.slug}): ${a.blurb}`).join('\n')}
 - [Security and data](${SITE_URL}/security): exactly what ${BRAND_NAME} reads (read-only scopes), what it stores and how, what it never does, how to revoke access and delete data
 - [Changelog](${SITE_URL}/changelog): what shipped, newest first
 - [About](${SITE_URL}/about): who it is for and how ${BRAND_NAME} makes money
@@ -33,7 +37,7 @@ ${FREE_TOOLS.map((t) => `  - [${t.title}](${SITE_URL}/tools/${t.slug}): ${t.shor
 
 - Data sources: Google Analytics 4 (analytics.readonly) and Google Search Console (webmasters.readonly). Read-only; ${BRAND_NAME} never changes Google data. No tracking script is needed.
 - Sign-in: Google. Portfolio pairs each GA4 property with its Search Console site by hostname.
-- Leaderboard verification: a site ranks only when the owner is a verified owner or full user of the domain in Search Console.
+- Leaderboard verification: a site ranks only when the owner is a verified owner or full user of the domain in Search Console. That proves ownership; visitor numbers come from Google Analytics 4 and clicks from Search Console.
 - MCP: remote server (Streamable HTTP) with OAuth; read-only tools for the portfolio, GA4 reports, realtime, Search Console search analytics, period comparisons, top movers and SEO opportunities.
 - The product and its official website both live at ${SITE_HOST}.
 `;

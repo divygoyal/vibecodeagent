@@ -11,13 +11,16 @@ import { GOOGLE_UPDATES, type GoogleUpdate } from '@/lib/googleUpdates';
 import { getMetric } from './catalog';
 import { applyViewerControls, type CompileCtx } from './compile';
 import { daysBetween, resolveRange } from './dates';
+import { shiftRange } from './widgetDates';
 import type { AnnotationMode, CellValue, Iso, MetricId, RefLine, ResolvedDates, SourceRef, WidgetDef } from './types';
 
 // ── Ranges ───────────────────────────────────────────────────────────────
 
 /** The days a widget shows: its own date override, else the dashboard range. */
 export function widgetRange(widget: Pick<WidgetDef, 'dateOverride'>, resolved: Pick<ResolvedDates, 'range' | 'today'>): { start: Iso; end: Iso } {
-    return widget.dateOverride?.range ? resolveRange(widget.dateOverride.range, resolved.today) : resolved.range;
+    const o = widget.dateOverride;
+    // Same precedence as the engine (widgetDates.ts): own range, then time shift, then the dashboard.
+    return o?.range ? resolveRange(o.range, resolved.today) : o?.shift ? shiftRange(resolved.range, o.shift) : resolved.range;
 }
 
 export function annotationMode(mode: AnnotationMode | undefined): AnnotationMode {

@@ -8,16 +8,18 @@
  */
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { CalendarDays, Check, ChevronDown, Filter, Globe, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Check, ChevronDown, Filter, Globe, X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { Button, Checkbox, Drawer, Popover, PopoverContent, PopoverTrigger, SearchInput, SegmentedControl } from '@/components/ui';
+import { Button, Checkbox, DateField, Drawer, Popover, PopoverContent, PopoverTrigger, SearchInput, SegmentedControl } from '@/components/ui';
 import { fmtDateRange } from '@/lib/format';
 import { MENU_PRESETS, PRESETS, QUICK_PRESETS, isIso } from '@/lib/builder/dates';
+import { COMPARE_OPTIONS, compareLengthNote, compareOptionId, customCompare } from '@/lib/builder/compare';
 import { countryName } from '@/lib/builder/countries';
 import { metricLabel } from '@/lib/builder/catalog';
-import { selectedGrain, selectedMetric } from '@/lib/builder/compile';
-import type { CompareSpec, ControlDef, ControlState, DatePresetId, DateRangeSpec, FilterControl, Grain, GrainControl, MetricControl, PageDef, ResolvedDates, SiteControl } from '@/lib/builder/types';
+import { selectedGrain, selectedMetric, selectedSearchType } from '@/lib/builder/compile';
+import { SEARCH_TYPES, searchTypeLabel } from '@/lib/builder/searchType';
+import type { CompareSpec, ControlDef, ControlState, DatePresetId, DateRangeSpec, FilterControl, Grain, GrainControl, MetricControl, PageDef, ResolvedDates, SearchTypeControl, SiteControl } from '@/lib/builder/types';
 
 // ── Date range ───────────────────────────────────────────────────────────
 
@@ -80,8 +82,8 @@ export function DateControl({ range, compare, onChange, canChange = true, canCom
                         <ChevronDown aria-hidden size={14} />
                     </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-72 p-1" aria-label="Date range">
-                    <div role="listbox" aria-label="Presets" className="max-h-72 overflow-y-auto">
+                <PopoverContent align="end" className="w-80 max-h-[var(--radix-popover-content-available-height)] overflow-y-auto p-1" aria-label="Date range">
+                    <div role="listbox" aria-label="Presets" className="max-h-56 overflow-y-auto">
                         {MENU_PRESETS.map((id) => {
                             const active = range.kind === 'preset' && range.id === id;
                             return (
@@ -97,29 +99,67 @@ export function DateControl({ range, compare, onChange, canChange = true, canCom
                     <form className="space-y-2 px-2.5 py-2" onSubmit={(e) => { e.preventDefault(); if (isIso(from) && isIso(to)) { onChange({ kind: 'custom', start: from <= to ? from : to, end: from <= to ? to : from }, compare); setOpen(false); } }}>
                         <p className="text-meta font-medium text-fg-muted">Custom range</p>
                         <div className="flex items-center gap-2">
-                            <input aria-label="Start date" type="date" value={from} max={today} onChange={(e) => setFrom(e.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-body-sm text-fg" />
+                            <DateField ariaLabel="Start date" value={from} max={today} onChange={setFrom} />
                             <span className="text-fg-muted">–</span>
-                            <input aria-label="End date" type="date" value={to} max={today} onChange={(e) => setTo(e.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-body-sm text-fg" />
+                            <DateField ariaLabel="End date" value={to} max={today} onChange={setTo} />
                         </div>
                         <Button type="submit" size="sm" variant="secondary" disabled={!isIso(from) || !isIso(to)} className="w-full">Apply dates</Button>
                     </form>
                     {canCompare ? (
                         <>
                             <div className="my-1 h-px bg-border-subtle" />
-                            <p className="px-2.5 pt-1 text-meta font-medium text-fg-muted">Compare to</p>
-                            <div role="radiogroup" aria-label="Compare to" className="pb-1">
-                                {([['previous_period', 'Previous period'], ['previous_year', 'Same period last year'], ['none', 'No comparison']] as const).map(([mode, text]) => (
-                                    <button key={mode} type="button" role="radio" aria-checked={compare.mode === mode} onClick={() => onChange(range, { mode })}
-                                        className="flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-body-sm text-fg hover:bg-subtle">
-                                        {text}
-                                        {compare.mode === mode ? <Check aria-hidden size={16} className="text-brand-text" /> : null}
-                                    </button>
-                                ))}
-                            </div>
+                            <CompareSection compare={compare} resolved={resolved} today={today} onPick={(c) => { onChange(range, c); if (c.mode !== 'custom') setOpen(false); }} />
                         </>
                     ) : null}
                 </PopoverContent>
             </Popover>
+        </div>
+    );
+}
+
+/** "Compare to" rows of the date popover: previous period, whole weeks back, last year, last year by weekday, custom, none. */
+function CompareSection({ compare, resolved, today, onPick }: { compare: CompareSpec; resolved?: ResolvedDates; today: string; onPick: (c: CompareSpec) => void }) {
+    const current = compareOptionId(compare);
+    const [customOpen, setCustomOpen] = useState(current === 'custom');
+    const [cFrom, setCFrom] = useState(compare.mode === 'custom' ? compare.start : '');
+    const [cTo, setCTo] = useState(compare.mode === 'custom' ? compare.end : '');
+    const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    const applied = resolved?.compare;
+    const custom = customCompare(cFrom, cTo);
+    // A custom window of another length than the range makes totals unlike: say so before it is applied (and while it is active).
+    const range = resolved?.range;
+    const lengthNote = range && custom && custom.mode === 'custom' ? compareLengthNote(range, custom) : null;
+    return (
+        <div>
+            <p className="px-2.5 pt-1 text-meta font-medium text-fg-muted">Compare to</p>
+            <div role="radiogroup" aria-label="Compare to" className="pb-1">
+                {COMPARE_OPTIONS.map((o) => {
+                    const on = current === o.id;
+                    return (
+                        <div key={o.id}>
+                            <button type="button" role="radio" aria-checked={on} onClick={() => { if (o.spec) { setCustomOpen(false); onPick(o.spec); } else setCustomOpen(true); }}
+                                className="flex min-h-8 w-full items-center justify-between gap-2 rounded-md px-2.5 py-1 text-left text-body-sm text-fg hover:bg-subtle">
+                                <span className="min-w-0">
+                                    <span className="block">{o.label}</span>
+                                    {on && applied && o.id !== 'none' ? <span className="block text-caption text-fg-muted" data-testid="compare-resolved">{fmtDateRange(applied.start, applied.end)}</span> : o.hint ? <span className="block text-caption text-fg-muted">{o.hint}</span> : null}
+                                </span>
+                                {on ? <Check aria-hidden size={16} className="shrink-0 text-brand-text" /> : null}
+                            </button>
+                            {o.id === 'custom' && customOpen ? (
+                                <form className="space-y-2 px-2.5 pb-2 pt-1" onSubmit={(e) => { e.preventDefault(); if (custom) onPick(custom); }}>
+                                    <div className="flex items-center gap-2">
+                                        <DateField ariaLabel="Comparison start date" value={cFrom} max={yesterday} onChange={setCFrom} />
+                                        <span className="text-fg-muted">–</span>
+                                        <DateField ariaLabel="Comparison end date" value={cTo} max={yesterday} onChange={setCTo} />
+                                    </div>
+                                    {lengthNote ? <p role="status" data-testid="compare-length-note" className="flex items-start gap-1.5 rounded-md bg-warn-soft px-2 py-1.5 text-meta text-fg-secondary"><AlertTriangle aria-hidden size={14} className="mt-px shrink-0 text-warn" />{lengthNote}</p> : null}
+                                    <Button type="submit" size="sm" variant="secondary" disabled={!custom} className="w-full">Apply comparison</Button>
+                                </form>
+                            ) : null}
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }
@@ -283,16 +323,24 @@ export function GrainSwitch({ control, state, onChange, size = 'md' }: { control
     );
 }
 
+/** Search type switcher (round 8): which Search Console search the widgets in scope read. */
+export function SearchTypeSwitch({ control, state, onChange, disabled }: { control: SearchTypeControl; state: ControlState; onChange: (v: SearchTypeControl['default']) => void; disabled?: boolean }) {
+    const ids = control.options.includes(control.default) ? control.options : [control.default, ...control.options];
+    const options = SEARCH_TYPES.filter((t) => ids.includes(t.id)).map((t) => ({ value: t.id, label: t.label, hint: t.id === 'web' ? 'Default' : undefined }));
+    return <PickOne label={control.label || 'Search type'} value={selectedSearchType(control, state).type} options={options} onChange={(v) => onChange(v as SearchTypeControl['default'])} disabled={disabled} />;
+}
+
 export interface ViewerSwitchHandlers {
     onSite?: (id: string, value: string | null) => void;
     onMetric?: (id: string, value: string | null) => void;
     onGrain?: (id: string, value: string | null) => void;
+    onSearchType?: (id: string, value: string | null) => void;
     /** Allowed sites of a site control (owner: from /api/dashboards/sites; public: the control's opaque choices). */
     siteOptions?: (control: SiteControl) => SwitchOption[];
 }
 
 /** The switchers a dashboard has, in control order; a switcher without a handler is not shown. */
-export function ViewerSwitches({ controls, state, handlers, defaultSiteLabel, size = 'md', kinds = ['site', 'metric', 'grain'] }: { controls: ControlDef[]; state: ControlState; handlers: ViewerSwitchHandlers; defaultSiteLabel: string; size?: 'sm' | 'md'; kinds?: Array<'site' | 'metric' | 'grain'> }) {
+export function ViewerSwitches({ controls, state, handlers, defaultSiteLabel, size = 'md', kinds = ['site', 'metric', 'grain', 'searchType'] }: { controls: ControlDef[]; state: ControlState; handlers: ViewerSwitchHandlers; defaultSiteLabel: string; size?: 'sm' | 'md'; kinds?: Array<'site' | 'metric' | 'grain' | 'searchType'> }) {
     return (
         <>
             {controls.filter((c) => (kinds as string[]).includes(c.type)).map((c) => {
@@ -306,6 +354,9 @@ export function ViewerSwitches({ controls, state, handlers, defaultSiteLabel, si
                 }
                 if (c.type === 'grain' && handlers.onGrain) {
                     return <GrainSwitch key={c.id} control={c} state={state} size={size} onChange={(v) => handlers.onGrain!(c.id, v === c.default ? null : v)} />;
+                }
+                if (c.type === 'searchType' && handlers.onSearchType && c.options.length) {
+                    return <SearchTypeSwitch key={c.id} control={c} state={state} onChange={(v) => handlers.onSearchType!(c.id, v === c.default ? null : v)} />;
                 }
                 return null;
             })}
@@ -325,6 +376,9 @@ export function switchSummary(controls: ControlDef[], state: ControlState, siteL
         } else if (c.type === 'grain') {
             const g = selectedGrain(c, state);
             if (g !== 'auto') parts.push(g === 'day' ? 'Daily' : g === 'week' ? 'Weekly' : 'Monthly');
+        } else if (c.type === 'searchType') {
+            const { type } = selectedSearchType(c, state);
+            if (type !== 'web') parts.push(searchTypeLabel(type));
         }
     }
     return parts.join(' · ');
