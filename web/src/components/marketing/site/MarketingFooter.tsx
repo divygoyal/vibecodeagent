@@ -2,9 +2,10 @@ import Link from 'next/link';
 
 import { BRAND_NAME } from '@/lib/brand';
 import { BrandMark } from './BrandMark';
+import { FeaturedOn } from './FeaturedOn';
 import { FOOTER_COLUMNS } from './nav';
 
-/** Footer (DESIGN 5.16): logo + one line, four link columns. */
+/** Footer (DESIGN 5.16): logo + one line, link columns, the directories that list us. */
 export function MarketingFooter() {
     return (
         <footer className="border-t border-border-subtle bg-surface">
@@ -34,7 +35,8 @@ export function MarketingFooter() {
                         ))}
                     </div>
                 </div>
-                <div className="mt-12 flex flex-col gap-2 border-t border-border-subtle pt-6 text-meta text-fg-muted sm:flex-row sm:items-center sm:justify-between">
+                <FeaturedOn />
+                <div className="mt-8 flex flex-col gap-2 border-t border-border-subtle pt-6 text-meta text-fg-muted sm:flex-row sm:items-center sm:justify-between">
                     <p>© {new Date().getFullYear()} {BRAND_NAME}</p>
                     <p className="sm:max-w-[640px] sm:text-right">
                         Google Analytics and Search Console are trademarks of Google LLC. ChatGPT, Claude and Cursor belong to their
